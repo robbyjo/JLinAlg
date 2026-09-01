@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.genetics.GenomicRelationshipMatrix;
 import org.jlinalg.mixed.RandomEffectTerm;
 import org.jlinalg.pedigree.Pedigree;
 import org.jlinalg.pedigree.PedigreeIndividual;
@@ -59,6 +60,30 @@ class CoxMixedModelTest {
         assertTrue(result.frailtyVariance() > 0);
         assertTrue(result.hazardRatios()[0] > 1);
         assertTrue(Double.isFinite(result.pValues()[0]));
+    }
+
+    @Test
+    void empiricalKinshipFrailtyHandlesRepeatedRowsAndNamedSampleModes() {
+        Fixture fixture = clusteredFixture();
+        List<String> ids = java.util.stream.IntStream.range(0, 12)
+            .mapToObj(index -> "g" + index).toList();
+        double[] relationship = new double[12 * 12];
+        for (int row = 0; row < 12; row++)
+            for (int column = 0; column < 12; column++)
+                relationship[row * 12 + column] =
+                    Math.pow(0.25, Math.abs(row - column));
+        GenomicRelationshipMatrix grm =
+            new GenomicRelationshipMatrix(ids, relationship);
+
+        CoxMixedResult result = CoxKinshipFrailty.fit(
+            fixture.survival(), fixture.fixed(), fixture.groups(), grm,
+            null, mixedOptions(), 1e-8, BackendPolicy.CPU);
+
+        assertTrue(result.converged(), result.convergenceMessage());
+        assertTrue(result.randomEffects("kinship").variance() > 0);
+        assertEquals(ids, result.randomEffects("kinship").coefficientNames());
+        assertEquals(12, result.randomEffects("kinship").modes().length);
+        assertTrue(result.hazardRatios()[0] > 1);
     }
 
     private static CoxMixedOptions mixedOptions() {

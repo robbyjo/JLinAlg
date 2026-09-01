@@ -112,8 +112,16 @@ When frozen null-model variance components are acceptable, prepare the REML
 projection once:
 
 ```java
+GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        relationshipVariants, sampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
 RemlAssociationScanner prepared = RemlAssociationScanner.prepare(
-    phenotype, covariates, varianceComponents,
+    phenotype, covariates, List.of(
+        grm.varianceComponent("cryptic"),
+        VarianceComponent.identity("residual", sampleIds.size())),
     RemlOptions.defaults(), BackendPolicy.PREFERRED);
 
 AssociationScanResult p3d = prepared.scan(
@@ -149,5 +157,6 @@ the selected missing-data policy.
 
 Burden, SKAT, and SKAT-O accept explicit weighted `VariantSet` membership.
 `LinearSetTestNullModel` handles unrelated samples; `RemlSetTestNullModel`
-reuses the fitted mixed projection for related samples. The complete file and
-set-test contract is in [the pipeline guide](../gwas-twas-pipeline.md).
+reuses the fitted GRM-adjusted mixed projection for related samples, including
+SKAT-O calibration. The complete file and set-test contract is in the
+[pipeline guide](../gwas-twas-pipeline.md).

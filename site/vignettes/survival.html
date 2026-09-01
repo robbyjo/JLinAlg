@@ -1,5 +1,5 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked fixed, Gaussian frailty, and pedigree-correlated Cox proportional-hazards models in JLinAlg."><title>Cox survival models vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
-<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Survival</span></div><h1>Hazard ratios with the risk set made explicit.</h1><p>Fit fixed Cox models, Gaussian shared frailty, or pedigree-correlated frailty from the same Efron/Breslow partial-likelihood core.</p></div></section>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked fixed, Gaussian, GRM-kinship, and pedigree-correlated Cox proportional-hazards models in JLinAlg."><title>Cox survival models vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Survival</span></div><h1>Hazard ratios with the risk set made explicit.</h1><p>Fit fixed Cox models, Gaussian shared frailty, empirical-GRM kinship, or pedigree-correlated frailty from the same Efron/Breslow partial-likelihood core.</p></div></section>
 <div class="container page-layout"><article class="prose">
 <h2 id="response">Encode follow-up</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Right-censored or start-stop</span></div><pre><code>CoxSurvivalData right =
     CoxSurvivalData.rightCensored(
@@ -27,6 +27,16 @@ CoxMixedResult mixed = CoxMixedModel.fit(
 
 double variance = mixed
     .randomEffects("center").variance();</code></pre></div><p>Conditional modes maximize penalized partial likelihood. Frailty variances use a Laplace-approximated marginal partial likelihood—not REML. Several independent or caller-precision Gaussian terms may be combined.</p>
+<h2 id="kinship">Adjust for cryptic relatedness</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Empirical GRM frailty</span></div><pre><code>GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        relationshipVariants, sampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+CoxMixedResult relatedFit =
+    CoxKinshipFrailty.fit(
+        right, covariates,
+        observationSampleIds, grm);</code></pre></div><p>The GRM is converted to named Gaussian precision internally. Repeated start-stop rows may map to the same sample. Explicit diagonal regularization handles duplicate samples and finite-marker rank.</p>
 <h2 id="pedigree">Use pedigree-correlated frailty</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Additive A-inverse precision</span></div><pre><code>CoxPedigreeResult pedigreeFit =
     CoxPedigreeFrailty.fit(
         right, covariates,
@@ -38,4 +48,4 @@ double mode = pedigreeFit
     .frailty("offspring");</code></pre></div><p>The pedigree facade uses directly constructed <code>A⁻¹</code> and returns named modes for every pedigree member, including unobserved ancestors retained in the coefficient system.</p>
 <div class="note warning"><strong>Current boundary</strong>The fixed right-censored risk pass is sorted and linear after setup. Start-stop data use the general reference path. Mixed/pedigree random information is currently dense; robust sandwich inference, PH diagnostics, gamma frailty, and sparse large-pedigree Cox solves remain planned.</div>
 <div class="next-links"><a href="mixed-models.html"><small>Previous</small><strong>REML and LMM</strong></a><a href="pedigree.html"><small>Next</small><strong>Pedigree models →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#mixed">Gaussian frailty</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>

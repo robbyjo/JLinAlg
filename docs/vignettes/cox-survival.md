@@ -76,6 +76,30 @@ a Laplace approximation that integrates the Gaussian frailties; this is not
 REML. `fixef()` and `ranef()` aliases follow the rest of JLinAlg's mixed-model
 surface.
 
+## Adjust for cryptic relatedness
+
+Use a caller-supplied or genotype-derived GRM as a named Gaussian frailty:
+
+```java
+GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        relationshipVariants, sampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+CoxMixedResult relatedFit = CoxKinshipFrailty.fit(
+    survival, covariates, observationSampleIds, grm,
+    offset, mixedOptions, 1e-8, BackendPolicy.PREFERRED);
+
+double variance = relatedFit.randomEffects("kinship").variance();
+double sampleMode = relatedFit.randomEffects("kinship").mode("sample-1");
+```
+
+Observation IDs may repeat for start-stop rows. The explicit diagonal
+regularization supports empirical GRMs that are singular because of duplicate
+samples or finite marker rank. The current covariance inversion and Laplace
+random-information block are dense.
+
 ## Use pedigree-correlated frailty
 
 Observation IDs may repeat, and pedigree individuals without survival rows
@@ -101,7 +125,7 @@ very large pedigrees still need the planned sparse Cox precision engine.
 - `exp(beta)` is a covariate hazard ratio under proportional hazards.
 - Fixed-effect p-values are asymptotic Wald z tests.
 - Baseline survival is `exp(-cumulativeHazard)` within each stratum.
-- Mixed and pedigree estimates use Gaussian log frailty and a Laplace
+- Mixed, GRM, and pedigree estimates use Gaussian log frailty and a Laplace
   approximation. Gamma frailty and adaptive quadrature are not implemented.
 - Schoenfeld residual proportional-hazards tests, martingale/deviance
   residuals, robust cluster sandwich covariance, recurrent-event robust

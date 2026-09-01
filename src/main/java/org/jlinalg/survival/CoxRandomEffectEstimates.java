@@ -18,4 +18,13 @@ public record CoxRandomEffectEstimates(
             throw new IllegalArgumentException("invalid Cox frailty estimates");
     }
     @Override public double[] modes() { return modes.clone(); }
+
+    /** Returns one named conditional mode. */
+    public double mode(String coefficientName) {
+        int index = coefficientNames.indexOf(coefficientName);
+        if (index < 0)
+            throw new IllegalArgumentException(
+                "unknown frailty coefficient: " + coefficientName);
+        return modes[index];
+    }
 }

@@ -99,10 +99,18 @@ class SetTestsTest {
 
     @Test
     void relatedSampleTestsReuseOneRemlProjection() {
+        double[] kinship = new double[RESPONSE.length * RESPONSE.length];
+        for (int row = 0; row < RESPONSE.length; row++)
+            for (int column = 0; column < RESPONSE.length; column++)
+                kinship[row * RESPONSE.length + column] =
+                    Math.pow(0.2, Math.abs(row - column));
         RemlAssociationScanner scanner = RemlAssociationScanner.prepare(
             RESPONSE, INTERCEPT,
-            List.of(VarianceComponent.identity("residual", RESPONSE.length)),
-            RemlOptions.builder().initialVariances(1).build(),
+            List.of(
+                new VarianceComponent(
+                    "cryptic-relatedness", RESPONSE.length, kinship),
+                VarianceComponent.identity("residual", RESPONSE.length)),
+            RemlOptions.builder().initialVariances(0.2, 1).build(),
             BackendPolicy.CPU);
         RemlSetTestNullModel nullModel = new RemlSetTestNullModel(scanner);
         VariantSet set = new VariantSet("related-gene", List.of(
@@ -111,12 +119,15 @@ class SetTestsTest {
 
         SetTestResult burden = SetTests.burden(set, nullModel, options(100));
         SetTestResult skat = SetTests.skat(set, nullModel, options(100));
+        SkatOResult skatO = SetTests.skatO(set, nullModel, options(100));
 
         assertTrue(Double.isFinite(burden.beta()));
         assertTrue(burden.standardError() > 0);
         assertTrue(burden.pValue() > 0 && burden.pValue() <= 1);
         assertTrue(skat.statistic() > 0);
         assertTrue(skat.pValue() > 0 && skat.pValue() <= 1);
+        assertTrue(skatO.adjustedPValue() > 0
+            && skatO.adjustedPValue() <= 1);
     }
 
     private static LinearSetTestNullModel nullModel() {

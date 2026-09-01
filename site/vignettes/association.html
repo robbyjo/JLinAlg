@@ -41,6 +41,18 @@ AssociationEstimate hit = scan.estimate(0);</code></pre></div><p>Fast OLS uses F
 
 AssociationBatchResult scores =
     prepared.scan(dosages, markerNames, execution);</code></pre></div><div class="note"><strong>Screening estimate</strong>The beta is a one-step null-model score estimate. Exactly refit selected variants when final reporting requires the alternative-model MLE.</div>
+<h2 id="grm">Model cryptic relatedness</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Accelerated genomic relationship matrix</span></div><pre><code>GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        relationshipVariants, analysisSampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+List&lt;RelatednessPair&gt; relatives =
+    grm.relatedPairsByKinship(0.0884);
+List&lt;VarianceComponent&gt; components = List.of(
+    grm.varianceComponent("grm"),
+    VarianceComponent.identity(
+        "residual", grm.samples()));</code></pre></div><p>Dosages are filtered by MAF and call rate, mean-imputed, standardized by allele variance, and multiplied through JDistlib. Use preferably LD-pruned markers. The same GRM covariance drives REML, GLMM PQL, P3D/EMMAX, and related-sample set tests.</p>
 <h2 id="p3d">Prepare a P3D/EMMAX REML scan</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Frozen variance components</span></div><pre><code>RemlAssociationScanner mixed =
     RemlAssociationScanner.prepare(
         phenotype, covariates, components,
@@ -87,4 +99,4 @@ double p = hit.pValue();
 double logP = hit.log10PValue();
 double minusLogP = hit.negativeLog10PValue();</code></pre></div><p>Keep allele direction, sample order, missing policy, tested coefficient, approximation, and backend provenance with the numeric table.</p>
 <div class="next-links"><a href="glmm.html"><small>Previous</small><strong>GLMM PQL</strong></a><a href="mendelian-randomization.html"><small>Next</small><strong>Mendelian randomization →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#input">Inputs and QC</a><a href="#stream">Stream output</a><a href="#ols">Fast OLS</a><a href="#glm">GLM score</a><a href="#p3d">P3D/EMMAX</a><a href="#exact">Exact refits</a><a href="#omics">Omics transforms</a><a href="#sets">Set tests</a><a href="#output">Outputs</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#input">Inputs and QC</a><a href="#stream">Stream output</a><a href="#ols">Fast OLS</a><a href="#glm">GLM score</a><a href="#grm">Cryptic relatedness</a><a href="#p3d">P3D/EMMAX</a><a href="#exact">Exact refits</a><a href="#omics">Omics transforms</a><a href="#sets">Set tests</a><a href="#output">Outputs</a></aside></div></main><site-footer root="../"></site-footer></body></html>

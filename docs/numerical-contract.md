@@ -350,6 +350,29 @@ First-order PQL is known to be least reliable for binary outcomes with small
 clusters, rare events, or substantial heterogeneity. These limitations are a
 property of the estimator rather than the linear-algebra backend.
 
+## Genomic relationship matrices and cryptic relatedness
+
+For each retained variant `j`, called alternate-allele dosages estimate
+`p_j = mean(g_j)/2`. Missing calls are mean-imputed, hence have centered value
+zero. The standardized matrix and additive GRM are
+
+```text
+Z_ij = (g_ij - 2 p_j) / sqrt(2 p_j (1-p_j))
+K = Z Z' / m,
+```
+
+where `m` is the number of variants passing the requested MAF and call-rate
+filters. Matrix multiplication uses the selected JDistlib backend. The GRM is
+intended to be built from suitably QC'd, preferably LD-pruned markers.
+Off-diagonal additive relationship is twice the reported kinship coefficient.
+
+`K` is a covariance basis for REML, GLMM PQL, P3D/EMMAX, and the retained-REML
+Burden/SKAT/SKAT-O score null. Repeated observations use `Z_subject K
+Z_subject'`. Cox kinship frailty uses `(K + epsilon mean(diag(K)) I)^-1` as
+Gaussian precision, with caller-visible relative `epsilon`; this regularizes
+duplicate samples and marker-rank deficiency. It remains a dense reference
+path.
+
 ## Cox proportional hazards and Gaussian frailty
 
 For event time `t`, the risk set follows counting-process convention

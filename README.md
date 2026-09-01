@@ -426,6 +426,38 @@ pedigree models are explicitly Laplace-approximated Gaussian frailty models,
 not Gaussian REML and not gamma frailty. See the
 [survival vignette](docs/vignettes/cox-survival.md).
 
+## Cryptic relatedness and genomic relationship matrices
+
+`GenomicRelationshipMatrix` constructs an additive GRM from aligned,
+variant-by-sample dosages using mean imputation and per-variant
+`sqrt(2 p (1-p))` standardization. MAF and call-rate filters are explicit, and
+the final `Z Z'` product routes through JDistlib so GPU, oneMKL, or OpenBLAS can
+handle the matrix-heavy step. `relatedPairs()` reports positive off-diagonal
+relationships and the corresponding kinship coefficients.
+
+```java
+GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        ldPrunedVariants, sampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+VarianceComponent cryptic = grm.varianceComponent("grm");
+List<RelatednessPair> pairs = grm.relatedPairsByKinship(0.0884);
+```
+
+The variance component plugs directly into Gaussian REML, GLMM PQL,
+`RemlAssociationScanner`, and therefore related-sample Burden, SKAT, and
+SKAT-O. An overload expands `Z K Z'` for reordered or repeated observation
+IDs. `CoxKinshipFrailty` uses the same GRM as a Laplace Gaussian frailty and
+handles near-singular empirical matrices with an explicit relative diagonal
+regularization.
+
+```java
+CoxMixedResult survivalFit = CoxKinshipFrailty.fit(
+    survival, covariates, observationSampleIds, grm);
+```
+
 ## lme4 and pedigreemm compatibility direction
 
 The existing dense APIs are compatibility-stable reference paths. Current

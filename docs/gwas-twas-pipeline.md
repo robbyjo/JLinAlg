@@ -76,7 +76,28 @@ SE, t statistic, denominator DF, p-value, `log10(p)`, `-log10(p)`, exclusions,
 and structured failures. Use `fastOls` instead when an in-memory result is
 convenient for a smaller analysis.
 
-For related samples, prepare variance components once and stream a
+For cryptic relatedness, build a GRM from aligned, preferably LD-pruned
+variants, inspect related pairs, and reuse it as a variance component:
+
+```java
+GenomicRelationshipMatrix grm =
+    GenomicRelationshipMatrix.fromVariants(
+        relationshipVariants, analysisSampleIds,
+        GenomicRelationshipOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+List<RelatednessPair> relatives = grm.relatedPairsByKinship(0.0884);
+List<VarianceComponent> kinshipComponents = List.of(
+    grm.varianceComponent("grm"),
+    VarianceComponent.identity("residual", grm.samples()));
+```
+
+GRM construction mean-imputes missing dosages after call-rate/MAF filtering
+and routes the standardized cross-product through JDistlib. For repeated
+phenotype rows, use `grm.varianceComponent("grm", observationSampleIds)` to
+expand the sample covariance to observation scale.
+
+Then prepare variance components once and stream a
 P3D/EMMAX-style scan:
 
 ```java
@@ -149,6 +170,7 @@ mixed projection once:
 RemlSetTestNullModel related = new RemlSetTestNullModel(nullModelScanner);
 SetTestResult mixedBurden = SetTests.burden(gene, related, options);
 SetTestResult mixedSkat = SetTests.skat(gene, related, options);
+SkatOResult mixedSkatO = SetTests.skatO(gene, related, options);
 ```
 
 Gene/region annotation, window construction, conditional analysis, and

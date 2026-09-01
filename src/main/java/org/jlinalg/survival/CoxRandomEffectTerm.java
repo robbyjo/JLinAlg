@@ -4,6 +4,8 @@ package org.jlinalg.survival;
 
 import java.util.List;
 import java.util.Objects;
+import org.jlinalg.compute.BackendContext;
+import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.mixed.RandomEffectTerm;
 
@@ -54,6 +56,74 @@ public final class CoxRandomEffectTerm {
         return new CoxRandomEffectTerm(term.name(), term.observations(),
             term.coefficients(), term.design(),
             MatrixOps.identity(term.coefficients()), term.coefficientNames());
+    }
+
+    /**
+     * Creates a correlated Gaussian term from a coefficient covariance.
+     * A small relative diagonal regularization supports empirical GRMs that
+     * are singular because of duplicate samples or finite marker rank.
+     */
+    public static CoxRandomEffectTerm fromCovariance(
+            String name,
+            double[][] design,
+            double[] covariance,
+            List<String> coefficientNames,
+            double relativeDiagonalRegularization,
+            BackendPolicy backendPolicy) {
+        if (design == null || design.length == 0 || design[0] == null
+                || covariance == null || coefficientNames == null
+                || coefficientNames.isEmpty() || backendPolicy == null
+                || !Double.isFinite(relativeDiagonalRegularization)
+                || relativeDiagonalRegularization <= 0)
+            throw new IllegalArgumentException(
+                "covariance term inputs and positive regularization are required");
+        int dimension = coefficientNames.size();
+        if (covariance.length != dimension * dimension
+                || design[0].length != dimension)
+            throw new IllegalArgumentException(
+                "covariance dimensions must match random coefficients");
+        double[] regularized = MatrixOps.finiteCopy(
+            covariance, "random-effect covariance");
+        double diagonalScale = 0;
+        double maximum = 0;
+        for (double value : regularized)
+            maximum = Math.max(maximum, Math.abs(value));
+        double symmetryTolerance = 1e-10 * Math.max(1, maximum);
+        for (int index = 0; index < dimension; index++) {
+            if (!(regularized[index * dimension + index] > 0))
+                throw new IllegalArgumentException(
+                    "random-effect covariance diagonal must be positive");
+            diagonalScale += regularized[index * dimension + index];
+            for (int column = 0; column < index; column++)
+                if (Math.abs(regularized[index * dimension + column]
+                        - regularized[column * dimension + index])
+                        > symmetryTolerance)
+                    throw new IllegalArgumentException(
+                        "random-effect covariance must be symmetric");
+        }
+        diagonalScale /= dimension;
+        for (int index = 0; index < dimension; index++)
+            regularized[index * dimension + index] +=
+                relativeDiagonalRegularization * diagonalScale;
+        double[] precision;
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            precision = context.backend().dpotrf(regularized, dimension)
+                .solve(MatrixOps.identity(dimension), dimension);
+        } catch (IllegalArgumentException | IllegalStateException
+                | ArithmeticException exception) {
+            throw new IllegalArgumentException(
+                "regularized random-effect covariance is not positive definite",
+                exception);
+        }
+        for (int row = 0; row < dimension; row++)
+            for (int column = 0; column < row; column++) {
+                double value = 0.5 * (precision[row * dimension + column]
+                    + precision[column * dimension + row]);
+                precision[row * dimension + column] = value;
+                precision[column * dimension + row] = value;
+            }
+        return new CoxRandomEffectTerm(
+            name, design, precision, coefficientNames);
     }
 
     public String name() { return name; }
