@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked REML, dense and sparse LMM, finite degrees of freedom, prediction, and refit examples in JLinAlg."><title>REML and LMM vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Mixed models</span></div><h1>Variance structure without a black box.</h1><p>Start from known covariance bases or named random terms, choose dense or sparse equations deliberately, and retain the full inference contract.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="reml">Fit covariance-component REML</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Random-intercept REML</span></div><pre><code>List&lt;VarianceComponent&gt; components = List.of(
+    VarianceComponent.randomIntercept(
+        "subject", subjectIds),
+    VarianceComponent.identity("residual", y.length));
+
+RemlResult fit = Reml.fit(y, fixedDesign, components);
+if (!fit.converged())
+    throw new IllegalStateException(
+        fit.convergenceMessage());
+
+System.out.println(Arrays.toString(
+    fit.varianceComponents()));</code></pre></div><p>Each basis is known; REML estimates only its nonnegative scale. Use profile ML—not REML—to compare nested models with different fixed-effect designs.</p>
+<h2 id="terms">Use named random terms</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Crossed intercept and independent slope</span></div><pre><code>List&lt;RandomEffectTerm&gt; random = List.of(
+    RandomEffectTerm.randomIntercept(
+        "subject", subjectIds),
+    RandomEffectTerm.randomSlope(
+        "subject:age", subjectIds, age),
+    RandomEffectTerm.randomIntercept(
+        "batch", batchIds));
+
+LinearMixedModelResult lmm =
+    LinearMixedModel.fit(y, fixedDesign, random);
+double[] modes = lmm.randomEffects("subject")
+    .estimates();</code></pre></div><p>The slope and intercept above have independent variances. Use <code>CorrelatedLinearMixedModel</code> or <code>(1 + age | subject)</code> formula syntax when covariance must be estimated.</p>
+<h2 id="sparse">Switch to sparse precision equations</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Sparse LMM</span></div><pre><code>SparseLinearMixedModelResult sparse =
+    SparseLinearMixedModel.fit(
+        y, fixedDesign, random,
+        RemlOptions.builder()
+            .initialVariances(1, 1, 1, 1)
+            .build(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>Provide one initial variance per random term plus residual. Sparse equations avoid observation-scale covariance matrices; dense REML remains the reference path for full PEVs and finite-DF adjustments.</p>
+<h2 id="df">Choose denominator degrees of freedom</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Kenward–Roger</span></div><pre><code>RemlOptions smallSample = RemlOptions.builder()
+    .degreesOfFreedomMethod(
+        DegreesOfFreedomMethod.KENWARD_ROGER)
+    .build();</code></pre></div><p>The fast default is <code>N-rank(X)-1</code>. Satterthwaite and Kenward–Roger are coefficient-specific dense options and cost more.</p>
+<h2 id="predict">Predict and refit</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>New levels and repeated responses</span></div><pre><code>double[] population =
+    MixedModelPrediction.marginal(lmm, newX);
+double[] conditional =
+    MixedModelPrediction.conditional(
+        lmm, newX, newRandomTerms, true);
+
+PreparedLinearMixedModel prepared =
+    PreparedLinearMixedModel.of(fixedDesign, random);
+LinearMixedModelResult first = prepared.fit(y);
+LinearMixedModelResult next =
+    prepared.refit(first, anotherResponse);</code></pre></div><p>With <code>allowNewLevels=true</code>, unseen groups receive random mode zero. Prepared refits retain design structure and warm-start variance estimates.</p>
+<div class="next-links"><a href="penalized-regression.html"><small>Previous</small><strong>Penalized regression</strong></a><a href="pedigree.html"><small>Next</small><strong>Pedigree models →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#reml">Covariance REML</a><a href="#terms">Random terms</a><a href="#sparse">Sparse equations</a><a href="#df">Finite DF</a><a href="#predict">Prediction and refit</a></aside></div></main><site-footer root="../"></site-footer></body></html>

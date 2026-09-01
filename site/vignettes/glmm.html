@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked JLinAlg GLMM PQL and pedigree GLMM examples with approximation guidance."><title>GLMM PQL vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>GLMM PQL</span></div><h1>Fast generalized mixed models—with the approximation named.</h1><p>Use first-order penalized quasi-likelihood for binomial and count mixed models, including pedigree covariance, while keeping its working-Gaussian limits explicit.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="random">Construct random covariance</h2><p>PQL uses the same observation-scale random covariance bases as dense REML. Build a group block without hand-writing a matrix:</p><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Random intercept basis</span></div><pre><code>VarianceComponent group =
+    VarianceComponent.randomIntercept(
+        "clinic", clinicIds);</code></pre></div>
+<h2 id="poisson">Fit a count mixed model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Poisson PQL</span></div><pre><code>GlmmPqlResult fit = GlmmPql.fit(
+    counts, fixedDesign,
+    GlmFamilies.poisson(),
+    List.of(group));
+
+if (!fit.converged())
+    throw new IllegalStateException(
+        fit.convergenceMessage());
+
+AssociationStatistics inference =
+    fit.associationStatistics();</code></pre></div><p>The full overload accepts positive prior weights, log exposure as an offset, PQL iteration controls, and a backend policy.</p>
+<h2 id="binary">Fit a binary pedigree GLMM</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree binomial PQL</span></div><pre><code>PedigreeGlmmPqlResult pedigreeFit =
+    PedigreeGlmmPql.fit(
+        affected, fixedDesign,
+        GlmFamilies.binomial(),
+        observationAnimalIds, pedigree);</code></pre></div><p>Supported families include binomial, Poisson, fixed-size negative-binomial, and appropriate quasi families. Gaussian responses belong in exact REML/LMM APIs.</p>
+<h2 id="interpret">Interpret the working fit</h2><p>Each outer iteration creates a GLM working response and known diagonal residual covariance, estimates random covariance scales by REML, then updates the random linear predictor.</p><div class="note warning"><strong>PQL is not a marginal GLMM likelihood</strong>It can be biased for rare binary events, small clusters, and large random-effect variance. Satterthwaite or Kenward–Roger options apply to the final working linearization—not the exact non-Gaussian model.</div><p>Report the estimator as PQL, check both inner and outer convergence, and avoid likelihood comparisons with future Laplace/AGQ fits.</p>
+<div class="next-links"><a href="pedigree.html"><small>Previous</small><strong>Pedigree REML</strong></a><a href="association.html"><small>Next</small><strong>Association engines →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#random">Random covariance</a><a href="#poisson">Count model</a><a href="#binary">Pedigree binary</a><a href="#interpret">Interpretation</a></aside></div></main><site-footer root="../"></site-footer></body></html>

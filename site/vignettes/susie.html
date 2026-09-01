@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked individual-data, summary z/LD, and sufficient-statistic SuSiE fine-mapping examples in JLinAlg."><title>SuSiE vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>SuSiE</span></div><h1>Fine-map signals, not only variants.</h1><p>Iterative Bayesian stepwise selection from individual data, z scores plus LD, or caller-supplied sufficient statistics, with PIPs and purity-filtered credible sets.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="options">Set the single-effect model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>SuSiE controls</span></div><pre><code>SusieOptions options = new SusieOptions(
+    5,      // maximum effects L
+    200,    // iterations
+    1e-8,   // convergence tolerance
+    .2,     // prior effect variance
+    true,   // estimate residual variance
+    .95,    // credible-set coverage
+    .5);    // minimum purity</code></pre></div><p>The maximum effect count is a modeling choice. Inspect whether extra single effects remain diffuse rather than interpreting every component as a discovery.</p>
+<h2 id="individual">Fit individual-level data</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Samples by variants</span></div><pre><code>SusieResult fit = Susie.fit(
+    phenotype, genotypeMatrix, variantNames,
+    options, BackendPolicy.PREFERRED);
+
+if (!fit.converged())
+    throw new IllegalStateException(
+        "SuSiE did not converge");
+
+double[] pip = fit.pip();
+double[] beta = fit.posteriorMean();
+List&lt;CredibleSet&gt; sets = fit.credibleSets();</code></pre></div><p>Individual predictors are centered/scaled once. Posterior means return on the original scale with a fitted intercept.</p>
+<h2 id="summary">Fit z scores and LD</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Summary fine mapping</span></div><pre><code>SusieResult summary = Susie.fitSummary(
+    zScores, ldCorrelation, sampleSize,
+    variantNames,
+    new SusieOptions(
+        5, 200, 1e-8, .2,
+        false, .95, .5),
+    BackendPolicy.PREFERRED);</code></pre></div><p>Summary mode assumes standardized quantitative traits and predictors. The LD matrix must match variant order, ancestry, and allele orientation and must be positive semidefinite.</p>
+<h2 id="suff">Use sufficient statistics</h2><p>When the standardized summary assumptions do not match the data scale, call <code>fitSufficientStatistics</code> with X′X, X′y, y′y, sample size, names, options, and backend.</p><div class="note"><strong>Read sets with PIPs</strong>Credible-set purity is the minimum absolute within-set LD. Report coverage, purity, member variants, PIPs, and the LD reference together.</div>
+<div class="next-links"><a href="time-series.html"><small>Previous</small><strong>Time series</strong></a><a href="sem.html"><small>Next</small><strong>Structural equation models →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#options">Options</a><a href="#individual">Individual data</a><a href="#summary">Summary data</a><a href="#suff">Sufficient statistics</a></aside></div></main><site-footer root="../"></site-footer></body></html>

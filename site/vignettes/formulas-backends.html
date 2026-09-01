@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked JLinAlg formula compilation, mixed syntax, backend policy, and benchmark examples."><title>Formulas and backends vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Formulas and backends</span></div><h1>Compile the model once. Route the algebra deliberately.</h1><p>Use an R-like layer for model construction without putting parsing, factor discovery, or contrast allocation inside the numerical hot path.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="fixed">Compile a fixed formula</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Treatment contrasts and interaction</span></div><pre><code>ModelTable table = ModelTable.builder(6)
+    .numeric("y", 11, 13, 15, 17, 19, 21)
+    .numeric("x", 0, 1, 2, 3, 4, 5)
+    .numeric("logExposure", 0, 0, 0, 0, 0, 0)
+    .numeric("w", 1, 2, 1, 2, 1, 2)
+    .categorical("sex", "F", "M", "F", "M", "F", "M")
+    .build();
+
+CompiledFormula compiled = Formula.compile(
+    "y ~ x * sex + offset(logExposure)",
+    table,
+    new FormulaOptions(
+        ContrastCoding.TREATMENT, "w"));
+
+OlsResult fit = compiled.fitOls(
+    OlsOptions.defaults(), BackendPolicy.PREFERRED);</code></pre></div><p>Use sum contrasts when needed. The compiled model owns contiguous response/design/weight/offset arrays and can fit OLS or GLM without reparsing.</p>
+<h2 id="mixed">Compile mixed syntax</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Independent and nested terms</span></div><pre><code>ModelTable repeatedTable = ModelTable.builder(6)
+    .numeric("y", 4.1, 4.7, 5.0, 5.4, 6.0, 6.3)
+    .numeric("age", 20, 22, 25, 31, 34, 38)
+    .categorical("site", "A", "A", "A", "B", "B", "B")
+    .categorical("subject", "1", "1", "2", "3", "3", "4")
+    .build();
+
+CompiledMixedFormula mixed = MixedFormula.compile(
+    "y ~ age + (1 + age || site) + " +
+    "(1 | subject)", repeatedTable);
+
+SparseLinearMixedModelResult sparse =
+    mixed.fitSparse(
+        RemlOptions.builder()
+            .initialVariances(1, 1, 1, 1)
+            .build(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>Double-bar expands independent intercept and slope terms. <code>(1 | site/subject)</code> expands site and site:subject. Single-bar correlated blocks use the dense correlated fitter.</p>
+<h2 id="policy">Select a backend policy</h2><p><code>PREFERRED</code> tries GPU automatic routing, oneMKL, OpenBLAS, then portable Java CPU. Results record the concrete provider and device.</p><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Provider provenance</span></div><pre><code>OlsResult fit = Ols.fit(
+    y, x, OlsOptions.defaults(),
+    BackendPolicy.PREFERRED);
+
+System.out.println(
+    fit.backend().selectedBackend());
+System.out.println(
+    fit.backend().deviceDescription());</code></pre></div><p>Strict CUDA, OpenCL, Vulkan, oneMKL, OpenBLAS, GPU, and CPU policies fail clearly when unavailable. They do not silently select another provider.</p>
+<h2 id="parallel">Avoid nested oversubscription</h2><div class="note"><strong>Start with one accelerator submitter</strong>GPU and native BLAS already parallelize kernels. Use <code>acceleratedSerial()</code> first. Use <code>cpuParallel()</code> when outer Java workers should own parallelism.</div>
+<h2 id="benchmark">Benchmark the target machine</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>PowerShell</span></div><pre><code>.\gradlew.bat benchmarkAssociation
+.\gradlew.bat benchmarkMixedModels</code></pre></div><p>Compare warm runs with identical models/tolerances and record provider/device. Sparse structure can matter more than peak dense FLOPS.</p>
+<div class="next-links"><a href="sem.html"><small>Previous</small><strong>Structural equation models</strong></a><a href="linear-models.html"><small>Start again</small><strong>OLS and GLM →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#fixed">Fixed formula</a><a href="#mixed">Mixed syntax</a><a href="#policy">Backend policy</a><a href="#parallel">Parallelism</a><a href="#benchmark">Benchmark</a></aside></div></main><site-footer root="../"></site-footer></body></html>

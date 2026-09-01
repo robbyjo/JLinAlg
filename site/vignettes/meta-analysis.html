@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked fixed and random meta-analysis, heterogeneity, Knapp-Hartung, and meta-regression examples in JLinAlg."><title>Meta-analysis vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Meta-analysis</span></div><h1>Pool effects, quantify disagreement.</h1><p>Fixed and random inverse-variance models with three tau² estimators, optional Knapp–Hartung inference, prediction intervals, and weighted meta-regression.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="studies">Define study effects</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Effect plus sampling SE</span></div><pre><code>List&lt;MetaStudy&gt; studies = List.of(
+    new MetaStudy("A", .20, .10),
+    new MetaStudy("B", .50, .20),
+    new MetaStudy("C", .10, .15),
+    new MetaStudy("D", .70, .25));</code></pre></div><p>The last field is a standard error, not a variance. Log-transform ratios before pooling and back-transform only for presentation.</p>
+<h2 id="fixed">Fit a fixed-effect model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Common pooled effect</span></div><pre><code>MetaAnalysisResult fixed = MetaAnalysis.fit(
+    studies, MetaAnalysisOptions.fixedEffect(),
+    BackendPolicy.PREFERRED);
+
+System.out.printf(
+    "beta=%g se=%g p=%g Q=%g I2=%g%n",
+    fixed.pooledEffectSize(), fixed.standardError(),
+    fixed.pValue(), fixed.cochranQ(),
+    fixed.iSquared());</code></pre></div><p>Cochran Q and its p-value test excess dispersion. I² and H² summarize heterogeneity; a fixed model has no random-effects prediction interval.</p>
+<h2 id="random">Fit random effects with REML</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>REML plus modified Knapp–Hartung</span></div><pre><code>MetaAnalysisOptions options =
+    MetaAnalysisOptions.builder()
+        .method(MetaAnalysisMethod.RANDOM_EFFECT)
+        .tauSquaredEstimator(
+            TauSquaredEstimator.REML)
+        .inferenceMethod(
+            MetaInferenceMethod.MODIFIED_HARTUNG_KNAPP)
+        .build();
+
+MetaAnalysisResult random = MetaAnalysis.fit(
+    studies, options, BackendPolicy.PREFERRED);</code></pre></div><p>Alternatives are DerSimonian–Laird and Paule–Mandel. Report tau²/tau and the prediction interval. Modified Knapp–Hartung never makes the model-based SE smaller.</p>
+<h2 id="regression">Explain heterogeneity with moderators</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Two-moderator meta-regression</span></div><pre><code>double[][] moderators = {
+    {-1, 0}, {0, 1}, {1, 0}, {2, 1}
+};
+MetaRegressionResult regression =
+    MetaRegression.fit(
+        studies, moderators,
+        List.of("dose", "highRisk"), true,
+        options, BackendPolicy.PREFERRED);
+
+System.out.println(regression.moderatorQ());
+System.out.println(regression.residualQ());
+System.out.println(
+    regression.heterogeneityRSquared());</code></pre></div><p>Do not add an intercept column when <code>includeIntercept=true</code>. Q<sub>M</sub> is the omnibus moderator Wald test; Q<sub>E</sub> tests residual heterogeneity. Heterogeneity R² is reduction in tau²—not ordinary variance explained.</p>
+<div class="note warning"><strong>Independence assumption</strong>The first engine assumes independent study estimates. It does not silently provide cluster-robust or multilevel correlated-effect meta-analysis.</div>
+<div class="next-links"><a href="mendelian-randomization.html"><small>Previous</small><strong>Mendelian randomization</strong></a><a href="time-series.html"><small>Next</small><strong>Time series →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#studies">Study inputs</a><a href="#fixed">Fixed effect</a><a href="#random">Random effects</a><a href="#regression">Meta-regression</a></aside></div></main><site-footer root="../"></site-footer></body></html>

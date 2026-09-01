@@ -1,5 +1,8 @@
 # JLinAlg
 
+**[Explore the project website](https://robbyjo.github.io/JLinAlg/)** for the
+complete feature map and browser-friendly worked vignettes.
+
 JLinAlg implements Java linear and mixed-model algorithms on top of
 [JDistlib 0.10.0](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.0).
 The current release slice provides ordinary least squares (OLS), generalized
@@ -37,6 +40,11 @@ randomization, meta-analysis/meta-regression, time series, SuSiE, and SEM. Each
 vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
 contract.
+
+The same material is organized as a responsive, system-themed website under
+[`site/`](site/index.html). GitHub Pages deploys that directory after changes
+land on `main`; visitors can follow their operating-system theme or select an
+explicit light or dark preference.
 
 ## OLS
 

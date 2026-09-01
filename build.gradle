@@ -106,6 +106,85 @@ test {
     }
 }
 
+def websiteRootPath = layout.projectDirectory.dir('site').asFile.absolutePath
+
+tasks.register('checkWebsite') {
+    group = 'verification'
+    description = 'Checks the static website structure, local links, and theme support.'
+    inputs.dir(websiteRootPath)
+
+    doLast {
+        File siteRoot = new File(websiteRootPath).canonicalFile
+        Set<File> htmlFiles = [] as Set
+        siteRoot.eachFileRecurse(groovy.io.FileType.FILES) { File candidate ->
+            if (candidate.name.endsWith('.html')) {
+                htmlFiles.add(candidate)
+            }
+        }
+
+        List<String> requiredPages = [
+            'index.html',
+            'vignettes/index.html',
+            'vignettes/linear-models.html',
+            'vignettes/penalized-regression.html',
+            'vignettes/mixed-models.html',
+            'vignettes/pedigree.html',
+            'vignettes/glmm.html',
+            'vignettes/association.html',
+            'vignettes/mendelian-randomization.html',
+            'vignettes/meta-analysis.html',
+            'vignettes/time-series.html',
+            'vignettes/susie.html',
+            'vignettes/sem.html',
+            'vignettes/formulas-backends.html'
+        ]
+        requiredPages.each { String relative ->
+            if (!new File(siteRoot, relative).isFile()) {
+                throw new GradleException(
+                    "Missing required website page: ${relative}")
+            }
+        }
+
+        htmlFiles.each { File page ->
+            String source = page.getText('UTF-8')
+            def references = source =~ /(?i)(?:href|src)="([^"]+)"/
+            references.each { match ->
+                String target = match[1]
+                String path = target.split('[?#]', 2)[0]
+                if (!path || path.startsWith('http://') ||
+                    path.startsWith('https://') || path.startsWith('mailto:')) {
+                    return
+                }
+
+                File resolved = new File(page.parentFile, path).canonicalFile
+                if (!resolved.toPath().startsWith(siteRoot.toPath())) {
+                    throw new GradleException(
+                        "Website reference escapes site root in ${page}: ${target}")
+                }
+                if (!resolved.exists()) {
+                    throw new GradleException(
+                        "Broken website reference in ${page}: ${target}")
+                }
+            }
+        }
+
+        String styles = new File(siteRoot, 'assets/styles.css').getText('UTF-8')
+        String script = new File(siteRoot, 'assets/app.js').getText('UTF-8')
+        if (!styles.contains('prefers-color-scheme: dark') ||
+            !script.contains('option value="system"') ||
+            !script.contains('option value="light"') ||
+            !script.contains('option value="dark"') ||
+            !script.contains('removeAttribute("data-theme")')) {
+            throw new GradleException(
+                'Website must preserve system-default light/dark theming and explicit overrides')
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('checkWebsite')
+}
+
 tasks.register('benchmarkAssociation', JavaExec) {
     group = 'verification'
     description = 'Runs deterministic GWAS/TWAS association macrobenchmarks.'

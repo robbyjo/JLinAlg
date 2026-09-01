@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked high-throughput OLS, GLM, exact, and P3D/EMMAX association scan examples in JLinAlg."><title>Association and GWAS vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Association</span></div><h1>Choose what to reuse across millions of tests.</h1><p>Prepared scans factor a shared null model once. Exact adapters refit any supported model with bounded parallelism. Both preserve input order and complete association output.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="ols">Fast OLS marker scan</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Residualized marker blocks</span></div><pre><code>AssociationEngineOptions execution =
+    AssociationEngineOptions.cpuParallel()
+        .withParallelism(8)
+        .withChunkSize(256);
+
+AssociationBatchResult scan =
+    FastOlsAssociation.scanPredictors(
+        phenotype, covariates, dosages,
+        markerNames, null, null,
+        OlsOptions.defaults(), execution);
+
+AssociationEstimate hit = scan.estimate(0);</code></pre></div><p>Fast OLS uses Frisch–Waugh–Lovell residualization and factors the shared covariates once. Rows are samples; candidate columns are markers or molecular features.</p>
+<h2 id="glm">Prepared GLM score scan</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Binary score screen</span></div><pre><code>FastGlmAssociation prepared =
+    FastGlmAssociation.prepare(
+        disease, covariates,
+        GlmFamilies.binomial(),
+        null, null, GlmOptions.defaults(),
+        execution);
+
+AssociationBatchResult scores =
+    prepared.scan(dosages, markerNames, execution);</code></pre></div><div class="note"><strong>Screening estimate</strong>The beta is a one-step null-model score estimate. Exactly refit selected variants when final reporting requires the alternative-model MLE.</div>
+<h2 id="p3d">Prepare a P3D/EMMAX REML scan</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Frozen variance components</span></div><pre><code>RemlAssociationScanner mixed =
+    RemlAssociationScanner.prepare(
+        phenotype, covariates, components,
+        RemlOptions.defaults(),
+        BackendPolicy.PREFERRED);
+
+AssociationScanResult p3d = mixed.scan(
+    rowMajorDosages, markerCount, markerNames,
+    new AssociationScanOptions(
+        2048, GenotypeMissingPolicy.MEAN_IMPUTE, 1));</code></pre></div><p>This estimates variance components once and reuses the GLS projection. It is the explicit P3D/EMMAX approximation, not per-marker REML.</p>
+<h2 id="exact">Run exact parallel refits</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Any association adapter</span></div><pre><code>AssociationFitter model =
+    AssociationModels.sparseLinearMixedModel(
+        randomTerms, RemlOptions.defaults());
+
+AssociationBatchResult exact =
+    ParallelAssociationEngine.scanPredictors(
+        phenotype, covariates, dosages,
+        markerNames, model, execution);</code></pre></div><p>Adapters cover OLS, GLM, dense/sparse/correlated LMM, REML, pedigree, GLMM PQL, ridge, and ARIMA-error LMM. Use <code>RECORD_NAN</code> to retain structured failures in long scans.</p>
+<h2 id="output">Write complete results</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Effect and uncertainty</span></div><pre><code>double beta = hit.beta();
+double se = hit.standardError();
+double statistic = hit.statistic();
+double p = hit.pValue();
+double logP = hit.log10PValue();
+double minusLogP = hit.negativeLog10PValue();</code></pre></div><p>Keep allele direction, sample order, missing policy, tested coefficient, approximation, and backend provenance with the numeric table.</p>
+<div class="next-links"><a href="glmm.html"><small>Previous</small><strong>GLMM PQL</strong></a><a href="mendelian-randomization.html"><small>Next</small><strong>Mendelian randomization →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#ols">Fast OLS</a><a href="#glm">GLM score</a><a href="#p3d">P3D/EMMAX</a><a href="#exact">Exact refits</a><a href="#output">Outputs</a></aside></div></main><site-footer root="../"></site-footer></body></html>

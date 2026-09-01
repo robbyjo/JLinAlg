@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked ridge, LASSO, elastic-net path, cross-validation, and inference examples in JLinAlg."><title>Penalized regression vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Penalized regression</span></div><h1>Shrink, select, and validate.</h1><p>Fit ridge, LASSO, and elastic-net models with standardized coordinate descent, warm regularization paths, and deterministic cross-validation.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="fit">Fit three penalties</h2><p>Supply predictor columns without a manual intercept; the penalized fitter handles its unpenalized intercept separately.</p><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Ridge, LASSO, elastic net</span></div><pre><code>PenalizedRegressionResult ridge =
+    PenalizedRegression.ridge(y, predictors, .1);
+PenalizedRegressionResult lasso =
+    PenalizedRegression.lasso(y, predictors, .1);
+
+ElasticNetOptions options = ElasticNetOptions.builder()
+    .alpha(.5)       // 0 ridge; 1 LASSO
+    .standardize(true)
+    .build();
+PenalizedRegressionResult elastic =
+    PenalizedRegression.fit(y, predictors, .1, options);</code></pre></div><p>Coefficients return on the original predictor scale. Positive observation weights and per-coefficient penalty factors are available in the options builder.</p>
+<h2 id="path">Build a warm lambda path</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Automatic path</span></div><pre><code>PenalizedRegressionPath path =
+    PenalizedRegression.automaticPath(
+        y, predictors, 100, 1e-4, options);
+
+for (int i = 0; i &lt; path.size(); i++) {
+    System.out.println(path.fit(i)
+        .activeCoefficientCount());
+}</code></pre></div><p>The path is descending in lambda and warm-started. The maximum lambda begins at an intercept-only LASSO solution.</p>
+<h2 id="cv">Select lambda without leakage</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Deterministic K-fold CV</span></div><pre><code>PenalizedCrossValidationResult cv =
+    PenalizedRegressionCrossValidation.automatic(
+        y, predictors, 100, 1e-4,
+        10, 20260901L, options);
+
+double lambdaMin = cv.lambdaMinimum();
+double lambdaOneSe = cv.lambdaOneStandardError();
+PenalizedRegressionResult conservative =
+    cv.oneStandardErrorFit();</code></pre></div><p>Preprocessing is learned independently inside every training fold. The one-SE choice is usually the simpler model within one standard error of minimum CV error.</p>
+<h2 id="inference">Handle inference honestly</h2><p>Ridge has effective-DF model-based inference:</p><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Ridge association statistics</span></div><pre><code>RidgeRegressionResult inference =
+    PenalizedRegressionInference.ridge(
+        y, predictors, lambdaMin, options,
+        BackendPolicy.PREFERRED);
+AssociationStatistics stats =
+    inference.associationStatistics();</code></pre></div><div class="note warning"><strong>Selection warning</strong>An OLS refit of a LASSO/elastic-net active set is conditional on selection. Its ordinary p-values are not selection-adjusted and should not be marketed as such.</div>
+<div class="next-links"><a href="linear-models.html"><small>Previous</small><strong>OLS and GLM</strong></a><a href="mixed-models.html"><small>Next</small><strong>REML and LMM →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#fit">Fit penalties</a><a href="#path">Lambda path</a><a href="#cv">Cross-validation</a><a href="#inference">Inference</a></aside></div></main><site-footer root="../"></site-footer></body></html>

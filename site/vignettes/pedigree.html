@@ -1,0 +1,48 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked pedigree construction, animal-model REML, sparse A-inverse, BLUP, PEV, and heritability examples in JLinAlg."><title>Pedigree model vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Pedigree models</span></div><h1>Animal models from ancestry to BLUP.</h1><p>Validate parentage, construct additive relationships and sparse precision, then fit dense reference or scalable sparse REML.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="build">Build a pedigree</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Validated ancestry</span></div><pre><code>Pedigree pedigree = Pedigree.of(List.of(
+    PedigreeIndividual.founder("sire"),
+    PedigreeIndividual.founder("dam"),
+    new PedigreeIndividual(
+        "offspring", "sire", "dam")));
+
+double relatedness = pedigree.relationship(
+    "sire", "offspring");
+double[] inbreeding =
+    pedigree.inbreedingCoefficients();</code></pre></div><p>Input order is arbitrary. Named parents must exist, cycles and duplicate IDs fail, and <code>null</code> denotes an unknown unrelated founder source.</p>
+<h2 id="dense">Fit the dense reference animal model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Animal REML</span></div><pre><code>List&lt;String&gt; animal = List.of(
+    "sire", "sire", "dam", "dam",
+    "offspring", "offspring");
+
+PedigreeRemlResult fit = PedigreeReml.fit(
+    phenotype, fixedDesign, animal, pedigree);
+
+double h2 = fit.heritability();
+double blup = fit.breedingValue("offspring");
+double reliability = fit.reliability("offspring");</code></pre></div><p>Observation IDs may repeat; ancestors without phenotypes remain in the prediction system. Report additive and residual variance alongside observation-scale narrow-sense heritability.</p>
+<h2 id="sparse">Use A-inverse directly</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Sparse pedigree REML</span></div><pre><code>SparseSymmetricMatrix aInverse =
+    pedigree.sparseRelationshipMatrixInverse();
+
+SparsePedigreeRemlResult sparse =
+    SparsePedigreeReml.fit(
+        phenotype, fixedDesign, animal, pedigree,
+        RemlOptions.builder()
+            .initialVariances(1, 1).build(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>This path never constructs dense A or observation-scale ZAZ′ during variance fitting.</p>
+<h2 id="combine">Combine pedigree and ordinary terms</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Animal plus batch</span></div><pre><code>PedigreeRandomEffectTerm additive =
+    PedigreeRandomEffectTerm.of(
+        "animal", animal, pedigree);
+RandomEffectTerm batch =
+    RandomEffectTerm.randomIntercept(
+        "batch", batchIds);
+
+SparseLinearMixedModelResult combined =
+    SparsePedigreeMixedModel.fit(
+        phenotype, fixedDesign,
+        List.of(additive), List.of(batch),
+        RemlOptions.builder()
+            .initialVariances(1, 1, 1).build(),
+        BackendPolicy.PREFERRED);</code></pre></div><div class="note warning"><strong>Current sparse boundary</strong>The dense animal model provides full PEV and reliability. Scalable extraction of the same full conditional covariance from the sparse combined model remains future work.</div>
+<div class="next-links"><a href="mixed-models.html"><small>Previous</small><strong>REML and LMM</strong></a><a href="glmm.html"><small>Next</small><strong>GLMM PQL →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#build">Build pedigree</a><a href="#dense">Dense animal REML</a><a href="#sparse">Sparse A-inverse</a><a href="#combine">Combined terms</a></aside></div></main><site-footer root="../"></site-footer></body></html>

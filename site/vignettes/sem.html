@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked observed-variable SEM path, covariance, equality constraint, inference, and fit-index examples in JLinAlg."><title>SEM vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>SEM</span></div><h1>Specify paths, estimate the implied covariance.</h1><p>Observed-variable RAM structural models with free/fixed regressions, variances and covariances, equality constraints, Wald inference, and global fit indices.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="model">Specify a mediation path</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>x → m → y</span></div><pre><code>SemModel model = SemModel.builder("x", "m", "y")
+    .regression("m", "x", .4)
+    .regression("y", "m", .6)
+    .variance("x", 1.0)
+    .variance("m", .8)
+    .variance("y", .5)
+    .build();</code></pre></div><p>The last number in each call is an optimizer start, not a fixed value. Use <code>fixedRegression</code>, <code>fixedVariance</code>, or <code>fixedCovariance</code> for known parameters.</p>
+<h2 id="covariance">Fit a sample covariance</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Covariance ML</span></div><pre><code>double[] covariance = {
+    1.0, .5, .35,
+    .5, 1.0, .70,
+    .35, .70, 1.0
+};
+
+SemFitResult fit = Sem.fitCovariance(
+    covariance, 2_000, model,
+    SemOptions.defaults(),
+    BackendPolicy.PREFERRED);
+
+SemParameterEstimate path =
+    fit.parameter("y~m");</code></pre></div><p>The covariance is row-major and ordered exactly like model variables. Inspect convergence, parameter SE/z/p, implied covariance, likelihood chi-square, CFI, TLI, RMSEA, SRMR, AIC, and BIC.</p>
+<h2 id="rows">Fit observed rows</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Complete-case covariance ML</span></div><pre><code>SemFitResult fromRows = Sem.fit(
+    observedRows, model,
+    new SemOptions(
+        10_000, 1e-8,
+        MissingDataPolicy.OMIT),
+    BackendPolicy.PREFERRED);</code></pre></div><p>Rows are observations and columns follow model variable order. <code>OMIT</code> uses complete-case covariance ML; it is not FIML.</p>
+<h2 id="constraints">Add equality constraints</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Shared parameter label</span></div><pre><code>SemModel constrained =
+    SemModel.builder("x", "m", "y")
+        .regression("equal", "m", "x", .4)
+        .regression("equal", "y", "m", .4)
+        .build();</code></pre></div><p>Repeated labels share one free parameter. Fit indices need positive model DF; a just-identified model can reproduce the sample covariance by construction.</p>
+<div class="note warning"><strong>Current scope</strong>This is observed-variable covariance SEM. Latent measurement models, means, ordinal thresholds, robust corrections, modification indices, and FIML are not silently approximated.</div>
+<div class="next-links"><a href="susie.html"><small>Previous</small><strong>SuSiE</strong></a><a href="formulas-backends.html"><small>Next</small><strong>Formulas and backends →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#model">Specify model</a><a href="#covariance">Fit covariance</a><a href="#rows">Fit rows</a><a href="#constraints">Constraints</a></aside></div></main><site-footer root="../"></site-footer></body></html>

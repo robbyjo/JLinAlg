@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked AR, MA, ARMA, ARIMA, seasonal, exact likelihood, forecast, diagnostic, and ARIMA-error LMM examples in JLinAlg."><title>Time-series vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Time series</span></div><h1>AR to seasonal ARIMA—and into an LMM.</h1><p>Conditional models for integration and forecast, an exact stationary Gaussian path, diagnostic utilities, small-order search, and profiled ARIMA-error mixed models.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="arma">Fit AR, MA, and ARMA</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Conditional Gaussian fits</span></div><pre><code>ArimaResult ar1 = Arima.fit(
+    series, ArimaOrder.ar(1));
+ArimaResult ar3 = Arima.fit(
+    series, ArimaOrder.ar(3));
+ArimaResult ma1 = Arima.fit(
+    series, ArimaOrder.ma(1));
+ArimaResult arma = Arima.fit(
+    series, ArimaOrder.arma(2, 1));
+
+if (!arma.converged())
+    throw new IllegalStateException(
+        arma.convergenceMessage());</code></pre></div><p>MA signs match R. Parameters are transformed to preserve stationarity/invertibility. Compare AICc only among models fitted to the same response definition.</p>
+<h2 id="seasonal">Difference and model seasonality</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Monthly SARIMA and forecast</span></div><pre><code>ArimaOptions options = ArimaOptions.builder()
+    .seasonalOrder(
+        SeasonalArimaOrder.of(1, 1, 1, 12))
+    .build();
+
+ArimaResult sarima = Arima.fit(
+    monthly, ArimaOrder.arima(1, 1, 1),
+    options);
+ArimaForecast forecast = sarima.forecast(12, .95);</code></pre></div><p><code>includeMean</code> belongs to undifferenced models. With exactly one total difference, use <code>includeDrift(true)</code> to model deterministic drift.</p>
+<h2 id="diagnostics">Check innovations</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>ACF, PACF, Ljung–Box</span></div><pre><code>double[] acf = arma.residualAutocorrelation(20);
+double[] pacf =
+    TimeSeriesDiagnostics.partialAutocorrelation(
+        arma.innovations(), 20);
+LjungBoxResult lb = arma.ljungBox(20);</code></pre></div><p>Choose diagnostic lags before inspecting results and supplement formal tests with residual and intervention plots.</p>
+<h2 id="exact">Use exact stationary likelihood</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Missing observations and panels</span></div><pre><code>ExactArmaResult exact = ExactArma.fit(
+    seriesWithNaN, ArimaOrder.arma(1, 1),
+    true, BackendPolicy.PREFERRED);
+
+ExactArmaResult panel = ExactArma.fitPanel(
+    List.of(siteOne, siteTwo, siteThree),
+    ArimaOrder.ar(1), true,
+    BackendPolicy.PREFERRED);</code></pre></div><p>Missing stationary observations are marginalized through the Toeplitz covariance. Integrated models are intentionally rejected by this exact path.</p>
+<h2 id="automatic">Search small orders</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Exhaustive AICc selection</span></div><pre><code>ArimaSelectionResult selected =
+    AutomaticArima.select(series, 3, 1, 3);
+ArimaResult best = selected.bestModel();</code></pre></div><p>Review every candidate's convergence and diagnostics rather than treating AICc selection as proof of the data-generating order.</p>
+<h2 id="lmm">Profile ARIMA errors in an LMM</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Correlated residual mixed model</span></div><pre><code>ArimaErrorLmmResult fit =
+    ArimaErrorLinearMixedModel.fit(
+        response, fixedDesign, randomTerms,
+        ArimaOrder.arma(1, 1),
+        ArimaErrorLmmOptions.builder()
+            .remlOptions(RemlOptions.defaults())
+            .build(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>Differenced fits difference response and every fixed/random design column together. A level intercept becomes zero; represent drift with a level-scale time trend.</p>
+<div class="next-links"><a href="meta-analysis.html"><small>Previous</small><strong>Meta-analysis</strong></a><a href="susie.html"><small>Next</small><strong>SuSiE fine mapping →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#arma">ARMA</a><a href="#seasonal">ARIMA/SARIMA</a><a href="#diagnostics">Diagnostics</a><a href="#exact">Exact ARMA</a><a href="#automatic">Order search</a><a href="#lmm">ARIMA-error LMM</a></aside></div></main><site-footer root="../"></site-footer></body></html>

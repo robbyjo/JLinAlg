@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked Mendelian randomization harmonization, IVW, Egger, LD, robustness, multivariable, and overlap examples in JLinAlg."><title>Mendelian randomization vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Mendelian randomization</span></div><h1>Align alleles before estimating causes.</h1><p>A worked summary-data flow from structured harmonization exclusions through core, LD-aware, robust, multivariable, and overlap-sensitive estimators.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="harmonize">Harmonize summary associations</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Exposure and outcome</span></div><pre><code>SummaryAssociation exposure =
+    new SummaryAssociation(
+        "rs1", "A", "C", .10, .02, .20);
+SummaryAssociation outcome =
+    new SummaryAssociation(
+        "rs1", "A", "C", .05, .02, .21);
+
+HarmonizationResult aligned =
+    AlleleHarmonizer.harmonize(
+        exposureStats, outcomeStats,
+        HarmonizationOptions.defaults());
+
+System.out.println(aligned.exclusions());</code></pre></div><p>Palindromic variants require frequencies that select exactly one orientation. Missing, duplicate, incompatible, frequency-inconsistent, and zero-exposure variants carry structured exclusions.</p>
+<h2 id="core">Run the core estimator set</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>IVW, Egger, median, leave-one-out</span></div><pre><code>MrAnalysisResult mr =
+    MendelianRandomization.analyze(
+        aligned.instruments(),
+        new MrOptions(.95, 10_000, 20260901L));
+
+MrEstimate fixed = mr.ivwFixed();
+MrEstimate random =
+    mr.ivwMultiplicativeRandom();
+MrEggerResult egger = mr.egger();</code></pre></div><p>Inspect Cochran Q/I², Egger intercept, I²GX, mean F statistic, leave-one-out results, and warnings—not only the smallest p-value.</p>
+<h2 id="ld">Retain correlated instruments</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Generalized IVW</span></div><pre><code>CorrelatedMrEstimate generalized =
+    CorrelatedMendelianRandomization.ivw(
+        aligned.instruments(), alleleAlignedLd, true);
+
+CorrelatedMrEggerResult ldEgger =
+    CorrelatedMendelianRandomization.egger(
+        aligned.instruments(), alleleAlignedLd);</code></pre></div><p>LD row/column signs and order must match the harmonized exposure effect alleles. Prune or scientifically regularize a nearly singular matrix first.</p>
+<h2 id="sensitivity">Add direction and robustness checks</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Sensitivity suite</span></div><pre><code>SteigerResult steiger = SteigerFiltering.analyze(
+    aligned.instruments(), nExposure, nOutcome);
+MrRapsResult raps =
+    RobustMendelianRandomization.raps(
+        aligned.instruments());
+MrPressoResult presso = MrPresso.analyze(
+    aligned.instruments(), .05);
+ContaminationMixtureResult mixture =
+    ContaminationMixture.fit(
+        aligned.instruments(), 1001);</code></pre></div><div class="note warning"><strong>Estimator scope</strong>The PRESSO-style path is an analytic robust-center/outlier diagnostic, not the R package's simulation calibration. Robustness checks do not validate the exclusion restriction.</div>
+<h2 id="extensions">Multivariable and overlap-aware MR</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Direct effects and sampling covariance</span></div><pre><code>MultivariableMrResult direct =
+    MultivariableMendelianRandomization.ivw(
+        instruments, List.of("LDL", "HDL"));
+OverlapAwareMrResult overlap =
+    OverlapAwareMendelianRandomization.ivw(
+        aligned.instruments(),
+        exposureOutcomeCovariance);</code></pre></div><p>The overlap input is per-instrument sampling covariance, not overlap percentage. Preserve original and winner's-curse-corrected exposure analyses as sensitivity results.</p>
+<div class="next-links"><a href="association.html"><small>Previous</small><strong>Association engines</strong></a><a href="meta-analysis.html"><small>Next</small><strong>Meta-analysis →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#harmonize">Harmonization</a><a href="#core">Core estimators</a><a href="#ld">LD-aware MR</a><a href="#sensitivity">Sensitivity</a><a href="#extensions">Extensions</a></aside></div></main><site-footer root="../"></site-footer></body></html>

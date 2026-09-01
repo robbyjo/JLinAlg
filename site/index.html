@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="JLinAlg is a high-performance Java statistical modeling library for linear models, mixed models, GWAS, Mendelian randomization, fine mapping, meta-analysis, time series, and SEM.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8f5"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1410">
+  <title>JLinAlg · High-performance statistical genetics in Java</title>
+  <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
+</head>
+<body>
+  <site-header root="./"></site-header>
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="reveal">
+          <span class="eyebrow">Statistical modeling on JDistlib</span>
+          <h1>Models that scale with your <span>science.</span></h1>
+          <p class="hero-copy">A Java-first toolkit for linear and mixed models, genetic association, causal inference, fine mapping, meta-analysis, time series, and structural models—with GPU and optimized CPU routing built in.</p>
+          <div class="hero-actions"><a class="button" href="vignettes/index.html">Explore worked examples →</a><a class="button secondary" href="https://github.com/robbyjo/JLinAlg">View source</a></div>
+          <div class="hero-notes"><span>Java 17+</span><span>FP64 throughout</span><span>GPL-2.0-or-later</span></div>
+        </div>
+        <div class="model-stack reveal" aria-label="Illustration of a model moving from design matrix to fit results">
+          <article class="stack-card"><div class="stack-label"><span>Design matrix · X</span><span class="stack-status"></span></div><div class="matrix"><i class="hot"></i><i></i><i></i><i class="warm"></i><i></i><i></i><i></i><i></i><i></i><i class="hot"></i><i></i><i class="warm"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="hot"></i><i></i><i></i><i></i><i></i><i class="warm"></i><i></i><i></i><i></i></div></article>
+          <article class="stack-card"><div class="stack-label"><span>Mixed formula</span><span>compiled once</span></div><div class="formula-line">y ~ age + sex + (1 + age | cohort)</div></article>
+          <article class="stack-card"><div class="stack-label"><span>Association result</span><span class="stack-status"></span></div><div class="mini-result"><div><small>β</small><strong>0.184</strong></div><div><small>SE</small><strong>0.029</strong></div><div><small>t</small><strong>6.34</strong></div><div><small>−log₁₀p</small><strong>9.61</strong></div></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-strip" aria-label="Project summary"><div class="container stats-grid"><div class="stat"><strong>13 model families</strong><span>One coherent Java API</span></div><div class="stat"><strong>3 acceleration tiers</strong><span>GPU · oneMKL · OpenBLAS</span></div><div class="stat"><strong>101 numerical tests</strong><span>Including independent R references</span></div><div class="stat"><strong>12 vignettes</strong><span>Inputs through interpretation</span></div></div></section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head reveal"><div><span class="eyebrow">Feature map</span><h2>From a single regression to a genome-wide scan.</h2></div><p>Use the matrix-first core directly, compile an R-like formula once, or prepare a high-throughput engine for repeated models.</p></div>
+        <div class="filters" aria-label="Filter features"><button class="filter" data-filter="all" aria-pressed="true">All</button><button class="filter" data-filter="core" aria-pressed="false">Core models</button><button class="filter" data-filter="genetics" aria-pressed="false">Genetics</button><button class="filter" data-filter="causal" aria-pressed="false">Causal & Bayesian</button><button class="filter" data-filter="structure" aria-pressed="false">Time & structure</button></div>
+        <div class="feature-grid">
+          <a class="feature-card reveal" data-category="core" href="vignettes/linear-models.html"><span class="feature-icon">β</span><h3>OLS & GLM</h3><p>Weighted linear models and eight GLM families with offsets, contrasts, missing policies, and complete inference.</p><span class="feature-link">Work through the models →</span></a>
+          <a class="feature-card reveal" data-category="core" href="vignettes/penalized-regression.html"><span class="feature-icon">λ</span><h3>Ridge, LASSO & elastic net</h3><p>Coordinate descent, warm paths, deterministic cross-validation, ridge inference, and active-set refits.</p><span class="feature-link">Tune a model →</span></a>
+          <a class="feature-card reveal" data-category="core" href="vignettes/mixed-models.html"><span class="feature-icon">V</span><h3>REML & mixed models</h3><p>Dense covariance components, sparse precision equations, correlated blocks, finite DF, prediction, and refit.</p><span class="feature-link">Fit an LMM →</span></a>
+          <a class="feature-card reveal" data-category="genetics" href="vignettes/pedigree.html"><span class="feature-icon">A⁻¹</span><h3>Pedigree models</h3><p>Animal-model REML, inbreeding, sparse relationship precision, BLUPs, PEVs, and combined random terms.</p><span class="feature-link">Build a pedigree fit →</span></a>
+          <a class="feature-card reveal" data-category="core" href="vignettes/glmm.html"><span class="feature-icon">g⁻¹</span><h3>Generalized mixed models</h3><p>Fast PQL working-REML fits for binomial, count, quasi, negative-binomial, and pedigree outcomes.</p><span class="feature-link">Understand the approximation →</span></a>
+          <a class="feature-card reveal" data-category="genetics" href="vignettes/association.html"><span class="feature-icon">10⁶</span><h3>Association, GWAS & TWAS</h3><p>Prepared OLS/GLM scans, exact bounded-parallel refits, and P3D/EMMAX-style REML projection reuse.</p><span class="feature-link">Choose a scan engine →</span></a>
+          <a class="feature-card reveal" data-category="causal" href="vignettes/mendelian-randomization.html"><span class="feature-icon">→</span><h3>Mendelian randomization</h3><p>Harmonization, IVW, Egger, LD, robust and outlier sensitivity, multivariable and overlap-aware MR.</p><span class="feature-link">Run a causal analysis →</span></a>
+          <a class="feature-card reveal" data-category="causal" href="vignettes/meta-analysis.html"><span class="feature-icon">Σ</span><h3>Meta-analysis</h3><p>Fixed/random pooling, REML/DL/Paule–Mandel heterogeneity, Knapp–Hartung, and meta-regression.</p><span class="feature-link">Pool study effects →</span></a>
+          <a class="feature-card reveal" data-category="structure" href="vignettes/time-series.html"><span class="feature-icon">t</span><h3>Time series</h3><p>AR through seasonal ARIMA, exact stationary ARMA, automatic selection, forecasts, and ARIMA-error LMMs.</p><span class="feature-link">Model a series →</span></a>
+          <a class="feature-card reveal" data-category="causal" href="vignettes/susie.html"><span class="feature-icon">PIP</span><h3>SuSiE fine mapping</h3><p>Individual data, summary z/LD, sufficient statistics, posterior effects, PIPs, and credible-set purity.</p><span class="feature-link">Fine-map a locus →</span></a>
+          <a class="feature-card reveal" data-category="structure" href="vignettes/sem.html"><span class="feature-icon">A,S</span><h3>Structural equation models</h3><p>Observed-variable RAM path models, equality constraints, Wald inference, and global fit indices.</p><span class="feature-link">Specify a path model →</span></a>
+          <a class="feature-card reveal" data-category="core" href="vignettes/formulas-backends.html"><span class="feature-icon">f()</span><h3>Formulas & backends</h3><p>Compile treatment/sum contrasts and mixed syntax once, then route FP64 work across the best available device.</p><span class="feature-link">Prepare the runtime →</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="architecture"><div class="container"><div class="section-head reveal"><div><span class="eyebrow">Architecture</span><h2>Scientific contracts above. Accelerated algebra below.</h2></div><p>Models keep their statistical meaning independent of the selected provider, and every fit records the concrete backend.</p></div><div class="architecture reveal"><article><span class="step">1</span><h3>Prepare once</h3><p>Compile formulas, sparse grouping terms, pedigree precision, or a shared association null model outside the hot loop.</p><div class="tag-list"><span class="tag">contiguous arrays</span><span class="tag">CSR designs</span><span class="tag">validated inputs</span></div></article><article><span class="step">2</span><h3>Solve with JDistlib</h3><p>Route dense FP64 kernels to GPU, oneMKL, OpenBLAS, or portable CPU; use sparse Cholesky where model structure wins.</p><div class="tag-list"><span class="tag">QR / SVD</span><span class="tag">Cholesky</span><span class="tag">BLAS</span></div></article><article><span class="step">3</span><h3>Return complete inference</h3><p>Keep effect, SE, statistic, DF, ordinary p, log p, convergence, and provider metadata together.</p><div class="tag-list"><span class="tag">β + SE</span><span class="tag">t / z / F / χ²</span><span class="tag">provenance</span></div></article></div></div></section>
+
+    <section class="section" id="performance"><div class="container"><div class="section-head reveal"><div><span class="eyebrow">Performance by design</span><h2>Reuse the expensive part.</h2></div><p>Fast paths are explicit about what is cached and which estimator they return.</p></div><div class="hero-grid"><div class="code-window reveal"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Prepared GWAS scan</span></div><pre><code><span class="type">RemlAssociationScanner</span> prepared =
+    <span class="type">RemlAssociationScanner</span>.prepare(
+        phenotype, covariates, components,
+        <span class="type">RemlOptions</span>.defaults(),
+        <span class="type">BackendPolicy</span>.PREFERRED);
+
+<span class="type">AssociationScanResult</span> scan = prepared.scan(
+    dosages, markerCount, markerNames,
+    <span class="type">AssociationScanOptions</span>.defaults());</code></pre></div><div class="prose reveal"><h2 style="margin-top:0">One null fit. Many tests.</h2><p>The P3D/EMMAX path estimates variance components once and caches its GLS projection. Fast OLS factors covariates once. Fast GLM keeps the final IRLS metric. Exact parallel adapters remain available when approximation is not acceptable.</p><div class="note"><strong>Default routing</strong>GPU when available, then oneMKL, OpenBLAS, and portable CPU. Strict policies fail clearly instead of silently changing providers.</div><a class="button secondary" href="vignettes/association.html">Compare scan strategies →</a></div></div></div></section>
+
+    <section class="section alt"><div class="container"><div class="section-head reveal"><div><span class="eyebrow">Worked vignettes</span><h2>Start with a complete analysis.</h2></div><p>Every vignette includes input layout, executable Java, result interpretation, performance choices, and limitations.</p></div><div class="vignette-grid reveal">
+      <a class="vignette-card" href="vignettes/linear-models.html"><small>01 · Core</small><h3>OLS and GLM</h3><p>Weights, offsets, families, inference.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/penalized-regression.html"><small>02 · Selection</small><h3>Penalized regression</h3><p>Paths, cross-validation, inference.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/mixed-models.html"><small>03 · Variance</small><h3>REML and LMM</h3><p>Dense, sparse, finite DF, prediction.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/pedigree.html"><small>04 · Quantitative genetics</small><h3>Pedigree models</h3><p>A-inverse, BLUP, heritability.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/glmm.html"><small>05 · Non-Gaussian</small><h3>GLMM PQL</h3><p>Working REML and pedigree outcomes.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/association.html"><small>06 · Scale</small><h3>GWAS and TWAS</h3><p>Prepared scans and exact refits.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/mendelian-randomization.html"><small>07 · Causal</small><h3>Mendelian randomization</h3><p>Harmonization through sensitivity.</p><span>Read →</span></a><a class="vignette-card" href="vignettes/meta-analysis.html"><small>08 · Evidence</small><h3>Meta-analysis</h3><p>Pooling, heterogeneity, regression.</p><span>Read →</span></a>
+    </div><div class="hero-actions" style="justify-content:center;margin-top:30px"><a class="button secondary" href="vignettes/index.html">Browse all 12 vignettes →</a></div></div></section>
+
+    <section class="section"><div class="container"><div class="callout reveal"><span class="eyebrow">Build from source</span><h2>One Gradle check from a verified build.</h2><p>The wrapper downloads the pinned JDistlib 0.10.0 artifact, verifies its SHA-256 digest, compiles on Java 17, and runs the numerical suite.</p><div class="hero-actions"><a class="button" href="https://github.com/robbyjo/JLinAlg">Clone on GitHub →</a><a class="button secondary" href="vignettes/formulas-backends.html">Backend guide</a></div></div></div></section>
+  </main>
+  <site-footer root="./"></site-footer>
+</body>
+</html>

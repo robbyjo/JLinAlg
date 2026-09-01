@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked JLinAlg OLS and GLM examples with weights, offsets, missing data, and inference."><title>OLS and GLM vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>OLS and GLM</span></div><h1>Linear models with complete inference.</h1><p>Fit ordinary, weighted, and generalized linear models while keeping effect, uncertainty, test statistic, degrees of freedom, and provenance together.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="ols">Fit an ordinary linear model</h2><p>JLinAlg does not add an intercept silently. Put a column of ones in the design when the model needs one.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>OLS with intercept and slope</span></div><pre><code>double[] y = {1, 2, 5, 7, 9};
+double[][] x = {
+    {1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}
+};
+
+OlsResult fit = Ols.fit(y, x);
+System.out.println(Arrays.toString(fit.coefficients()));
+System.out.println(Arrays.toString(fit.standardErrors()));
+System.out.println(Arrays.toString(fit.tStatistics()));
+System.out.println(Arrays.toString(fit.pValues()));</code></pre></div>
+<p>The slope is <code>fit.coefficients()[1]</code>. Its t test uses <code>N-rank(X)</code> residual DF. Check <code>fit.rank()</code>, residual plots, and influence outside the library before interpreting the model.</p>
+<h2 id="weighted">Add weights, offsets, and missing policy</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Weighted OLS</span></div><pre><code>double[] weights = {1, 1, 2, 2, 1};
+double[] offset = {0, 0, .2, .2, .2};
+OlsOptions options = new OlsOptions(
+    RankDeficiencyStrategy.ERROR, .95,
+    MissingDataPolicy.OMIT);
+
+OlsResult weighted = Ols.fit(
+    y, x, weights, offset, options,
+    BackendPolicy.PREFERRED);
+int[] sourceRows = weighted.retainedRows();</code></pre></div>
+<div class="note"><strong>Offset semantics</strong>OLS subtracts the additive response-scale offset before solving. Positive weights control precision; they are not frequency expansion.</div>
+<h2 id="glm">Fit binary and count outcomes</h2><p>The family supplies the link, variance, deviance, and likelihood contract. GLM coefficient tests are asymptotic Wald z tests.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Logistic and Poisson models</span></div><pre><code>GlmResult logistic = Glm.fit(
+    disease, design, GlmFamilies.binomial());
+
+double[] logExposure = Arrays.stream(exposure)
+    .map(Math::log).toArray();
+GlmResult poisson = Glm.fit(
+    counts, design, GlmFamilies.poisson(),
+    null, logExposure, GlmOptions.defaults(),
+    BackendPolicy.PREFERRED);
+
+if (!poisson.converged())
+    throw new IllegalStateException("IRLS did not converge");</code></pre></div>
+<p>Also available: Gaussian/identity, Gamma/log, inverse-Gaussian/log, fixed-size negative-binomial/log, quasi-binomial, and quasi-Poisson. For grouped binomial data use response proportions with trial counts as prior weights.</p>
+<h2 id="inference">Test a scientific contrast</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Joint coefficient hypothesis</span></div><pre><code>double[][] contrast = {
+    {0, 1, 0},
+    {0, 0, 1}
+};
+ContrastTestResult test = fit.testContrast(contrast);</code></pre></div><p>OLS returns a finite-DF F test; GLM returns an asymptotic chi-square Wald test. A rank-deficient design fails unless a minimum-norm SVD solution is explicitly requested.</p>
+<div class="next-links"><a href="formulas-backends.html"><small>Related</small><strong>Compile a formula →</strong></a><a href="penalized-regression.html"><small>Next</small><strong>Penalized regression →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#ols">Ordinary OLS</a><a href="#weighted">Weights and offsets</a><a href="#glm">GLM families</a><a href="#inference">Contrasts</a></aside></div></main><site-footer root="../"></site-footer></body></html>
