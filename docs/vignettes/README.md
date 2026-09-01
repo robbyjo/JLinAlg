@@ -18,6 +18,7 @@ Run the complete verification suite before adapting an example:
 | [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
 | [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |
 | [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, combined random terms, GLMM PQL, pedigree GLMM PQL |
+| [Cox and frailty survival models](cox-survival.md) | right-censoring, delayed entry, strata, Efron/Breslow ties, hazard ratios, Gaussian frailty, pedigree frailty |
 | [Formulas and compute backends](formulas-and-backends.md) | model tables, contrasts, offsets, mixed formulas, nested/correlated terms, GPU/oneMKL/OpenBLAS policy |
 | [Association, GWAS, and omics QTL](association-gwas-twas.md) | CSV/TSV/VCF/BCF/BGEN, cohort QC, fast OLS/GLM, P3D/EMMAX, omics transforms, Burden/SKAT/SKAT-O, p-value scales |
 | [Mendelian randomization](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |

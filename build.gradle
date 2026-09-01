@@ -130,6 +130,7 @@ tasks.register('checkWebsite') {
             'vignettes/linear-models.html',
             'vignettes/penalized-regression.html',
             'vignettes/mixed-models.html',
+            'vignettes/survival.html',
             'vignettes/pedigree.html',
             'vignettes/glmm.html',
             'vignettes/association.html',

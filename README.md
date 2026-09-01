@@ -387,6 +387,45 @@ GLMM likelihood inference. Satterthwaite and Kenward-Roger options propagate to
 the final PQL working REML fit; for non-Gaussian models both remain PQL-based
 approximations.
 
+## Cox proportional-hazards and frailty models
+
+`CoxRegression` fits right-censored or counting-process Cox models with
+strata, offsets, Breslow or Efron ties, hazard ratios, SE/z/p inference, and a
+stratum-specific baseline cumulative hazard. The common right-censored path
+sorts each stratum once and accumulates risk-set moments in descending time;
+delayed-entry data use the general start-stop reference path.
+
+```java
+CoxSurvivalData survival = CoxSurvivalData.rightCensored(time, event);
+CoxResult fit = CoxRegression.fit(survival, covariates);
+
+double hazardRatio = fit.hazardRatios()[0];
+double se = fit.standardErrors()[0];
+double p = fit.pValues()[0];
+```
+
+`CoxMixedModel` adds one or more Gaussian log-frailty terms and profiles their
+variances with a Laplace-approximated marginal partial likelihood. Independent
+grouped terms can be converted from `RandomEffectTerm`; arbitrary precision
+matrices are accepted through `CoxRandomEffectTerm`. `CoxPedigreeFrailty`
+uses the pedigree's sparse-built `A^-1` directly as the additive frailty
+precision and returns named individual modes.
+
+```java
+CoxRandomEffectTerm center = CoxRandomEffectTerm.independent(
+    RandomEffectTerm.randomIntercept("center", centerIds));
+CoxMixedResult mixed = CoxMixedModel.fit(
+    survival, covariates, List.of(center));
+
+CoxPedigreeResult pedigreeFit = CoxPedigreeFrailty.fit(
+    survival, covariates, animalIds, pedigree);
+```
+
+The fixed model is an ordinary Cox partial-likelihood estimator. Mixed and
+pedigree models are explicitly Laplace-approximated Gaussian frailty models,
+not Gaussian REML and not gamma frailty. See the
+[survival vignette](docs/vignettes/cox-survival.md).
+
 ## lme4 and pedigreemm compatibility direction
 
 The existing dense APIs are compatibility-stable reference paths. Current

@@ -350,6 +350,49 @@ First-order PQL is known to be least reliable for binary outcomes with small
 clusters, rare events, or substantial heterogeneity. These limitations are a
 property of the estimator rather than the linear-algebra backend.
 
+## Cox proportional hazards and Gaussian frailty
+
+For event time `t`, the risk set follows counting-process convention
+
+```text
+R(t) = { i : start_i < t <= stop_i }.
+```
+
+The fixed model maximizes the Cox log partial likelihood. Breslow ties use one
+risk-set denominator raised to the event count. Efron ties progressively remove
+`k/d` of the tied-event risk sum for `k = 0,...,d-1`. Newton updates use the
+analytic score and observed information; exponentials are shifted by the
+largest linear predictor in each active risk set. Coefficient inference is an
+asymptotic Wald z test, and hazard ratios plus confidence limits are obtained
+by exponentiating beta and its normal-theory interval.
+
+For right-censored input, risk moments are accumulated after one descending
+time sort per stratum. General delayed-entry/start-stop input retains direct
+risk-set evaluation. The reported baseline hazard uses the selected tie rule;
+baseline survival is `exp(-cumulativeHazard)`.
+
+For Gaussian random terms, conditional modes maximize
+
+```text
+l_partial(beta, b) - 1/2 sum_j b_j' P_j b_j / sigma_j^2.
+```
+
+Frailty variances are profiled on the log scale using the Laplace objective
+
+```text
+l_Laplace = l_penalized
+            + 1/2 log|Q|
+            - 1/2 log|H_bb|,
+```
+
+where `Q` is block-diagonal Gaussian precision and `H_bb` is the random-effect
+block of penalized observed information at the conditional mode. Fixed-effect
+covariance is the fixed block of the inverse joint penalized information.
+Pedigree frailty uses the directly constructed numerator-relationship
+precision `A^-1 / sigma_a^2`; unphenotyped ancestors remain in the coefficient
+system. This is a dense Laplace reference likelihood for the random-effect
+block, not REML, gamma frailty, or adaptive quadrature.
+
 ## Mendelian randomization
 
 Summary associations are restricted initially to biallelic SNPs with alleles
