@@ -158,3 +158,7 @@ generic association adapter: ordinary post-selection p-values are not valid
 without an explicitly chosen inferential procedure. Ridge has a built-in
 model-based adapter; callers can supply a custom selection-adjusted fitter for
 other penalized analyses.
+
+For block-streamed CSV/TSV/VCF/BCF/BGEN ingestion, aligned-cohort QC,
+incremental result writing, omics transformations, and Burden/SKAT/SKAT-O,
+see the [GWAS/TWAS pipeline guide](gwas-twas-pipeline.md).

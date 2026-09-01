@@ -30,6 +30,8 @@ covariance bases continue to receive the same numerical model.
 - Henderson prediction equations consuming sparse grouped `Z`; pedigree
   BLUP/PEV/reliability now consumes sparse `A^-1` directly.
 - Batched P3D/EMMAX-style null-model reuse for GWAS/TWAS marker scans.
+- Related-sample Burden, SKAT, and SKAT-O score tests reuse the same retained
+  REML projection rather than refitting a mixed model for every set.
 - Sparse-equation ML/REML for independent grouped terms with reusable
   minimum-degree sparse Cholesky and no observation-scale covariance matrix.
 - Sparse pedigree variance estimation using `A^-1` directly.
@@ -77,6 +79,14 @@ requires marginal maximum likelihood with a Laplace approximation, followed by
 adaptive Gauss-Hermite quadrature for supported low-dimensional integrations.
 These estimators must not be labeled REML: their likelihood and inference are
 distinct from the current working-Gaussian REML calculation.
+
+Accordingly, JLinAlg does not yet claim full `lme4` likelihood parity. The
+largest remaining parity items are sparse correlated-block likelihoods,
+Laplace/AGQ GLMM estimation, boundary-aware optimizer behavior, and
+profile/bootstrap inference. `pedigreemm`'s core Gaussian animal model,
+pedigree PQL facade, sparse `A^-1`, multiple pedigree terms, BLUP, and dense
+PEV/reliability paths are present; scalable sparse PEV diagonals and
+formula-native pedigree/new-data mapping remain open.
 
 ## User-facing compatibility
 

@@ -1,6 +1,25 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked high-throughput OLS, GLM, exact, and P3D/EMMAX association scan examples in JLinAlg."><title>Association and GWAS vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
-<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Association</span></div><h1>Choose what to reuse across millions of tests.</h1><p>Prepared scans factor a shared null model once. Exact adapters refit any supported model with bounded parallelism. Both preserve input order and complete association output.</p></div></section>
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Association</span></div><h1>Stream the cohort. Reuse the model.</h1><p>Read modern genotype formats in bounded blocks, compute QC after sample alignment, transform omics matrices, and reuse prepared OLS or mixed-model nulls across millions of tests.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<h2 id="input">Open and filter a cohort</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>VCF, BCF, or BGEN</span></div><pre><code>VariantSource source = VariantSources.open(
+    Path.of("cohort.vcf.gz"));
+
+VariantFilterOptions qc = VariantFilterOptions.builder()
+    .minimumMac(20).minimumMaf(0.005)
+    .maximumMissingRate(0.02)
+    .minimumImputationQuality(0.8).build();
+
+AssociationPipelineOptions pipeline =
+    new AssociationPipelineOptions(4096, qc);</code></pre></div><p>CSV, TSV, VCF, VCF.gz, BCF, and biallelic layout-2 BGEN are supported; PLINK is intentionally omitted. Samples are matched and reordered before MAC, MAF, missingness, and quality filters are calculated.</p>
+<h2 id="stream">Stream results to disk</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Bounded input and output</span></div><pre><code>try (DelimitedAssociationWriter output =
+        new DelimitedAssociationWriter(
+            Path.of("gwas.tsv"), '\t')) {
+    StreamingAssociationPipeline.fastOlsTo(
+        source, analysisSampleIds, phenotype,
+        covariates, null, null,
+        OlsOptions.defaults(), execution,
+        pipeline, output);
+}</code></pre></div><p>The same ordered table records tested estimates, cohort QC, exclusions, and structured failures. Use <code>remlP3dTo</code> with a retained <code>RemlAssociationScanner</code> for related samples.</p>
 <h2 id="ols">Fast OLS marker scan</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Residualized marker blocks</span></div><pre><code>AssociationEngineOptions execution =
     AssociationEngineOptions.cpuParallel()
         .withParallelism(8)
@@ -40,6 +59,27 @@ AssociationBatchResult exact =
     ParallelAssociationEngine.scanPredictors(
         phenotype, covariates, dosages,
         markerNames, model, execution);</code></pre></div><p>Adapters cover OLS, GLM, dense/sparse/correlated LMM, REML, pedigree, GLMM PQL, ridge, and ARIMA-error LMM. Use <code>RECORD_NAN</code> to retain structured failures in long scans.</p>
+<h2 id="omics">Transform molecular features</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>TWAS, EWAS, or PWAS</span></div><pre><code>OmicsTransform transform = OmicsTransforms.compose(
+    OmicsTransforms.winsorize(0.01, 0.99),
+    OmicsTransforms.rankInverseNormal());
+
+OmicsAssociationResult traits =
+    StreamingOmicsAssociationPipeline.scanResponses(
+        matrix, analysisSampleIds, design,
+        testedCoefficient, transform,
+        OmicsMissingPolicy.MEAN_IMPUTE, 512,
+        null, null, OlsOptions.defaults(), execution);</code></pre></div><p>Identity, Winsorization, log, shifted log, z-score, and tie-aware Blom inverse-normal transforms compose without mutating source rows.</p>
+<h2 id="sets">Test rare-variant sets</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Burden, SKAT, and SKAT-O</span></div><pre><code>LinearSetTestNullModel nullModel =
+    LinearSetTestNullModel.prepare(
+        phenotype, covariates,
+        OlsOptions.defaults(), BackendPolicy.PREFERRED);
+
+SetTestResult burden = SetTests.burden(
+    gene, nullModel, SetTestOptions.defaults());
+SetTestResult skat = SetTests.skat(
+    gene, nullModel, SetTestOptions.defaults());
+SkatOResult skatO = SetTests.skatO(
+    gene, nullModel, SetTestOptions.defaults());</code></pre></div><p>Effect-allele orientation and QC are explicit. Wrap the retained mixed scanner in <code>RemlSetTestNullModel</code> to run related-sample Burden/SKAT/SKAT-O without another REML fit per gene.</p>
 <h2 id="output">Write complete results</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Effect and uncertainty</span></div><pre><code>double beta = hit.beta();
 double se = hit.standardError();
 double statistic = hit.statistic();
@@ -47,4 +87,4 @@ double p = hit.pValue();
 double logP = hit.log10PValue();
 double minusLogP = hit.negativeLog10PValue();</code></pre></div><p>Keep allele direction, sample order, missing policy, tested coefficient, approximation, and backend provenance with the numeric table.</p>
 <div class="next-links"><a href="glmm.html"><small>Previous</small><strong>GLMM PQL</strong></a><a href="mendelian-randomization.html"><small>Next</small><strong>Mendelian randomization →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#ols">Fast OLS</a><a href="#glm">GLM score</a><a href="#p3d">P3D/EMMAX</a><a href="#exact">Exact refits</a><a href="#output">Outputs</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#input">Inputs and QC</a><a href="#stream">Stream output</a><a href="#ols">Fast OLS</a><a href="#glm">GLM score</a><a href="#p3d">P3D/EMMAX</a><a href="#exact">Exact refits</a><a href="#omics">Omics transforms</a><a href="#sets">Set tests</a><a href="#output">Outputs</a></aside></div></main><site-footer root="../"></site-footer></body></html>

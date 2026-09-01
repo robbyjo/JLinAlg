@@ -4,6 +4,29 @@ JLinAlg distinguishes fast prepared scans from exact repeated fits. Both
 return ordered effect size, SE, statistic, p-value, log10 p-value, and
 `-log10(p)`.
 
+For production file-backed work, use `VariantSources` with CSV, TSV, VCF,
+VCF.gz, BCF, or BGEN. PLINK is intentionally outside this API. Sample alignment
+precedes cohort-specific MAC/MAF/missingness/quality filtering.
+
+```java
+VariantSource source = VariantSources.open(Path.of("cohort.bgen"));
+VariantFilterOptions qc = VariantFilterOptions.builder()
+    .minimumMac(20).minimumMaf(0.005)
+    .maximumMissingRate(0.02)
+    .minimumImputationQuality(0.8).build();
+
+try (DelimitedAssociationWriter writer =
+        new DelimitedAssociationWriter(Path.of("gwas.tsv"), '\t')) {
+    StreamingAssociationPipeline.fastOlsTo(
+        source, analysisSampleIds, phenotype, covariates,
+        null, null, OlsOptions.defaults(), execution,
+        new AssociationPipelineOptions(4096, qc), writer);
+}
+```
+
+The sink overload keeps input and output memory bounded and writes results,
+QC exclusions, and failures in source order.
+
 ## Fast OLS predictor scan
 
 Rows are samples, covariate columns are shared by every test, and candidate
@@ -116,3 +139,15 @@ start with one submitting thread.
 
 See the [association engine reference](../association-engine.md) for exact
 adapter signatures and execution-policy details.
+
+## Omics transforms and rare-variant sets
+
+`DelimitedMatrixSource` and `StreamingOmicsAssociationPipeline` provide the
+same sample alignment for TWAS, EWAS, and PWAS feature matrices. Compose
+Winsorization, log, z-score, or tie-aware rank inverse-normal transforms before
+the selected missing-data policy.
+
+Burden, SKAT, and SKAT-O accept explicit weighted `VariantSet` membership.
+`LinearSetTestNullModel` handles unrelated samples; `RemlSetTestNullModel`
+reuses the fitted mixed projection for related samples. The complete file and
+set-test contract is in [the pipeline guide](../gwas-twas-pipeline.md).

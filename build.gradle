@@ -32,6 +32,8 @@ sourceSets {
 
 dependencies {
     api files(jdistlibJar)
+    api 'com.github.samtools:htsjdk:5.0.0'
+    api 'com.github.luben:zstd-jni:1.5.7-16'
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'

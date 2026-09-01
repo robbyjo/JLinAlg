@@ -456,6 +456,16 @@ and performs block efficient-score tests with one-step effect estimates. It is
 the fast first-stage binary/count scan; exact alternative-model refits remain
 available through `ParallelAssociationEngine`.
 
+The file-backed pipeline accepts CSV, TSV, VCF, VCF.gz, BCF, and BGEN rather
+than PLINK. It aligns samples before computing MAC/MAF/missingness/quality QC,
+streams genotype blocks into fast OLS or frozen-null REML, and can write tested,
+excluded, and failed rows incrementally as CSV/TSV. Feature-by-sample omics
+matrices support Winsorization, log, z-score, and rank inverse-normal transforms
+for TWAS/EWAS/PWAS. Continuous-trait Burden, SKAT, and SKAT-O work with either
+an unrelated OLS null or the same retained related-sample REML projection.
+See [the pipeline guide](docs/gwas-twas-pipeline.md) for formats, examples, and
+explicit current boundaries.
+
 ## Mendelian randomization
 
 The first MR layer accepts validated biallelic SNP associations and explicitly

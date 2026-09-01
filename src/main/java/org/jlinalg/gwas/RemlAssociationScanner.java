@@ -182,6 +182,28 @@ public final class RemlAssociationScanner {
 
     public RemlResult nullModel() { return nullModel; }
 
+    /**
+     * Applies the retained mixed-model null projection P to a row-major
+     * observation-by-variable matrix without refitting variance components.
+     */
+    public double[] project(double[] variables, int variableCount) {
+        if (variables == null || variableCount < 1
+                || variables.length != observations * variableCount)
+            throw new IllegalArgumentException(
+                "projection matrix dimensions are invalid");
+        MatrixOps.requireFinite(variables, "projected variables");
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            return MatrixOps.multiply(context.backend(), projection,
+                observations, observations, variables, variableCount);
+        }
+    }
+
+    /** Returns P y from the retained mixed-model null fit. */
+    public double[] projectedResponse() { return projectedResponse.clone(); }
+    public int observations() { return observations; }
+    public double associationDegreesOfFreedom() { return degreesOfFreedom; }
+    public BackendPolicy backendPolicy() { return backendPolicy; }
+
     private static void execute(
             int batches, int parallelism, BatchOperation operation) {
         ForkJoinPool pool = new ForkJoinPool(Math.min(batches, parallelism));
