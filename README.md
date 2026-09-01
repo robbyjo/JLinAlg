@@ -395,9 +395,11 @@ convenience support covers independent random intercepts/slopes, arbitrary
 pedigree Gaussian REML, pedigree binomial/Poisson/negative-binomial PQL,
 profile ML, compiled fixed/mixed formulas, correlated random blocks, sparse
 independent-term variance estimation, ML model comparison, and singular-fit
-diagnostics. It does not yet implement the full `lme4` surface: sparse
-correlated-block estimation, Laplace/AGQ GLMMs, profile/bootstrap inference,
-and response simulation remain staged work. `PreparedLinearMixedModel` retains
+diagnostics. Marginal/conditional response simulation and deterministic,
+parallel parametric bootstrap inference are available for ordinary Gaussian
+LMMs and pedigree animal models. It does not yet implement the full `lme4`
+surface: sparse correlated-block estimation, Laplace/AGQ GLMMs, and profile-
+likelihood intervals remain staged work. `PreparedLinearMixedModel` retains
 a model structure for warm-started response refits. `MixedModelPrediction`
 provides marginal or conditional new-data prediction with an explicit
 `allowNewLevels` policy. `SparsePedigreeMixedModel` composes multiple pedigree

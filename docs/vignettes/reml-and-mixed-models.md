@@ -117,3 +117,35 @@ LinearMixedModelResult next = prepared.refit(first, anotherResponse);
 This is useful for repeated phenotypes with identical rows and model structure.
 For large association scans, the dedicated association engines reuse still
 more null-model work; see the [GWAS/TWAS vignette](association-gwas-twas.md).
+
+## Simulate and bootstrap a fitted model
+
+Marginal simulation draws new random effects and residuals. Conditional
+simulation retains fitted random-effect modes and draws only residuals:
+
+```java
+double[][] marginal = MixedModelSimulation.simulate(
+    prepared, first, 100, 42,
+    MixedModelSimulationMode.MARGINAL);
+double[][] conditional = MixedModelSimulation.simulate(
+    prepared, first, 100, 42,
+    MixedModelSimulationMode.CONDITIONAL);
+```
+
+Parametric bootstrap simulates marginally, warm-refits the prepared model, and
+summarizes successful replicates:
+
+```java
+BootstrapOptions bootstrap = new BootstrapOptions(
+    999, 0.95, 20260901L, 8);
+GaussianBootstrapResult intervals = MixedModelBootstrap.bootstrap(
+    prepared, first, bootstrap);
+
+BootstrapParameterSummary slope =
+    intervals.fixedEffectSummaries().get(1);
+```
+
+Each summary reports the fitted estimate, bootstrap mean, bias, empirical SE,
+and percentile interval. Failed/nonconverged replicates remain in
+`failures()`. Use one bootstrap worker with GPU/native multithreaded BLAS; raise
+parallelism deliberately for a CPU backend.

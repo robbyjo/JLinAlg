@@ -147,8 +147,19 @@ public final class PedigreeReml {
                 ? clamp(1.0 - pev / priorVariance, 0.0, 1.0) : 0.0;
         }
 
+        double[] conditionalFitted = new double[rows];
+        double[] beta = reml.beta();
+        for (int observation = 0; observation < rows; observation++) {
+            conditionalFitted[observation] =
+                breedingValues[observationIndices[observation]];
+            for (int fixed = 0; fixed < columns; fixed++)
+                conditionalFitted[observation] +=
+                    fixedEffects[observation * columns + fixed] * beta[fixed];
+        }
         return new PedigreeRemlResult(reml, pedigree.individualIds(),
-            breedingValues, predictionErrorVariances, reliabilities);
+            breedingValues, predictionErrorVariances, reliabilities,
+            conditionalFitted,
+            MatrixOps.subtract(response, conditionalFitted));
     }
 
     private static int[] observationIndices(

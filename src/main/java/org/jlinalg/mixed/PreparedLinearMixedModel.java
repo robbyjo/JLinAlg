@@ -69,6 +69,9 @@ public final class PreparedLinearMixedModel {
     public int observations() { return observations; }
     public int fixedEffectColumns() { return fixedColumns; }
     public List<RandomEffectTerm> randomEffects() { return randomEffects; }
+    RemlOptions options() { return options; }
+    BackendPolicy backendPolicy() { return backendPolicy; }
+    double[] fixedEffectsView() { return fixedEffects; }
 
     private void validateResponse(double[] response) {
         if (response == null || response.length != observations)

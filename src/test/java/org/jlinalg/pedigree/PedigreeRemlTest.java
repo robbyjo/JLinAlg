@@ -47,6 +47,12 @@ class PedigreeRemlTest {
         for (double reliability : result.reliabilities()) {
             assertTrue(reliability > 0.0 && reliability < 1.0);
         }
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+            result.beta(), result.fixef(), 0);
+        assertEquals(result.breedingValue("A"), result.ranef().get("A"));
+        assertEquals(2, result.varCorr().size());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+            response, add(result.fittedValues(), result.residuals()), 1e-12);
     }
 
     @Test
@@ -60,5 +66,12 @@ class PedigreeRemlTest {
             response, fixed, List.of("A", "A"), pedigree));
         assertThrows(IllegalArgumentException.class, () -> PedigreeReml.fit(
             response, fixed, List.of("A", "A", "missing"), pedigree));
+    }
+
+    private static double[] add(double[] left, double[] right) {
+        double[] result = new double[left.length];
+        for (int index = 0; index < result.length; index++)
+            result[index] = left[index] + right[index];
+        return result;
     }
 }

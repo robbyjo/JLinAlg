@@ -35,11 +35,33 @@ PedigreeRemlResult fit = PedigreeReml.fit(y, x, animal, pedigree);
 double h2 = fit.heritability();
 double offspringBlup = fit.breedingValue("offspring");
 double offspringReliability = fit.reliability("offspring");
+Map<String, Double> animalModes = fit.ranef();
 ```
 
 The dense reference path returns additive/residual variance, heritability,
 BLUP, PEV, and reliability. Check the underlying REML convergence before using
 the estimates scientifically.
+
+Retain the animal-model structure for simulation and bootstrap:
+
+```java
+PreparedPedigreeReml prepared = new PreparedPedigreeReml(
+    x, animal, pedigree, RemlOptions.defaults(),
+    BackendPolicy.PREFERRED);
+PedigreeRemlResult fitted = prepared.fit(y);
+
+double[][] simulated = PedigreeSimulation.simulate(
+    prepared, fitted, 100,
+    42, MixedModelSimulationMode.MARGINAL);
+GaussianBootstrapResult intervals = PedigreeBootstrap.bootstrap(
+    prepared, fitted,
+    new BootstrapOptions(999, 0.95, 42, 1));
+```
+
+Marginal simulation draws breeding values jointly from the fitted numerator-
+relationship covariance. Conditional simulation retains the BLUPs. Pedigree
+results also expose `fixef()`, named `ranef()`, `varCorr()`, and conditional
+`fittedValues()`/`residuals()` aliases.
 
 ## Sparse animal model and additional random terms
 

@@ -41,6 +41,11 @@ covariance bases continue to receive the same numerical model.
   single-bar blocks, and `fixef`/`ranef`/`VarCorr`-style accessors.
 - ML-only nested likelihood-ratio model comparison.
 - Retained-design response refits with variance-component warm starts.
+- Marginal and conditional Gaussian response simulation for ordinary LMMs and
+  pedigree animal models, with deterministic seeds.
+- Accelerator-friendly parametric bootstrap for fixed effects and variance
+  components, including percentile intervals, empirical bias/SE, bounded CPU
+  parallelism, warm refits, and structured convergence failures.
 - Marginal and conditional prediction on new data, including an explicit
   zero-mode policy for unseen grouping levels.
 - Multiple named pedigree precision terms and ordinary independent random
@@ -83,7 +88,7 @@ distinct from the current working-Gaussian REML calculation.
 Accordingly, JLinAlg does not yet claim full `lme4` likelihood parity. The
 largest remaining parity items are sparse correlated-block likelihoods,
 Laplace/AGQ GLMM estimation, boundary-aware optimizer behavior, and
-profile/bootstrap inference. `pedigreemm`'s core Gaussian animal model,
+profile-likelihood inference. `pedigreemm`'s core Gaussian animal model,
 pedigree PQL facade, sparse `A^-1`, multiple pedigree terms, BLUP, and dense
 PEV/reliability paths are present; scalable sparse PEV diagonals and
 formula-native pedigree/new-data mapping remain open.
@@ -94,7 +99,7 @@ The compiled formula layer now covers fixed effects, contrasts, interactions,
 offsets/weights, independent random intercepts/slopes, `||`, nested grouping,
 and dense correlated blocks. Remaining formula work includes automatic
 complete-case alignment for missing grouping rows and pedigree mappings.
-Post-fit work still includes response simulation, richer singular-fit
-diagnostics, profile likelihood, and parametric bootstrap. Conditional and
-marginal prediction plus response refit are now available as matrix-first APIs;
-formula-native `newdata` compilation remains to be added.
+Post-fit work still includes richer singular-fit diagnostics and profile-
+likelihood intervals. Conditional/marginal prediction, response refit,
+response simulation, and parametric bootstrap are now available as matrix-
+first APIs; formula-native `newdata` compilation remains to be added.

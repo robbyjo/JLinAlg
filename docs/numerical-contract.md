@@ -164,6 +164,31 @@ from `W` because they were not estimated. The implementation follows the dense
 reference route and is therefore intentionally an opt-in, relatively expensive
 calculation.
 
+### Gaussian mixed-model simulation and bootstrap
+
+Marginal LMM simulation uses the fitted fixed mean and independently draws
+each scalar random term and residual:
+
+```text
+y* = X beta_hat + sum_j Z_j b_j* + e*
+b_j* ~ N(0, sigma_j^2 I)
+e*   ~ N(0, sigma_e^2 I).
+```
+
+Conditional simulation replaces each `b_j*` with its fitted conditional mode
+and redraws only `e*`. Pedigree marginal simulation instead draws the complete
+breeding-value vector from `N(0, sigma_a^2 A)` by Cholesky factorization of the
+numerator relationship matrix; conditional simulation retains the fitted
+BLUPs.
+
+Parametric bootstrap always uses marginal simulation, then warm-refits the
+same retained design. Replicate seeds are derived independently from the
+requested seed and replicate index, so results do not depend on CPU scheduling
+order. Summaries use the successful replicates to report empirical bias,
+sample standard deviation, and linearly interpolated percentile intervals.
+Nonconverged and failed refits are excluded from those summaries and retained
+as structured failures; they are never silently replaced.
+
 ## Pedigree REML
 
 The pedigree layer constructs the numerator relationship matrix `A` by the
