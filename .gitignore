@@ -1,0 +1,11 @@
+.gradle/
+.r-reference-lib/
+build/
+out/
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+hs_err_pid*
+replay_pid*

@@ -1,0 +1,118 @@
+# Repeated association, GWAS, and TWAS
+
+JLinAlg distinguishes fast prepared scans from exact repeated fits. Both
+return ordered effect size, SE, statistic, p-value, log10 p-value, and
+`-log10(p)`.
+
+## Fast OLS predictor scan
+
+Rows are samples, covariate columns are shared by every test, and candidate
+columns are markers or molecular features:
+
+```java
+AssociationEngineOptions execution = AssociationEngineOptions.cpuParallel()
+    .withParallelism(8)
+    .withChunkSize(256);
+
+AssociationBatchResult scan = FastOlsAssociation.scanPredictors(
+    phenotype,
+    covariates,
+    dosages,
+    markerNames,
+    null,                 // weights
+    null,                 // offset
+    OlsOptions.defaults(),
+    execution);
+
+AssociationEstimate hit = scan.estimate(0);
+System.out.printf("%s beta=%g se=%g p=%g -log10p=%g%n",
+    hit.name(), hit.beta(), hit.standardError(), hit.pValue(),
+    hit.negativeLog10PValue());
+```
+
+`FastOlsAssociation` factors the covariates once and uses
+Frisch-Waugh-Lovell residualization for marker blocks. The default changing-
+predictor missing policy mean-imputes each marker. Select
+`VariableMissingPolicy.ERROR` when imputation is not scientifically intended.
+
+To scan many phenotypes against one design, call `scanResponses` and specify
+the fixed-effect coefficient index to report.
+
+## Fast GLM score scan
+
+Prepare one null IRLS model, then score many predictors:
+
+```java
+FastGlmAssociation prepared = FastGlmAssociation.prepare(
+    binaryPhenotype, covariates, GlmFamilies.binomial(),
+    null, null, GlmOptions.defaults(), execution);
+
+AssociationBatchResult scoreScan = prepared.scan(
+    dosages, markerNames, execution);
+```
+
+The returned beta is a one-step null-model score estimate. Use it for screening
+and exactly refit selected variants if the final reported beta must be the
+full alternative-model maximum-likelihood estimate.
+
+## Exact parallel refits
+
+The generic engine appends each candidate as the last fixed-effect column and
+fits the selected adapter independently:
+
+```java
+AssociationFitter fitter = AssociationModels.reml(
+    varianceComponents, RemlOptions.defaults());
+
+AssociationBatchResult exact = ParallelAssociationEngine.scanPredictors(
+    phenotype, covariates, dosages, markerNames, fitter, execution);
+```
+
+Built-in adapters cover OLS/weighted OLS, GLM, dense or sparse LMM, correlated
+LMM, REML, pedigree REML, GLMM PQL, pedigree GLMM PQL, ridge, and ARIMA-error
+LMM. Implement `AssociationFitter` for another thread-safe model returning
+`AssociationStatistics`.
+
+For a long production scan, consider:
+
+```java
+AssociationEngineOptions tolerant = execution.withFailurePolicy(
+    AssociationFailurePolicy.RECORD_NAN);
+```
+
+This preserves structured failures and input order rather than terminating the
+whole job. Inspect `failures()` before writing final results.
+
+## P3D/EMMAX-style mixed-model scan
+
+When frozen null-model variance components are acceptable, prepare the REML
+projection once:
+
+```java
+RemlAssociationScanner prepared = RemlAssociationScanner.prepare(
+    phenotype, covariates, varianceComponents,
+    RemlOptions.defaults(), BackendPolicy.PREFERRED);
+
+AssociationScanResult p3d = prepared.scan(
+    rowMajorDosages, markerCount, markerNames,
+    new AssociationScanOptions(
+        2048, GenotypeMissingPolicy.MEAN_IMPUTE, 1));
+```
+
+This does not re-estimate variance components for every marker. It is therefore
+much faster than exact REML refits but represents the P3D/EMMAX approximation.
+Increase scan parallelism primarily for a CPU backend; with GPU or native BLAS,
+start with one submitting thread.
+
+## Output hygiene
+
+- Preserve allele/effect-direction metadata outside the numerical matrix.
+- Confirm sample order is identical across phenotype, covariates, kinship, and
+  candidate columns.
+- Report the tested coefficient, model/approximation, missing policy, and
+  backend provenance.
+- Use `negativeLog10PValue()` for plotting but retain ordinary p-values and
+  effect/SE for downstream meta-analysis.
+
+See the [association engine reference](../association-engine.md) for exact
+adapter signatures and execution-policy details.

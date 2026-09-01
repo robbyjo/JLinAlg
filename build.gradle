@@ -1,0 +1,150 @@
+import java.security.MessageDigest
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = 'org.jlinalg'
+version = '0.1.0-SNAPSHOT'
+
+def jdistlibVersion = '0.10.0'
+def jdistlibSha256 = '3644fd53eba2c99cbc6c68ea939ea5dc595b6e810b328821023a341195be3a3e'
+def jdistlibJar = layout.buildDirectory.file(
+    "dependencies/jdistlib-all-${jdistlibVersion}.jar")
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+sourceSets {
+    benchmark {
+        java.srcDir 'src/benchmark/java'
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+dependencies {
+    api files(jdistlibJar)
+
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('fetchJdistlib') {
+    group = 'build setup'
+    description = 'Downloads and verifies the pinned JDistlib release.'
+    outputs.file(jdistlibJar)
+
+    doLast {
+        File destination = jdistlibJar.get().asFile
+        destination.parentFile.mkdirs()
+
+        def digest = { File file ->
+            MessageDigest md = MessageDigest.getInstance('SHA-256')
+            file.withInputStream { input ->
+                byte[] buffer = new byte[8192]
+                for (int count = input.read(buffer); count >= 0;
+                     count = input.read(buffer)) {
+                    if (count > 0) md.update(buffer, 0, count)
+                }
+            }
+            md.digest().collect { String.format('%02x', it & 0xff) }.join('')
+        }
+
+        if (destination.isFile() && digest(destination) == jdistlibSha256) {
+            return
+        }
+
+        File temporary = new File(destination.parentFile,
+            destination.name + '.download')
+        temporary.delete()
+        new URI("https://github.com/robbyjo/JDistlib/releases/download/" +
+            "v${jdistlibVersion}/jdistlib-all-${jdistlibVersion}.jar")
+            .toURL().withInputStream { input ->
+                temporary.withOutputStream { output -> output << input }
+            }
+
+        String actual = digest(temporary)
+        if (actual != jdistlibSha256) {
+            temporary.delete()
+            throw new GradleException(
+                "JDistlib checksum mismatch: expected ${jdistlibSha256}, got ${actual}")
+        }
+        java.nio.file.Files.move(temporary.toPath(), destination.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn tasks.named('fetchJdistlib')
+    options.encoding = 'UTF-8'
+    options.release = 17
+    options.compilerArgs += ['-Xlint:all', '-Werror']
+}
+
+tasks.withType(Javadoc).configureEach {
+    dependsOn tasks.named('fetchJdistlib')
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:none', '-quiet')
+    exclude 'org/jlinalg/internal/**'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.register('benchmarkAssociation', JavaExec) {
+    group = 'verification'
+    description = 'Runs deterministic GWAS/TWAS association macrobenchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.AssociationBenchmark'
+    jvmArgs '-Xms1g', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkMixedModels', JavaExec) {
+    group = 'verification'
+    description = 'Runs deterministic dense/sparse mixed-model macrobenchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.MixedModelBenchmark'
+    jvmArgs '-Xms1g', '-Xmx6g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            pom {
+                name = 'JLinAlg'
+                description = 'Java linear and mixed-model algorithms backed by JDistlib.'
+                licenses {
+                    license {
+                        name = 'GNU General Public License, version 2 or later'
+                        url = 'https://www.gnu.org/licenses/old-licenses/gpl-2.0.html'
+                        distribution = 'repo'
+                    }
+                }
+            }
+        }
+    }
+}
