@@ -1,0 +1,58 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked GAM, GAMM, GAMLSS, and vector additive model examples in JLinAlg."><title>Additive models · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Additive models</span></div><h1>Smooth the mean—or the whole distribution.</h1><p>Compile bases once, select single or marginal penalties, add pedigree and correlated covariance, and reuse the result for high-throughput association.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="gam">Fit a REML GAM</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Gaussian P-spline</span></div><pre><code>PSplineTerm age = PSplineTerm.of(
+    "s(age)", ageYears, 12);
+GamResult fit = Gam.fitGaussian(
+    phenotype, fixedDesign, List.of(age));
+
+double beta = fit.parametricCoefficients()[1];
+double se = fit.parametricStandardErrors()[1];
+double t = fit.parametricTStatistics()[1];
+double p = fit.parametricPValues()[1];</code></pre></div><p>Gaussian smoothing is an exact mixed-model REML fit. Profile ML and residual, Satterthwaite, or Kenward–Roger inference are selected through <code>RemlOptions</code>. Generalized GAMs accept every built-in GLM family, offsets, and prior weights.</p>
+<h2 id="tensor">Use anisotropic tensor penalties</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>te() with GCV</span></div><pre><code>CompiledQuadraticGamFormula model =
+    AdvancedGamFormula.compile(
+        "y ~ sex + te(age,bmi,kx=8,kz=7)", table);
+
+GaussianSmoothSelectionResult result =
+    model.fitGaussian(
+        SmoothingSelectionOptions.gcv(),
+        BackendPolicy.PREFERRED);</code></pre></div><p><code>QuadraticSmoothTerm</code> retains multiple penalties. <code>te()</code> estimates a penalty for each margin; <code>ti()</code> removes marginal trends for interaction-only terms. Fixed, GCV, UBRE, and AIC selection share the same compiled representation.</p>
+<h2 id="bases">Choose a smooth basis</h2><p>Constructors cover P-splines, cyclic periodic terms, low-rank two-dimensional thin plates, tensor products, varying coefficients, random-effect smooths, and graph-Laplacian Markov random fields. Identifiability is imposed once when null spaces are compiled.</p>
+<h2 id="gamm">Combine smooths and relatedness</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree Laplace GAMM</span></div><pre><code>VarianceComponent animal =
+    GammCovariances.pedigree(
+        "animal", observationIds, pedigree);
+
+GeneralizedGammLaplaceResult fit =
+    GeneralizedGammLaplace.fit(
+        y, fixedDesign, List.of(age),
+        GlmFamilies.binomial(), List.of(animal),
+        weights, offset,
+        GlmmLaplaceOptions.defaults(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>Exact Gaussian REML accepts grouped, pedigree, cryptic-relatedness/GRM, and residual covariance components. Non-Gaussian fits offer fast PQL and an accuracy-oriented dense first-order Laplace marginal likelihood. <code>ArmaCorrelation</code> supplies stationary AR/MA/ARMA residual matrices.</p>
+<h2 id="distribution">Model location, scale, shape, or category</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Parameter-specific formulas</span></div><pre><code>DistributionalResult fit =
+    DistributionalFormula.fit(
+        List.of("y ~ s(age,k=10)",
+                "y ~ sex + s(age,k=7)"),
+        List.of(List.of(new double[]{0.8}),
+                List.of(new double[]{2.0})),
+        table,
+        DistributionalFamilies
+            .gaussianLocationScale(),
+        FormulaOptions.defaults(),
+        DistributionalOptions.defaults(),
+        BackendPolicy.PREFERRED);</code></pre></div><p>Gaussian, Gamma, Beta, NB2, zero-inflated, hurdle, multinomial, and ordinal families use one linked additive predictor per parameter. Prepared warm refits, prediction, quantile residuals, centiles, likelihood-ratio comparison, and AIC are available.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Vector-response probabilities</span></div><pre><code>double[][] probability =
+    DistributionalPrediction.categoryProbabilities(
+        fit, parameterPredictors,
+        DistributionalFamilies.multinomial(3));</code></pre></div><p>The returned matrix is observation by category and each row sums to one. Deterministic Java tests compare the Gaussian location/scale path with <code>gamlss</code> and multinomial logits, likelihood, and probabilities with <code>VGAM</code>.</p>
+<h2 id="scan">Scan markers against one smooth null</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Prepared GAM association</span></div><pre><code>try (PreparedGamAssociation scan =
+        new PreparedGamAssociation(
+            nullFit,
+            AssociationEngineOptions
+                .acceleratedSerial())) {
+    AssociationBatchResult hits =
+        scan.scan(genotypes, variantNames);
+}</code></pre></div><p>The null penalty factorization is retained. Each marker block uses a batched cross-product and returns beta, SE, t, regular p, log10-p, and −log10-p. <code>DiscretePSplineBasis</code> aggregates repeated covariate rows for BAM-like cross-products.</p>
+<div class="next-links"><a href="linear-models.html"><small>Previous</small><strong>OLS and GLM</strong></a><a href="penalized-regression.html"><small>Next</small><strong>Penalized regression →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#gam">REML GAM</a><a href="#tensor">Tensor penalties</a><a href="#bases">Smooth bases</a><a href="#gamm">GAMM and pedigree</a><a href="#distribution">Distributional models</a><a href="#scan">Association scans</a></aside></div></main><site-footer root="../"></site-footer></body></html>

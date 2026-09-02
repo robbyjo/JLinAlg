@@ -7,16 +7,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.MatrixTriangle;
 import jdistlib.accelerator.PreparedSparseCholesky;
 import jdistlib.accelerator.SparseOrdering;
 import jdistlib.math.opt.Bobyqa;
+import jdistlib.math.opt.Optimization;
 import jdistlib.math.opt.OptimizationResult;
 import jdistlib.matrix.CsrMatrix;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.compute.BackendProvenance;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.internal.MatrixOps;
@@ -66,74 +69,257 @@ public final class SparseLinearMixedModel {
             List<SparsePrecisionMatrix> precisionBases,
             RemlOptions options,
             BackendPolicy backendPolicy) {
-        MatrixOps.validateModelData(response, fixedEffects, rows, columns);
+        try (Prepared prepared = prepareWithPrecision(rows, randomEffects,
+                precisionBases, options, backendPolicy)) {
+            return prepared.fit(response, fixedEffects, columns);
+        }
+    }
+
+    /** Prepares reusable random-effect structure for repeated fixed-design fits. */
+    public static Prepared prepare(
+            int rows,
+            List<RandomEffectTerm> randomEffects,
+            RemlOptions options,
+            BackendPolicy backendPolicy) {
+        return prepareWithPrecision(
+            rows, randomEffects, null, options, backendPolicy);
+    }
+
+    /** Prepares reusable structure with caller-supplied precision bases. */
+    public static Prepared prepareWithPrecision(
+            int rows,
+            List<RandomEffectTerm> randomEffects,
+            List<SparsePrecisionMatrix> precisionBases,
+            RemlOptions options,
+            BackendPolicy backendPolicy) {
         validate(randomEffects, rows, options, backendPolicy);
         if (options.degreesOfFreedomMethod()
                 != DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION)
             throw new IllegalArgumentException(
                 "sparse LMM currently supports residual-approximation DF; "
                     + "use the dense reference fitter for Satterthwaite or Kenward-Roger");
-        CombinedDesign design = combine(randomEffects, rows);
-        List<SparsePrecisionMatrix> precisions = precisions(
-            randomEffects, precisionBases);
-        SparsePattern pattern = crossProductPattern(
-            design, randomEffects, precisions);
-        double[] initial = initialLogVariances(
-            response, randomEffects.size() + 1, options);
-        double[] lower = new double[initial.length];
-        double[] upper = new double[initial.length];
-        Arrays.fill(lower, Math.log(options.minimumVariance()));
-        Arrays.fill(upper, Math.log(options.maximumVariance()));
-        int maximumEvaluations = Math.max(100,
-            options.maximumIterations() * 10);
-        try (BackendContext context = BackendContext.select(backendPolicy)) {
-            ComputeBackend backend = context.backend();
-            double[] precisionLogDeterminants = precisionLogDeterminants(
+        return new Prepared(rows, randomEffects,
+            precisions(randomEffects, precisionBases), options, backendPolicy);
+    }
+
+    /**
+     * Reuses sparse cross-products, precision log determinants, the backend
+     * context, and variance starts across a model scan.
+     */
+    public static final class Prepared implements AutoCloseable {
+        private final int rows;
+        private final List<RandomEffectTerm> terms;
+        private final List<SparsePrecisionMatrix> precisions;
+        private final RemlOptions options;
+        private final BackendPolicy backendPolicy;
+        private final CombinedDesign design;
+        private final SparsePattern pattern;
+        private final BackendContext context;
+        private final ComputeBackend backend;
+        private final BackendProvenance provenance;
+        private final double[] precisionLogDeterminants;
+        private final double[] lower;
+        private final double[] upper;
+        private final int maximumEvaluations;
+        private final ConcurrentLinkedQueue<PreparedSparseCholesky> factors;
+        private final ThreadLocal<PreparedSparseCholesky> localFactor;
+        private volatile double[] sharedLogVarianceRatios;
+        private volatile boolean closed;
+
+        private Prepared(
+                int rows, List<RandomEffectTerm> terms,
+                List<SparsePrecisionMatrix> precisions,
+                RemlOptions options, BackendPolicy backendPolicy) {
+            this.rows = rows;
+            this.terms = List.copyOf(terms);
+            this.precisions = precisions;
+            this.options = options;
+            this.backendPolicy = backendPolicy;
+            this.design = combine(this.terms, rows);
+            this.pattern = crossProductPattern(
+                design, this.terms, precisions);
+            this.context = BackendContext.select(backendPolicy);
+            this.backend = context.backend();
+            this.provenance = context.provenance();
+            this.precisionLogDeterminants = precisionLogDeterminants(
                 precisions, backend);
-            CsrMatrix initialMatrix = pattern.matrix(exp(initial));
+            int components = terms.size();
+            this.lower = new double[components];
+            this.upper = new double[components];
+            double maximumRatio = options.maximumVariance()
+                / options.minimumVariance();
+            Arrays.fill(lower, -Math.log(maximumRatio));
+            Arrays.fill(upper, Math.log(maximumRatio));
+            this.maximumEvaluations = Math.max(100,
+                options.maximumIterations() * 10);
+            if (provenance.selectedBackend().startsWith("cholmod+")) {
+                factors = new ConcurrentLinkedQueue<>();
+                localFactor = ThreadLocal.withInitial(() -> {
+                    PreparedSparseCholesky factor = backend.prepareDcsrpotrf(
+                        pattern.matrix(relativeVariances(
+                            new double[terms.size()])),
+                        MatrixTriangle.LOWER,
+                        SparseOrdering.MINIMUM_DEGREE);
+                    factors.add(factor);
+                    return factor;
+                });
+            } else {
+                factors = null;
+                localFactor = null;
+            }
+        }
+
+        /** Fits one response/design while retaining reusable sparse state. */
+        public SparseLinearMixedModelResult fit(
+                double[] response, double[] fixedEffects, int columns) {
+            if (closed) throw new IllegalStateException(
+                "prepared sparse LMM is closed");
+            MatrixOps.validateModelData(
+                response, fixedEffects, rows, columns);
+            double[] shared = sharedLogVarianceRatios;
+            double[] initial = shared != null ? shared.clone()
+                : initialLogVarianceRatios(response, terms.size(), options);
+            if (localFactor != null) {
+                return fit(response, fixedEffects, columns, initial,
+                    localFactor.get());
+            }
             try (PreparedSparseCholesky factor = backend.prepareDcsrpotrf(
-                    initialMatrix, MatrixTriangle.LOWER,
-                    SparseOrdering.MINIMUM_DEGREE)) {
-                Objective objective = new Objective(response, fixedEffects,
-                    rows, columns, randomEffects, design, pattern, factor,
-                    precisionLogDeterminants,
-                    options.varianceEstimation(), backend);
-                OptimizationResult optimized = Bobyqa.bobyqa(initial.clone(),
+                    pattern.matrix(relativeVariances(initial)),
+                    MatrixTriangle.LOWER, SparseOrdering.MINIMUM_DEGREE)) {
+                return fit(response, fixedEffects, columns, initial, factor);
+            }
+        }
+
+        private SparseLinearMixedModelResult fit(
+                double[] response, double[] fixedEffects, int columns,
+                double[] initial, PreparedSparseCholesky factor) {
+            Objective objective = new Objective(response, fixedEffects,
+                rows, columns, terms, design, pattern, factor,
+                precisionLogDeterminants,
+                options.varianceEstimation(), backend);
+            OptimizationResult optimized = optimize(initial, objective);
+            Evaluation fitted = objective.evaluate(optimized.mX);
+            int factorNonzeroCount = factor.factorNonzeroCount();
+            double[] variances = fitted.variances();
+            double[] standardErrors = new double[columns];
+            for (int column = 0; column < columns; column++)
+                standardErrors[column] = Math.sqrt(Math.max(0.0,
+                    fitted.fixedCovariance()[column * columns + column]));
+            double degrees = rows - columns - 1.0;
+            if (!(degrees > 0.0)) throw new IllegalArgumentException(
+                "sparse LMM requires positive denominator DF");
+            AssociationStatistics association = AssociationStatistics.studentT(
+                fitted.beta(), standardErrors, degrees,
+                DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
+            List<RandomEffectEstimates> estimates = estimates(
+                terms, design.termStarts(), variances, fitted.randomModes());
+            List<String> names = new ArrayList<>(terms.size() + 1);
+            for (RandomEffectTerm term : terms) names.add(term.name());
+            names.add("residual");
+            return new SparseLinearMixedModelResult(names, variances,
+                association, fitted.fixedCovariance(), estimates,
+                fitted.conditionalFitted(), fitted.conditionalResiduals(),
+                fitted.logLikelihood(), options.varianceEstimation(),
+                optimized.numFunctionCalls,
+                optimized.numFunctionCalls < maximumEvaluations,
+                design.columns(), pattern.values().length,
+                factorNonzeroCount, provenance);
+        }
+
+        /** Uses one deterministic fitted variance start for subsequent fits. */
+        public void warmStart(double... varianceComponents) {
+            if (closed) throw new IllegalStateException(
+                "prepared sparse LMM is closed");
+            if (varianceComponents == null
+                    || varianceComponents.length != terms.size() + 1)
+                throw new IllegalArgumentException(
+                    "warm start requires random terms plus residual variance");
+            double residual = varianceComponents[terms.size()];
+            if (!(residual > 0.0) || !Double.isFinite(residual))
+                throw new IllegalArgumentException(
+                    "warm-start residual variance must be finite and positive");
+            double[] ratios = new double[terms.size()];
+            for (int term = 0; term < terms.size(); term++) {
+                double value = varianceComponents[term];
+                if (!(value > 0.0) || !Double.isFinite(value))
+                    throw new IllegalArgumentException(
+                        "warm-start variances must be finite and positive");
+                ratios[term] = Math.log(value / residual);
+            }
+            sharedLogVarianceRatios = ratios;
+        }
+
+        private OptimizationResult optimize(
+                double[] initial, Objective objective) {
+            try {
+                OptimizationResult primary = Bobyqa.bobyqa(initial,
                     lower, upper, parameters -> objective.value(parameters),
                     Math.min(2 * initial.length + 1,
                         (initial.length + 1) * (initial.length + 2) / 2),
                     Math.min(1.0, options.maximumLogVarianceStep()),
                     Math.max(1e-7, options.relativeTolerance()),
-                    maximumEvaluations,
-                    true);
-                Evaluation fitted = objective.evaluate(optimized.mX);
-                double[] variances = exp(optimized.mX);
-                double[] standardErrors = new double[columns];
-                for (int column = 0; column < columns; column++)
-                    standardErrors[column] = Math.sqrt(Math.max(0.0,
-                        fitted.fixedCovariance()[column * columns + column]));
-                double degrees = rows - columns - 1.0;
-                if (!(degrees > 0.0))
-                    throw new IllegalArgumentException(
-                        "sparse LMM requires positive denominator DF");
-                AssociationStatistics association = AssociationStatistics.studentT(
-                    fitted.beta(), standardErrors, degrees,
-                    DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
-                List<RandomEffectEstimates> estimates = estimates(
-                    randomEffects, design.termStarts(), variances,
-                    fitted.randomModes());
-                List<String> names = new ArrayList<>(randomEffects.size() + 1);
-                for (RandomEffectTerm term : randomEffects) names.add(term.name());
-                names.add("residual");
-                return new SparseLinearMixedModelResult(names, variances,
-                    association, fitted.fixedCovariance(), estimates,
-                    fitted.conditionalFitted(), fitted.conditionalResiduals(),
-                    fitted.logLikelihood(), options.varianceEstimation(),
-                    optimized.numFunctionCalls,
-                    optimized.numFunctionCalls < maximumEvaluations,
-                    design.columns(), pattern.values().length,
-                    factor.factorNonzeroCount(), context.provenance());
+                    maximumEvaluations, true);
+                return localFactor == null || terms.size() == 1 ? primary
+                    : coordinateOptimize(primary.mX, objective,
+                        4, Math.max(1e-4, options.relativeTolerance()), 30);
+            } catch (ArithmeticException | ArrayIndexOutOfBoundsException failure) {
+                return coordinateOptimize(initial, objective);
             }
+        }
+
+        private OptimizationResult coordinateOptimize(
+                double[] initial, Objective objective) {
+            return coordinateOptimize(initial, objective, 12,
+                Math.max(1e-7, options.relativeTolerance()),
+                maximumEvaluations);
+        }
+
+        private OptimizationResult coordinateOptimize(
+                double[] initial, Objective objective, int iterations,
+                double tolerance, int searchEvaluations) {
+            double[] point = initial.clone();
+            int[] calls = {0};
+            double best = objective.value(point);
+            calls[0]++;
+            for (int iteration = 0; iteration < iterations
+                    && calls[0] < maximumEvaluations; iteration++) {
+                double maximumChange = 0.0;
+                for (int coordinate = 0; coordinate < point.length; coordinate++) {
+                    final int selected = coordinate;
+                    double before = point[selected];
+                    double searchLower = Math.max(lower[selected], before - 8.0);
+                    double searchUpper = Math.min(upper[selected], before + 8.0);
+                    double optimum = Optimization.optimize(value -> {
+                        point[selected] = value;
+                        calls[0]++;
+                        return objective.value(point);
+                    }, searchLower, searchUpper, tolerance,
+                        Math.max(20, Math.min(searchEvaluations,
+                            maximumEvaluations - calls[0])));
+                    point[selected] = optimum;
+                    best = objective.value(point);
+                    calls[0]++;
+                    maximumChange = Math.max(
+                        maximumChange, Math.abs(optimum - before));
+                    if (calls[0] >= maximumEvaluations) break;
+                }
+                if (maximumChange <= Math.max(
+                        1e-6, options.relativeTolerance())) break;
+            }
+            return new OptimizationResult(
+                point.clone(), best, calls[0], true);
+        }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            if (localFactor != null) {
+                localFactor.remove();
+                for (PreparedSparseCholesky factor : factors) factor.close();
+                factors.clear();
+            }
+            context.close();
         }
     }
 
@@ -170,25 +356,30 @@ public final class SparseLinearMixedModel {
 
         double value(double[] parameters) {
             try {
-                Evaluation result = evaluate(parameters);
-                return Double.isFinite(result.logLikelihood())
-                    ? -result.logLikelihood() : INVALID_OBJECTIVE;
+                Evaluation result = evaluate(parameters, false);
+                if (!Double.isFinite(result.logLikelihood()))
+                    return INVALID_OBJECTIVE;
+                return -result.logLikelihood();
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 return INVALID_OBJECTIVE;
             }
         }
 
-        Evaluation evaluate(double[] logVariances) {
-            double[] variances = exp(logVariances);
-            factor.refactor(pattern.matrix(variances));
-            double residualVariance = variances[variances.length - 1];
-            double[] inverseY = inverseMarginal(response, residualVariance);
+        Evaluation evaluate(double[] logVarianceRatios) {
+            return evaluate(logVarianceRatios, true);
+        }
+
+        private Evaluation evaluate(
+                double[] logVarianceRatios, boolean materializeResult) {
+            double[] ratios = exp(logVarianceRatios);
+            factor.refactor(pattern.matrix(relativeVariances(logVarianceRatios)));
+            double[] inverseY = inverseMarginal(response, 1.0);
             double[] inverseX = new double[rows * columns];
             double[] source = new double[rows];
             for (int column = 0; column < columns; column++) {
                 for (int row = 0; row < rows; row++)
                     source[row] = fixed[row * columns + column];
-                double[] solved = inverseMarginal(source, residualVariance);
+                double[] solved = inverseMarginal(source, 1.0);
                 for (int row = 0; row < rows; row++)
                     inverseX[row * columns + column] = solved[row];
             }
@@ -203,36 +394,44 @@ public final class SparseLinearMixedModel {
             double quadratic = backend.ddot(rows, response, 0, 1,
                 inverseY, 0, 1) - backend.ddot(columns, rightSide, 0, 1,
                 beta, 0, 1);
-            double logDeterminant = rows * Math.log(residualVariance)
-                + factor.logDeterminant();
+            double logDeterminant = factor.logDeterminant();
             for (int term = 0; term < terms.size(); term++)
                 logDeterminant += terms.get(term).coefficients()
-                    * Math.log(variances[term])
+                    * Math.log(ratios[term])
                     - precisionLogDeterminants[term];
             boolean restricted = estimation == VarianceEstimation.REML;
+            double scaleDegrees = restricted ? rows - columns : rows;
+            double residualVariance = quadratic / scaleDegrees;
             double logLikelihood = -0.5 * (
-                (restricted ? rows - columns : rows) * LOG_TWO_PI
+                scaleDegrees * (LOG_TWO_PI + Math.log(residualVariance))
                     + logDeterminant
                     + (restricted ? fixedFactor.logDeterminant() : 0.0)
-                    + Math.max(0.0, quadratic));
+                    + quadratic / residualVariance);
+            if (!materializeResult)
+                return new Evaluation(beta, null, null, null, null,
+                    logLikelihood, null);
             double[] fixedCovariance = fixedFactor.solve(
                 MatrixOps.identity(columns), columns);
+            for (int index = 0; index < fixedCovariance.length; index++)
+                fixedCovariance[index] *= residualVariance;
             symmetrize(fixedCovariance, columns);
             double[] residual = MatrixOps.subtract(response,
                 MatrixOps.multiply(backend, fixed, rows, columns, beta));
             double[] randomRightSide = transposeMultiply(design, residual);
-            for (int index = 0; index < randomRightSide.length; index++)
-                randomRightSide[index] /= residualVariance;
             double[] randomModes = factor.solve(randomRightSide);
             double[] conditionalFitted = MatrixOps.multiply(
                 backend, fixed, rows, columns, beta);
             double[] randomFitted = multiply(design, randomModes);
             for (int row = 0; row < rows; row++)
                 conditionalFitted[row] += randomFitted[row];
+            double[] variances = new double[ratios.length + 1];
+            for (int term = 0; term < ratios.length; term++)
+                variances[term] = ratios[term] * residualVariance;
+            variances[ratios.length] = residualVariance;
             return new Evaluation(beta, fixedCovariance, randomModes,
                 conditionalFitted,
                 MatrixOps.subtract(response, conditionalFitted),
-                logLikelihood);
+                logLikelihood, variances);
         }
 
         private double[] inverseMarginal(
@@ -487,6 +686,24 @@ public final class SparseLinearMixedModel {
         return result;
     }
 
+    private static double[] initialLogVarianceRatios(
+            double[] response, int randomTerms, RemlOptions options) {
+        double[] absolute = initialLogVariances(
+            response, randomTerms + 1, options);
+        double residual = absolute[randomTerms];
+        double[] result = new double[randomTerms];
+        for (int term = 0; term < randomTerms; term++)
+            result[term] = absolute[term] - residual;
+        return result;
+    }
+
+    private static double[] relativeVariances(double[] logVarianceRatios) {
+        double[] result = Arrays.copyOf(
+            exp(logVarianceRatios), logVarianceRatios.length + 1);
+        result[logVarianceRatios.length] = 1.0;
+        return result;
+    }
+
     private static void validate(
             List<RandomEffectTerm> terms, int rows,
             RemlOptions options, BackendPolicy backendPolicy) {
@@ -550,5 +767,6 @@ public final class SparseLinearMixedModel {
                               double[] randomModes,
                               double[] conditionalFitted,
                               double[] conditionalResiduals,
-                              double logLikelihood) { }
+                              double logLikelihood,
+                              double[] variances) { }
 }

@@ -57,4 +57,240 @@ class GeeRReferenceTest {
             -0.000415293889415103, 0.000379679977253081
         }, result.biasCorrectedCovariance(), 8e-4);
     }
+
+    @Test
+    void smallSampleAndScaleModelsAgreeWithRPackages() {
+        int clusters = 15;
+        int size = 3;
+        double[] response = new double[clusters * size];
+        double[][] design = new double[response.length][2];
+        int[] id = new int[response.length];
+        int[] wave = new int[response.length];
+        for (int localCluster = 0; localCluster < clusters; localCluster++) {
+            int originalCluster = localCluster + 3;
+            double clusterEffect = (originalCluster % 5 - 2) * 0.25;
+            for (int visit = 0; visit < size; visit++) {
+                int row = localCluster * size + visit;
+                response[row] = 1.5 + 0.7 * visit + clusterEffect
+                    + ((originalCluster + visit) % 3 - 1) * 0.1;
+                design[row][0] = 1.0;
+                design[row][1] = visit;
+                id[row] = localCluster;
+                wave[row] = visit;
+            }
+        }
+        GeeResult smallSample = Gee.fit(response, design, id, wave,
+            GlmFamilies.gaussian(), null, null,
+            GeeOptions.builder().correlation(GeeCorrelation.EXCHANGEABLE).build(),
+            BackendPolicy.CPU);
+
+        // geesmv 1.3 returns only the covariance diagonal. Its Gaussian
+        // implementation requires balanced clusters, hence this dedicated case.
+        assertEquals(0.00928571428571429,
+            smallSample.kauermannCarrollCovariance()[0], 0.003);
+        assertEquals(0.000357142857142858,
+            smallSample.kauermannCarrollCovariance()[3], 3e-4);
+        assertEquals(0.00928571428571425,
+            smallSample.fayGraubardCovariance()[0], 0.003);
+        assertEquals(0.000357142857142858,
+            smallSample.fayGraubardCovariance()[3], 3e-4);
+
+        int scaleClusters = 30;
+        int scaleSize = 4;
+        int scaleRows = scaleClusters * scaleSize;
+        double[] scaleResponse = new double[scaleRows];
+        double[][] scaleMeanDesign = new double[scaleRows][2];
+        double[][] scaleDesign = new double[scaleRows][2];
+        int[] scaleId = new int[scaleRows];
+        int[] scaleWave = new int[scaleRows];
+        for (int cluster = 0; cluster < scaleClusters; cluster++) {
+            for (int visit = 0; visit < scaleSize; visit++) {
+                int row = cluster * scaleSize + visit;
+                scaleResponse[row] = 1.1 + 0.3 * visit
+                    + Math.exp(0.1 + 0.12 * visit)
+                    * Math.sin((row + 3) * 1.7) * 0.18;
+                scaleMeanDesign[row][0] = 1.0;
+                scaleMeanDesign[row][1] = visit;
+                scaleDesign[row][0] = 1.0;
+                scaleDesign[row][1] = visit;
+                scaleId[row] = cluster;
+                scaleWave[row] = visit;
+            }
+        }
+        GeeResult scale = Gee.fit(scaleResponse, scaleMeanDesign,
+            scaleId, scaleWave, GlmFamilies.gaussian(), null, null,
+            GeeOptions.builder().correlation(GeeCorrelation.EXCHANGEABLE)
+                .scaleDesign(scaleDesign).scaleLink(GeeParameterLink.LOG).build(),
+            BackendPolicy.CPU);
+
+        assertArrayEquals(new double[] {1.11424718442824, 0.28841828473756},
+            scale.coefficients(), 0.02);
+        assertArrayEquals(new double[] {-3.92062248583538, 0.234275702155774},
+            scale.scaleCoefficients(), 0.5);
+    }
+
+    @Test
+    void exchangeableBinomialAgreesWithGeepack() {
+        int clusters = 30;
+        int size = 4;
+        double[] response = new double[clusters * size];
+        double[][] design = new double[response.length][3];
+        int[] id = new int[response.length];
+        int[] wave = new int[response.length];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            for (int visit = 0; visit < size; visit++) {
+                int row = cluster * size + visit;
+                double x = (cluster % 7 - 3) / 3.0;
+                double probability = 1.0 / (1.0
+                    + Math.exp(-(-0.4 + 0.55 * x + 0.25 * visit)));
+                double uniform = ((cluster * 17 + visit * 13) % 97 + 0.5) / 97.0;
+                response[row] = uniform < probability ? 1.0 : 0.0;
+                design[row][0] = 1.0;
+                design[row][1] = x;
+                design[row][2] = visit;
+                id[row] = cluster;
+                wave[row] = visit;
+            }
+        }
+        GeeResult result = Gee.fit(response, design, id, wave,
+            GlmFamilies.binomial(), null, null,
+            GeeOptions.builder().correlation(GeeCorrelation.EXCHANGEABLE).build(),
+            BackendPolicy.CPU);
+
+        assertArrayEquals(new double[] {
+            -0.176797375911445, 0.517038929396022, 0.207942173228593
+        }, result.coefficients(), 2e-4);
+        assertEquals(0.332993992827278,
+            result.associationParameters()[0], 0.01);
+        assertArrayEquals(new double[] {
+            0.137582368876383, -0.000675129232759631, -0.0506719855692514,
+            -0.000675129232759631, 0.163421858188419, 0.00657821508627044,
+            -0.0506719855692514, 0.00657821508627044, 0.0377190025766127
+        }, result.robustCovariance(), 3e-5);
+    }
+
+    @Test
+    void ar1PoissonAgreesWithGeepack() {
+        int clusters = 24;
+        int size = 4;
+        double[] response = new double[clusters * size];
+        double[][] design = new double[response.length][3];
+        int[] id = new int[response.length];
+        int[] wave = new int[response.length];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            for (int visit = 0; visit < size; visit++) {
+                int row = cluster * size + visit;
+                double x = (cluster % 6 - 2.5) / 2.5;
+                double mean = Math.exp(0.25 + 0.32 * x + 0.14 * visit);
+                response[row] = Math.max(0.0, Math.floor(mean
+                    + ((cluster * 11 + visit * 7) % 5 - 2) * 0.35));
+                design[row][0] = 1.0;
+                design[row][1] = x;
+                design[row][2] = visit;
+                id[row] = cluster;
+                wave[row] = visit;
+            }
+        }
+        GeeResult result = Gee.fit(response, design, id, wave,
+            GlmFamilies.poisson(), null, null,
+            GeeOptions.builder().correlation(GeeCorrelation.AR1).build(),
+            BackendPolicy.CPU);
+
+        assertArrayEquals(new double[] {
+            -0.240350254210952, 0.492715363616079, 0.206648272941827
+        }, result.coefficients(), 0.006);
+        assertArrayEquals(new double[] {
+            0.00789366924186695, -0.00141272985241483, -0.00313146253614801,
+            -0.00141272985241483, 0.00372543007265254, -0.000240274050126009,
+            -0.00313146253614801, -0.000240274050126009, 0.00165117281368829
+        }, result.robustCovariance(), 4e-4);
+    }
+
+    @Test
+    void weightedOffsetIrregularGaussianAgreesWithGeepack() {
+        java.util.List<Double> responses = new java.util.ArrayList<>();
+        java.util.List<double[]> designs = new java.util.ArrayList<>();
+        java.util.List<Integer> ids = new java.util.ArrayList<>();
+        java.util.List<Integer> waves = new java.util.ArrayList<>();
+        java.util.List<Double> weights = new java.util.ArrayList<>();
+        java.util.List<Double> offsets = new java.util.ArrayList<>();
+        for (int cluster = 0; cluster < 20; cluster++) {
+            for (int visit = 0; visit < 4; visit++) {
+                if (cluster % 4 == 0 && visit == 2) continue;
+                ids.add(cluster);
+                waves.add(visit);
+                weights.add(1.0 + (cluster + visit) % 3 * 0.25);
+                offsets.add(0.08 * visit);
+                responses.add(0.9 + 0.45 * visit + 0.2 * (cluster % 2)
+                    + 0.08 * visit + ((cluster + 2 * visit) % 5 - 2) * 0.04);
+                designs.add(new double[] {1.0, visit});
+            }
+        }
+        int n = responses.size();
+        double[] response = new double[n];
+        double[][] design = new double[n][];
+        int[] id = new int[n];
+        int[] wave = new int[n];
+        double[] weight = new double[n];
+        double[] offset = new double[n];
+        for (int row = 0; row < n; row++) {
+            response[row] = responses.get(row);
+            design[row] = designs.get(row);
+            id[row] = ids.get(row);
+            wave[row] = waves.get(row);
+            weight[row] = weights.get(row);
+            offset[row] = offsets.get(row);
+        }
+        GeeResult result = Gee.fit(response, design, id, wave,
+            GlmFamilies.gaussian(), weight, offset,
+            GeeOptions.builder().correlation(GeeCorrelation.AR1).build(),
+            BackendPolicy.CPU);
+
+        assertArrayEquals(new double[] {1.00188360650232, 0.450704479575405},
+            result.coefficients(), 0.002);
+        assertArrayEquals(new double[] {
+            0.000634116021532505, -2.83603466126965e-05,
+            -2.83603466126964e-05, 3.81540279973492e-05
+        }, result.robustCovariance(), 1e-4);
+    }
+
+    @Test
+    void standardWorkingStructuresAgreeWithGeepack() {
+        int clusters = 20;
+        int size = 4;
+        double[] response = new double[clusters * size];
+        double[][] design = new double[response.length][2];
+        int[] id = new int[response.length];
+        int[] wave = new int[response.length];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            for (int visit = 0; visit < size; visit++) {
+                int row = cluster * size + visit;
+                response[row] = 1.2 + 0.35 * visit
+                    + (cluster % 5 - 2) * 0.08
+                    + ((cluster + visit) % 3 - 1) * 0.03;
+                design[row][0] = 1.0;
+                design[row][1] = visit;
+                id[row] = cluster;
+                wave[row] = visit;
+            }
+        }
+        GeeCorrelation[] structures = {
+            GeeCorrelation.INDEPENDENCE, GeeCorrelation.EXCHANGEABLE,
+            GeeCorrelation.AR1, GeeCorrelation.UNSTRUCTURED
+        };
+        double[][] expected = {
+            {1.19985, 0.34985},
+            {1.19985, 0.34985},
+            {1.19855029556857, 0.349999871792751},
+            {1.19998786403, 0.350040827991679}
+        };
+        for (int index = 0; index < structures.length; index++) {
+            GeeResult result = Gee.fit(response, design, id, wave,
+                GlmFamilies.gaussian(), null, null,
+                GeeOptions.builder().correlation(structures[index]).build(),
+                BackendPolicy.CPU);
+            assertArrayEquals(expected[index], result.coefficients(), 0.003,
+                structures[index].toString());
+        }
+    }
 }

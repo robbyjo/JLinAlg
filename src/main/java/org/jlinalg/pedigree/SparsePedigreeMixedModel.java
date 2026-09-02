@@ -60,4 +60,33 @@ public final class SparsePedigreeMixedModel {
         return SparseLinearMixedModel.fitWithPrecision(response, fixedEffects,
             rows, columns, terms, precisions, options, backendPolicy);
     }
+
+    /** Prepares reusable pedigree and ordinary random-effect structure. */
+    public static SparseLinearMixedModel.Prepared prepare(
+            int rows,
+            List<PedigreeRandomEffectTerm> pedigreeEffects,
+            List<RandomEffectTerm> ordinaryEffects,
+            RemlOptions options,
+            BackendPolicy backendPolicy) {
+        if (pedigreeEffects == null || pedigreeEffects.isEmpty()
+                || ordinaryEffects == null)
+            throw new IllegalArgumentException(
+                "at least one pedigree term and an ordinary-term list are required");
+        List<RandomEffectTerm> terms = new ArrayList<>();
+        List<SparsePrecisionMatrix> precisions = new ArrayList<>();
+        for (PedigreeRandomEffectTerm value : pedigreeEffects) {
+            if (value == null)
+                throw new IllegalArgumentException("pedigree terms must not be null");
+            terms.add(value.randomEffect());
+            precisions.add(value.precision());
+        }
+        for (RandomEffectTerm value : ordinaryEffects) {
+            if (value == null)
+                throw new IllegalArgumentException("ordinary terms must not be null");
+            terms.add(value);
+            precisions.add(SparsePrecisionMatrix.identity(value.coefficients()));
+        }
+        return SparseLinearMixedModel.prepareWithPrecision(
+            rows, terms, precisions, options, backendPolicy);
+    }
 }

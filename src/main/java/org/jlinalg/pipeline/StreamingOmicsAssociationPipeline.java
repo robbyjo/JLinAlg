@@ -11,7 +11,10 @@ import org.jlinalg.association.AssociationBatchResult;
 import org.jlinalg.association.AssociationEngineOptions;
 import org.jlinalg.association.AssociationEstimate;
 import org.jlinalg.association.AssociationFailure;
+import org.jlinalg.association.FastGlmAssociation;
 import org.jlinalg.association.FastOlsAssociation;
+import org.jlinalg.glm.GlmFamily;
+import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.ols.OlsOptions;
 
 /** Block-streamed fast OLS scans for transformed omics feature matrices. */
@@ -75,6 +78,64 @@ public final class StreamingOmicsAssociationPipeline {
                     matrix, names, weights, offset, olsOptions, engineOptions));
     }
 
+    /** Streams predictor-oriented OLS results without retaining all features. */
+    public static OmicsAssociationSummary scanPredictorsTo(
+            NumericMatrixSource source,
+            List<String> analysisSampleIds,
+            double[] response,
+            double[][] covariates,
+            OmicsTransform transform,
+            OmicsMissingPolicy missingPolicy,
+            int featureBlockSize,
+            double[] weights,
+            double[] offset,
+            OlsOptions olsOptions,
+            AssociationEngineOptions engineOptions,
+            OmicsAssociationSink sink) throws IOException {
+        validate(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy);
+        if (sink == null || response == null || covariates == null
+                || response.length != analysisSampleIds.size()
+                || covariates.length != analysisSampleIds.size())
+            throw new IllegalArgumentException(
+                "response, covariates, and omics sink must match analysis samples");
+        return scanTo(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy, (matrix, names) ->
+                FastOlsAssociation.scanPredictors(response, covariates,
+                    matrix, names, weights, offset, olsOptions, engineOptions),
+            sink);
+    }
+
+    /** Streams prepared-null GLM score tests for generic numeric omics rows. */
+    public static OmicsAssociationSummary scanPredictorsGlmTo(
+            NumericMatrixSource source,
+            List<String> analysisSampleIds,
+            double[] response,
+            double[][] covariates,
+            GlmFamily family,
+            OmicsTransform transform,
+            OmicsMissingPolicy missingPolicy,
+            int featureBlockSize,
+            double[] weights,
+            double[] offset,
+            GlmOptions glmOptions,
+            AssociationEngineOptions engineOptions,
+            OmicsAssociationSink sink) throws IOException {
+        validate(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy);
+        if (sink == null || response == null || covariates == null
+                || response.length != analysisSampleIds.size()
+                || covariates.length != analysisSampleIds.size())
+            throw new IllegalArgumentException(
+                "response, covariates, and omics sink must match analysis samples");
+        FastGlmAssociation prepared = FastGlmAssociation.prepare(response,
+            covariates, family, weights, offset, glmOptions, engineOptions);
+        return scanTo(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy,
+            (matrix, names) -> prepared.scan(matrix, names, engineOptions),
+            sink);
+    }
+
     private static OmicsAssociationResult scan(
             NumericMatrixSource source, List<String> analysisSampleIds,
             int blockSize, OmicsTransform transform,
@@ -117,6 +178,53 @@ public final class StreamingOmicsAssociationPipeline {
         }
         return new OmicsAssociationResult(
             sourceFeatures, estimates, failures);
+    }
+
+    private static OmicsAssociationSummary scanTo(
+            NumericMatrixSource source, List<String> analysisSampleIds,
+            int blockSize, OmicsTransform transform,
+            OmicsMissingPolicy missingPolicy, BlockScanner scanner,
+            OmicsAssociationSink sink) throws IOException {
+        int[] sampleOrder = SampleAlignment.requireOrder(
+            source.metadata().sampleIds(), analysisSampleIds);
+        long sourceFeatures = 0;
+        long tested = 0;
+        long failed = 0;
+        try (NumericBlockReader reader = source.open(sampleOrder)) {
+            for (NumericBlock block; (block = reader.read(blockSize)) != null;) {
+                sourceFeatures += block.rows().size();
+                List<String> names = block.rows().stream()
+                    .map(NumericRow::id).toList();
+                double[][] matrix = new double[analysisSampleIds.size()]
+                    [block.rows().size()];
+                for (int feature = 0; feature < block.rows().size(); feature++) {
+                    double[] values = transform.apply(
+                        block.rows().get(feature).valuesView());
+                    prepareMissing(values, missingPolicy,
+                        block.rows().get(feature).id());
+                    for (int sample = 0; sample < values.length; sample++)
+                        matrix[sample][feature] = values[sample];
+                }
+                AssociationBatchResult result = scanner.scan(matrix, names);
+                for (int index = 0; index < result.size(); index++) {
+                    AssociationEstimate estimate = result.estimate(index);
+                    sink.acceptEstimate(new OmicsAssociationEstimate(
+                        estimate.name(), estimate.beta(),
+                        estimate.standardError(), estimate.statistic(),
+                        estimate.degreesOfFreedom(), estimate.pValue(),
+                        estimate.log10PValue(),
+                        estimate.negativeLog10PValue()));
+                    tested++;
+                }
+                for (AssociationFailure failure : result.failures()) {
+                    sink.acceptFailure(new AssociationPipelineFailure(
+                        names.get(failure.index()), failure.exceptionType(),
+                        failure.message()));
+                    failed++;
+                }
+            }
+        }
+        return new OmicsAssociationSummary(sourceFeatures, tested, failed);
     }
 
     private static void prepareMissing(

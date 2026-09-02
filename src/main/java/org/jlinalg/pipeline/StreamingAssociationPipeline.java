@@ -11,7 +11,10 @@ import org.jlinalg.association.AssociationBatchResult;
 import org.jlinalg.association.AssociationEngineOptions;
 import org.jlinalg.association.AssociationEstimate;
 import org.jlinalg.association.AssociationFailure;
+import org.jlinalg.association.FastGlmAssociation;
 import org.jlinalg.association.FastOlsAssociation;
+import org.jlinalg.glm.GlmFamily;
+import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.gwas.AssociationScanOptions;
 import org.jlinalg.gwas.AssociationScanResult;
 import org.jlinalg.gwas.RemlAssociationScanner;
@@ -65,6 +68,31 @@ public final class StreamingAssociationPipeline {
                 FastOlsAssociation.scanPredictors(
                     response, covariates, variants, names, weights, offset,
                     olsOptions, engineOptions)), sink);
+    }
+
+    /**
+     * Fits one covariate-only GLM and streams efficient-score tests for all
+     * variants. The prepared null model is reused across every input block.
+     */
+    public static AssociationPipelineSummary fastGlmTo(
+            VariantSource source,
+            List<String> analysisSampleIds,
+            double[] response,
+            double[][] covariates,
+            GlmFamily family,
+            double[] weights,
+            double[] offset,
+            GlmOptions glmOptions,
+            AssociationEngineOptions engineOptions,
+            AssociationPipelineOptions pipelineOptions,
+            AssociationPipelineSink sink) throws IOException {
+        validate(source, analysisSampleIds, response, covariates,
+            pipelineOptions);
+        FastGlmAssociation prepared = FastGlmAssociation.prepare(response,
+            covariates, family, weights, offset, glmOptions, engineOptions);
+        return scanTo(source, analysisSampleIds, pipelineOptions,
+            (variants, names) -> BlockResult.of(
+                prepared.scan(variants, names, engineOptions)), sink);
     }
 
     public static AssociationPipelineResult remlP3d(

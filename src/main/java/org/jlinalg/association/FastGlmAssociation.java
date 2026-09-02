@@ -17,6 +17,7 @@ import org.jlinalg.glm.GlmFamily;
 import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.glm.GlmResult;
 import org.jlinalg.inference.AssociationStatistics;
+import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.internal.MatrixOps;
 
 /** Prepared-null, block-score GLM association scanner. */
@@ -196,8 +197,13 @@ public final class FastGlmAssociation {
                 }
             }
         });
-        AssociationStatistics statistics = AssociationStatistics.normal(
-            beta, standardErrors);
+        double degreesOfFreedom = observations - covariateCount - 1.0;
+        if (!(degreesOfFreedom > 0.0))
+            throw new IllegalArgumentException(
+                "GLM association scan requires positive approximate DFE");
+        AssociationStatistics statistics = AssociationStatistics.studentT(
+            beta, standardErrors, degreesOfFreedom,
+            DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
         List<AssociationFailure> ordered = failures.stream()
             .sorted(Comparator.comparingInt(AssociationFailure::index)).toList();
         return new AssociationBatchResult(names, statistics.beta(),

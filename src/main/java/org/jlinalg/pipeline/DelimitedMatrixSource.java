@@ -66,7 +66,6 @@ public final class DelimitedMatrixSource implements NumericMatrixSource {
                         "sample IDs must be unique and nonblank: " + path);
                 samples.add(sample);
             }
-            HashSet<String> rowIds = new HashSet<>();
             long rows = 0;
             for (String line; (line = input.readLine()) != null;) {
                 if (line.isBlank()) continue;
@@ -77,9 +76,9 @@ public final class DelimitedMatrixSource implements NumericMatrixSource {
                         + " fields but found " + fields.size()
                         + " at line " + lineNumber + " in " + path);
                 String id = fields.get(0).trim();
-                if (id.isEmpty() || !rowIds.add(id))
+                if (id.isEmpty())
                     throw new IOException(
-                        "row IDs must be unique and nonblank at line "
+                        "row IDs must be nonblank at line "
                         + lineNumber + " in " + path);
                 rows++;
             }

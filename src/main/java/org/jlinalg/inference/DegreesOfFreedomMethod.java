@@ -30,6 +30,9 @@ public enum DegreesOfFreedomMethod {
      */
     KENWARD_ROGER,
 
+    /** Number of independent clusters minus the fitted mean-model dimension. */
+    CLUSTER,
+
     /** Asymptotic normal inference without finite denominator degrees of freedom. */
     ASYMPTOTIC
 }

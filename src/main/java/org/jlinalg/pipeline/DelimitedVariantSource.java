@@ -79,7 +79,6 @@ public final class DelimitedVariantSource implements VariantSource {
                         "sample IDs must be unique and nonblank: " + path);
                 samples.add(sample);
             }
-            HashSet<String> seenVariants = new HashSet<>();
             long rows = 0;
             for (String line; (line = input.readLine()) != null;) {
                 long lineNumber = rows + 2;
@@ -90,9 +89,9 @@ public final class DelimitedVariantSource implements VariantSource {
                         + " fields but found " + fields.size()
                         + " at line " + lineNumber + " in " + path);
                 String id = fields.get(0).trim();
-                if (id.isEmpty() || !seenVariants.add(id))
+                if (id.isEmpty())
                     throw new IOException(
-                        "variant IDs must be unique and nonblank at line "
+                        "variant IDs must be nonblank at line "
                         + lineNumber + " in " + path);
                 if (genomic) parsePosition(fields.get(2), lineNumber);
                 rows++;

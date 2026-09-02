@@ -12,6 +12,48 @@ import org.jlinalg.internal.MatrixOps;
 public final class ClinicalGee {
     private ClinicalGee() { }
 
+    /** Predicts marginal means for new design rows with zero offsets. */
+    public static GeePrediction[] predict(
+            GeeResult fit,
+            double[][] newDesign,
+            GlmFamily family) {
+        return predict(fit, newDesign, family, null, 0.95);
+    }
+
+    /** Predicts new-data marginal means with delta-method uncertainty. */
+    public static GeePrediction[] predict(
+            GeeResult fit,
+            double[][] newDesign,
+            GlmFamily family,
+            double[] offset,
+            double confidenceLevel) {
+        if (fit == null || family == null || newDesign == null
+                || newDesign.length == 0
+                || offset != null && offset.length != newDesign.length
+                || !(confidenceLevel > 0.0 && confidenceLevel < 1.0)) {
+            throw new IllegalArgumentException("prediction inputs are invalid");
+        }
+        double[] beta = fit.coefficients();
+        double[] covariance = fit.covariance();
+        double critical = Normal.quantile(0.5 + confidenceLevel / 2.0,
+            0.0, 1.0, true, false);
+        GeePrediction[] result = new GeePrediction[newDesign.length];
+        for (int row = 0; row < newDesign.length; row++) {
+            double[] design = validateRow(newDesign[row], beta.length);
+            double eta = dot(design, beta) + (offset == null ? 0.0 : offset[row]);
+            double linkStandardError = Math.sqrt(Math.max(0.0,
+                quadratic(design, covariance)));
+            double mean = family.inverseLink(eta);
+            double responseStandardError = Math.abs(family.meanDerivative(eta))
+                * linkStandardError;
+            double lower = family.inverseLink(eta - critical * linkStandardError);
+            double upper = family.inverseLink(eta + critical * linkStandardError);
+            result[row] = new GeePrediction(eta, linkStandardError, mean,
+                responseStandardError, Math.min(lower, upper), Math.max(lower, upper));
+        }
+        return result;
+    }
+
     /** Computes one adjusted mean for each supplied reference-grid design row. */
     public static MarginalMeanEstimate[] marginalMeans(
             GeeResult fit,

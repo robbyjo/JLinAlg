@@ -10,7 +10,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
+import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
+import jdistlib.accelerator.MatrixTranspose;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.inference.DegreesOfFreedomMethod;
@@ -57,22 +59,89 @@ public final class FastOlsAssociation {
         validate(predictors, rows, predictorCount, olsOptions, engineOptions);
         List<String> names = names(predictorNames, predictorCount, "variable");
         long started = System.nanoTime();
-        WeightedBase base = prepareBase(response, covariates, rows,
+        try (BackendContext context = BackendContext.select(
+                engineOptions.backendPolicy())) {
+            ComputeBackend backend = context.backend();
+            WeightedBase base = prepareBase(response, covariates, rows,
+                covariateCount, weights, offset, olsOptions, backend);
+            return scanPrepared(predictors, predictorCount, names,
+                rows, covariateCount, base, backend, engineOptions, started);
+        }
+    }
+
+    /** Prepares a fixed OLS null model and backend for repeated predictor blocks. */
+    public static PreparedPredictorScan preparePredictors(
+            double[] response, double[] covariates, int rows,
+            int covariateCount, double[] weights, double[] offset,
+            OlsOptions olsOptions, AssociationEngineOptions engineOptions) {
+        MatrixOps.validateModelData(response, covariates, rows, covariateCount);
+        if (olsOptions == null || engineOptions == null)
+            throw new IllegalArgumentException("OLS and engine options are required");
+        return new PreparedPredictorScan(response, covariates, rows,
             covariateCount, weights, offset, olsOptions, engineOptions);
-        int degreesOfFreedom = rows - base.rank() - 1;
-        if (degreesOfFreedom < 1)
-            throw new IllegalArgumentException("predictor scan requires residual degrees of freedom");
-        double[] beta = nan(predictorCount);
-        double[] standardErrors = nan(predictorCount);
-        ConcurrentLinkedQueue<AssociationFailure> failures = new ConcurrentLinkedQueue<>();
-        int chunks = (predictorCount + engineOptions.chunkSize() - 1)
-            / engineOptions.chunkSize();
-        execute(chunks, engineOptions.parallelism(), chunk -> {
-            int first = chunk * engineOptions.chunkSize();
-            int count = Math.min(engineOptions.chunkSize(), predictorCount - first);
-            try (BackendContext context = BackendContext.select(
-                    engineOptions.backendPolicy())) {
-                ComputeBackend backend = context.backend();
+    }
+
+    /** A retained fixed OLS projection for low-overhead block scans. */
+    public static final class PreparedPredictorScan implements AutoCloseable {
+        private final int rows;
+        private final int covariateCount;
+        private final AssociationEngineOptions engineOptions;
+        private final BackendContext context;
+        private final WeightedBase base;
+        private boolean closed;
+
+        private PreparedPredictorScan(
+                double[] response, double[] covariates, int rows,
+                int covariateCount, double[] weights, double[] offset,
+                OlsOptions olsOptions, AssociationEngineOptions engineOptions) {
+            this.rows = rows;
+            this.covariateCount = covariateCount;
+            this.engineOptions = engineOptions;
+            context = BackendContext.select(engineOptions.backendPolicy());
+            base = prepareBase(response, covariates, rows, covariateCount,
+                weights, offset, olsOptions, context.backend());
+        }
+
+        public AssociationBatchResult scan(
+                double[] predictors, int predictorCount,
+                List<String> predictorNames) {
+            if (closed) throw new IllegalStateException(
+                "prepared OLS predictor scan is closed");
+            validate(predictors, rows, predictorCount,
+                OlsOptions.defaults(), engineOptions);
+            return scanPrepared(predictors, predictorCount,
+                names(predictorNames, predictorCount, "variable"),
+                rows, covariateCount, base, context.backend(),
+                engineOptions, System.nanoTime());
+        }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            context.close();
+        }
+    }
+
+    private static AssociationBatchResult scanPrepared(
+            double[] predictors, int predictorCount, List<String> names,
+            int rows, int covariateCount, WeightedBase base,
+            ComputeBackend backend, AssociationEngineOptions engineOptions,
+            long started) {
+            int degreesOfFreedom = rows - base.rank() - 1;
+            if (degreesOfFreedom < 1)
+                throw new IllegalArgumentException(
+                    "predictor scan requires residual degrees of freedom");
+            double[] beta = nan(predictorCount);
+            double[] standardErrors = nan(predictorCount);
+            ConcurrentLinkedQueue<AssociationFailure> failures =
+                new ConcurrentLinkedQueue<>();
+            int chunks = (predictorCount + engineOptions.chunkSize() - 1)
+                / engineOptions.chunkSize();
+            execute(chunks, engineOptions.parallelism(), chunk -> {
+                int first = chunk * engineOptions.chunkSize();
+                int count = Math.min(
+                    engineOptions.chunkSize(), predictorCount - first);
                 PreparedPredictors prepared = predictorBlock(
                     predictors, rows, predictorCount,
                     first, count, base.squareRootWeights(),
@@ -114,13 +183,13 @@ public final class FastOlsAssociation {
                     standardErrors[destination] = Math.sqrt(
                         rss / degreesOfFreedom / information);
                 }
-            }
-        });
-        AssociationStatistics statistics = AssociationStatistics.studentT(
-            beta, standardErrors, degreesOfFreedom, DegreesOfFreedomMethod.RESIDUAL);
-        return result(names, statistics, failures, covariateCount,
-            Math.min(engineOptions.parallelism(), chunks),
-            System.nanoTime() - started);
+            });
+            AssociationStatistics statistics = AssociationStatistics.studentT(
+                beta, standardErrors, degreesOfFreedom,
+                DegreesOfFreedomMethod.RESIDUAL);
+            return result(names, statistics, failures, covariateCount,
+                Math.min(engineOptions.parallelism(), chunks),
+                System.nanoTime() - started);
     }
 
     public static AssociationBatchResult scanResponses(
@@ -232,27 +301,39 @@ public final class FastOlsAssociation {
     private static WeightedBase prepareBase(
             double[] response, double[] design, int rows, int columns,
             double[] weights, double[] offset, OlsOptions olsOptions,
-            AssociationEngineOptions engineOptions) {
+            ComputeBackend backend) {
         double[] squareRootWeights = weights(weights, rows);
         double[] offsets = offsets(offset, rows);
         double[] weightedDesign = weightDesign(design, rows, columns, squareRootWeights);
         double[] weightedResponse = new double[rows];
         for (int row = 0; row < rows; row++)
             weightedResponse[row] = squareRootWeights[row] * (response[row] - offsets[row]);
-        try (BackendContext context = BackendContext.select(engineOptions.backendPolicy())) {
-            ComputeBackend backend = context.backend();
-            LeastSquaresSolver.Solution solution = LeastSquaresSolver.solve(
+        LeastSquaresSolver.Solution solution;
+        try {
+            double[] information = MatrixOps.transposeMultiply(backend,
+                weightedDesign, rows, columns, weightedDesign, columns);
+            CholeskyFactor factor = backend.dpotrf(information, columns);
+            double[] rightSide = new double[columns];
+            backend.dgemv(MatrixTranspose.TRANSPOSE, rows, columns,
+                1.0, weightedDesign, weightedResponse, 0.0, rightSide);
+            solution = new LeastSquaresSolver.Solution(
+                factor.solve(rightSide),
+                factor.solve(MatrixOps.identity(columns), columns),
+                columns, false, 0.0);
+        } catch (IllegalArgumentException | IllegalStateException failure) {
+            solution = LeastSquaresSolver.solve(
                 weightedDesign, weightedResponse, rows, columns,
-                olsOptions.rankDeficiencyStrategy() == RankDeficiencyStrategy.MINIMUM_NORM,
+                olsOptions.rankDeficiencyStrategy()
+                    == RankDeficiencyStrategy.MINIMUM_NORM,
                 backend);
-            double[] fitted = MatrixOps.multiply(
-                backend, weightedDesign, rows, columns, solution.coefficients());
-            double[] residual = MatrixOps.subtract(weightedResponse, fitted);
-            double rss = backend.ddot(rows, residual, 0, 1, residual, 0, 1);
-            return new WeightedBase(weightedDesign,
-                solution.unscaledCovariance(), residual, squareRootWeights,
-                Math.max(0.0, rss), solution.rank());
         }
+        double[] fitted = MatrixOps.multiply(
+            backend, weightedDesign, rows, columns, solution.coefficients());
+        double[] residual = MatrixOps.subtract(weightedResponse, fitted);
+        double rss = backend.ddot(rows, residual, 0, 1, residual, 0, 1);
+        return new WeightedBase(weightedDesign,
+            solution.unscaledCovariance(), residual, squareRootWeights,
+            Math.max(0.0, rss), solution.rank());
     }
 
     private static PreparedPredictors predictorBlock(

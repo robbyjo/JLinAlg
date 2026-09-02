@@ -9,9 +9,14 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.IntStream;
 import jdistlib.Normal;
+import jdistlib.T;
 import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
+import jdistlib.accelerator.SymmetricEigenDecomposition;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.compute.BackendProvenance;
@@ -27,6 +32,8 @@ import org.jlinalg.model.MissingDataPolicy;
 public final class Gee {
     private static final double MINIMUM_VARIANCE = 1e-12;
     private static final double MAXIMUM_CORRELATION = 0.98;
+    private static final ThreadLocal<ClusterWorkspace> CLUSTER_WORKSPACE =
+        ThreadLocal.withInitial(ClusterWorkspace::new);
 
     private Gee() { }
 
@@ -76,25 +83,60 @@ public final class Gee {
             throw new IllegalArgumentException(
                 "family, options, and backendPolicy are required");
         }
-        Prepared data = prepare(response, design, rows, columns,
+        PreparedGeeData data = prepare(response, design, rows, columns,
+            cluster, repeated, weights, offset, options, family);
+        return fit(data, family, options, backendPolicy);
+    }
+
+    /** Validates, omits missing rows, and cluster-sorts reusable GEE inputs. */
+    public static PreparedGeeData prepare(
+            double[] response,
+            double[] design,
+            int rows,
+            int columns,
+            int[] cluster,
+            int[] repeated,
+            double[] weights,
+            double[] offset,
+            GeeOptions options,
+            GlmFamily family) {
+        if (family == null || options == null) {
+            throw new IllegalArgumentException("family and options are required");
+        }
+        PreparedGeeData data = prepareInternal(response, design, rows, columns,
             cluster, repeated, weights, offset, options, family);
         validateOptions(data, options, family);
+        return data;
+    }
 
-        double[] coefficients = startingCoefficients(
-            data, family, options, backendPolicy);
+    /** Fits a warm-startable GEE without repeating validation and cluster sorting. */
+    public static GeeResult fit(
+            PreparedGeeData data,
+            GlmFamily family,
+            GeeOptions options,
+            BackendPolicy backendPolicy) {
+        if (data == null || family == null || options == null
+                || backendPolicy == null) {
+            throw new IllegalArgumentException(
+                "prepared data, family, options, and backendPolicy are required");
+        }
+        validateOptions(data, options, family);
+        double[] coefficients = startingCoefficients(data, family,
+            options, backendPolicy);
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             return fitPrepared(data, family, options, coefficients,
-                context.backend(), context.provenance());
+                context.backend(), context.provenance(), true);
         }
     }
 
     private static GeeResult fitPrepared(
-            Prepared data,
+            PreparedGeeData data,
             GlmFamily family,
             GeeOptions options,
             double[] coefficients,
             ComputeBackend backend,
-            BackendProvenance provenance) {
+            BackendProvenance provenance,
+            boolean allowExactDeletion) {
         double[] associationParameters = initialAssociation(data, options);
         Scale scale = new Scale(options.dispersion(),
             new double[0], constant(data.rows(), options.dispersion()));
@@ -102,42 +144,48 @@ public final class Gee {
         boolean converged = false;
         String message = "maximum iterations reached";
         int iterations = 0;
+        double lastCoefficientChange = Double.POSITIVE_INFINITY;
+        double lastAssociationChange = Double.POSITIVE_INFINITY;
+        double lastScaleChange = Double.POSITIVE_INFINITY;
+        double lastStepMultiplier = Double.NaN;
 
         for (int iteration = 1;
                 iteration <= options.maximumIterations(); iteration++) {
             iterations = iteration;
+            Scale previousScale = scale;
             scale = estimateScale(data, family, state, options, backend);
+            double scaleChange = relativeMaximumChange(
+                previousScale.observationScale(), scale.observationScale());
             state = state(data, family, coefficients,
                 scale.observationScale(), backend);
             double[] updatedAssociation = estimateAssociation(
                 data, state, scale.observationScale(), options, backend);
             if (iteration > 1 && updatedAssociation.length == associationParameters.length) {
+                double damping = options.associationDamping();
                 for (int index = 0; index < updatedAssociation.length; index++) {
-                    updatedAssociation[index] = 0.5 * associationParameters[index]
-                        + 0.5 * updatedAssociation[index];
+                    updatedAssociation[index] = (1.0 - damping)
+                        * associationParameters[index]
+                        + damping * updatedAssociation[index];
                 }
             }
             double associationChange = relativeMaximumChange(
                 associationParameters, updatedAssociation);
+            lastAssociationChange = associationChange;
+            lastScaleChange = scaleChange;
             associationParameters = updatedAssociation;
 
             Accumulation accumulation = accumulate(data, state,
                 scale.observationScale(), associationParameters,
                 options, backend);
-            double[] score = accumulation.score().clone();
             double[] inverseBread = inverseSymmetric(
                 accumulation.bread(), data.columns(), backend);
-            if (options.method() == GeeMethod.BIAS_REDUCED) {
-                score = adjustedScore(data, state, scale.observationScale(),
-                    associationParameters, options, inverseBread, backend);
-            } else if (options.method() == GeeMethod.JEFFREYS) {
-                addInPlace(score, jeffreysAdjustment(data, family, coefficients,
-                    scale.observationScale(), associationParameters,
-                    options, backend));
-            }
+            double[] score = estimatingScore(data, family, coefficients, state,
+                scale.observationScale(), associationParameters, options,
+                accumulation, inverseBread, backend);
             double[] step = multiply(inverseBread, data.columns(), score);
             double[] candidate = null;
             State candidateState = null;
+            double candidateScoreNorm = Double.POSITIVE_INFINITY;
             double baselineScoreNorm = norm(score);
             double multiplier = 1.0;
             for (int attempt = 0; attempt < 24; attempt++) {
@@ -148,10 +196,18 @@ public final class Gee {
                     Accumulation trialAccumulation = accumulate(data, trialState,
                         scale.observationScale(), associationParameters,
                         options, backend);
-                    if (norm(trialAccumulation.score()) <= baselineScoreNorm
+                    double[] trialInverseBread = inverseSymmetric(
+                        trialAccumulation.bread(), data.columns(), backend);
+                    double[] trialScore = estimatingScore(data, family, trial,
+                        trialState, scale.observationScale(), associationParameters,
+                        options, trialAccumulation, trialInverseBread, backend);
+                    double trialScoreNorm = norm(trialScore);
+                    if (trialScoreNorm <= baselineScoreNorm
                             + 1e-10 * (1.0 + baselineScoreNorm)) {
                         candidate = trial;
                         candidateState = trialState;
+                        candidateScoreNorm = trialScoreNorm;
+                        lastStepMultiplier = multiplier;
                         break;
                     }
                 } catch (IllegalArgumentException exception) {
@@ -170,12 +226,16 @@ public final class Gee {
                 break;
             }
             double coefficientChange = relativeMaximumChange(coefficients, candidate);
+            lastCoefficientChange = coefficientChange;
             coefficients = candidate;
             state = candidateState;
             if (coefficientChange <= options.relativeTolerance()
-                    && associationChange <= Math.sqrt(options.relativeTolerance())) {
+                    && associationChange <= options.associationTolerance()
+                    && scaleChange <= options.scaleTolerance()
+                    && candidateScoreNorm <= options.scoreTolerance()
+                        * (1.0 + norm(coefficients))) {
                 converged = true;
-                message = "coefficient and association tolerances reached";
+                message = "coefficient, association, scale, and score tolerances reached";
                 break;
             }
         }
@@ -228,36 +288,76 @@ public final class Gee {
         } else {
             Arrays.fill(dfAdjusted, Double.NaN);
         }
-        double[] correctedMeat = biasCorrectedMeat(data, state,
-            scale.observationScale(), associationParameters,
-            options, naive, backend);
-        double[] biasCorrected = sandwich(naive, correctedMeat, p);
+        double[] biasCorrected = sandwich(naive, correctedMeat(data, state,
+            scale.observationScale(), associationParameters, options, naive,
+            LeverageCorrection.MANCL_DEROUEN, backend), p);
+        double[] kauermannCarroll = sandwich(naive, correctedMeat(data, state,
+            scale.observationScale(), associationParameters, options, naive,
+            LeverageCorrection.KAUERMANN_CARROLL, backend), p);
+        double[] fayGraubard = sandwich(naive, correctedMeat(data, state,
+            scale.observationScale(), associationParameters, options, naive,
+            LeverageCorrection.FAY_GRAUBARD, backend), p);
+        boolean requestExactDeletion = allowExactDeletion
+            && (options.covariance() == GeeCovariance.JACKKNIFE
+                || options.exactClusterDeletion());
+        Deletion deletion = requestExactDeletion
+            ? exactClusterDeletion(data, family, options, coefficients,
+                backend, provenance)
+            : new Deletion(new double[0], filled(p * p, Double.NaN));
+        double[] jackknife = deletion.covariance();
         double[] selected = switch (options.covariance()) {
             case NAIVE -> naive;
             case ROBUST -> robust;
             case DF_ADJUSTED -> dfAdjusted;
             case BIAS_CORRECTED -> biasCorrected;
+            case KAUERMANN_CARROLL -> kauermannCarroll;
+            case FAY_GRAUBARD -> fayGraubard;
+            case JACKKNIFE -> jackknife;
         };
+        double degreesOfFreedom = options.inference() == GeeInference.CLUSTER_T
+            ? data.clusters() - p : Double.POSITIVE_INFINITY;
+        if (options.inference() == GeeInference.CLUSTER_T
+                && !(degreesOfFreedom > 0.0)) {
+            throw new IllegalArgumentException(
+                "cluster-t inference requires more clusters than parameters");
+        }
         Inference inference = inference(coefficients, selected,
-            options.confidenceLevel());
+            options.confidenceLevel(), options.inference(), degreesOfFreedom);
         GeeCriteria criteria = criteria(data, state, scale.observationScale(),
             robust, family, p, backend);
+        Residuals residuals = residuals(data, state, family, naive,
+            scale.observationScale(), associationParameters, options, backend);
+        GeeDiagnostics diagnostics = diagnostics(data, state,
+            scale.observationScale(), associationParameters, options,
+            coefficients, naive, deletion.coefficients(), backend);
+        double finalScoreNorm = norm(estimatingScore(data, family, coefficients,
+            state, scale.observationScale(), associationParameters, options,
+            finalAccumulation, naive, backend));
+        GeeConvergenceDiagnostics convergenceDiagnostics =
+            new GeeConvergenceDiagnostics(iterations, converged, message,
+                lastCoefficientChange, lastAssociationChange, lastScaleChange,
+                finalScoreNorm, lastStepMultiplier);
 
         return new GeeResult(
             family.name(), options.correlation(), options.association(),
             options.covariance(), options.method(), coefficients, selected,
             naive, robust, dfAdjusted, biasCorrected,
+            kauermannCarroll, fayGraubard, jackknife,
             inference.standardErrors(), inference.statistics(), inference.pValues(),
             inference.lower(), inference.upper(),
             data.output(state.linearPredictor()), data.output(state.means()),
-            data.output(state.pearsonResiduals()), associationParameters,
-            scale.average(), scale.coefficients(), criteria,
+            data.output(state.pearsonResiduals()),
+            data.output(residuals.response()), data.output(residuals.deviance()),
+            data.output(residuals.working()), data.output(residuals.standardized()),
+            associationParameters, scale.average(), scale.coefficients(), criteria,
+            options.inference(), degreesOfFreedom, diagnostics,
+            convergenceDiagnostics,
             data.rows(), data.clusters(), data.minimumClusterSize(),
             data.maximumClusterSize(), p, iterations, converged, message,
             data.retainedRows(), data.originalRows(), provenance);
     }
 
-    private static Prepared prepare(
+    private static PreparedGeeData prepareInternal(
             double[] response,
             double[] design,
             int rows,
@@ -380,7 +480,7 @@ public final class Gee {
             outputPosition[index] = rank[sortedOriginal[index]];
         }
         int maximumWave = Arrays.stream(waves).max().orElse(0) + 1;
-        return new Prepared(keptResponse, keptDesign, keptWeights, keptOffset,
+        return new PreparedGeeData(keptResponse, keptDesign, keptWeights, keptOffset,
             keptScale, options.scaleDesignColumns(), n, columns,
             keptClusters, waves, starts, maximumWave,
             retainedRows, outputPosition, rows);
@@ -415,7 +515,7 @@ public final class Gee {
     }
 
     private static void validateOptions(
-            Prepared data, GeeOptions options, GlmFamily family) {
+            PreparedGeeData data, GeeOptions options, GlmFamily family) {
         if (data.clusters() < 2) {
             throw new IllegalArgumentException("GEE requires at least two clusters");
         }
@@ -436,6 +536,11 @@ public final class Gee {
                 "correlationDesign must have choose(maximum waves, 2) rows");
         }
         if (options.association() == GeeAssociation.ODDS_RATIO) {
+            if (options.associationLink() != GeeParameterLink.IDENTITY
+                    && options.associationLink() != GeeParameterLink.LOG) {
+                throw new IllegalArgumentException(
+                    "odds-ratio association supports the default or log link");
+            }
             if (!family.name().toLowerCase(java.util.Locale.ROOT).contains("binomial")) {
                 throw new IllegalArgumentException(
                     "odds-ratio association requires a binomial family");
@@ -459,7 +564,7 @@ public final class Gee {
     }
 
     private static double[] startingCoefficients(
-            Prepared data,
+            PreparedGeeData data,
             GlmFamily family,
             GeeOptions options,
             BackendPolicy backendPolicy) {
@@ -478,7 +583,7 @@ public final class Gee {
     }
 
     private static State state(
-            Prepared data,
+            PreparedGeeData data,
             GlmFamily family,
             double[] coefficients,
             double[] observationScale,
@@ -515,7 +620,7 @@ public final class Gee {
     }
 
     private static Scale estimateScale(
-            Prepared data,
+            PreparedGeeData data,
             GlmFamily family,
             State state,
             GeeOptions options,
@@ -535,19 +640,33 @@ public final class Gee {
             return new Scale(global, new double[0], constant(data.rows(), global));
         }
         int q = data.scaleColumns();
-        double[] gamma = new double[q];
+        GeeParameterLink link = options.scaleLink();
+        double[] initialTarget = new double[data.rows()];
+        for (int row = 0; row < data.rows(); row++) {
+            double squared = data.weights()[row] * state.residuals()[row]
+                * state.residuals()[row] / state.variances()[row];
+            initialTarget[row] = link.link(Math.max(MINIMUM_VARIANCE, squared));
+        }
+        double[] gamma = LeastSquaresSolver.solve(data.scaleDesign(), initialTarget,
+            data.rows(), q, false, backend).coefficients();
         for (int iteration = 0; iteration < 30; iteration++) {
             double[] eta = MatrixOps.multiply(backend, data.scaleDesign(),
                 data.rows(), q, gamma);
             double[] target = new double[data.rows()];
             double[] weightedDesign = new double[data.scaleDesign().length];
             double[] weightedTarget = new double[data.rows()];
-            double rootWeight = Math.sqrt(0.5);
             for (int row = 0; row < data.rows(); row++) {
-                double phi = Math.exp(Math.max(-30.0, Math.min(30.0, eta[row])));
+                double phi = Math.max(MINIMUM_VARIANCE, link.inverse(eta[row]));
+                double derivative = link.inverseDerivative(eta[row]);
+                if (!Double.isFinite(derivative) || Math.abs(derivative) < 1e-12) {
+                    derivative = Math.copySign(1e-12,
+                        derivative == 0.0 ? 1.0 : derivative);
+                }
                 double squared = data.weights()[row] * state.residuals()[row]
                     * state.residuals()[row] / state.variances()[row];
-                target[row] = eta[row] + (squared - phi) / phi;
+                target[row] = eta[row] + (squared - phi) / derivative;
+                double rootWeight = Math.abs(derivative)
+                    / (Math.sqrt(2.0) * phi);
                 weightedTarget[row] = rootWeight * target[row];
                 for (int column = 0; column < q; column++) {
                     weightedDesign[row * q + column] = rootWeight
@@ -556,7 +675,7 @@ public final class Gee {
             }
             double[] next = LeastSquaresSolver.solve(weightedDesign,
                 weightedTarget, data.rows(), q, false, backend).coefficients();
-            if (relativeMaximumChange(gamma, next) < 1e-8) {
+            if (relativeMaximumChange(gamma, next) < options.scaleTolerance()) {
                 gamma = next;
                 break;
             }
@@ -567,13 +686,14 @@ public final class Gee {
         double[] phi = new double[data.rows()];
         double average = 0.0;
         for (int row = 0; row < data.rows(); row++) {
-            phi[row] = Math.exp(Math.max(-30.0, Math.min(30.0, eta[row])));
+            phi[row] = Math.max(MINIMUM_VARIANCE, link.inverse(eta[row]));
             average += phi[row];
         }
         return new Scale(average / data.rows(), gamma, phi);
     }
 
-    private static double[] initialAssociation(Prepared data, GeeOptions options) {
+    private static double[] initialAssociation(
+            PreparedGeeData data, GeeOptions options) {
         int count = associationParameterCount(data, options);
         double[] result = new double[count];
         if (options.association() == GeeAssociation.ODDS_RATIO) {
@@ -586,7 +706,8 @@ public final class Gee {
         return result;
     }
 
-    private static int associationParameterCount(Prepared data, GeeOptions options) {
+    private static int associationParameterCount(
+            PreparedGeeData data, GeeOptions options) {
         return switch (options.correlation()) {
             case INDEPENDENCE -> 0;
             case EXCHANGEABLE, AR1 -> 1;
@@ -599,7 +720,7 @@ public final class Gee {
     }
 
     private static double[] estimateAssociation(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             GeeOptions options,
@@ -658,7 +779,7 @@ public final class Gee {
     }
 
     private static double[] estimateUserCorrelation(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             GeeOptions options,
             ComputeBackend backend) {
@@ -680,8 +801,10 @@ public final class Gee {
                 for (int second = start; second < first; second++) {
                     int pair = pairIndex(data.waves()[first], data.waves()[second]);
                     System.arraycopy(z, pair * q, design, row * q, q);
-                    target[row] = state.pearsonResiduals()[first]
-                        * state.pearsonResiduals()[second];
+                    double empirical = clamp(state.pearsonResiduals()[first]
+                        * state.pearsonResiduals()[second],
+                        -MAXIMUM_CORRELATION, MAXIMUM_CORRELATION);
+                    target[row] = options.associationLink().link(empirical);
                     row++;
                 }
             }
@@ -695,7 +818,7 @@ public final class Gee {
     }
 
     private static double[] estimateOddsRatios(
-            Prepared data, GeeOptions options, ComputeBackend backend) {
+            PreparedGeeData data, GeeOptions options, ComputeBackend backend) {
         if (options.correlation() == GeeCorrelation.USER_DEFINED) {
             return estimateUserOddsRatios(data, options, backend);
         }
@@ -728,7 +851,7 @@ public final class Gee {
     }
 
     private static double[] estimateUserOddsRatios(
-            Prepared data, GeeOptions options, ComputeBackend backend) {
+            PreparedGeeData data, GeeOptions options, ComputeBackend backend) {
         int pairs = data.maximumWave() * (data.maximumWave() - 1) / 2;
         double[][] cells = new double[pairs][4];
         for (int cluster = 0; cluster < data.clusters(); cluster++) {
@@ -748,10 +871,12 @@ public final class Gee {
         }
         double adding = options.oddsRatioContinuityCorrection();
         double[] target = new double[pairs];
+        GeeParameterLink link = oddsRatioLink(options);
         for (int pair = 0; pair < pairs; pair++) {
-            target[pair] = Math.log((cells[pair][0] + adding)
+            double oddsRatio = (cells[pair][0] + adding)
                 * (cells[pair][3] + adding)
-                / ((cells[pair][1] + adding) * (cells[pair][2] + adding)));
+                / ((cells[pair][1] + adding) * (cells[pair][2] + adding));
+            target[pair] = link.link(oddsRatio);
         }
         try {
             return LeastSquaresSolver.solve(options.correlationDesign(), target,
@@ -759,6 +884,11 @@ public final class Gee {
         } catch (IllegalArgumentException exception) {
             return new double[options.correlationDesignColumns()];
         }
+    }
+
+    private static GeeParameterLink oddsRatioLink(GeeOptions options) {
+        return options.associationLink() == GeeParameterLink.IDENTITY
+            ? GeeParameterLink.LOG : options.associationLink();
     }
 
     private static int associationIndex(
@@ -775,7 +905,7 @@ public final class Gee {
     }
 
     private static Accumulation accumulate(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
@@ -785,37 +915,80 @@ public final class Gee {
         double[] bread = new double[p * p];
         double[] meat = new double[p * p];
         double[] score = new double[p];
-        for (int cluster = 0; cluster < data.clusters(); cluster++) {
-            ClusterComponents components = clusterComponents(data, state, phi,
-                associationParameters, options, cluster, backend);
-            double[] clusterScore = new double[p];
-            for (int column = 0; column < p; column++) {
-                for (int row = 0; row < components.size(); row++) {
-                    clusterScore[column] += components.derivativeDesign()[row * p + column]
-                        * components.solvedResidual()[row];
-                }
-                score[column] += clusterScore[column];
+        ClusterAccumulation[] clusterValues;
+        if (options.parallelism() > 1
+                && data.clusters() >= options.parallelThreshold()) {
+            ForkJoinPool pool = new ForkJoinPool(options.parallelism());
+            try {
+                clusterValues = pool.submit(() -> IntStream.range(0, data.clusters())
+                    .parallel()
+                    .mapToObj(cluster -> accumulateCluster(data, state, phi,
+                        associationParameters, options, cluster, backend))
+                    .toArray(ClusterAccumulation[]::new)).get();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("parallel GEE accumulation interrupted",
+                    exception);
+            } catch (ExecutionException exception) {
+                throw new IllegalStateException("parallel GEE accumulation failed",
+                    exception.getCause());
+            } finally {
+                pool.shutdown();
             }
-            for (int first = 0; first < p; first++) {
-                for (int second = 0; second < p; second++) {
-                    double value = 0.0;
-                    for (int row = 0; row < components.size(); row++) {
-                        value += components.derivativeDesign()[row * p + first]
-                            * components.solvedDerivativeDesign()[row * p + second];
-                    }
-                    bread[first * p + second] += value;
-                    meat[first * p + second] += clusterScore[first]
-                        * clusterScore[second];
-                }
+        } else {
+            clusterValues = new ClusterAccumulation[data.clusters()];
+            for (int cluster = 0; cluster < data.clusters(); cluster++) {
+                clusterValues[cluster] = accumulateCluster(data, state, phi,
+                    associationParameters, options, cluster, backend);
             }
+        }
+        for (ClusterAccumulation value : clusterValues) {
+            addInPlace(score, value.score());
+            addInPlace(bread, value.bread());
+            addInPlace(meat, value.meat());
         }
         symmetrize(bread, p);
         symmetrize(meat, p);
         return new Accumulation(bread, meat, score);
     }
 
+    private static ClusterAccumulation accumulateCluster(
+            PreparedGeeData data,
+            State state,
+            double[] phi,
+            double[] associationParameters,
+            GeeOptions options,
+            int cluster,
+            ComputeBackend backend) {
+        int p = data.columns();
+        ClusterComponents components = clusterComponents(data, state, phi,
+            associationParameters, options, cluster, backend);
+        double[] clusterScore = new double[p];
+        double[] bread = new double[p * p];
+        double[] meat = new double[p * p];
+        for (int column = 0; column < p; column++) {
+            for (int row = 0; row < components.size(); row++) {
+                clusterScore[column] += components.derivativeDesign()[row * p + column]
+                    * components.solvedResidual()[row];
+            }
+        }
+        for (int first = 0; first < p; first++) {
+            for (int second = 0; second < p; second++) {
+                double value = 0.0;
+                for (int row = 0; row < components.size(); row++) {
+                    value += components.derivativeDesign()[row * p + first]
+                        * components.solvedDerivativeDesign()[row * p + second];
+                }
+                bread[first * p + second] = value;
+                meat[first * p + second] = clusterScore[first]
+                    * clusterScore[second];
+            }
+        }
+        return new ClusterAccumulation(bread, meat, clusterScore);
+    }
+
     private static ClusterComponents clusterComponents(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
@@ -826,8 +999,10 @@ public final class Gee {
         int end = data.starts()[cluster + 1];
         int size = end - start;
         int p = data.columns();
-        double[] derivativeDesign = new double[size * p];
-        double[] residual = new double[size];
+        ClusterWorkspace workspace = CLUSTER_WORKSPACE.get();
+        workspace.ensure(size, p);
+        double[] derivativeDesign = workspace.derivativeDesign;
+        double[] residual = workspace.residual;
         for (int local = 0; local < size; local++) {
             int row = start + local;
             residual[local] = state.residuals()[row];
@@ -837,11 +1012,11 @@ public final class Gee {
             }
         }
         double[] covariance = covarianceMatrix(data, state, phi,
-            associationParameters, options, start, end);
+            associationParameters, options, start, end, backend);
         CholeskyFactor factor = covarianceFactor(covariance, size, backend);
         double[] solvedResidual = factor.solve(residual);
-        double[] solvedDesign = new double[size * p];
-        double[] rightSide = new double[size];
+        double[] solvedDesign = workspace.solvedDesign;
+        double[] rightSide = workspace.rightSide;
         for (int column = 0; column < p; column++) {
             for (int row = 0; row < size; row++) {
                 rightSide[row] = derivativeDesign[row * p + column];
@@ -856,13 +1031,14 @@ public final class Gee {
     }
 
     private static double[] covarianceMatrix(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
             GeeOptions options,
             int start,
-            int end) {
+            int end,
+            ComputeBackend backend) {
         int size = end - start;
         double[] covariance = new double[size * size];
         double[] standardDeviation = new double[size];
@@ -885,11 +1061,88 @@ public final class Gee {
                 covariance[second * size + first] = value;
             }
         }
-        return covariance;
+        return positiveDefiniteCovariance(covariance, size, options, backend);
+    }
+
+    private static double[] positiveDefiniteCovariance(
+            double[] covariance,
+            int size,
+            GeeOptions options,
+            ComputeBackend backend) {
+        try {
+            backend.dpotrf(covariance.clone(), size);
+            return covariance;
+        } catch (IllegalArgumentException exception) {
+            if (!options.positiveDefiniteProjection()) {
+                throw new IllegalArgumentException(
+                    "working covariance is not positive definite", exception);
+            }
+        }
+        double[] standardDeviation = new double[size];
+        double[] correlation = new double[size * size];
+        for (int row = 0; row < size; row++) {
+            standardDeviation[row] = Math.sqrt(Math.max(MINIMUM_VARIANCE,
+                covariance[row * size + row]));
+        }
+        for (int row = 0; row < size; row++) {
+            for (int column = 0; column < size; column++) {
+                correlation[row * size + column] = covariance[row * size + column]
+                    / (standardDeviation[row] * standardDeviation[column]);
+                if (!Double.isFinite(correlation[row * size + column])) {
+                    throw new IllegalArgumentException(
+                        "non-finite working correlation at (" + row + ", "
+                            + column + "): covariance="
+                            + covariance[row * size + column]
+                            + ", sd.row=" + standardDeviation[row]
+                            + ", sd.column=" + standardDeviation[column]);
+                }
+            }
+            correlation[row * size + row] = 1.0;
+        }
+        for (int iteration = 0; iteration < 4; iteration++) {
+            SymmetricEigenDecomposition eigen = backend.dsyev(correlation, size);
+            double[] values = eigen.eigenvalues();
+            double[] vectors = eigen.eigenvectors();
+            double floor = 1e-4;
+            double[] projected = new double[size * size];
+            for (int component = 0; component < size; component++) {
+                double value = Math.max(floor, values[component]);
+                for (int row = 0; row < size; row++) {
+                    double left = vectors[row * size + component] * value;
+                    for (int column = 0; column < size; column++) {
+                        projected[row * size + column] += left
+                            * vectors[column * size + component];
+                    }
+                }
+            }
+            double[] diagonal = new double[size];
+            for (int index = 0; index < size; index++) {
+                diagonal[index] = Math.sqrt(Math.max(floor,
+                    projected[index * size + index]));
+            }
+            for (int row = 0; row < size; row++) {
+                for (int column = 0; column < size; column++) {
+                    correlation[row * size + column] = projected[row * size + column]
+                        / (diagonal[row] * diagonal[column]);
+                    if (!Double.isFinite(correlation[row * size + column])) {
+                        correlation[row * size + column] = row == column ? 1.0 : 0.0;
+                    }
+                }
+                correlation[row * size + row] = 1.0;
+            }
+        }
+        double[] result = new double[size * size];
+        for (int row = 0; row < size; row++) {
+            for (int column = 0; column < size; column++) {
+                result[row * size + column] = correlation[row * size + column]
+                    * standardDeviation[row] * standardDeviation[column];
+            }
+        }
+        return result;
     }
 
     private static double pairCorrelation(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] parameters,
             GeeOptions options,
@@ -910,9 +1163,9 @@ public final class Gee {
                 association += design[pair * parameters.length + parameter]
                     * parameters[parameter];
             }
-            if (options.association() == GeeAssociation.ODDS_RATIO) {
-                association = Math.exp(clamp(association, -20.0, 20.0));
-            }
+            association = options.association() == GeeAssociation.ODDS_RATIO
+                ? oddsRatioLink(options).inverse(association)
+                : options.associationLink().inverse(association);
         } else {
             int index = associationIndex(firstWave, secondWave,
                 data.maximumWave(), options);
@@ -971,8 +1224,31 @@ public final class Gee {
             "working covariance is not positive definite", failure);
     }
 
+    private static double[] estimatingScore(
+            PreparedGeeData data,
+            GlmFamily family,
+            double[] coefficients,
+            State state,
+            double[] phi,
+            double[] associationParameters,
+            GeeOptions options,
+            Accumulation accumulation,
+            double[] inverseBread,
+            ComputeBackend backend) {
+        if (options.method() == GeeMethod.BIAS_REDUCED) {
+            return adjustedScore(data, state, phi, associationParameters,
+                options, inverseBread, backend);
+        }
+        double[] score = accumulation.score().clone();
+        if (options.method() == GeeMethod.JEFFREYS) {
+            addInPlace(score, jeffreysAdjustment(data, family, coefficients,
+                phi, associationParameters, options, backend));
+        }
+        return score;
+    }
+
     private static double[] adjustedScore(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
@@ -982,26 +1258,29 @@ public final class Gee {
         int p = data.columns();
         double[] score = new double[p];
         for (int cluster = 0; cluster < data.clusters(); cluster++) {
-            double[] clusterScore = biasAdjustedClusterScore(data, state, phi,
-                associationParameters, options, inverseBread, cluster, backend);
+            double[] clusterScore = leverageAdjustedClusterScore(data, state, phi,
+                associationParameters, options, inverseBread, cluster,
+                LeverageCorrection.MANCL_DEROUEN, backend);
             addInPlace(score, clusterScore);
         }
         return score;
     }
 
-    private static double[] biasCorrectedMeat(
-            Prepared data,
+    private static double[] correctedMeat(
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
             GeeOptions options,
             double[] inverseBread,
+            LeverageCorrection correction,
             ComputeBackend backend) {
         int p = data.columns();
         double[] meat = new double[p * p];
         for (int cluster = 0; cluster < data.clusters(); cluster++) {
-            double[] score = biasAdjustedClusterScore(data, state, phi,
-                associationParameters, options, inverseBread, cluster, backend);
+            double[] score = leverageAdjustedClusterScore(data, state, phi,
+                associationParameters, options, inverseBread, cluster,
+                correction, backend);
             for (int first = 0; first < p; first++) {
                 for (int second = 0; second < p; second++) {
                     meat[first * p + second] += score[first] * score[second];
@@ -1011,14 +1290,153 @@ public final class Gee {
         return meat;
     }
 
-    private static double[] biasAdjustedClusterScore(
-            Prepared data,
+    private static Deletion exactClusterDeletion(
+            PreparedGeeData data,
+            GlmFamily family,
+            GeeOptions options,
+            double[] coefficients,
+            ComputeBackend backend,
+            BackendProvenance provenance) {
+        int clusters = data.clusters();
+        int p = data.columns();
+        if (clusters <= Math.max(2, p)) {
+            throw new IllegalArgumentException(
+                "exact cluster jackknife requires more clusters than parameters");
+        }
+        double[] deleted = new double[clusters * p];
+        GeeOptions deletionOptions = options.toBuilder()
+            .covariance(GeeCovariance.ROBUST)
+            .exactClusterDeletion(false)
+            .initialCoefficients(coefficients)
+            .build();
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            PreparedGeeData subset = data.withoutCluster(cluster);
+            GeeResult refit = fitPrepared(subset, family, deletionOptions,
+                coefficients.clone(), backend, provenance, false);
+            if (!refit.converged()) {
+                throw new IllegalArgumentException(
+                    "delete-cluster GEE did not converge for cluster "
+                        + data.cluster()[data.starts()[cluster]]);
+            }
+            System.arraycopy(refit.coefficients(), 0, deleted, cluster * p, p);
+        }
+        double[] center = new double[p];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            for (int column = 0; column < p; column++) {
+                center[column] += deleted[cluster * p + column] / clusters;
+            }
+        }
+        double[] covariance = new double[p * p];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            for (int first = 0; first < p; first++) {
+                double left = deleted[cluster * p + first] - center[first];
+                for (int second = 0; second < p; second++) {
+                    covariance[first * p + second] += left
+                        * (deleted[cluster * p + second] - center[second]);
+                }
+            }
+        }
+        scaleInPlace(covariance, (clusters - 1.0) / clusters);
+        return new Deletion(deleted, covariance);
+    }
+
+    private static GeeDiagnostics diagnostics(
+            PreparedGeeData data,
+            State state,
+            double[] phi,
+            double[] associationParameters,
+            GeeOptions options,
+            double[] coefficients,
+            double[] inverseBread,
+            double[] exactDeleted,
+            ComputeBackend backend) {
+        int clusters = data.clusters();
+        int p = data.columns();
+        int[] ids = new int[clusters];
+        double[] scores = new double[clusters * p];
+        double[] leverageTrace = new double[clusters];
+        double[] cook = new double[clusters];
+        double[] deleted = new double[clusters * p];
+        for (int cluster = 0; cluster < clusters; cluster++) {
+            ids[cluster] = data.cluster()[data.starts()[cluster]];
+            ClusterComponents components = clusterComponents(data, state, phi,
+                associationParameters, options, cluster, backend);
+            double[] score = new double[p];
+            for (int column = 0; column < p; column++) {
+                for (int row = 0; row < components.size(); row++) {
+                    score[column] += components.derivativeDesign()[row * p + column]
+                        * components.solvedResidual()[row];
+                }
+                scores[cluster * p + column] = score[column];
+            }
+            double[] dA = multiplyRectangular(components.derivativeDesign(),
+                components.size(), p, inverseBread, p);
+            double[] leverage = multiplyTransposeRight(dA,
+                components.size(), p, components.solvedDerivativeDesign(),
+                components.size());
+            for (int row = 0; row < components.size(); row++) {
+                leverageTrace[cluster] += leverage[row * components.size() + row];
+            }
+            double[] influence = multiply(inverseBread, p, score);
+            double quadratic = 0.0;
+            for (int column = 0; column < p; column++) {
+                deleted[cluster * p + column] = coefficients[column]
+                    - influence[column];
+                quadratic += score[column] * influence[column];
+            }
+            cook[cluster] = Math.max(0.0, quadratic / p);
+        }
+        return new GeeDiagnostics(ids, p, scores, leverageTrace, cook,
+            deleted, exactDeleted);
+    }
+
+    private static Residuals residuals(
+            PreparedGeeData data,
+            State state,
+            GlmFamily family,
+            double[] inverseBread,
+            double[] phi,
+            double[] associationParameters,
+            GeeOptions options,
+            ComputeBackend backend) {
+        double[] response = state.residuals().clone();
+        double[] deviance = new double[data.rows()];
+        double[] working = new double[data.rows()];
+        double[] standardized = state.pearsonResiduals().clone();
+        for (int row = 0; row < data.rows(); row++) {
+            double magnitude = Math.sqrt(Math.max(0.0, data.weights()[row]
+                * family.unitDeviance(data.response()[row], state.means()[row])));
+            deviance[row] = Math.copySign(magnitude, response[row]);
+            working[row] = response[row] / state.derivatives()[row];
+        }
+        int p = data.columns();
+        for (int cluster = 0; cluster < data.clusters(); cluster++) {
+            ClusterComponents components = clusterComponents(data, state, phi,
+                associationParameters, options, cluster, backend);
+            double[] dA = multiplyRectangular(components.derivativeDesign(),
+                components.size(), p, inverseBread, p);
+            double[] leverage = multiplyTransposeRight(dA,
+                components.size(), p, components.solvedDerivativeDesign(),
+                components.size());
+            int start = data.starts()[cluster];
+            for (int local = 0; local < components.size(); local++) {
+                double remaining = Math.max(0.05,
+                    1.0 - leverage[local * components.size() + local]);
+                standardized[start + local] /= Math.sqrt(remaining);
+            }
+        }
+        return new Residuals(response, deviance, working, standardized);
+    }
+
+    private static double[] leverageAdjustedClusterScore(
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] associationParameters,
             GeeOptions options,
             double[] inverseBread,
             int cluster,
+            LeverageCorrection correction,
             ComputeBackend backend) {
         ClusterComponents components = clusterComponents(data, state, phi,
             associationParameters, options, cluster, backend);
@@ -1035,13 +1453,15 @@ public final class Gee {
                     - leverage[row * size + column];
             }
         }
-        double[] adjustedResidual;
-        try {
-            adjustedResidual = backend.dgetrf(identityMinus, size)
-                .solve(components.residual());
-        } catch (IllegalArgumentException exception) {
-            adjustedResidual = components.residual();
-        }
+        double[] adjustedResidual = switch (correction) {
+            case MANCL_DEROUEN -> solveLeverage(identityMinus,
+                components.residual(), size, backend);
+            case KAUERMANN_CARROLL -> multiply(
+                inverseSymmetricSquareRoot(identityMinus, size, backend),
+                size, components.residual());
+            case FAY_GRAUBARD -> fayGraubardResidual(components.residual(),
+                leverage, size, options.fayGraubardBound());
+        };
         CholeskyFactor factor = covarianceFactor(
             components.covariance(), size, backend);
         double[] solved = factor.solve(adjustedResidual);
@@ -1055,8 +1475,56 @@ public final class Gee {
         return score;
     }
 
+    private static double[] solveLeverage(
+            double[] matrix,
+            double[] residual,
+            int size,
+            ComputeBackend backend) {
+        try {
+            return backend.dgetrf(matrix, size).solve(residual);
+        } catch (IllegalArgumentException exception) {
+            double[] inverseRoot = inverseSymmetricSquareRoot(
+                matrix, size, backend);
+            return multiply(inverseRoot, size,
+                multiply(inverseRoot, size, residual));
+        }
+    }
+
+    private static double[] inverseSymmetricSquareRoot(
+            double[] matrix, int size, ComputeBackend backend) {
+        double[] symmetric = matrix.clone();
+        symmetrize(symmetric, size);
+        SymmetricEigenDecomposition eigen = backend.dsyev(symmetric, size);
+        double[] values = eigen.eigenvalues();
+        double[] vectors = eigen.eigenvectors();
+        double[] result = new double[size * size];
+        for (int component = 0; component < size; component++) {
+            double scale = 1.0 / Math.sqrt(Math.max(1e-8, values[component]));
+            for (int row = 0; row < size; row++) {
+                double left = vectors[row * size + component] * scale;
+                for (int column = 0; column < size; column++) {
+                    result[row * size + column] += left
+                        * vectors[column * size + component];
+                }
+            }
+        }
+        return result;
+    }
+
+    private static double[] fayGraubardResidual(
+            double[] residual, double[] leverage,
+            int size, double bound) {
+        double[] result = residual.clone();
+        for (int row = 0; row < size; row++) {
+            double diagonal = Math.max(0.0,
+                Math.min(bound, leverage[row * size + row]));
+            result[row] /= Math.sqrt(1.0 - diagonal);
+        }
+        return result;
+    }
+
     private static double[] jeffreysAdjustment(
-            Prepared data,
+            PreparedGeeData data,
             GlmFamily family,
             double[] coefficients,
             double[] phi,
@@ -1089,7 +1557,7 @@ public final class Gee {
     }
 
     private static GeeCriteria criteria(
-            Prepared data,
+            PreparedGeeData data,
             State state,
             double[] phi,
             double[] robustCovariance,
@@ -1103,7 +1571,7 @@ public final class Gee {
         Accumulation independent = accumulate(data, state, phi,
             new double[0], independence, backend);
         double trace = traceProduct(independent.bread(), robustCovariance, parameters);
-        double quasiLikelihood = -0.5 * state.deviance();
+        double quasiLikelihood = quasiLikelihood(data, state, family);
         double qic = -2.0 * quasiLikelihood + 2.0 * trace;
         double qicu = -2.0 * quasiLikelihood + 2.0 * parameters;
         double qicc = data.clusters() > parameters + 1
@@ -1114,25 +1582,95 @@ public final class Gee {
             trace, qicc, parameters);
     }
 
+    private static double quasiLikelihood(
+            PreparedGeeData data, State state, GlmFamily family) {
+        double result = 0.0;
+        String name = family.name().toLowerCase(java.util.Locale.ROOT);
+        for (int row = 0; row < data.rows(); row++) {
+            double response = data.response()[row];
+            double mean = state.means()[row];
+            double value;
+            if (name.startsWith("gaussian")) {
+                double residual = response - mean;
+                value = -0.5 * residual * residual;
+            } else if (name.contains("binomial")) {
+                double bounded = clamp(mean, 1e-12, 1.0 - 1e-12);
+                value = response == 0.0 ? 0.0
+                    : response * Math.log(bounded / response);
+                value += response == 1.0 ? 0.0
+                    : (1.0 - response) * Math.log(
+                        (1.0 - bounded) / (1.0 - response));
+            } else if (name.contains("poisson")) {
+                value = response == 0.0 ? -mean
+                    : response * Math.log(mean / response) - (mean - response);
+            } else if (name.startsWith("gamma")) {
+                value = 1.0 - response / mean + Math.log(response / mean);
+            } else if (name.startsWith("inverse.gaussian")) {
+                value = -response / (2.0 * mean * mean) + 1.0 / mean
+                    - 1.0 / (2.0 * response);
+            } else {
+                value = numericalQuasiLikelihood(response, mean, family);
+            }
+            result += data.weights()[row] * value;
+        }
+        return result;
+    }
+
+    private static double numericalQuasiLikelihood(
+            double response, double mean, GlmFamily family) {
+        if (response == mean) return 0.0;
+        int intervals = 64;
+        double step = (mean - response) / intervals;
+        double total = quasiIntegrand(response, response, family)
+            + quasiIntegrand(mean, response, family);
+        for (int index = 1; index < intervals; index++) {
+            double point = response + index * step;
+            total += (index % 2 == 0 ? 2.0 : 4.0)
+                * quasiIntegrand(point, response, family);
+        }
+        return step * total / 3.0;
+    }
+
+    private static double quasiIntegrand(
+            double point, double response, GlmFamily family) {
+        double safePoint = Math.max(1e-10, point);
+        double variance = Math.max(MINIMUM_VARIANCE, family.variance(safePoint));
+        return (response - point) / variance;
+    }
+
     private static Inference inference(
-            double[] coefficients, double[] covariance, double confidenceLevel) {
+            double[] coefficients,
+            double[] covariance,
+            double confidenceLevel,
+            GeeInference inference,
+            double degreesOfFreedom) {
         int p = coefficients.length;
         double[] standardErrors = new double[p];
         double[] statistics = new double[p];
         double[] pValues = new double[p];
         double[] lower = new double[p];
         double[] upper = new double[p];
-        double critical = Normal.quantile(0.5 + confidenceLevel / 2.0,
-            0.0, 1.0, true, false);
+        double critical = inference == GeeInference.CLUSTER_T
+            ? T.quantile(0.5 + confidenceLevel / 2.0,
+                degreesOfFreedom, true, false)
+            : Normal.quantile(0.5 + confidenceLevel / 2.0,
+                0.0, 1.0, true, false);
         for (int column = 0; column < p; column++) {
             double variance = covariance[column * p + column];
             standardErrors[column] = variance >= 0.0
                 ? Math.sqrt(variance) : Double.NaN;
             statistics[column] = coefficients[column] / standardErrors[column];
-            pValues[column] = Double.isFinite(statistics[column])
-                ? 2.0 * Normal.cumulative(Math.abs(statistics[column]),
-                    0.0, 1.0, false, false)
-                : Double.NaN;
+            if (!Double.isFinite(statistics[column])) {
+                pValues[column] = Double.NaN;
+            } else if (inference == GeeInference.CLUSTER_T) {
+                pValues[column] = 2.0 * T.cumulative(
+                    Math.abs(statistics[column]), degreesOfFreedom,
+                    false, false);
+            } else {
+                pValues[column] = 2.0 * Normal.cumulative(
+                    Math.abs(statistics[column]), 0.0, 1.0,
+                    false, false);
+            }
             lower[column] = coefficients[column] - critical * standardErrors[column];
             upper[column] = coefficients[column] + critical * standardErrors[column];
         }
@@ -1318,44 +1856,8 @@ public final class Gee {
         return result;
     }
 
-    private record Prepared(
-            double[] response,
-            double[] design,
-            double[] weights,
-            double[] offset,
-            double[] scaleDesign,
-            int scaleColumns,
-            int rows,
-            int columns,
-            int[] cluster,
-            int[] waves,
-            int[] starts,
-            int maximumWave,
-            int[] retainedRows,
-            int[] outputPosition,
-            int originalRows) {
-        int clusters() { return starts.length - 1; }
-        int minimumClusterSize() {
-            int result = Integer.MAX_VALUE;
-            for (int index = 0; index < clusters(); index++) {
-                result = Math.min(result, starts[index + 1] - starts[index]);
-            }
-            return result;
-        }
-        int maximumClusterSize() {
-            int result = 0;
-            for (int index = 0; index < clusters(); index++) {
-                result = Math.max(result, starts[index + 1] - starts[index]);
-            }
-            return result;
-        }
-        double[] output(double[] sorted) {
-            double[] result = new double[rows];
-            for (int index = 0; index < rows; index++) {
-                result[outputPosition[index]] = sorted[index];
-            }
-            return result;
-        }
+    private static double[] filled(int length, double value) {
+        return constant(length, value);
     }
 
     private record State(
@@ -1380,6 +1882,11 @@ public final class Gee {
             double[] score) {
     }
 
+    private record ClusterAccumulation(
+            double[] bread,
+            double[] meat,
+            double[] score) { }
+
     private record ClusterComponents(
             int size,
             double[] derivativeDesign,
@@ -1387,6 +1894,39 @@ public final class Gee {
             double[] solvedResidual,
             double[] solvedDerivativeDesign,
             double[] covariance) {
+    }
+
+    private enum LeverageCorrection {
+        MANCL_DEROUEN,
+        KAUERMANN_CARROLL,
+        FAY_GRAUBARD
+    }
+
+    private record Deletion(double[] coefficients, double[] covariance) { }
+
+    private record Residuals(
+            double[] response,
+            double[] deviance,
+            double[] working,
+            double[] standardized) { }
+
+    private static final class ClusterWorkspace {
+        private double[] derivativeDesign = new double[0];
+        private double[] residual = new double[0];
+        private double[] solvedDesign = new double[0];
+        private double[] rightSide = new double[0];
+
+        void ensure(int size, int parameters) {
+            int matrix = size * parameters;
+            if (derivativeDesign.length != matrix) {
+                derivativeDesign = new double[matrix];
+                solvedDesign = new double[matrix];
+            }
+            if (residual.length != size) {
+                residual = new double[size];
+                rightSide = new double[size];
+            }
+        }
     }
 
     private record Inference(

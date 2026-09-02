@@ -14,8 +14,8 @@ public final class OrdinalGee {
     /**
      * Fits {@code logit(P(Y <= k)) = threshold[k] - x beta}.
      * The covariate matrix must not include an intercept; category values are
-     * zero based. Working independence is used so the sandwich covariance
-     * accounts for both repeated observations and cumulative indicators.
+     * zero based. Any supported correlation or local-odds-ratio structure may
+     * be used over the augmented visit-by-cutoff waves.
      */
     public static OrdinalGeeResult fit(
             int[] response,
@@ -37,15 +37,40 @@ public final class OrdinalGee {
             throw new IllegalArgumentException(
                 "ordinal GEE requires at least three categories");
         }
-        if (options.correlation() != GeeCorrelation.INDEPENDENCE) {
+        boolean[] proportional = new boolean[covariates[0].length];
+        java.util.Arrays.fill(proportional, true);
+        return fitPartial(response, covariates, cluster, repeated,
+            categories, proportional, options, backendPolicy);
+    }
+
+    /** Fits a partial proportional-odds cumulative-logit GEE. */
+    public static OrdinalGeeResult fitPartial(
+            int[] response,
+            double[][] covariates,
+            int[] cluster,
+            int[] repeated,
+            int categories,
+            boolean[] proportional,
+            GeeOptions options,
+            BackendPolicy backendPolicy) {
+        if (response == null || covariates == null || covariates.length == 0
+                || covariates[0] == null || cluster == null || options == null
+                || backendPolicy == null || response.length != covariates.length
+                || response.length != cluster.length
+                || repeated != null && repeated.length != response.length
+                || proportional == null
+                || proportional.length != covariates[0].length
+                || categories < 3) {
             throw new IllegalArgumentException(
-                "ordinal GEE currently requires working independence");
+                "partial proportional-odds inputs are invalid");
         }
         int n = response.length;
         int predictors = covariates[0].length;
         int cutoffs = categories - 1;
         int augmentedRows = n * cutoffs;
-        int columns = cutoffs + predictors;
+        int slopeColumns = 0;
+        for (boolean shared : proportional) slopeColumns += shared ? 1 : cutoffs;
+        int columns = cutoffs + slopeColumns;
         double[] binary = new double[augmentedRows];
         double[][] design = new double[augmentedRows][columns];
         int[] augmentedCluster = new int[augmentedRows];
@@ -63,8 +88,16 @@ public final class OrdinalGee {
                 int destination = row * cutoffs + cutoff;
                 binary[destination] = response[row] <= cutoff ? 1.0 : 0.0;
                 design[destination][cutoff] = 1.0;
+                int destinationColumn = cutoffs;
                 for (int column = 0; column < predictors; column++) {
-                    design[destination][cutoffs + column] = -covariates[row][column];
+                    if (proportional[column]) {
+                        design[destination][destinationColumn++] =
+                            -covariates[row][column];
+                    } else {
+                        design[destination][destinationColumn + cutoff] =
+                            -covariates[row][column];
+                        destinationColumn += cutoffs;
+                    }
                 }
                 augmentedCluster[destination] = cluster[row];
                 augmentedRepeated[destination] = wave * cutoffs + cutoff;
@@ -73,6 +106,6 @@ public final class OrdinalGee {
         GeeResult fit = Gee.fit(binary, design, augmentedCluster,
             augmentedRepeated, GlmFamilies.binomial(), null, null,
             options, backendPolicy);
-        return new OrdinalGeeResult(categories, fit);
+        return new OrdinalGeeResult(categories, predictors, proportional, fit);
     }
 }

@@ -15,6 +15,11 @@ The committed fixtures were generated on 2026-08-31 with:
 - `rrBLUP` 4.6.3;
 - `MendelianRandomization` 0.10.0.
 
+The additive-model fixtures were regenerated on 2026-09-02 with `mgcv` 1.9-4,
+`lme4` 2.0-6, `gamlss` 5.5-0, `gamlss.dist` 6.1-1, and `VGAM` 1.1-14.
+Optional smoke references also use `gamm4` 0.3-0 and `gam` 1.22-7. These may
+be installed into the ignored project-local `.r-reference-lib` directory.
+
 The source examples and contracts are documented by
 [base R `lm`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/lm.html),
 [base R `glm`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/glm.html),
@@ -34,6 +39,9 @@ and the CRAN
 | Pedigree REML | `rrBLUP::mixed.solve` | additive relationship matrix with unphenotyped founders and repeated records; variances, BLUE, BLUPs, PEVs |
 | MR | `MendelianRandomization` | shipped LDL-C/coronary-heart-disease example; fixed/random IVW, Q, MR-Egger, weighted-median point estimate |
 | Meta-analysis | base R matrix algebra and `pchisq` | fixed inverse-variance pooling, Cochran Q, generalized DL random effects, and numeric meta-regression |
+| Gaussian GAM | `mgcv::gam` | REML P-spline fitted values, EDF, smoothing parameter, deviance, and likelihood |
+| Binomial Laplace GLMM | `lme4::glmer` | coefficients, random-intercept variance, likelihood, and selected fitted probabilities |
+| Distributional/vector models | `gamlss::gamlss`, `VGAM::vglm` | Gaussian location/scale coefficients, fitted parameters, and likelihood; multinomial logits, likelihood, and category probabilities |
 
 R and JLinAlg use different optimizers and termination rules. Closed-form and
 direct linear-model quantities use tolerances near floating-point rounding.
@@ -57,6 +65,17 @@ project root. Then run:
 ```powershell
 & 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
   'src\test\resources\r-reference\generate-reference.R'
+```
+
+The additive fixtures are regenerated separately:
+
+```powershell
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  'src\test\resources\r-reference\generate-gam-reference.R'
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  'src\test\resources\r-reference\generate-laplace-glmm-reference.R'
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  'src\test\resources\r-reference\generate-distributional-reference.R'
 ```
 
 Review package-version changes and numerical differences before updating Java

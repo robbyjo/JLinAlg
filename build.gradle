@@ -8,8 +8,8 @@ plugins {
 group = 'org.jlinalg'
 version = '0.1.0-SNAPSHOT'
 
-def jdistlibVersion = '0.10.0'
-def jdistlibSha256 = '3644fd53eba2c99cbc6c68ea939ea5dc595b6e810b328821023a341195be3a3e'
+def jdistlibVersion = '0.10.1'
+def jdistlibSha256 = 'c1912e1d10928a0df321c33c85d5f97b3921e40e9bbbdcddfc508358dfb2af03'
 def jdistlibJar = layout.buildDirectory.file(
     "dependencies/jdistlib-all-${jdistlibVersion}.jar")
 
@@ -23,11 +23,95 @@ java {
 }
 
 sourceSets {
+    main {
+        resources.srcDir layout.buildDirectory.dir(
+            'generated-resources/cholmod')
+    }
     benchmark {
         java.srcDir 'src/benchmark/java'
         compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
         runtimeClasspath += output + compileClasspath
     }
+}
+
+def cholmodSourceDir = layout.projectDirectory.dir('src/main/native/cholmod')
+def cholmodBuildDir = layout.buildDirectory.dir('native/cholmod')
+def cholmodResourceDir = layout.buildDirectory.dir(
+    'generated-resources/cholmod')
+def nativeOs = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+def nativeArchName = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+def nativePlatform = nativeOs.contains('win') ? 'windows'
+    : nativeOs.contains('mac') ? 'macos' : 'linux'
+def nativeMachine = ['amd64', 'x86_64'].contains(nativeArchName)
+    ? 'x86_64' : ['aarch64', 'arm64'].contains(nativeArchName)
+        ? 'arm64' : nativeArchName
+def cholmodLibraryName = nativePlatform == 'windows'
+    ? 'jlinalg_cholmod.dll' : nativePlatform == 'macos'
+        ? 'libjlinalg_cholmod.dylib' : 'libjlinalg_cholmod.so'
+def environmentMklRoot = System.getenv('MKLROOT')
+def detectedMklRoot = environmentMklRoot != null
+        && file(environmentMklRoot).isDirectory()
+    ? environmentMklRoot
+    : file('C:/Program Files (x86)/Intel/oneAPI/mkl/2023.1.0').isDirectory()
+        ? 'C:/Program Files (x86)/Intel/oneAPI/mkl/2023.1.0' : null
+def configuredMklRoot = providers.gradleProperty('cholmodMklRoot')
+    .getOrElse(detectedMklRoot)
+def configuredSuiteSparse = providers.gradleProperty('suiteSparseSourceDir')
+    .getOrNull()
+def cholmodConfigureCommand = [
+    'cmake', '-S', cholmodSourceDir.asFile.absolutePath,
+    '-B', cholmodBuildDir.get().asFile.absolutePath,
+    '-DCMAKE_BUILD_TYPE=Release'
+]
+if (configuredMklRoot != null && !configuredMklRoot.isBlank())
+    cholmodConfigureCommand.add(
+        "-DJLINALG_MKL_ROOT=${configuredMklRoot}")
+if (configuredSuiteSparse != null && !configuredSuiteSparse.isBlank())
+    cholmodConfigureCommand.add(
+        "-DFETCHCONTENT_SOURCE_DIR_SUITESPARSE=${configuredSuiteSparse}")
+
+tasks.register('configureCholmodNative', Exec) {
+    group = 'build setup'
+    description = 'Configures the pinned SuiteSparse CHOLMOD JNI bridge.'
+    inputs.dir(cholmodSourceDir)
+    inputs.property('mklRoot', configuredMklRoot ?: '')
+    inputs.property('suiteSparseSource', configuredSuiteSparse ?: '')
+    outputs.file(cholmodBuildDir.map { it.file('CMakeCache.txt') })
+    commandLine cholmodConfigureCommand
+}
+
+tasks.register('buildCholmodNative', Exec) {
+    group = 'build'
+    description = 'Builds the SuiteSparse CHOLMOD JNI bridge for this host.'
+    dependsOn tasks.named('configureCholmodNative')
+    inputs.file(cholmodSourceDir.file('cholmod_jni.c'))
+    outputs.file(cholmodBuildDir.map {
+        it.file("bin/Release/${cholmodLibraryName}")
+    })
+    commandLine 'cmake', '--build', cholmodBuildDir.get().asFile.absolutePath,
+        '--config', 'Release', '--target', 'jlinalg_cholmod', '--parallel'
+}
+
+tasks.register('packageCholmodNative', Sync) {
+    group = 'build'
+    description = 'Stages the host CHOLMOD JNI library as a classpath resource.'
+    dependsOn tasks.named('buildCholmodNative')
+    from(cholmodBuildDir.map { it.dir('bin') }) {
+        include "**/${cholmodLibraryName}"
+        eachFile { details -> details.path = details.name }
+        includeEmptyDirs = false
+    }
+    into(cholmodResourceDir.map {
+        it.dir("native/${nativePlatform}-${nativeMachine}")
+    })
+}
+
+tasks.register('nativeCholmodJar', Jar) {
+    group = 'build'
+    description = 'Builds a platform-specific CHOLMOD native resource JAR.'
+    dependsOn tasks.named('packageCholmodNative')
+    archiveClassifier = "cholmod-${nativePlatform}-${nativeMachine}"
+    from cholmodResourceDir
 }
 
 dependencies {
@@ -188,6 +272,34 @@ tasks.named('check') {
     dependsOn tasks.named('checkWebsite')
 }
 
+tasks.register('executableJar', Jar) {
+    group = 'build'
+    description = 'Builds the self-contained java -jar command-line application.'
+    dependsOn tasks.named('classes')
+    archiveBaseName = 'jlinalg'
+    archiveVersion = project.version
+    destinationDirectory = layout.buildDirectory.dir('cli')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+            'Main-Class': 'org.jlinalg.cli.JLinAlgCli',
+            'Implementation-Title': 'JLinAlg CLI',
+            'Implementation-Version': project.version
+        )
+    }
+    from sourceSets.main.output
+    from {
+        configurations.runtimeClasspath.collect { dependency ->
+            dependency.isDirectory() ? dependency : zipTree(dependency)
+        }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('executableJar')
+}
+
 tasks.register('benchmarkAssociation', JavaExec) {
     group = 'verification'
     description = 'Runs deterministic GWAS/TWAS association macrobenchmarks.'
@@ -206,6 +318,30 @@ tasks.register('benchmarkMixedModels', JavaExec) {
     dependsOn tasks.named('benchmarkClasses')
     classpath = sourceSets.benchmark.runtimeClasspath
     mainClass = 'org.jlinalg.benchmark.MixedModelBenchmark'
+    jvmArgs '-Xms1g', '-Xmx6g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkTopmed100', JavaExec) {
+    group = 'verification'
+    description = 'Runs the prepared TOPMed 100-gene BMI benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.Topmed100GeneBenchmark'
+    jvmArgs '-Xms2g', '-Xmx12g'
+    args providers.gradleProperty('topmedArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
+tasks.register('benchmarkGam', JavaExec) {
+    group = 'verification'
+    description = 'Runs cold, discrete, prepared-scan, and warm GAM benchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.GamBenchmark'
     jvmArgs '-Xms1g', '-Xmx6g'
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.')

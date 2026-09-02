@@ -91,6 +91,26 @@ public final class OmicsTransforms {
         };
     }
 
+    /** Converts methylation beta values to base-2 M values after clipping. */
+    public static OmicsTransform mValue(double epsilon) {
+        if (!(epsilon > 0.0 && epsilon < 0.5) || !Double.isFinite(epsilon))
+            throw new IllegalArgumentException(
+                "M-value epsilon must be finite and in (0, 0.5)");
+        return values -> {
+            double[] result = required(values).clone();
+            for (int index = 0; index < result.length; index++) {
+                if (!Double.isFinite(result[index])) continue;
+                if (result[index] < 0.0 || result[index] > 1.0)
+                    throw new IllegalArgumentException(
+                        "M-value transform requires beta values in [0,1]");
+                double beta = Math.max(epsilon,
+                    Math.min(1.0 - epsilon, result[index]));
+                result[index] = Math.log(beta / (1.0 - beta)) / Math.log(2.0);
+            }
+            return result;
+        };
+    }
+
     /**
      * Blom rank-based inverse-normal transform with average ranks for ties.
      * Missing values remain missing and do not enter the ranks.

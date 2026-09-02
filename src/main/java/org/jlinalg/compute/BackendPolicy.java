@@ -6,7 +6,7 @@ package org.jlinalg.compute;
 
 /** Compute backend selection policies supported by JLinAlg. */
 public enum BackendPolicy {
-    /** GPU with automatic workload routing, then oneMKL, OpenBLAS, and Java CPU. */
+    /** CHOLMOD sparse with native dense CPU, then GPU, native CPU, and Java CPU. */
     PREFERRED,
     /** JDistlib automatic GPU/Java-CPU workload routing. */
     AUTO,
@@ -20,6 +20,8 @@ public enum BackendPolicy {
     VULKAN,
     /** Intel oneMKL, selected strictly. */
     ONEMKL,
+    /** SuiteSparse CHOLMOD with the best available dense CPU delegate. */
+    CHOLMOD,
     /** OpenBLAS, selected strictly. */
     OPENBLAS,
     /** Deterministic portable Java CPU implementation. */

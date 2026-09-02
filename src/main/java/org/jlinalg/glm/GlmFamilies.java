@@ -42,6 +42,10 @@ public final class GlmFamilies {
     public static GlmFamily negativeBinomial(double size) {
         return new NegativeBinomialLog(size);
     }
+    /** Tweedie quasi-likelihood with log link and caller-supplied variance power. */
+    public static GlmFamily tweedie(double power) {
+        return new TweedieLogFamily(power);
+    }
 
     /** Quasi-binomial proportions with logit link and Pearson dispersion. */
     public static GlmFamily quasiBinomial() { return QUASI_BINOMIAL; }

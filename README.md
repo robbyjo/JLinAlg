@@ -31,11 +31,93 @@ On Linux or macOS:
 
 No system Gradle installation is needed.
 
+## Executable command line
+
+Build the self-contained command-line JAR with:
+
+```powershell
+.\\gradlew.bat executableJar
+```
+
+The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
+runtime dependencies. A fixed-effect omics scan can then be run as:
+
+```powershell
+java -jar build/cli/jlinalg-0.1.0-SNAPSHOT.jar \`
+  --omics methylation.tsv \`
+  --pheno phenotype.tsv \`
+  --id IID \`
+  --formula "trait ~ age + sex + <omics>" \`
+  --transform "<omics>=mvalue(epsilon=1e-6)|zscore()" \`
+  --out ewas-results.tsv
+```
+
+`<omics>` is the one formula term sourced from the omics input. Every other
+response, fixed-effect, interaction, and random-effect name must be a phenotype
+column. Without `--omics`, the command fits one phenotype-only model and emits
+all fixed-effect coefficients. Gaussian fixed-only formulas resolve to OLS;
+Gaussian formulas containing terms such as `(1|Batch)` resolve to REML. A
+non-Gaussian `--family` resolves to GLM or PQL GLMM, and `Surv(time,event)`
+uses Cox regression.
+
+Add a genomic relationship matrix with `--grm FILE`. Its presence makes an
+otherwise fixed Gaussian or non-Gaussian formula resolve to LMM or GLMM,
+respectively; a Cox formula uses the GRM as a Gaussian kinship frailty. For
+repeated observations, `--individual-id COLUMN` names the phenotype column
+that maps rows to GRM individuals. It defaults to the `--id` column.
+
+```powershell
+java -jar build/cli/jlinalg-0.1.0-SNAPSHOT.jar `
+  --pheno phenotype.tsv --id observation_id --individual-id IID `
+  --formula "trait ~ age + sex" --grm cohort `
+  --out trait-grm.tsv
+```
+
+`--grm` accepts either a labeled square CSV/TSV (first column contains row
+IDs; remaining headers contain column IDs) or a GCTA prefix backed by
+`PREFIX.grm.bin` and `PREFIX.grm.id`. GCTA binary values are read as the
+standard little-endian, single-precision lower triangle. If IIDs are not
+unique, the reader exposes them as `FID:IID`. The GRM is necessarily retained
+as a dense sample-by-sample covariance matrix, while the much larger omics
+matrix remains block streamed. GRM provenance, format, matching column, and
+memory footprint are recorded in the run log and manifest.
+
+Delimited omics inputs have features in rows and sample IDs in the header.
+VCF, BCF, and BGEN inputs use the existing streaming genotype readers.
+CSV/TSV feature identifiers are inspected conservatively to infer GWAS, EWAS,
+or Ensembl expression schemas; `--omics-type` overrides the inference.
+
+The omics matrix is never materialized in full. Readers validate in constant
+memory and process an adaptive block sized from current JVM heap headroom.
+`--block-size N` overrides the automatic choice. Results are spooled as they
+arrive, and Benjamini-Hochberg adjustment uses bounded external sorting rather
+than retaining every result or p-value in memory.
+
+The common result table contains beta, standard error, test statistic,
+denominator DF, partial R-squared where defined, p-value, and BH FDR. Genotype
+results additionally report ALT-oriented effects, allele frequencies, MAC,
+missingness, and all-sample HWE. Recognized binary responses add separate case
+and control HWE columns. Non-WGS annotations can be joined with:
+
+```text
+--annot annotation.tsv --annot-id probe_id --annot-cols chr,start,gene,strand
+```
+
+Logging is on by default. `--out results.tsv` creates `results.tsv.log` and
+`results.tsv.manifest.json`; `--log` overrides the human-readable log path.
+Use `--dry-run` to validate and resolve an analysis without fitting it.
+
+Built-in transform pipelines include winsorization, shifted/log1p transforms,
+z-scoring, Blom inverse-normal ranks, and EWAS M values. Trusted custom Java
+transforms implement `OmicsTransformProvider`, register it through Java's
+service-provider mechanism, and are loaded with `--transform-plugin FILE.jar`.
+
 ## Vignettes and worked examples
 
 The [vignette index](docs/vignettes/README.md) provides end-to-end examples for
 every implemented feature group: OLS/GLM and penalized regression, REML/LMM,
-pedigree and GLMM PQL, formulas/backends, association and GWAS/TWAS, Mendelian
+GAM/GAMM and distributional/vector additive models, pedigree and GLMM
+PQL/Laplace, formulas/backends, association and GWAS/TWAS, Mendelian
 randomization, meta-analysis/meta-regression, time series, SuSiE, and SEM. Each
 vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
@@ -486,14 +568,36 @@ routing is advantageous.
 
 The default `BackendPolicy.PREFERRED` order is:
 
-1. GPU through JDistlib automatic workload routing;
-2. oneMKL;
-3. OpenBLAS;
-4. the portable Java CPU backend.
+1. SuiteSparse CHOLMOD for sparse factorization, paired with the best
+   available native dense CPU backend;
+2. GPU through JDistlib automatic workload routing;
+3. oneMKL;
+4. OpenBLAS;
+5. the portable Java CPU backend.
 
-Strict CUDA, OpenCL, Vulkan, oneMKL, OpenBLAS, GPU, automatic, and CPU policies
-are also available. Results retain the selected backend and device description.
-FP64 is used throughout.
+Strict CHOLMOD, CUDA, OpenCL, Vulkan, oneMKL, OpenBLAS, GPU, automatic, and CPU
+policies are also available. The CLI exposes the same choices through
+`--backend`; `--backend preferred` is the default. Results retain the
+selected backend and device description. FP64 is used throughout.
+
+The CHOLMOD JNI bridge pins SuiteSparse 7.12.2 by source URL and SHA-256.
+It retains one symbolic analysis per worker and repeats only numeric
+factorization while the sparsity pattern is unchanged. Build and stage the
+host library with:
+
+```powershell
+.\gradlew.bat nativeCholmodJar
+```
+
+The build uses CMake and the system BLAS/LAPACK. On this Windows development
+host it detects oneMKL; another installation can be selected with
+`-PcholmodMklRoot=PATH`. An existing SuiteSparse checkout can be supplied
+with `-PsuiteSparseSourceDir=PATH`. During development the loader finds
+`build/native/cholmod/bin/Release/jlinalg_cholmod.dll`; packaged
+platform-specific resources and an explicit
+`-Djlinalg.cholmod.library=PATH` are also supported. If the native bridge is
+absent, `PREFERRED` follows the fallback order above, while strict
+`CHOLMOD` fails with the native loader diagnostic.
 
 ## Compiled formulas and high-throughput association
 

@@ -22,6 +22,9 @@ public final class ModelTable {
     public static Builder builder(int rows) { return new Builder(rows); }
     public int rows() { return rows; }
 
+    /** Returns a defensive copy of a named numeric column. */
+    public double[] numericColumn(String name) { return numeric(name).clone(); }
+
     double[] numeric(String name) {
         double[] value = numeric.get(name);
         if (value == null) {
