@@ -336,6 +336,18 @@ tasks.register('benchmarkTopmed100', JavaExec) {
     }.getOrElse([])
 }
 
+tasks.register('benchmarkTopmedObesityGlmm', JavaExec) {
+    group = 'verification'
+    description = 'Runs the prepared TOPMed Obesity GLM/GLMM benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedObesityGlmmBenchmark'
+    jvmArgs '-Xms2g', '-Xmx12g'
+    args providers.gradleProperty('topmedArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
 tasks.register('benchmarkGam', JavaExec) {
     group = 'verification'
     description = 'Runs cold, discrete, prepared-scan, and warm GAM benchmarks.'
