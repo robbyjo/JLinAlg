@@ -10,8 +10,12 @@ import org.jlinalg.internal.MatrixOps;
 public final class PenalizedRegressionResult {
     private final double intercept;
     private final double[] coefficients;
-    private final double[] fittedValues;
-    private final double[] residuals;
+    private volatile double[] fittedValues;
+    private volatile double[] residuals;
+    private final double[] response;
+    private final double[] predictors;
+    private final int rows;
+    private final int columns;
     private final double lambda;
     private final double alpha;
     private final double objective;
@@ -24,8 +28,10 @@ public final class PenalizedRegressionResult {
     PenalizedRegressionResult(
             double intercept,
             double[] coefficients,
-            double[] fittedValues,
-            double[] residuals,
+            double[] response,
+            double[] predictors,
+            int rows,
+            int columns,
             double lambda,
             double alpha,
             double objective,
@@ -36,8 +42,10 @@ public final class PenalizedRegressionResult {
             String convergenceMessage) {
         this.intercept = intercept;
         this.coefficients = coefficients.clone();
-        this.fittedValues = fittedValues.clone();
-        this.residuals = residuals.clone();
+        this.response = response;
+        this.predictors = predictors;
+        this.rows = rows;
+        this.columns = columns;
         this.lambda = lambda;
         this.alpha = alpha;
         this.objective = objective;
@@ -52,8 +60,14 @@ public final class PenalizedRegressionResult {
     public double[] coefficients() { return coefficients.clone(); }
     /** Alias for coefficients, consistent with the association-oriented APIs. */
     public double[] beta() { return coefficients(); }
-    public double[] fittedValues() { return fittedValues.clone(); }
-    public double[] residuals() { return residuals.clone(); }
+    public double[] fittedValues() {
+        materializePredictions();
+        return fittedValues.clone();
+    }
+    public double[] residuals() {
+        materializePredictions();
+        return residuals.clone();
+    }
     public double lambda() { return lambda; }
     public double alpha() { return alpha; }
     public double objective() { return objective; }
@@ -64,6 +78,26 @@ public final class PenalizedRegressionResult {
     public int iterations() { return iterations; }
     public boolean converged() { return converged; }
     public String convergenceMessage() { return convergenceMessage; }
+
+    private void materializePredictions() {
+        if (fittedValues != null) return;
+        synchronized (this) {
+            if (fittedValues != null) return;
+            double[] fitted = new double[rows];
+            double[] errors = new double[rows];
+            for (int row = 0; row < rows; row++) {
+                double value = intercept;
+                for (int column = 0; column < columns; column++) {
+                    value += predictors[row * columns + column]
+                        * coefficients[column];
+                }
+                fitted[row] = value;
+                errors[row] = response[row] - value;
+            }
+            residuals = errors;
+            fittedValues = fitted;
+        }
+    }
 
     /** Predicts on a conventional matrix in the original predictor scale. */
     public double[] predict(double[][] predictors) {

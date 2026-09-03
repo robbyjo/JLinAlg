@@ -75,6 +75,28 @@ class PenalizedRegressionTest {
     }
 
     @Test
+    void zeroPenaltyFactorLeavesCovariateUnpenalized() {
+        ElasticNetOptions options = ElasticNetOptions.builder()
+            .alpha(1.0)
+            .standardize(false)
+            .penaltyFactors(1.0, 0.0)
+            .build();
+        PenalizedRegressionResult result = PenalizedRegression.fit(
+            RESPONSE, ORTHOGONAL, 0.5, options);
+
+        assertTrue(result.converged(), result.convergenceMessage());
+        assertArrayEquals(new double[] {1.5, -1.0},
+            result.coefficients(), 2e-12);
+    }
+
+    @Test
+    void negativePenaltyFactorIsRejected() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ElasticNetOptions.builder()
+                .penaltyFactors(1.0, -1.0).build());
+    }
+
+    @Test
     void pathUsesDescendingLambdasAndAutomaticMaximumStartsAtZero() {
         ElasticNetOptions options = ElasticNetOptions.builder()
             .alpha(1.0)
@@ -88,6 +110,47 @@ class PenalizedRegressionTest {
         assertThrows(IllegalArgumentException.class,
             () -> PenalizedRegression.path(RESPONSE, ORTHOGONAL,
                 new double[] {0.1, 0.2}, options));
+    }
+
+    @Test
+    void preparedDesignMatchesOrdinaryPathsAcrossAlphaValues() {
+        ElasticNetOptions options = ElasticNetOptions.builder()
+            .penaltyFactors(1.0, 0.0)
+            .parallelism(2)
+            .build();
+        PenalizedRegression.Prepared prepared = PenalizedRegression.prepare(
+            RESPONSE, ORTHOGONAL, options);
+
+        for (double alpha : new double[] {0.0, 0.5, 1.0}) {
+            PenalizedRegressionResult expected = PenalizedRegression.fit(
+                RESPONSE, ORTHOGONAL, 0.5,
+                PenalizedRegression.copyWithAlpha(options, alpha));
+            PenalizedRegressionResult actual =
+                prepared.path(new double[] {0.5}, alpha).fit(0);
+            assertEquals(expected.intercept(), actual.intercept(), 0.0);
+            assertArrayEquals(expected.coefficients(), actual.coefficients());
+            assertArrayEquals(expected.fittedValues(), actual.fittedValues());
+            assertArrayEquals(expected.residuals(), actual.residuals());
+        }
+    }
+
+    @Test
+    void wideAutomaticPathSupportsUnpenalizedCovariates() {
+        double[][] wide = {
+            {-1, -1, 0, 1, 0},
+            {0, 1, 1, 0, 1},
+            {1, -1, 0, -1, 2}
+        };
+        ElasticNetOptions options = ElasticNetOptions.builder()
+            .alpha(1.0)
+            .penaltyFactors(0.0, 1.0, 1.0, 1.0, 1.0)
+            .build();
+        PenalizedRegressionPath path = PenalizedRegression.automaticPath(
+            new double[] {1, 2, 4}, wide, 10, 1e-3, options);
+
+        assertEquals(10, path.size());
+        assertTrue(path.fits().stream().allMatch(
+            PenalizedRegressionResult::converged));
     }
 
     @Test

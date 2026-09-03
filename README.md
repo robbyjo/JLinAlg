@@ -189,7 +189,8 @@ log likelihood/AIC when defined, convergence status, and backend provenance.
 `PenalizedRegression` fits Gaussian penalized models by cyclic coordinate
 descent. The intercept is not penalized; predictors are standardized during
 optimization by default and coefficients are returned on their original scale.
-Positive observation weights and per-coefficient penalty factors are supported.
+Positive observation weights and nonnegative per-coefficient penalty factors
+are supported; a zero factor leaves a covariate unpenalized.
 
 ```java
 PenalizedRegressionResult ridge =
@@ -202,13 +203,21 @@ ElasticNetOptions options = ElasticNetOptions.builder()
     .build();
 PenalizedRegressionResult elasticNet =
     PenalizedRegression.fit(y, x, 0.1, options);
+
+PenalizedRegression.Prepared prepared =
+    PenalizedRegression.prepare(y, x, options);
+PenalizedRegressionPath ridgePath =
+    prepared.automaticPath(100, 1e-4, 0.0);
+PenalizedRegressionPath lassoPath =
+    prepared.automaticPath(100, 1e-4, 1.0);
 ```
 
 `automaticPath` creates a descending log-spaced lambda path and uses warm
 starts. `PenalizedRegressionCrossValidation` performs reproducible K-fold
 selection and returns both the minimum-error lambda and the conservative
 one-standard-error choice. Preprocessing is learned separately inside each
-training fold.
+training fold. A prepared design reuses centering, scaling, response products,
+and the covariance matrix across alpha values or user-supplied paths.
 
 Ridge coefficient beta, SE, effective-residual DF, t statistic, and p-value
 are available from `PenalizedRegressionInference.ridge`. For LASSO and elastic

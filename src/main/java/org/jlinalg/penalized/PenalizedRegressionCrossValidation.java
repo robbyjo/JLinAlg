@@ -146,6 +146,7 @@ public final class PenalizedRegressionCrossValidation {
             .fitIntercept(source.fitIntercept())
             .standardize(source.standardize())
             .maximumIterations(source.maximumIterations())
+            .parallelism(source.parallelism())
             .relativeTolerance(source.relativeTolerance());
         if (weights != null) {
             builder.observationWeights(weights);

@@ -45,7 +45,7 @@ public final class PenalizedRegressionInference {
             options, 0.0);
         PenalizedRegressionResult fit = PenalizedRegression.fit(
             response, predictors, lambda, ridgeOptions);
-        PenalizedRegression.PreparedData data = PenalizedRegression.prepare(
+        PenalizedRegression.PreparedData data = PenalizedRegression.prepareData(
             response, design, response.length, columns, ridgeOptions);
 
         try (BackendContext context = BackendContext.select(backendPolicy)) {
@@ -157,6 +157,9 @@ public final class PenalizedRegressionInference {
 
     private static double[] weightedGram(
             PenalizedRegression.PreparedData data) {
+        if (data.gramMatrix() != null) {
+            return data.gramMatrix().clone();
+        }
         int columns = data.columns();
         double[] result = new double[columns * columns];
         for (int row = 0; row < columns; row++) {
@@ -165,8 +168,8 @@ public final class PenalizedRegressionInference {
                 for (int observation = 0;
                         observation < data.rows(); observation++) {
                     value += data.weights()[observation]
-                        * data.workingPredictors()[observation * columns + row]
-                        * data.workingPredictors()[observation * columns + column]
+                        * data.workingPredictors()[row * data.rows() + observation]
+                        * data.workingPredictors()[column * data.rows() + observation]
                         / data.rows();
                 }
                 result[row * columns + column] = value;

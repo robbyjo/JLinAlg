@@ -19,7 +19,11 @@ measurement.
 .\gradlew.bat benchmarkAssociation
 .\gradlew.bat benchmarkMixedModels
 .\gradlew.bat benchmarkTimeSeries
+.\gradlew.bat benchmarkTopmedPenalized
 ```
+
+The real-data ridge/LASSO/elastic-net comparison with R `glmnet` is documented
+in [TOPMed penalized-regression performance](topmed-penalized-performance.md).
 
 ## Time-series benchmarks
 

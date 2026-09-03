@@ -12,6 +12,7 @@ public final class ElasticNetOptions {
     private final boolean fitIntercept;
     private final boolean standardize;
     private final int maximumIterations;
+    private final int parallelism;
     private final double relativeTolerance;
     private final double[] observationWeights;
     private final double[] penaltyFactors;
@@ -21,6 +22,7 @@ public final class ElasticNetOptions {
         fitIntercept = builder.fitIntercept;
         standardize = builder.standardize;
         maximumIterations = builder.maximumIterations;
+        parallelism = builder.parallelism;
         relativeTolerance = builder.relativeTolerance;
         observationWeights = builder.observationWeights == null
             ? null : builder.observationWeights.clone();
@@ -36,6 +38,8 @@ public final class ElasticNetOptions {
     public boolean fitIntercept() { return fitIntercept; }
     public boolean standardize() { return standardize; }
     public int maximumIterations() { return maximumIterations; }
+    /** Worker count used for deterministic covariance preprocessing. */
+    public int parallelism() { return parallelism; }
     public double relativeTolerance() { return relativeTolerance; }
     public double[] observationWeights() {
         return observationWeights == null ? null : observationWeights.clone();
@@ -50,6 +54,7 @@ public final class ElasticNetOptions {
         private boolean fitIntercept = true;
         private boolean standardize = true;
         private int maximumIterations = 100_000;
+        private int parallelism = 1;
         private double relativeTolerance = 1e-8;
         private double[] observationWeights;
         private double[] penaltyFactors;
@@ -76,6 +81,11 @@ public final class ElasticNetOptions {
             return this;
         }
 
+        public Builder parallelism(int value) {
+            parallelism = value;
+            return this;
+        }
+
         public Builder relativeTolerance(double value) {
             relativeTolerance = value;
             return this;
@@ -87,7 +97,10 @@ public final class ElasticNetOptions {
             return this;
         }
 
-        /** Positive per-coefficient multipliers for both L1 and L2 penalties. */
+        /**
+         * Nonnegative per-coefficient multipliers for both L1 and L2 penalties.
+         * A zero factor leaves a predictor unpenalized.
+         */
         public Builder penaltyFactors(double... values) {
             penaltyFactors = MatrixOps.finiteCopy(values, "penaltyFactors");
             return this;
@@ -101,13 +114,17 @@ public final class ElasticNetOptions {
                 throw new IllegalArgumentException(
                     "maximumIterations must be positive");
             }
+            if (parallelism < 1) {
+                throw new IllegalArgumentException(
+                    "parallelism must be positive");
+            }
             if (!Double.isFinite(relativeTolerance)
                     || !(relativeTolerance > 0.0)) {
                 throw new IllegalArgumentException(
                     "relativeTolerance must be finite and positive");
             }
             validatePositive(observationWeights, "observationWeights");
-            validatePositive(penaltyFactors, "penaltyFactors");
+            validateNonnegative(penaltyFactors, "penaltyFactors");
             return new ElasticNetOptions(this);
         }
 
@@ -119,6 +136,18 @@ public final class ElasticNetOptions {
                 if (!(value > 0.0)) {
                     throw new IllegalArgumentException(
                         name + " must contain only positive values");
+                }
+            }
+        }
+
+        private static void validateNonnegative(double[] values, String name) {
+            if (values == null) {
+                return;
+            }
+            for (double value : values) {
+                if (value < 0.0) {
+                    throw new IllegalArgumentException(
+                        name + " must contain only nonnegative values");
                 }
             }
         }
