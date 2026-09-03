@@ -125,18 +125,19 @@ public final class Gee {
             options, backendPolicy);
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             return fitPrepared(data, family, options, coefficients,
-                context.backend(), context.provenance(), true);
+                context.backend(), context.provenance(), true, false);
         }
     }
 
-    private static GeeResult fitPrepared(
+    static GeeResult fitPrepared(
             PreparedGeeData data,
             GlmFamily family,
             GeeOptions options,
             double[] coefficients,
             ComputeBackend backend,
             BackendProvenance provenance,
-            boolean allowExactDeletion) {
+            boolean allowExactDeletion,
+            boolean compact) {
         double[] associationParameters = initialAssociation(data, options);
         Scale scale = new Scale(options.dispersion(),
             new double[0], constant(data.rows(), options.dispersion()));
@@ -288,15 +289,25 @@ public final class Gee {
         } else {
             Arrays.fill(dfAdjusted, Double.NaN);
         }
-        double[] biasCorrected = sandwich(naive, correctedMeat(data, state,
-            scale.observationScale(), associationParameters, options, naive,
-            LeverageCorrection.MANCL_DEROUEN, backend), p);
-        double[] kauermannCarroll = sandwich(naive, correctedMeat(data, state,
-            scale.observationScale(), associationParameters, options, naive,
-            LeverageCorrection.KAUERMANN_CARROLL, backend), p);
-        double[] fayGraubard = sandwich(naive, correctedMeat(data, state,
-            scale.observationScale(), associationParameters, options, naive,
-            LeverageCorrection.FAY_GRAUBARD, backend), p);
+        double[] unavailable = filled(p * p, Double.NaN);
+        double[] biasCorrected = compact
+                && options.covariance() != GeeCovariance.BIAS_CORRECTED
+            ? unavailable.clone()
+            : sandwich(naive, correctedMeat(data, state,
+                scale.observationScale(), associationParameters, options, naive,
+                LeverageCorrection.MANCL_DEROUEN, backend), p);
+        double[] kauermannCarroll = compact
+                && options.covariance() != GeeCovariance.KAUERMANN_CARROLL
+            ? unavailable.clone()
+            : sandwich(naive, correctedMeat(data, state,
+                scale.observationScale(), associationParameters, options, naive,
+                LeverageCorrection.KAUERMANN_CARROLL, backend), p);
+        double[] fayGraubard = compact
+                && options.covariance() != GeeCovariance.FAY_GRAUBARD
+            ? unavailable.clone()
+            : sandwich(naive, correctedMeat(data, state,
+                scale.observationScale(), associationParameters, options, naive,
+                LeverageCorrection.FAY_GRAUBARD, backend), p);
         boolean requestExactDeletion = allowExactDeletion
             && (options.covariance() == GeeCovariance.JACKKNIFE
                 || options.exactClusterDeletion());
@@ -323,13 +334,23 @@ public final class Gee {
         }
         Inference inference = inference(coefficients, selected,
             options.confidenceLevel(), options.inference(), degreesOfFreedom);
-        GeeCriteria criteria = criteria(data, state, scale.observationScale(),
-            robust, family, p, backend);
-        Residuals residuals = residuals(data, state, family, naive,
-            scale.observationScale(), associationParameters, options, backend);
-        GeeDiagnostics diagnostics = diagnostics(data, state,
-            scale.observationScale(), associationParameters, options,
-            coefficients, naive, deletion.coefficients(), backend);
+        GeeCriteria criteria = compact
+            ? new GeeCriteria(Double.NaN, Double.NaN, Double.NaN,
+                Double.NaN, Double.NaN, p)
+            : criteria(data, state, scale.observationScale(),
+                robust, family, p, backend);
+        Residuals residuals = compact
+            ? new Residuals(new double[0], new double[0],
+                new double[0], new double[0])
+            : residuals(data, state, family, naive,
+                scale.observationScale(), associationParameters, options, backend);
+        GeeDiagnostics diagnostics = compact
+            ? new GeeDiagnostics(new int[0], p, new double[0],
+                new double[0], new double[0], new double[0],
+                deletion.coefficients())
+            : diagnostics(data, state, scale.observationScale(),
+                associationParameters, options, coefficients, naive,
+                deletion.coefficients(), backend);
         double finalScoreNorm = norm(estimatingScore(data, family, coefficients,
             state, scale.observationScale(), associationParameters, options,
             finalAccumulation, naive, backend));
@@ -345,10 +366,13 @@ public final class Gee {
             kauermannCarroll, fayGraubard, jackknife,
             inference.standardErrors(), inference.statistics(), inference.pValues(),
             inference.lower(), inference.upper(),
-            data.output(state.linearPredictor()), data.output(state.means()),
-            data.output(state.pearsonResiduals()),
-            data.output(residuals.response()), data.output(residuals.deviance()),
-            data.output(residuals.working()), data.output(residuals.standardized()),
+            compact ? new double[0] : data.output(state.linearPredictor()),
+            compact ? new double[0] : data.output(state.means()),
+            compact ? new double[0] : data.output(state.pearsonResiduals()),
+            compact ? new double[0] : data.output(residuals.response()),
+            compact ? new double[0] : data.output(residuals.deviance()),
+            compact ? new double[0] : data.output(residuals.working()),
+            compact ? new double[0] : data.output(residuals.standardized()),
             associationParameters, scale.average(), scale.coefficients(), criteria,
             options.inference(), degreesOfFreedom, diagnostics,
             convergenceDiagnostics,
@@ -563,7 +587,7 @@ public final class Gee {
         }
     }
 
-    private static double[] startingCoefficients(
+    static double[] startingCoefficients(
             PreparedGeeData data,
             GlmFamily family,
             GeeOptions options,
@@ -738,6 +762,30 @@ public final class Gee {
         int count = associationParameterCount(data, options);
         if (options.correlation() == GeeCorrelation.USER_DEFINED) {
             return estimateUserCorrelation(data, state, options, backend);
+        }
+        if (options.correlation() == GeeCorrelation.EXCHANGEABLE) {
+            double sumProducts = 0.0;
+            double pairCount = 0.0;
+            for (int cluster = 0; cluster < data.clusters(); cluster++) {
+                int start = data.starts()[cluster];
+                int end = data.starts()[cluster + 1];
+                double sum = 0.0;
+                double sumSquares = 0.0;
+                for (int row = start; row < end; row++) {
+                    double value = state.pearsonResiduals()[row];
+                    sum += value;
+                    sumSquares += value * value;
+                }
+                sumProducts += 0.5 * (sum * sum - sumSquares);
+                double size = end - start;
+                pairCount += size * (size - 1.0) / 2.0;
+            }
+            double denominator = pairCount - data.columns();
+            double estimate = denominator <= 0.0
+                ? 0.0 : sumProducts / denominator;
+            double lower = -1.0
+                / Math.max(1.0, data.maximumClusterSize() - 1.0) + 1e-6;
+            return new double[] {clamp(estimate, lower, MAXIMUM_CORRELATION)};
         }
         double[] sums = new double[count];
         double[] counts = new double[count];
@@ -1011,23 +1059,77 @@ public final class Gee {
                     * data.design()[row * p + column];
             }
         }
-        double[] covariance = covarianceMatrix(data, state, phi,
-            associationParameters, options, start, end, backend);
-        CholeskyFactor factor = covarianceFactor(covariance, size, backend);
-        double[] solvedResidual = factor.solve(residual);
+        boolean structured = options.association() == GeeAssociation.CORRELATION
+            && (options.correlation() == GeeCorrelation.INDEPENDENCE
+                || options.correlation() == GeeCorrelation.EXCHANGEABLE);
+        double[] covariance = structured ? new double[0]
+            : covarianceMatrix(data, state, phi,
+                associationParameters, options, start, end, backend);
+        CholeskyFactor factor = structured ? null
+            : covarianceFactor(covariance, size, backend);
+        double[] solvedResidual = structured
+            ? structuredSolve(data, state, phi, associationParameters,
+                options, start, end, residual)
+            : factor.solve(residual);
         double[] solvedDesign = workspace.solvedDesign;
         double[] rightSide = workspace.rightSide;
         for (int column = 0; column < p; column++) {
             for (int row = 0; row < size; row++) {
                 rightSide[row] = derivativeDesign[row * p + column];
             }
-            double[] solved = factor.solve(rightSide);
+            double[] solved = structured
+                ? structuredSolve(data, state, phi, associationParameters,
+                    options, start, end, rightSide)
+                : factor.solve(rightSide);
             for (int row = 0; row < size; row++) {
                 solvedDesign[row * p + column] = solved[row];
             }
         }
         return new ClusterComponents(size, derivativeDesign, residual,
             solvedResidual, solvedDesign, covariance);
+    }
+
+    private static double[] structuredSolve(
+            PreparedGeeData data,
+            State state,
+            double[] phi,
+            double[] associationParameters,
+            GeeOptions options,
+            int start,
+            int end,
+            double[] rightSide) {
+        int size = end - start;
+        double[] result = new double[size];
+        if (options.correlation() == GeeCorrelation.INDEPENDENCE) {
+            for (int local = 0; local < size; local++) {
+                int row = start + local;
+                double variance = phi[row] * state.variances()[row]
+                    / data.weights()[row];
+                result[local] = rightSide[local] / variance;
+            }
+            return result;
+        }
+        double rho = associationParameters[0];
+        double oneMinus = 1.0 - rho;
+        double denominator = 1.0 + (size - 1.0) * rho;
+        double common = rho / (oneMinus * denominator);
+        double sum = 0.0;
+        double[] standardized = new double[size];
+        for (int local = 0; local < size; local++) {
+            int row = start + local;
+            double standardDeviation = Math.sqrt(phi[row]
+                * state.variances()[row] / data.weights()[row]);
+            standardized[local] = rightSide[local] / standardDeviation;
+            sum += standardized[local];
+        }
+        for (int local = 0; local < size; local++) {
+            int row = start + local;
+            double standardDeviation = Math.sqrt(phi[row]
+                * state.variances()[row] / data.weights()[row]);
+            result[local] = (standardized[local] / oneMinus - common * sum)
+                / standardDeviation;
+        }
+        return result;
     }
 
     private static double[] covarianceMatrix(
@@ -1312,7 +1414,7 @@ public final class Gee {
         for (int cluster = 0; cluster < clusters; cluster++) {
             PreparedGeeData subset = data.withoutCluster(cluster);
             GeeResult refit = fitPrepared(subset, family, deletionOptions,
-                coefficients.clone(), backend, provenance, false);
+                coefficients.clone(), backend, provenance, false, true);
             if (!refit.converged()) {
                 throw new IllegalArgumentException(
                     "delete-cluster GEE did not converge for cluster "
@@ -1462,9 +1564,17 @@ public final class Gee {
             case FAY_GRAUBARD -> fayGraubardResidual(components.residual(),
                 leverage, size, options.fayGraubardBound());
         };
-        CholeskyFactor factor = covarianceFactor(
-            components.covariance(), size, backend);
-        double[] solved = factor.solve(adjustedResidual);
+        int start = data.starts()[cluster];
+        int end = data.starts()[cluster + 1];
+        double[] solved;
+        if (components.covariance().length == 0) {
+            solved = structuredSolve(data, state, phi, associationParameters,
+                options, start, end, adjustedResidual);
+        } else {
+            CholeskyFactor factor = covarianceFactor(
+                components.covariance(), size, backend);
+            solved = factor.solve(adjustedResidual);
+        }
         double[] score = new double[p];
         for (int column = 0; column < p; column++) {
             for (int row = 0; row < size; row++) {

@@ -27,6 +27,11 @@ import org.jlinalg.association.ParallelAssociationEngine;
 import org.jlinalg.association.VariableMissingPolicy;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.compute.BackendContext;
+import org.jlinalg.gee.GeeCorrelation;
+import org.jlinalg.gee.GeeOptions;
+import org.jlinalg.gee.GeeScanResult;
+import org.jlinalg.gee.PreparedGeeScan;
+import org.jlinalg.glm.GlmFamilies;
 import org.jlinalg.mixed.RandomEffectTerm;
 import org.jlinalg.mixed.SparseLinearMixedModel;
 import org.jlinalg.ols.OlsOptions;
@@ -107,11 +112,62 @@ public final class Topmed100GeneBenchmark {
                 pedigree.size(), data.rows());
         }
 
+        Map<String, PreparedGeeScan> geeScans = new LinkedHashMap<>();
+        for (String model : List.of("gee-independence", "gee-exchangeable")) {
+            if (!options.models.contains(model)) continue;
+            GeeCorrelation correlation = model.equals("gee-independence")
+                ? GeeCorrelation.INDEPENDENCE : GeeCorrelation.EXCHANGEABLE;
+            GeeOptions geeOptions = GeeOptions.builder()
+                .correlation(correlation).associationDamping(1.0)
+                .associationTolerance(1e-6)
+                .parallelism(1).build();
+            PreparedGeeScan scan = PreparedGeeScan.prepare(data.response(),
+                data.baseDesign(), data.rows(), data.baseColumns(),
+                data.cluster(), null, null, null, GlmFamilies.gaussian(),
+                geeOptions, options.backend);
+            geeScans.put(model, scan);
+            preparedModels.add(scan);
+        }
+
         List<Timing> timings = new ArrayList<>();
         List<Result> results = new ArrayList<>();
         for (String model : options.models) {
-            if (!model.equals("ols") && !fitters.containsKey(model))
+            if (!model.equals("ols") && !fitters.containsKey(model)
+                    && !geeScans.containsKey(model))
                 throw new IllegalArgumentException("unknown model: " + model);
+            if (geeScans.containsKey(model)) {
+                PreparedGeeScan scan = geeScans.get(model);
+                scan.scan(firstPredictor(data), 1,
+                    data.featureKeys().subList(0, 1), 1);
+                for (int measurement = 1; measurement <= options.measurements;
+                        measurement++) {
+                    System.gc();
+                    GeeScanResult result = scan.scan(data.predictors(), data.genes(),
+                        data.featureKeys(), options.threads);
+                    double seconds = result.elapsedNanoseconds() / 1e9;
+                    consume(result);
+                    timings.add(new Timing("JLinAlg", model,
+                        options.backend.name(), options.threads, measurement,
+                        data.genes(), seconds, data.genes() / seconds));
+                    if (measurement == 1) addResults(
+                        results, model, options.threads, data, result);
+                    long failed = java.util.stream.IntStream.range(0, result.size())
+                        .filter(index -> !result.converged()[index]).count();
+                    int[] fitIterations = result.iterations();
+                    double averageIterations = Arrays.stream(fitIterations)
+                        .average().orElse(Double.NaN);
+                    int maximumIterations = Arrays.stream(fitIterations)
+                        .max().orElse(0);
+                    System.out.printf(Locale.ROOT,
+                        "JLinAlg model=%s threads=%d measurement=%d genes=%d "
+                            + "seconds=%.6f genes_per_second=%.3f failures=%d "
+                            + "mean_iterations=%.2f max_iterations=%d%n",
+                        model, options.threads, measurement, data.genes(),
+                        seconds, data.genes() / seconds, failed,
+                        averageIterations, maximumIterations);
+                }
+                continue;
+            }
             run(model, data, firstPredictor(data), engine, fitters.get(model),
                 preparedOls);
             for (int measurement = 1; measurement <= options.measurements;
@@ -170,6 +226,11 @@ public final class Topmed100GeneBenchmark {
         checksum += beta.length == 0 ? 0.0 : beta[beta.length - 1];
     }
 
+    private static void consume(GeeScanResult result) {
+        double[] beta = result.coefficients();
+        checksum += beta.length == 0 ? 0.0 : beta[beta.length - 1];
+    }
+
     private static void addResults(
             List<Result> destination, String model, int threads,
             Data data, AssociationBatchResult source) {
@@ -182,7 +243,19 @@ public final class Topmed100GeneBenchmark {
         }
     }
 
-    private static Data readAnalysis(Path directory, int requestedGenes)
+    private static void addResults(
+            List<Result> destination, String model, int threads,
+            Data data, GeeScanResult source) {
+        double[] beta = source.coefficients();
+        double[] standardErrors = source.standardErrors();
+        for (int index = 0; index < data.genes(); index++) {
+            destination.add(new Result("JLinAlg", model, threads,
+                data.featureKeys().get(index), data.featureIds().get(index),
+                beta[index], standardErrors[index]));
+        }
+    }
+
+    static Data readAnalysis(Path directory, int requestedGenes)
             throws IOException {
         List<String> featureKeys = new ArrayList<>();
         List<String> featureIds = new ArrayList<>();
@@ -248,8 +321,19 @@ public final class Topmed100GeneBenchmark {
                 row * requestedGenes, requestedGenes);
         }
         return new Data(rows, requestedGenes, baseColumns, response,
-            baseDesign, predictors, List.copyOf(batches), List.copyOf(animals),
+            baseDesign, predictors, List.copyOf(batches), clusterCodes(batches),
+            List.copyOf(animals),
             List.copyOf(featureKeys), List.copyOf(featureIds));
+    }
+
+    private static int[] clusterCodes(List<String> values) {
+        Map<String, Integer> levels = new LinkedHashMap<>();
+        int[] result = new int[values.size()];
+        for (int row = 0; row < result.length; row++) {
+            result[row] = levels.computeIfAbsent(values.get(row),
+                ignored -> levels.size());
+        }
+        return result;
     }
 
     private static Pedigree readPedigree(Path path) throws IOException {
@@ -337,9 +421,10 @@ public final class Topmed100GeneBenchmark {
         }
     }
 
-    private record Data(
+    record Data(
         int rows, int genes, int baseColumns, double[] response,
         double[] baseDesign, double[] predictors, List<String> batch,
+        int[] cluster,
         List<String> animal, List<String> featureKeys,
         List<String> featureIds) { }
     private record Timing(String runtime, String model, String backend, int threads,

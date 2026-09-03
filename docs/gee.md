@@ -66,6 +66,27 @@ GeeResult fit = Gee.fit(prepared, family,
     BackendPolicy.CPU);
 ```
 
+For association scans, `PreparedGeeScan` additionally reuses the sorted fixed
+covariates, backend context, and a fitted null-model start. It returns only the
+per-predictor coefficient-level results, avoiding fitted-value, residual, QIC,
+and unrequested small-sample diagnostic work:
+
+```java
+try (PreparedGeeScan scan = PreparedGeeScan.prepare(
+        response, fixedCovariates, rows, fixedColumns, subjectId, visit,
+        weights, offset, GlmFamilies.gaussian(), options,
+        BackendPolicy.CPU)) {
+    GeeScanResult result = scan.scan(
+        rowMajorPredictors, predictorCount, predictorNames, 8);
+}
+```
+
+The scan parallelism is across predictors. Each individual fit stays
+single-threaded, which avoids nested pools and is usually the useful strategy
+for gene- or marker-level workloads. Predictor values must be finite after the
+fixed-input missing-data filtering, and scan options must not supply initial
+coefficients or request exact delete-cluster fits.
+
 Positive-definite projection is enabled by default for unstructured, fixed, and user-designed working matrices. Set `positiveDefiniteProjection(false)` to fail instead. `associationTolerance`, `scaleTolerance`, `scoreTolerance`, and `associationDamping` provide independent convergence control.
 
 ## Validation and performance
@@ -73,6 +94,13 @@ Positive-definite projection is enabled by default for unstructured, fixed, and 
 `GeeRReferenceTest` compares Gaussian, binomial, Poisson, weighted/offset, irregular-wave, and standard working-structure fits with `geepack` 1.3.13 and `geer` 0.1.0. Coefficients and robust covariance use tight or method-appropriate tolerances; nuisance estimates and small-sample covariance use broader tolerances where package conventions differ. The generator records exact package versions and every reference value.
 
 `GeeBenchmark` and `src/benchmark/r/gee_benchmark.R` use the same deterministic design. On the development machine, preparation of 50,000 observations took 0.09 seconds. Eight-thread Java fits took 1.00 seconds for exchangeable, 1.11 seconds for AR(1), and 2.05 seconds for unstructured, versus 0.62, 0.87, and 1.78 seconds for geepack. Java and R coefficients agreed closely. These are environment-specific smoke numbers, not universal performance claims; parallelism helps primarily when there are many clusters and enough per-cluster work.
+
+Independence and exchangeable correlation have specialized linear-time
+cluster solves; exchangeable association estimation also uses cluster sums
+rather than enumerating all observation pairs. This matters when a cluster has
+thousands of observations. `docs/topmed-gee-performance.md` records the
+real-data BMI scan, R agreement, commands, and its important four-cluster
+inference limitation.
 
 For very small numbers of clusters, prefer a leverage correction or `JACKKNIFE` with `CLUSTER_T`, and report the number of clusters. Exact deletion performs one additional fit per cluster and is therefore opt-in through covariance selection or `exactClusterDeletion(true)`. A working structure improves efficiency only when it is a useful approximation; robust covariance protects coefficient inference from correlation misspecification but not from a misspecified marginal mean model.
 

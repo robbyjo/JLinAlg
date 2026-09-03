@@ -136,6 +136,31 @@ public final class PreparedGeeData {
             keptWaves, keptStarts, maximumWave, identity, identity.clone(), kept);
     }
 
+    PreparedGeeData withAppendedPredictor(
+            double[] predictors, int predictorCount, int predictor) {
+        if (predictors == null || predictorCount < 1
+                || predictor < 0 || predictor >= predictorCount
+                || predictors.length != originalRows * predictorCount) {
+            throw new IllegalArgumentException("predictor matrix dimensions are invalid");
+        }
+        int expandedColumns = columns + 1;
+        double[] expandedDesign = new double[rows * expandedColumns];
+        for (int sortedRow = 0; sortedRow < rows; sortedRow++) {
+            System.arraycopy(design, sortedRow * columns, expandedDesign,
+                sortedRow * expandedColumns, columns);
+            int originalRow = retainedRows[outputPosition[sortedRow]];
+            double value = predictors[originalRow * predictorCount + predictor];
+            if (!Double.isFinite(value)) {
+                throw new IllegalArgumentException(
+                    "predictor contains a non-finite value at row " + originalRow);
+            }
+            expandedDesign[sortedRow * expandedColumns + columns] = value;
+        }
+        return new PreparedGeeData(response, expandedDesign, weights, offset,
+            scaleDesign, scaleColumns, rows, expandedColumns, cluster, waves,
+            starts, maximumWave, retainedRows, outputPosition, originalRows);
+    }
+
     private static double[] removeRows(
             double[] source, int width, int start, int end) {
         double[] result = new double[source.length - (end - start) * width];

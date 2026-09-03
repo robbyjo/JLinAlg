@@ -1,6 +1,10 @@
 # Copyright (C) 2026 JLinAlg contributors
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+local_reference_library <- file.path(getwd(), ".r-reference-lib")
+if (dir.exists(local_reference_library)) {
+  .libPaths(c(local_reference_library, .libPaths()))
+}
 suppressPackageStartupMessages(library(data.table))
 
 parse_arguments <- function(arguments) {
@@ -10,7 +14,8 @@ parse_arguments <- function(arguments) {
     prepared_dir = "build/benchmarks/topmed100",
     genes = 100L,
     measurements = 1L,
-    models = "ols,reml,pedigree"
+    models = "ols,reml,pedigree",
+    output_prefix = "r"
   )
   index <- 1L
   while (index <= length(arguments)) {
@@ -174,8 +179,16 @@ benchmark_models <- function(options) {
   Sys.setenv(OMP_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1",
     MKL_NUM_THREADS = "1", VECLIB_MAXIMUM_THREADS = "1",
     BLIS_NUM_THREADS = "1", RCPP_PARALLEL_NUM_THREADS = "1")
-  suppressPackageStartupMessages(library(lme4))
-  suppressPackageStartupMessages(library(pedigreemm))
+  requested_models <- strsplit(options$models, ",", fixed = TRUE)[[1L]]
+  if (any(requested_models %in% c("reml", "pedigree"))) {
+    suppressPackageStartupMessages(library(lme4))
+  }
+  if ("pedigree" %in% requested_models) {
+    suppressPackageStartupMessages(library(pedigreemm))
+  }
+  if (any(startsWith(requested_models, "gee-"))) {
+    suppressPackageStartupMessages(library(geer))
+  }
   analysis <- fread(file.path(options$prepared_dir, "analysis.csv"),
     colClasses = list(character = c("SampleName", "animal_id", "Batch")),
     showProgress = FALSE)
@@ -185,13 +198,21 @@ benchmark_models <- function(options) {
     colClasses = "character", na.strings = "", showProgress = FALSE)
   features <- head(features, options$genes)
   analysis[, Batch := factor(Batch)]
+  analysis[, gee_cluster := as.integer(Batch)]
+  if (any(startsWith(requested_models, "gee-"))) {
+    setorder(analysis, gee_cluster)
+  }
   analysis[, animal_id := factor(animal_id, levels = pedigree_table$id)]
-  pedigree <- pedigreemm::pedigree(sire = pedigree_table$sire,
-    dam = pedigree_table$dam, label = pedigree_table$id)
-  pedigree_list <- list(animal_id = pedigree)
-  controls <- lmer_control()
+  pedigree_list <- NULL
+  if ("pedigree" %in% requested_models) {
+    pedigree <- pedigreemm::pedigree(sire = pedigree_table$sire,
+      dam = pedigree_table$dam, label = pedigree_table$id)
+    pedigree_list <- list(animal_id = pedigree)
+  }
+  controls <- if (any(requested_models %in% c("reml", "pedigree"))) {
+    lmer_control()
+  } else NULL
   fixed_rhs <- "Sex + Age + WBC_Pred + LY_PER_Pred + MO_PER_Pred + EO_PER_Pred + BA_PER_Pred"
-  requested_models <- strsplit(options$models, ",", fixed = TRUE)[[1L]]
 
   fit_gene <- function(model, feature) {
     formula <- as.formula(paste("BMI ~", feature, "+", fixed_rhs,
@@ -202,6 +223,11 @@ benchmark_models <- function(options) {
       REML = TRUE, control = controls))
     if (model == "pedigree") return(pedigreemm(formula, data = analysis,
       pedigree = pedigree_list, control = controls))
+    if (startsWith(model, "gee-")) {
+      correlation <- sub("^gee-", "", model)
+      return(geewa(formula, id = gee_cluster, data = analysis,
+        family = gaussian(), corstr = correlation, method = "gee"))
+    }
     stop("unknown model: ", model)
   }
 
@@ -212,7 +238,9 @@ benchmark_models <- function(options) {
     for (measurement in seq_len(options$measurements)) {
       garbage <- gc()
       elapsed <- system.time({
-        fits <- lapply(features$feature_key, function(feature) fit_gene(model, feature))
+        fits <- lapply(features$feature_key, function(feature) {
+          tryCatch(fit_gene(model, feature), error = identity)
+        })
       })[["elapsed"]]
       timing_rows[[length(timing_rows) + 1L]] <- data.table(
         runtime = "R", model, threads = 1L, measurement,
@@ -220,8 +248,20 @@ benchmark_models <- function(options) {
         genes_per_second = nrow(features) / elapsed)
       if (measurement == 1L) {
         for (index in seq_along(fits)) {
-          coefficients <- if (model == "ols") coef(summary(fits[[index]])) else
-            coef(summary(fits[[index]]))
+          if (inherits(fits[[index]], "error")) {
+            result_rows[[length(result_rows) + 1L]] <- data.table(
+              runtime = "R", model, threads = 1L,
+              feature_key = features$feature_key[[index]],
+              feature_id = features$feature_id[[index]],
+              beta = NA_real_, standard_error = NA_real_)
+            next
+          }
+          coefficients <- if (startsWith(model, "gee-")) {
+            estimate <- fits[[index]]$coefficients
+            covariance <- vcov(fits[[index]], cov_type = "robust")
+            cbind(Estimate = estimate,
+              `Std. Error` = sqrt(diag(covariance)))
+          } else coef(summary(fits[[index]]))
           key <- features$feature_key[[index]]
           result_rows[[length(result_rows) + 1L]] <- data.table(
             runtime = "R", model, threads = 1L, feature_key = key,
@@ -234,9 +274,13 @@ benchmark_models <- function(options) {
   }
   timings <- rbindlist(timing_rows)
   results <- rbindlist(result_rows)
-  fwrite(timings, file.path(options$prepared_dir, "r_timings.csv"))
-  fwrite(results, file.path(options$prepared_dir, "r_results.csv"))
+  fwrite(timings, file.path(options$prepared_dir,
+    paste0(options$output_prefix, "_timings.csv")))
+  fwrite(results, file.path(options$prepared_dir,
+    paste0(options$output_prefix, "_results.csv")))
   print(timings)
+  failures <- sum(!is.finite(results$beta) | !is.finite(results$standard_error))
+  cat("failures=", failures, "\n", sep = "")
   if (length(warnings())) print(warnings())
 }
 
