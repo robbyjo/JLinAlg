@@ -12,11 +12,14 @@ import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.mixed.LinearMixedModel;
 import org.jlinalg.mixed.LinearMixedModelResult;
 import org.jlinalg.mixed.RandomEffectEstimates;
 import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparseLinearMixedModel;
+import org.jlinalg.mixed.SparseLinearMixedModelResult;
 import org.jlinalg.reml.RemlOptions;
 
 /** Generalized additive model fitters. */
@@ -56,19 +59,33 @@ public final class Gam {
             List<PSplineTerm> smoothTerms,
             RemlOptions options,
             BackendPolicy backendPolicy) {
+        if (backendPolicy == null)
+            throw new IllegalArgumentException("backendPolicy is required");
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            return fitGaussian(response, parametricDesign, rows,
+                parametricColumns, smoothTerms, options, context);
+        }
+    }
+
+    static GamResult fitGaussian(
+            double[] response,
+            double[] parametricDesign,
+            int rows,
+            int parametricColumns,
+            List<PSplineTerm> smoothTerms,
+            RemlOptions options,
+            BackendContext context) {
         MatrixOps.validateModelData(
             response, parametricDesign, rows, parametricColumns);
         validateSmoothTerms(smoothTerms, rows);
-        if (options == null || backendPolicy == null) {
+        if (options == null || context == null) {
             throw new IllegalArgumentException(
-                "options and backendPolicy are required");
+                "options and backend context are required");
         }
 
         List<DecomposedTerm> decomposed = new ArrayList<>(smoothTerms.size());
-        try (BackendContext context = BackendContext.select(backendPolicy)) {
-            for (PSplineTerm term : smoothTerms) {
-                decomposed.add(decompose(term, context.backend()));
-            }
+        for (PSplineTerm term : smoothTerms) {
+            decomposed.add(decompose(term, context.backend()));
         }
 
         int fixedColumns = parametricColumns;
@@ -99,13 +116,24 @@ public final class Gam {
                 coefficientNames.add(term.term().name() + ".pen" + (column + 1));
             }
             randomTerms.add(RandomEffectTerm.of(
-                term.term().name(), asMatrix(term.randomDesign(), rows,
-                    term.randomColumns()), coefficientNames));
+                term.term().name(), term.randomDesign(), rows,
+                term.randomColumns(), coefficientNames));
         }
 
-        LinearMixedModelResult mixed = LinearMixedModel.fit(
-            response, fixedDesign, rows, fixedColumns,
-            randomTerms, options, backendPolicy);
+        LinearMixedModelResult mixed;
+        if (options.degreesOfFreedomMethod()
+                == DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION) {
+            SparseLinearMixedModelResult sparse =
+                SparseLinearMixedModel.fitWithBackend(
+                response, fixedDesign, rows, fixedColumns,
+                randomTerms, options, context.backend(), context.provenance());
+            mixed = LinearMixedModelResult.fromSparse(
+                sparse, response, fixedDesign, rows, fixedColumns);
+        } else {
+            mixed = LinearMixedModel.fit(response, fixedDesign, rows,
+                fixedColumns, randomTerms, options,
+                context.provenance().requested());
+        }
         double[] allFixed = mixed.beta();
         double[] componentVariances = mixed.reml().varianceComponents();
         double residualVariance = componentVariances[componentVariances.length - 1];
@@ -261,15 +289,6 @@ public final class Gam {
                             * right[index * columns + column];
                 }
             }
-        }
-        return result;
-    }
-
-    private static double[][] asMatrix(
-            double[] rowMajor, int rows, int columns) {
-        double[][] result = new double[rows][columns];
-        for (int row = 0; row < rows; row++) {
-            System.arraycopy(rowMajor, row * columns, result[row], 0, columns);
         }
         return result;
     }

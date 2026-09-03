@@ -38,6 +38,49 @@ public final class LinearMixedModelResult {
         this.conditionalResiduals = conditionalResiduals.clone();
     }
 
+    /**
+     * Adapts an exact sparse coefficient-space fit to the dense LMM result
+     * contract without materializing an observation covariance matrix.
+     */
+    public static LinearMixedModelResult fromSparse(
+            SparseLinearMixedModelResult sparse,
+            double[] response,
+            double[] fixedEffects,
+            int rows,
+            int columns) {
+        Objects.requireNonNull(sparse, "sparse");
+        if (response == null || response.length != rows
+                || fixedEffects == null
+                || fixedEffects.length != rows * columns) {
+            throw new IllegalArgumentException(
+                "response and fixed-effect dimensions are invalid");
+        }
+        double[] beta = sparse.beta();
+        if (beta.length != columns) {
+            throw new IllegalArgumentException(
+                "sparse fixed-effect count does not match the design");
+        }
+        double[] marginalFitted = new double[rows];
+        for (int row = 0; row < rows; row++) {
+            for (int column = 0; column < columns; column++) {
+                marginalFitted[row] += fixedEffects[row * columns + column]
+                    * beta[column];
+            }
+        }
+        double[] marginalResiduals = new double[rows];
+        for (int row = 0; row < rows; row++) {
+            marginalResiduals[row] = response[row] - marginalFitted[row];
+        }
+        RemlResult reml = RemlResult.fromCoefficientSpace(
+            sparse.componentNames(), sparse.varianceComponents(),
+            sparse.associationStatistics(), sparse.fixedEffectCovariance(),
+            marginalFitted, marginalResiduals, sparse.logLikelihood(),
+            sparse.varianceEstimation(), rows, columns,
+            sparse.functionEvaluations(), sparse.converged(), sparse.backend());
+        return new LinearMixedModelResult(reml, sparse.randomEffects(),
+            sparse.conditionalFittedValues(), sparse.conditionalResiduals());
+    }
+
     public RemlResult reml() { return reml; }
     public AssociationStatistics associationStatistics() {
         return reml.associationStatistics();

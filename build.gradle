@@ -372,6 +372,30 @@ tasks.register('benchmarkGam', JavaExec) {
     }
 }
 
+tasks.register('benchmarkTopmedGam', JavaExec) {
+    group = 'verification'
+    description = 'Runs the prepared TOPMed BMI P-spline benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedGamBenchmark'
+    jvmArgs '-Xms2g', '-Xmx12g'
+    args providers.gradleProperty('topmedGamArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
+tasks.register('benchmarkTopmedGamm', JavaExec) {
+    group = 'verification'
+    description = 'Runs prepared TOPMed batch and pedigree GAMM benchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedGammBenchmark'
+    jvmArgs '-Xms2g', '-Xmx12g'
+    args providers.gradleProperty('topmedGammArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {

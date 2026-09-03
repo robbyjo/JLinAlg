@@ -75,6 +75,39 @@ public final class RemlResult {
         this.backend = Objects.requireNonNull(backend, "backend");
     }
 
+    /**
+     * Adapts an exact coefficient-space Gaussian fit to the common REML
+     * result contract. Score values are unavailable from derivative-free
+     * coefficient-space optimization and are reported as zero.
+     */
+    public static RemlResult fromCoefficientSpace(
+            List<String> componentNames,
+            double[] varianceComponents,
+            AssociationStatistics associationStatistics,
+            double[] fixedEffectCovariance,
+            double[] fittedValues,
+            double[] residuals,
+            double logLikelihood,
+            VarianceEstimation varianceEstimation,
+            int observations,
+            int fixedEffectCount,
+            int functionEvaluations,
+            boolean converged,
+            BackendProvenance backend) {
+        Objects.requireNonNull(
+            associationStatistics, "associationStatistics");
+        return new RemlResult(componentNames, varianceComponents,
+            associationStatistics.beta(), fixedEffectCovariance,
+            fixedEffectCovariance, associationStatistics.standardErrors(),
+            fittedValues, residuals, new double[varianceComponents.length],
+            associationStatistics, logLikelihood, varianceEstimation,
+            observations, fixedEffectCount, functionEvaluations, converged,
+            converged
+                ? "coefficient-space optimizer converged"
+                : "coefficient-space optimizer reached its evaluation limit",
+            backend);
+    }
+
     public List<String> componentNames() { return componentNames; }
     public double[] varianceComponents() { return varianceComponents.clone(); }
     public double[] fixedEffects() { return fixedEffects.clone(); }

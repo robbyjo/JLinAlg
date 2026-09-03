@@ -77,6 +77,17 @@ public final class RandomEffectTerm {
             MatrixOps.rowMajor(design, design.length), coefficientNames);
     }
 
+    /** Creates a term from a contiguous row-major design matrix. */
+    public static RandomEffectTerm of(
+            String name,
+            double[] design,
+            int observations,
+            int coefficients,
+            List<String> coefficientNames) {
+        return new RandomEffectTerm(name, observations, coefficients,
+            design, coefficientNames);
+    }
+
     /** Creates a random-effect term from a validated CSR design matrix. */
     public static RandomEffectTerm ofSparseCsr(
             String name,

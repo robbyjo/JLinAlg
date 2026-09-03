@@ -143,6 +143,17 @@ observations, not cross-machine performance guarantees. Override workload size
 with `-Djlinalg.benchmark.observations` and
 `-Djlinalg.benchmark.markers`.
 
+The real-data `benchmarkTopmedGam` task compares a changing-predictor
+100-gene P-spline scan with single-threaded `mgcv`. See
+[TOPMed 100-gene GAM performance](topmed-gam-performance.md) for the model,
+numerical checks, timings, and reproduction commands.
+
+The `benchmarkTopmedGamm` task profiles batch and additive-pedigree GAMM
+scans with retained sparse structure. See
+[TOPMed 100-gene GAMM performance](topmed-gamm-performance.md) for matched
+mgcv batch timings, pedigree scaling, numerical checks, and reproduction
+commands.
+
 ## R validation
 
 Three deterministic, committed cross-language gates cover every stage without
