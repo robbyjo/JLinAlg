@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import jdistlib.T;
-import jdistlib.accelerator.SingularValueDecomposition;
+import jdistlib.accelerator.SymmetricEigenDecomposition;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.pipeline.VariantFilterResult;
 import org.jlinalg.pipeline.VariantFilters;
@@ -23,12 +23,12 @@ public final class SetTests {
     public static SetTestResult burden(
             VariantSet set, LinearSetTestNullModel nullModel,
             SetTestOptions options) {
-        Prepared prepared = prepare(set, nullModel, options);
+        PreparedVariantSet prepared = prepare(set, nullModel, options);
         double[] burden = new double[nullModel.observations()];
-        for (int variant = 0; variant < prepared.dosages().length; variant++)
+        for (int variant = 0; variant < prepared.dosagesView().length; variant++)
             for (int sample = 0; sample < burden.length; sample++)
-                burden[sample] += prepared.weights()[variant]
-                    * prepared.dosages()[variant][sample];
+                burden[sample] += prepared.weightsView()[variant]
+                    * prepared.dosagesView()[variant][sample];
         double[] residualBurden = nullModel.residualize(
             new double[][] {burden})[0];
         double information = dot(residualBurden, residualBurden);
@@ -53,21 +53,21 @@ public final class SetTests {
             / Math.log(10);
         double pValue = Math.min(1, Math.exp(logP * Math.log(10)));
         return new SetTestResult(set.id(), "burden", set.variants().size(),
-            prepared.dosages().length, statistic, beta, standardError,
+            prepared.includedVariants(), statistic, beta, standardError,
             degrees, pValue, logP, "student-t", new double[0],
-            prepared.excluded());
+            prepared.excludedVariants());
     }
 
     /** Related-sample burden score test using one retained REML projection. */
     public static SetTestResult burden(
             VariantSet set, RemlSetTestNullModel nullModel,
             SetTestOptions options) {
-        Prepared prepared = prepare(set, nullModel, options);
+        PreparedVariantSet prepared = prepare(set, nullModel, options);
         double[] burden = new double[nullModel.observations()];
-        for (int variant = 0; variant < prepared.dosages().length; variant++)
+        for (int variant = 0; variant < prepared.dosagesView().length; variant++)
             for (int sample = 0; sample < burden.length; sample++)
-                burden[sample] += prepared.weights()[variant]
-                    * prepared.dosages()[variant][sample];
+                burden[sample] += prepared.weightsView()[variant]
+                    * prepared.dosagesView()[variant][sample];
         SetTestScoreState state = nullModel.score(new double[][] {burden});
         double score = state.scoresView()[0];
         double information = state.informationView()[0];
@@ -83,41 +83,78 @@ public final class SetTests {
             / Math.log(10);
         double pValue = Math.min(1, Math.exp(logP * Math.log(10)));
         return new SetTestResult(set.id(), "burden-reml-score",
-            set.variants().size(), prepared.dosages().length, statistic,
+            set.variants().size(), prepared.includedVariants(), statistic,
             beta, standardError, degrees, pValue, logP, "student-t",
-            new double[0], prepared.excluded());
+            new double[0], prepared.excludedVariants());
+    }
+
+    /** Efficient burden score from a prepared set and any score null model. */
+    public static SetTestResult burden(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel) {
+        requireCompatible(prepared, nullModel);
+        double[][] weighted = weighted(
+            prepared.dosagesView(), prepared.weightsView());
+        return burdenScore(prepared, nullModel, nullModel.score(weighted));
     }
 
     public static SetTestResult skat(
-            VariantSet set, GaussianSetTestNullModel nullModel,
+            VariantSet set, SetTestScoreNullModel nullModel,
             SetTestOptions options) {
-        Prepared prepared = prepare(set, nullModel, options);
+        return skat(prepare(set, nullModel, options), nullModel);
+    }
+
+    public static SetTestResult skat(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel) {
+        requireCompatible(prepared, nullModel);
         double[][] weighted = weighted(
-            prepared.dosages(), prepared.weights());
-        return kernelResult(set.id(), "skat", set.variants().size(),
-            prepared.dosages().length, weighted, nullModel,
-            prepared.excluded());
+            prepared.dosagesView(), prepared.weightsView());
+        return kernelResult(prepared.id(), "skat",
+            prepared.requestedVariants(), prepared.includedVariants(),
+            nullModel.score(weighted), prepared.excludedVariants());
     }
 
     public static SkatOResult skatO(
-            VariantSet set, GaussianSetTestNullModel nullModel,
+            VariantSet set, SetTestScoreNullModel nullModel,
             SetTestOptions options) {
-        Prepared prepared = prepare(set, nullModel, options);
+        return skatO(prepare(set, nullModel, options), nullModel, options);
+    }
+
+    public static SkatOResult skatO(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
+            SetTestOptions options) {
+        requireCompatible(prepared, nullModel);
         double[][] base = weighted(
-            prepared.dosages(), prepared.weights());
-        double[] burden = new double[nullModel.observations()];
-        for (double[] variant : base)
-            for (int sample = 0; sample < burden.length; sample++)
-                burden[sample] += variant[sample];
+            prepared.dosagesView(), prepared.weightsView());
+        return skatO(prepared, nullModel.score(base), options);
+    }
+
+    /** Computes all three tests from one accelerated score projection. */
+    public static SetTestSuiteResult scoreSuite(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
+            SetTestOptions options) {
+        requireCompatible(prepared, nullModel);
+        double[][] base = weighted(
+            prepared.dosagesView(), prepared.weightsView());
+        SetTestScoreState state = nullModel.score(base);
+        SetTestResult burden = burdenScore(prepared, nullModel, state);
+        SetTestResult skat = kernelResult(prepared.id(), "skat",
+            prepared.requestedVariants(), prepared.includedVariants(), state,
+            prepared.excludedVariants());
+        return new SetTestSuiteResult(
+            burden, skat, skatO(prepared, state, options));
+    }
+
+    private static SkatOResult skatO(
+            PreparedVariantSet prepared, SetTestScoreState baseState,
+            SetTestOptions options) {
         double[] rhoGrid = options.skatORhoGrid();
         List<SkatOResult.Component> components = new ArrayList<>(rhoGrid.length);
         double minimumP = 1;
         for (double rho : rhoGrid) {
-            double[][] factor = factor(base, burden, rho);
-            SetTestResult result = kernelResult(set.id(),
-                "skat-o[rho=" + rho + "]", set.variants().size(),
-                prepared.dosages().length, factor, nullModel,
-                prepared.excluded());
+            SetTestResult result = kernelResult(prepared.id(),
+                "skat-o[rho=" + rho + "]", prepared.requestedVariants(),
+                prepared.includedVariants(), transform(baseState, rho),
+                prepared.excludedVariants());
             components.add(new SkatOResult.Component(rho, result));
             minimumP = Math.min(minimumP, result.pValue());
         }
@@ -126,16 +163,18 @@ public final class SetTests {
             critical[index] = QuadraticFormDistribution.critical(
                 components.get(index).result().eigenvalues(), minimumP);
         Random random = new Random(options.randomSeed());
-        SetTestScoreState baseState = nullModel.score(base);
         ScoreSampler sampler = new ScoreSampler(
-            baseState.informationView(), base.length);
+            baseState.informationView(), baseState.variants());
         int extreme = 0;
+        double[] simulated = sampler.sample(
+            random, options.skatOSimulations());
         for (int simulation = 0;
                 simulation < options.skatOSimulations(); simulation++) {
-            double[] simulatedScores = sampler.sample(random);
             double squaredSum = 0;
             double sum = 0;
-            for (double score : simulatedScores) {
+            for (int variant = 0; variant < baseState.variants(); variant++) {
+                double score = simulated[
+                    variant * options.skatOSimulations() + simulation];
                 squaredSum += score * score;
                 sum += score;
             }
@@ -151,23 +190,21 @@ public final class SetTests {
         }
         double adjusted = (extreme + 1.0)
             / (options.skatOSimulations() + 1.0);
-        return new SkatOResult(set.id(), set.variants().size(),
-            prepared.dosages().length, components, minimumP, adjusted,
+        return new SkatOResult(prepared.id(), prepared.requestedVariants(),
+            prepared.includedVariants(), components, minimumP, adjusted,
             Math.log10(adjusted), options.skatOSimulations(),
-            options.randomSeed(), prepared.excluded());
+            options.randomSeed(), prepared.excludedVariants());
     }
 
     private static SetTestResult kernelResult(
             String setId, String method, int requested,
-            int included, double[][] factor,
-            GaussianSetTestNullModel nullModel,
+            int included, SetTestScoreState scoreState,
             List<VariantFilterResult> excluded) {
-        SetTestScoreState scoreState = nullModel.score(factor);
         double statistic = 0;
         for (double score : scoreState.scoresView())
             statistic += score * score;
         double[] eigenvalues = eigenvalues(
-            scoreState.informationView(), factor.length);
+            scoreState.informationView(), scoreState.variants());
         QuadraticFormDistribution.Tail tail =
             QuadraticFormDistribution.survival(statistic, eigenvalues);
         return new SetTestResult(setId, method, requested, included,
@@ -176,12 +213,20 @@ public final class SetTests {
             eigenvalues, excluded);
     }
 
-    private static Prepared prepare(
-            VariantSet set, GaussianSetTestNullModel nullModel,
+    private static PreparedVariantSet prepare(
+            VariantSet set, SetTestScoreNullModel nullModel,
             SetTestOptions options) {
-        if (set == null || nullModel == null || options == null)
+        if (nullModel == null)
+            throw new IllegalArgumentException("null model is required");
+        return prepare(set, nullModel.observations(), options);
+    }
+
+    /** Performs filtering, effect-allele orientation, and imputation once. */
+    public static PreparedVariantSet prepare(
+            VariantSet set, int observations, SetTestOptions options) {
+        if (set == null || options == null || observations < 1)
             throw new IllegalArgumentException(
-                "variant set, null model, and options are required");
+                "variant set, observations, and options are required");
         List<double[]> dosages = new ArrayList<>();
         List<Double> weights = new ArrayList<>();
         List<VariantFilterResult> excluded = new ArrayList<>();
@@ -193,7 +238,7 @@ public final class SetTests {
                 continue;
             }
             dosages.add(oriented(member, filter.statistics(),
-                options.missingPolicy(), nullModel.observations()));
+                options.missingPolicy(), observations));
             weights.add(member.weight());
         }
         if (dosages.isEmpty())
@@ -202,8 +247,8 @@ public final class SetTests {
         double[] numericWeights = new double[weights.size()];
         for (int index = 0; index < numericWeights.length; index++)
             numericWeights[index] = weights.get(index);
-        return new Prepared(dosages.toArray(double[][]::new),
-            numericWeights, excluded);
+        return new PreparedVariantSet(set.id(), set.variants().size(),
+            dosages.toArray(double[][]::new), numericWeights, excluded);
     }
 
     private static double[] oriented(
@@ -245,38 +290,99 @@ public final class SetTests {
         return result;
     }
 
-    private static double[][] factor(
-            double[][] base, double[] burden, double rho) {
-        int rows = (rho < 1 ? base.length : 0) + (rho > 0 ? 1 : 0);
-        double[][] result = new double[rows][];
-        int destination = 0;
-        if (rho < 1) {
-            double scale = Math.sqrt(1 - rho);
-            for (double[] variant : base) {
-                result[destination] = variant.clone();
-                for (int sample = 0; sample < variant.length; sample++)
-                    result[destination][sample] *= scale;
-                destination++;
+    private static SetTestResult burdenScore(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
+            SetTestScoreState state) {
+        double score = Arrays.stream(state.scoresView()).sum();
+        double information = Arrays.stream(state.informationView()).sum();
+        if (!(information > 1e-14) || !Double.isFinite(information))
+            throw new IllegalArgumentException(
+                "burden is constant or collinear after null-model adjustment");
+        double beta = score / information;
+        double standardError = Math.sqrt(1.0 / information);
+        double statistic = score / Math.sqrt(information);
+        double pValue = nullModel.burdenPValue(statistic);
+        return new SetTestResult(prepared.id(), "burden-score",
+            prepared.requestedVariants(), prepared.includedVariants(),
+            statistic, beta, standardError, nullModel.degreesOfFreedom(),
+            pValue, Math.log10(pValue), nullModel.burdenPValueMethod(),
+            new double[0], prepared.excludedVariants());
+    }
+
+    private static SetTestScoreState transform(
+            SetTestScoreState base, double rho) {
+        int variants = base.variants();
+        if (rho == 0) return base;
+        double[] scores = base.scoresView();
+        double[] information = base.informationView();
+        if (rho == 1) {
+            return new SetTestScoreState(
+                new double[] {Arrays.stream(scores).sum()},
+                new double[] {Arrays.stream(information).sum()}, 1);
+        }
+        int dimension = variants + 1;
+        double[] transformedScores = new double[dimension];
+        double[] transformedInformation = new double[dimension * dimension];
+        double variantScale = Math.sqrt(1 - rho);
+        double burdenScale = Math.sqrt(rho);
+        double crossScale = variantScale * burdenScale;
+        for (int left = 0; left < variants; left++) {
+            transformedScores[left] = variantScale * scores[left];
+            double rowSum = 0;
+            for (int right = 0; right < variants; right++) {
+                double value = information[left * variants + right];
+                transformedInformation[left * dimension + right] =
+                    (1 - rho) * value;
+                rowSum += value;
             }
+            transformedInformation[left * dimension + variants] =
+                crossScale * rowSum;
+            transformedInformation[variants * dimension + left] =
+                crossScale * rowSum;
         }
-        if (rho > 0) {
-            result[destination] = burden.clone();
-            double scale = Math.sqrt(rho);
-            for (int sample = 0; sample < burden.length; sample++)
-                result[destination][sample] *= scale;
-        }
-        return result;
+        transformedScores[variants] = burdenScale
+            * Arrays.stream(scores).sum();
+        transformedInformation[dimension * dimension - 1] = rho
+            * Arrays.stream(information).sum();
+        return new SetTestScoreState(
+            transformedScores, transformedInformation, dimension);
+    }
+
+    private static void requireCompatible(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel) {
+        if (prepared == null || nullModel == null)
+            throw new IllegalArgumentException(
+                "prepared variant set and null model are required");
+        if (prepared.observations() != nullModel.observations())
+            throw new IllegalArgumentException(
+                "prepared variant set does not match null-model observations");
     }
 
     private static double[] eigenvalues(double[] matrix, int dimension) {
         try (BackendContext context = BackendContext.select(
-                org.jlinalg.compute.BackendPolicy.CPU)) {
-            SingularValueDecomposition decomposition =
-                context.backend().dgesvd(matrix, dimension, dimension);
-            return Arrays.stream(decomposition.singularValues())
-                .filter(value -> value > 1e-12)
+                org.jlinalg.compute.BackendPolicy.PREFERRED)) {
+            SymmetricEigenDecomposition decomposition =
+                context.backend().dsyev(symmetricCopy(matrix, dimension), dimension);
+            double maximum = Arrays.stream(decomposition.eigenvalues())
+                .map(Math::abs).max().orElse(0);
+            double tolerance = 1e-12 * Math.max(1, maximum);
+            return Arrays.stream(decomposition.eigenvalues())
+                .filter(value -> value > tolerance)
                 .sorted().toArray();
         }
+    }
+
+    private static double[] symmetricCopy(double[] matrix, int dimension) {
+        double[] result = matrix.clone();
+        for (int row = 0; row < dimension; row++) {
+            for (int column = 0; column < row; column++) {
+                double value = 0.5 * (result[row * dimension + column]
+                    + result[column * dimension + row]);
+                result[row * dimension + column] = value;
+                result[column * dimension + row] = value;
+            }
+        }
+        return result;
     }
 
     private static double dot(double[] left, double[] right) {
@@ -286,10 +392,6 @@ public final class SetTests {
         return result;
     }
 
-    private record Prepared(
-        double[][] dosages, double[] weights,
-        List<VariantFilterResult> excluded) { }
-
     private static final class ScoreSampler {
         private final double[] leftVectors;
         private final double[] squareRootValues;
@@ -298,32 +400,31 @@ public final class SetTests {
         private ScoreSampler(double[] covariance, int dimension) {
             this.dimension = dimension;
             try (BackendContext context = BackendContext.select(
-                    org.jlinalg.compute.BackendPolicy.CPU)) {
-                SingularValueDecomposition decomposition =
-                    context.backend().dgesvd(
-                        covariance, dimension, dimension);
-                leftVectors = decomposition.leftSingularVectors();
-                double[] singularValues = decomposition.singularValues();
+                    org.jlinalg.compute.BackendPolicy.PREFERRED)) {
+                SymmetricEigenDecomposition decomposition =
+                    context.backend().dsyev(
+                        symmetricCopy(covariance, dimension), dimension);
+                leftVectors = decomposition.eigenvectors();
+                double[] eigenvalues = decomposition.eigenvalues();
                 squareRootValues = new double[dimension];
-                for (int index = 0;
-                        index < Math.min(dimension, singularValues.length);
-                        index++)
+                for (int index = 0; index < dimension; index++)
                     squareRootValues[index] = Math.sqrt(
-                        Math.max(0, singularValues[index]));
+                        Math.max(0, eigenvalues[index]));
             }
         }
 
-        private double[] sample(Random random) {
-            double[] gaussian = new double[dimension];
-            for (int index = 0; index < dimension; index++)
-                gaussian[index] = random.nextGaussian()
-                    * squareRootValues[index];
-            double[] result = new double[dimension];
+        private double[] sample(Random random, int samples) {
+            double[] gaussian = new double[dimension * samples];
             for (int row = 0; row < dimension; row++)
-                for (int column = 0; column < dimension; column++)
-                    result[row] += leftVectors[row * dimension + column]
-                        * gaussian[column];
-            return result;
+                for (int sample = 0; sample < samples; sample++)
+                    gaussian[row * samples + sample] = random.nextGaussian()
+                        * squareRootValues[row];
+            try (BackendContext context = BackendContext.select(
+                    org.jlinalg.compute.BackendPolicy.PREFERRED)) {
+                return org.jlinalg.internal.MatrixOps.multiply(
+                    context.backend(), leftVectors, dimension, dimension,
+                    gaussian, samples);
+            }
         }
     }
 }

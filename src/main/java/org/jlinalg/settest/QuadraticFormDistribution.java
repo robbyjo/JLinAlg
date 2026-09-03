@@ -65,20 +65,13 @@ final class QuadraticFormDistribution {
             throw new IllegalArgumentException(
                 "survival probability must be in (0,1]");
         if (survivalProbability == 1) return 0;
-        double high = Arrays.stream(eigenvalues).sum();
-        for (int iteration = 0; iteration < 128
-                && survival(high, eigenvalues).pValue() > survivalProbability;
-                iteration++)
-            high *= 2;
-        double low = 0;
-        for (int iteration = 0; iteration < 64; iteration++) {
-            double middle = (low + high) * 0.5;
-            if (survival(middle, eigenvalues).pValue() > survivalProbability)
-                low = middle;
-            else
-                high = middle;
-        }
-        return high;
+        double sum = Arrays.stream(eigenvalues).sum();
+        double sumSquares = Arrays.stream(eigenvalues)
+            .map(value -> value * value).sum();
+        double degrees = sum * sum / sumSquares;
+        double scale = sumSquares / sum;
+        return scale * ChiSquare.quantile(
+            survivalProbability, degrees, false, false);
     }
 
     private static Double imhof(double statistic, double[] eigenvalues) {

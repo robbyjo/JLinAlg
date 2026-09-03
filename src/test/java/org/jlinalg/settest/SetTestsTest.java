@@ -11,6 +11,8 @@ import java.util.List;
 import jdistlib.ChiSquare;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.gwas.RemlAssociationScanner;
+import org.jlinalg.glm.GlmFamilies;
+import org.jlinalg.glmm.GlmmPqlOptions;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.pipeline.VariantFilterOptions;
 import org.jlinalg.pipeline.VariantRecord;
@@ -130,6 +132,60 @@ class SetTestsTest {
             && skatO.adjustedPValue() <= 1);
     }
 
+    @Test
+    void preparedSuiteProjectsOnceAndMatchesStandaloneKernelTests() {
+        VariantSet set = new VariantSet("suite", List.of(
+            member("v1", FIRST, EffectAllele.ALTERNATE),
+            member("v2", SECOND, EffectAllele.ALTERNATE)));
+        SetTestOptions options = options(250);
+        PreparedVariantSet prepared = SetTests.prepare(
+            set, RESPONSE.length, options);
+        CountingNullModel counted = new CountingNullModel(nullModel());
+
+        SetTestSuiteResult suite = SetTests.scoreSuite(
+            prepared, counted, options);
+        assertEquals(1, counted.calls);
+
+        SetTestResult skat = SetTests.skat(prepared, nullModel());
+        SkatOResult skatO = SetTests.skatO(prepared, nullModel(), options);
+        assertEquals(skat.statistic(), suite.skat().statistic(), 1e-12);
+        assertEquals(skat.pValue(), suite.skat().pValue(), 1e-12);
+        assertEquals(skatO.adjustedPValue(),
+            suite.skatO().adjustedPValue(), 0);
+        for (int index = 0; index < skatO.components().size(); index++)
+            assertEquals(skatO.components().get(index).result().pValue(),
+                suite.skatO().components().get(index).result().pValue(), 1e-10);
+    }
+
+    @Test
+    void binaryPqlNullSupportsPreparedSetTests() {
+        double[] binary = {0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1};
+        double[] kinship = new double[binary.length * binary.length];
+        for (int row = 0; row < binary.length; row++)
+            for (int column = 0; column < binary.length; column++)
+                kinship[row * binary.length + column] =
+                    Math.pow(0.1, Math.abs(row - column));
+        PqlSetTestNullModel nullModel = PqlSetTestNullModel.prepare(
+            binary, INTERCEPT, GlmFamilies.binomial(),
+            List.of(new VarianceComponent("kinship", binary.length, kinship)),
+            GlmmPqlOptions.defaults(), BackendPolicy.CPU);
+        VariantSet set = new VariantSet("binary", List.of(
+            member("v1", FIRST, EffectAllele.ALTERNATE),
+            member("v2", SECOND, EffectAllele.ALTERNATE)));
+        PreparedVariantSet prepared = SetTests.prepare(
+            set, binary.length, options(50));
+
+        SetTestSuiteResult result = SetTests.scoreSuite(
+            prepared, nullModel, options(50));
+
+        assertTrue(result.burden().pValue() > 0
+            && result.burden().pValue() <= 1);
+        assertTrue(result.skat().pValue() > 0
+            && result.skat().pValue() <= 1);
+        assertTrue(result.skatO().adjustedPValue() > 0
+            && result.skatO().adjustedPValue() <= 1);
+    }
+
     private static LinearSetTestNullModel nullModel() {
         return LinearSetTestNullModel.prepare(
             RESPONSE, INTERCEPT, OlsOptions.defaults(), BackendPolicy.CPU);
@@ -146,5 +202,24 @@ class SetTestsTest {
         return new WeightedVariant(new VariantRecord(
             id, "1", 1, "A", "G", dosage, Double.NaN),
             effectAllele, 1);
+    }
+
+    private static final class CountingNullModel
+            implements GaussianSetTestNullModel {
+        private final GaussianSetTestNullModel delegate;
+        private int calls;
+
+        private CountingNullModel(GaussianSetTestNullModel delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override public int observations() { return delegate.observations(); }
+        @Override public double degreesOfFreedom() {
+            return delegate.degreesOfFreedom();
+        }
+        @Override public SetTestScoreState score(double[][] variantRows) {
+            calls++;
+            return delegate.score(variantRows);
+        }
     }
 }

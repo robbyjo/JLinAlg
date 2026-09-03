@@ -348,6 +348,18 @@ tasks.register('benchmarkTopmed100', JavaExec) {
     }.getOrElse([])
 }
 
+tasks.register('benchmarkTopmedSlidingSet', JavaExec) {
+    group = 'verification'
+    description = 'Runs the TOPMed pedigree-aware sliding-window set benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedSlidingWindowSetBenchmark'
+    jvmArgs '-Xms2g', '-Xmx14g'
+    args providers.gradleProperty('topmedSetArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
 tasks.register('benchmarkTopmedPenalized', JavaExec) {
     group = 'verification'
     description = 'Runs the prepared TOPMed 100-gene penalized benchmark.'
