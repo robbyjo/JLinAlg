@@ -5,6 +5,8 @@
 package org.jlinalg.settest;
 
 import jdistlib.Normal;
+import jdistlib.accelerator.ComputeBackend;
+import org.jlinalg.compute.BackendPolicy;
 
 /** Reusable efficient-score projection for a variant-set null model. */
 public interface SetTestScoreNullModel {
@@ -21,4 +23,14 @@ public interface SetTestScoreNullModel {
     }
 
     default String burdenPValueMethod() { return "normal-score"; }
+
+    /**
+     * Returns a retained backend owned by this null model, or {@code null}
+     * when set-test operations should acquire one from {@link #backendPolicy()}.
+     * Callers must not close the returned backend.
+     */
+    default ComputeBackend computeBackend() { return null; }
+
+    /** Backend policy used when this null model does not retain a backend. */
+    default BackendPolicy backendPolicy() { return BackendPolicy.PREFERRED; }
 }

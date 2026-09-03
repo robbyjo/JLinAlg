@@ -161,7 +161,7 @@ public final class PqlSetTestNullModel implements SetTestScoreNullModel {
     }
 
     public GlmmPqlResult nullModel() { return nullModel; }
-    public BackendPolicy backendPolicy() { return backendPolicy; }
+    @Override public BackendPolicy backendPolicy() { return backendPolicy; }
 
     private static double clamp(double value, double minimum, double maximum) {
         return Math.max(minimum, Math.min(maximum, value));

@@ -134,6 +134,10 @@ public final class KnownCovarianceSetTestNullModel
 
     public BackendPolicy backendPolicy() { return backendPolicy; }
 
+    @Override public ComputeBackend computeBackend() {
+        return context.backend();
+    }
+
     @Override public void close() {
         context.close();
     }

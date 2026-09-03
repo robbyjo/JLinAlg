@@ -12,11 +12,27 @@ public record SetTestOptions(
         SetTestMissingPolicy missingPolicy,
         double[] skatORhoGrid,
         int skatOSimulations,
-        long randomSeed) {
+        long randomSeed,
+        SkatOCalibration skatOCalibration) {
+    /**
+     * Source-compatible constructor retaining the historical simulation
+     * calibration when simulations and a seed are supplied explicitly.
+     */
+    public SetTestOptions(
+            VariantFilterOptions variantFilter,
+            SetTestMissingPolicy missingPolicy,
+            double[] skatORhoGrid,
+            int skatOSimulations,
+            long randomSeed) {
+        this(variantFilter, missingPolicy, skatORhoGrid, skatOSimulations,
+            randomSeed, SkatOCalibration.PARAMETRIC_SIMULATION);
+    }
+
     public SetTestOptions {
-        if (variantFilter == null || missingPolicy == null)
+        if (variantFilter == null || missingPolicy == null
+                || skatOCalibration == null)
             throw new IllegalArgumentException(
-                "variant filter and missing policy are required");
+                "variant filter, missing policy, and calibration are required");
         if (skatORhoGrid == null || skatORhoGrid.length < 2)
             throw new IllegalArgumentException(
                 "SKAT-O rho grid requires at least two values");
@@ -32,15 +48,20 @@ public record SetTestOptions(
                 throw new IllegalArgumentException(
                     "SKAT-O rho values must increase strictly within [0,1]");
         }
-        if (skatOSimulations < 1)
+        if (skatOSimulations < 0
+                || (skatOSimulations < 1
+                    && skatOCalibration
+                        == SkatOCalibration.PARAMETRIC_SIMULATION))
             throw new IllegalArgumentException(
-                "SKAT-O simulations must be positive");
+                "SKAT-O simulations must be nonnegative and positive "
+                    + "for parametric simulation");
     }
     @Override public double[] skatORhoGrid() { return skatORhoGrid.clone(); }
 
     public static SetTestOptions defaults() {
         return new SetTestOptions(VariantFilterOptions.defaults(),
             SetTestMissingPolicy.MEAN_IMPUTE,
-            new double[] {0, 0.25, 0.5, 0.75, 1}, 10_000, 20260901L);
+            new double[] {0, 0.25, 0.5, 0.75, 1}, 10_000, 20260901L,
+            SkatOCalibration.ANALYTIC);
     }
 }

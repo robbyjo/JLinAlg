@@ -4,6 +4,7 @@
  */
 package org.jlinalg.settest;
 
+import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.gwas.RemlAssociationScanner;
 
 /**
@@ -24,6 +25,9 @@ public final class RemlSetTestNullModel implements GaussianSetTestNullModel {
     @Override public int observations() { return scanner.observations(); }
     @Override public double degreesOfFreedom() {
         return scanner.associationDegreesOfFreedom();
+    }
+    @Override public BackendPolicy backendPolicy() {
+        return scanner.backendPolicy();
     }
 
     @Override

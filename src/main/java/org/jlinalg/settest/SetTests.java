@@ -8,7 +8,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Function;
 import jdistlib.T;
+import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.SymmetricEigenDecomposition;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.pipeline.VariantFilterResult;
@@ -106,11 +108,18 @@ public final class SetTests {
     public static SetTestResult skat(
             PreparedVariantSet prepared, SetTestScoreNullModel nullModel) {
         requireCompatible(prepared, nullModel);
+        return withBackend(nullModel,
+            backend -> skat(prepared, nullModel, backend));
+    }
+
+    private static SetTestResult skat(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
+            ComputeBackend backend) {
         double[][] weighted = weighted(
             prepared.dosagesView(), prepared.weightsView());
         return kernelResult(prepared.id(), "skat",
             prepared.requestedVariants(), prepared.includedVariants(),
-            nullModel.score(weighted), prepared.excludedVariants());
+            nullModel.score(weighted), prepared.excludedVariants(), backend);
     }
 
     public static SkatOResult skatO(
@@ -123,9 +132,11 @@ public final class SetTests {
             PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
             SetTestOptions options) {
         requireCompatible(prepared, nullModel);
-        double[][] base = weighted(
-            prepared.dosagesView(), prepared.weightsView());
-        return skatO(prepared, nullModel.score(base), options);
+        return withBackend(nullModel, backend -> {
+            double[][] base = weighted(
+                prepared.dosagesView(), prepared.weightsView());
+            return skatO(prepared, nullModel.score(base), options, backend);
+        });
     }
 
     /** Computes all three tests from one accelerated score projection. */
@@ -133,20 +144,22 @@ public final class SetTests {
             PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
             SetTestOptions options) {
         requireCompatible(prepared, nullModel);
-        double[][] base = weighted(
-            prepared.dosagesView(), prepared.weightsView());
-        SetTestScoreState state = nullModel.score(base);
-        SetTestResult burden = burdenScore(prepared, nullModel, state);
-        SetTestResult skat = kernelResult(prepared.id(), "skat",
-            prepared.requestedVariants(), prepared.includedVariants(), state,
-            prepared.excludedVariants());
-        return new SetTestSuiteResult(
-            burden, skat, skatO(prepared, state, options));
+        return withBackend(nullModel, backend -> {
+            double[][] base = weighted(
+                prepared.dosagesView(), prepared.weightsView());
+            SetTestScoreState state = nullModel.score(base);
+            SetTestResult burden = burdenScore(prepared, nullModel, state);
+            SetTestResult skat = kernelResult(prepared.id(), "skat",
+                prepared.requestedVariants(), prepared.includedVariants(), state,
+                prepared.excludedVariants(), backend);
+            return new SetTestSuiteResult(
+                burden, skat, skatO(prepared, state, options, backend));
+        });
     }
 
     private static SkatOResult skatO(
             PreparedVariantSet prepared, SetTestScoreState baseState,
-            SetTestOptions options) {
+            SetTestOptions options, ComputeBackend backend) {
         double[] rhoGrid = options.skatORhoGrid();
         List<SkatOResult.Component> components = new ArrayList<>(rhoGrid.length);
         double minimumP = 1;
@@ -154,20 +167,45 @@ public final class SetTests {
             SetTestResult result = kernelResult(prepared.id(),
                 "skat-o[rho=" + rho + "]", prepared.requestedVariants(),
                 prepared.includedVariants(), transform(baseState, rho),
-                prepared.excludedVariants());
+                prepared.excludedVariants(), backend);
             components.add(new SkatOResult.Component(rho, result));
             minimumP = Math.min(minimumP, result.pValue());
         }
+        double adjusted;
+        int simulations;
+        long seed;
+        if (options.skatOCalibration() == SkatOCalibration.ANALYTIC) {
+            adjusted = SkatOAnalyticDistribution.adjustedPValue(
+                minimumP, rhoGrid, components, baseState, backend);
+            simulations = 0;
+            seed = 0L;
+        } else {
+            adjusted = simulatedAdjustedPValue(
+                minimumP, rhoGrid, components, baseState, options, backend);
+            simulations = options.skatOSimulations();
+            seed = options.randomSeed();
+        }
+        return new SkatOResult(prepared.id(), prepared.requestedVariants(),
+            prepared.includedVariants(), components, minimumP, adjusted,
+            Math.log10(adjusted), simulations, seed,
+            prepared.excludedVariants());
+    }
+
+    private static double simulatedAdjustedPValue(
+            double minimumP, double[] rhoGrid,
+            List<SkatOResult.Component> components,
+            SetTestScoreState baseState, SetTestOptions options,
+            ComputeBackend backend) {
         double[] critical = new double[components.size()];
         for (int index = 0; index < critical.length; index++)
             critical[index] = QuadraticFormDistribution.critical(
                 components.get(index).result().eigenvalues(), minimumP);
         Random random = new Random(options.randomSeed());
         ScoreSampler sampler = new ScoreSampler(
-            baseState.informationView(), baseState.variants());
+            baseState.informationView(), baseState.variants(), backend);
         int extreme = 0;
         double[] simulated = sampler.sample(
-            random, options.skatOSimulations());
+            random, options.skatOSimulations(), backend);
         for (int simulation = 0;
                 simulation < options.skatOSimulations(); simulation++) {
             double squaredSum = 0;
@@ -188,23 +226,18 @@ public final class SetTests {
             }
             if (exceeds) extreme++;
         }
-        double adjusted = (extreme + 1.0)
-            / (options.skatOSimulations() + 1.0);
-        return new SkatOResult(prepared.id(), prepared.requestedVariants(),
-            prepared.includedVariants(), components, minimumP, adjusted,
-            Math.log10(adjusted), options.skatOSimulations(),
-            options.randomSeed(), prepared.excludedVariants());
+        return (extreme + 1.0) / (options.skatOSimulations() + 1.0);
     }
 
     private static SetTestResult kernelResult(
             String setId, String method, int requested,
             int included, SetTestScoreState scoreState,
-            List<VariantFilterResult> excluded) {
+            List<VariantFilterResult> excluded, ComputeBackend backend) {
         double statistic = 0;
         for (double score : scoreState.scoresView())
             statistic += score * score;
         double[] eigenvalues = eigenvalues(
-            scoreState.informationView(), scoreState.variants());
+            scoreState.informationView(), scoreState.variants(), backend);
         QuadraticFormDistribution.Tail tail =
             QuadraticFormDistribution.survival(statistic, eigenvalues);
         return new SetTestResult(setId, method, requested, included,
@@ -358,17 +391,26 @@ public final class SetTests {
                 "prepared variant set does not match null-model observations");
     }
 
-    private static double[] eigenvalues(double[] matrix, int dimension) {
+    static double[] eigenvalues(
+            double[] matrix, int dimension, ComputeBackend backend) {
+        SymmetricEigenDecomposition decomposition =
+            backend.dsyev(symmetricCopy(matrix, dimension), dimension);
+        double maximum = Arrays.stream(decomposition.eigenvalues())
+            .map(Math::abs).max().orElse(0);
+        double tolerance = 1e-12 * Math.max(1, maximum);
+        return Arrays.stream(decomposition.eigenvalues())
+            .filter(value -> value > tolerance)
+            .sorted().toArray();
+    }
+
+    private static <T> T withBackend(
+            SetTestScoreNullModel nullModel,
+            Function<ComputeBackend, T> operation) {
+        ComputeBackend retained = nullModel.computeBackend();
+        if (retained != null) return operation.apply(retained);
         try (BackendContext context = BackendContext.select(
-                org.jlinalg.compute.BackendPolicy.PREFERRED)) {
-            SymmetricEigenDecomposition decomposition =
-                context.backend().dsyev(symmetricCopy(matrix, dimension), dimension);
-            double maximum = Arrays.stream(decomposition.eigenvalues())
-                .map(Math::abs).max().orElse(0);
-            double tolerance = 1e-12 * Math.max(1, maximum);
-            return Arrays.stream(decomposition.eigenvalues())
-                .filter(value -> value > tolerance)
-                .sorted().toArray();
+                nullModel.backendPolicy())) {
+            return operation.apply(context.backend());
         }
     }
 
@@ -397,34 +439,29 @@ public final class SetTests {
         private final double[] squareRootValues;
         private final int dimension;
 
-        private ScoreSampler(double[] covariance, int dimension) {
+        private ScoreSampler(
+                double[] covariance, int dimension, ComputeBackend backend) {
             this.dimension = dimension;
-            try (BackendContext context = BackendContext.select(
-                    org.jlinalg.compute.BackendPolicy.PREFERRED)) {
-                SymmetricEigenDecomposition decomposition =
-                    context.backend().dsyev(
-                        symmetricCopy(covariance, dimension), dimension);
-                leftVectors = decomposition.eigenvectors();
-                double[] eigenvalues = decomposition.eigenvalues();
-                squareRootValues = new double[dimension];
-                for (int index = 0; index < dimension; index++)
-                    squareRootValues[index] = Math.sqrt(
-                        Math.max(0, eigenvalues[index]));
-            }
+            SymmetricEigenDecomposition decomposition = backend.dsyev(
+                symmetricCopy(covariance, dimension), dimension);
+            leftVectors = decomposition.eigenvectors();
+            double[] eigenvalues = decomposition.eigenvalues();
+            squareRootValues = new double[dimension];
+            for (int index = 0; index < dimension; index++)
+                squareRootValues[index] = Math.sqrt(
+                    Math.max(0, eigenvalues[index]));
         }
 
-        private double[] sample(Random random, int samples) {
+        private double[] sample(
+                Random random, int samples, ComputeBackend backend) {
             double[] gaussian = new double[dimension * samples];
             for (int row = 0; row < dimension; row++)
                 for (int sample = 0; sample < samples; sample++)
                     gaussian[row * samples + sample] = random.nextGaussian()
                         * squareRootValues[row];
-            try (BackendContext context = BackendContext.select(
-                    org.jlinalg.compute.BackendPolicy.PREFERRED)) {
-                return org.jlinalg.internal.MatrixOps.multiply(
-                    context.backend(), leftVectors, dimension, dimension,
-                    gaussian, samples);
-            }
+            return org.jlinalg.internal.MatrixOps.multiply(
+                backend, leftVectors, dimension, dimension,
+                gaussian, samples);
         }
     }
 }

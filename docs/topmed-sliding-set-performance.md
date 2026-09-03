@@ -26,23 +26,26 @@ JLinAlg.
 
 | Outcome | Analysis | JLinAlg oneMKL (s) | R GMMAT (s) | Speed ratio |
 |---|---|---:|---:|---:|
-| BMI | Burden | 5.003 | 40.390 | 8.07x JLinAlg |
-| BMI | SKAT | 11.689 | 40.390 | 3.46x JLinAlg |
-| BMI | SKAT-O | 53.980 | 41.260 | 1.31x R |
-| BMI | shared suite | 60.799 | 42.220 | 1.44x R |
-| Obesity | Burden | 4.971 | 43.710 | 8.79x JLinAlg |
-| Obesity | SKAT | 11.529 | 44.890 | 3.89x JLinAlg |
-| Obesity | SKAT-O | 54.250 | 45.890 | 1.18x R |
-| Obesity | shared suite | 60.494 | 45.780 | 1.32x R |
+| BMI | Burden | 5.051 | 40.390 | 8.00x JLinAlg |
+| BMI | SKAT | 5.374 | 40.390 | 7.52x JLinAlg |
+| BMI | SKAT-O | 7.676 | 41.260 | 5.37x JLinAlg |
+| BMI | shared suite | 7.899 | 42.220 | 5.35x JLinAlg |
+| Obesity | Burden | 4.964 | 43.710 | 8.81x JLinAlg |
+| Obesity | SKAT | 5.345 | 44.890 | 8.40x JLinAlg |
+| Obesity | SKAT-O | 7.774 | 45.890 | 5.90x JLinAlg |
+| Obesity | shared suite | 8.075 | 45.780 | 5.67x JLinAlg |
 
-The score projection is the dominant cost for Burden and SKAT. Materializing
-the retained projection once and multiplying each window through oneMKL made
-JLinAlg 8.1--8.8x faster for Burden and 3.5--3.9x faster for SKAT. SKAT-O has
-a deliberately different calibration cost: JLinAlg runs a deterministic
-10,000-draw correlated-null simulation, while GMMAT uses its analytic
-SKAT-O calculation. R is therefore 1.18--1.31x faster for SKAT-O and
-1.32--1.44x faster for the suite on this configuration. These rows compare the
-shipped methods, not identical SKAT-O calibration algorithms.
+The optimized scan retains one backend selected and owned by the null model;
+component eigensolves and SKAT-O calibration no longer perform hardware
+discovery per window. Analytic SKAT-O uses GMMAT's moment-matched
+one-dimensional integration structure. The historical seeded correlated-null
+simulation remains available explicitly.
+
+Relative to the original implementation, backend reuse made SKAT 2.18x faster
+for BMI and 2.16x faster for Obesity. Backend reuse plus analytic calibration
+made SKAT-O 7.03x and 6.98x faster, and the shared suites 7.70x and 7.49x
+faster. Burden is unchanged because it did not perform component eigensolves
+or SKAT-O calibration.
 
 ## Numerical checks
 
@@ -56,13 +59,14 @@ difference on that scale.
 | BMI | SKAT | 0.999998 | 0.000425 |
 | Obesity | Burden | 0.999261 | 0.0628 |
 | Obesity | SKAT | 0.999750 | 0.1441 |
-| BMI | SKAT-O | 0.957748 | 1.2001 |
-| Obesity | SKAT-O | 0.984193 | 0.5658 |
+| BMI | SKAT-O | 0.999796 | 0.00631 |
+| Obesity | SKAT-O | 0.998954 | 0.0756 |
 
-The larger SKAT-O differences are expected from the simulation-versus-analytic
-calibration, including JLinAlg's Monte Carlo p-value floor of `1 / 10001`.
-The smaller binary-model shifts reflect the independently fitted first-order
-Laplace/PQL-style null in JLinAlg versus GMMAT's binary mixed-model null.
+SKAT-O agreement improved substantially after adopting analytic calibration.
+The remaining small differences reflect Imhof component tails in JLinAlg
+versus GMMAT's preferred Davies tails. Binary-model shifts also reflect the
+independently fitted first-order Laplace/PQL-style null in JLinAlg versus
+GMMAT's binary mixed-model null.
 
 ## Selected windows
 
@@ -98,9 +102,10 @@ rare variants.
 The JLinAlg implementation exposes reusable prepared variant sets, generic
 continuous/binary score-null projections, and a shared Burden/SKAT/SKAT-O
 suite. It uses a symmetric eigendecomposition for positive-semidefinite score
-covariances and batches all SKAT-O null draws into an accelerated matrix
-multiply. Filtering is exposed separately so callers can keep preparation out
-of timed scans.
+covariances and a scan-owned backend for all window operations. Analytic
+SKAT-O is the default; explicitly requested simulation batches null draws into
+an accelerated matrix multiply. Filtering is exposed separately so callers
+can keep preparation out of timed scans.
 
 ## Reproduction
 
@@ -113,6 +118,10 @@ the R harness is `src/benchmark/r/topmed_sliding_set_benchmark.R`.
 $env:MKL_NUM_THREADS='8'
 $env:OMP_NUM_THREADS='8'
 .\gradlew.bat benchmarkTopmedSlidingSet --no-daemon
+
+# Optional legacy 10,000-draw calibration:
+.\gradlew.bat benchmarkTopmedSlidingSet --no-daemon `
+  '-PtopmedSetArgs=--skato-calibration PARAMETRIC_SIMULATION'
 
 & 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
   src\benchmark\r\topmed_sliding_set_benchmark.R

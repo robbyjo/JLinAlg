@@ -138,7 +138,7 @@ public final class LinearSetTestNullModel implements GaussianSetTestNullModel {
     public int residualDegreesOfFreedom() { return residualDegreesOfFreedom; }
     public double residualSumSquares() { return residualSumSquares; }
     public double residualVariance() { return residualVariance; }
-    public BackendPolicy backendPolicy() { return backendPolicy; }
+    @Override public BackendPolicy backendPolicy() { return backendPolicy; }
 
     double[] responseResidualView() { return responseResidual; }
 

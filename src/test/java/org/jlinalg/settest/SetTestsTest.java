@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import jdistlib.ChiSquare;
+import jdistlib.accelerator.ComputeBackend;
+import jdistlib.accelerator.CpuComputeBackend;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.gwas.RemlAssociationScanner;
 import org.jlinalg.glm.GlmFamilies;
@@ -77,6 +79,33 @@ class SetTestsTest {
         assertEquals(ChiSquare.cumulative(3.5 / 2, 1, false, false),
             result.pValue(), 1e-15);
         assertEquals("exact-scaled-chi-square", result.method());
+    }
+
+    @Test
+    void analyticSkatOMatchesGmmatReferenceAndUsesRetainedBackend() {
+        double[] third =
+            {0, 0, 1, 0, 1, 0, 2, 1, 0, 1, 2, 0};
+        VariantSet set = new VariantSet("analytic", List.of(
+            member("v1", FIRST, EffectAllele.ALTERNATE),
+            member("v2", SECOND, EffectAllele.ALTERNATE),
+            member("v3", third, EffectAllele.ALTERNATE)));
+        SetTestOptions options = new SetTestOptions(
+            VariantFilterOptions.defaults(), SetTestMissingPolicy.MEAN_IMPUTE,
+            new double[] {0, 0.25, 0.5, 0.75, 1}, 0, 0,
+            SkatOCalibration.ANALYTIC);
+        FixedScoreNullModel nullModel = new FixedScoreNullModel(
+            new double[] {0.4, -0.3, 0.8},
+            new double[] {
+                1, 0.2, 0.1,
+                0.2, 0.8, 0.05,
+                0.1, 0.05, 1.2
+            });
+
+        SkatOResult result = SetTests.skatO(set, nullModel, options);
+
+        assertEquals(0.7856467311977459,
+            result.adjustedPValue(), 1e-4);
+        assertEquals(0, result.simulations());
     }
 
     @Test
@@ -220,6 +249,34 @@ class SetTestsTest {
         @Override public SetTestScoreState score(double[][] variantRows) {
             calls++;
             return delegate.score(variantRows);
+        }
+        @Override public ComputeBackend computeBackend() {
+            return delegate.computeBackend();
+        }
+        @Override public BackendPolicy backendPolicy() {
+            return delegate.backendPolicy();
+        }
+    }
+
+    private static final class FixedScoreNullModel
+            implements SetTestScoreNullModel {
+        private final SetTestScoreState state;
+        private final ComputeBackend backend = new CpuComputeBackend();
+
+        private FixedScoreNullModel(double[] scores, double[] information) {
+            state = new SetTestScoreState(
+                scores, information, scores.length);
+        }
+
+        @Override public int observations() { return RESPONSE.length; }
+        @Override public SetTestScoreState score(double[][] variantRows) {
+            assertEquals(state.variants(), variantRows.length);
+            return state;
+        }
+        @Override public ComputeBackend computeBackend() { return backend; }
+        @Override public BackendPolicy backendPolicy() {
+            throw new AssertionError(
+                "retained backend should avoid policy selection");
         }
     }
 }

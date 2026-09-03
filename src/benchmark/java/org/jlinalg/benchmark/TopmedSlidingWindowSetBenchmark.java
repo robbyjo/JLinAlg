@@ -53,6 +53,7 @@ import org.jlinalg.settest.SetTestResult;
 import org.jlinalg.settest.SetTestScoreNullModel;
 import org.jlinalg.settest.SetTestSuiteResult;
 import org.jlinalg.settest.SetTests;
+import org.jlinalg.settest.SkatOCalibration;
 import org.jlinalg.settest.SkatOResult;
 import org.jlinalg.settest.VariantSet;
 import org.jlinalg.settest.VariantWeights;
@@ -85,7 +86,7 @@ public final class TopmedSlidingWindowSetBenchmark {
         SetTestOptions setOptions = new SetTestOptions(
             rareFilter(options.maximumMaf), SetTestMissingPolicy.MEAN_IMPUTE,
             new double[] {0, 0.25, 0.5, 0.75, 1},
-            options.skatOSimulations, 20260903L);
+            options.skatOSimulations, 20260903L, options.skatOCalibration);
         List<PreparedVariantSet> preparedWindows = data.windows.stream()
             .map(window -> SetTests.prepare(window.variantSet,
                 data.samples.size(), setOptions)).toList();
@@ -568,6 +569,8 @@ public final class TopmedSlidingWindowSetBenchmark {
             writer.write("window_size," + options.windowSize + "\n");
             writer.write("stride," + options.stride + "\n");
             writer.write("maximum_maf," + options.maximumMaf + "\n");
+            writer.write("skato_calibration,"
+                + options.skatOCalibration + "\n");
             writer.write("matching_id,framid\n");
             writer.write("pedigree_id,sabreid\n");
             writer.write("unlisted_pedigree_ids,singleton\n");
@@ -752,6 +755,7 @@ public final class TopmedSlidingWindowSetBenchmark {
         private int minimumVariants = 2;
         private int measurements = 3;
         private int skatOSimulations = 10_000;
+        private SkatOCalibration skatOCalibration = SkatOCalibration.ANALYTIC;
         private double maximumMaf = 0.01;
         private boolean prepareOnly;
         private final Set<String> pedigreeIds = new LinkedHashSet<>();
@@ -783,6 +787,8 @@ public final class TopmedSlidingWindowSetBenchmark {
                     case "measurements" -> result.measurements = Integer.parseInt(value);
                     case "skato-simulations" ->
                         result.skatOSimulations = Integer.parseInt(value);
+                    case "skato-calibration" -> result.skatOCalibration =
+                        SkatOCalibration.valueOf(value.toUpperCase(Locale.ROOT));
                     case "maximum-maf" -> result.maximumMaf = Double.parseDouble(value);
                     default -> throw new IllegalArgumentException(
                         "unknown option: " + key);
