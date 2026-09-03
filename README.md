@@ -451,8 +451,15 @@ outer convergence, the final working REML likelihood, and backend provenance.
 PQL is an approximation, not an exact non-Gaussian restricted likelihood. It
 can be biased for binary data with small clusters, rare outcomes, or large
 random-effect variance. JLinAlg deliberately rejects Gaussian input in this API;
-Gaussian mixed models should use exact `Reml` directly. Laplace or adaptive
-quadrature GLMM likelihoods are future, separately named estimators.
+Gaussian mixed models should use exact `Reml` directly.
+
+`SparseGlmmLaplace` is the marginal-likelihood alternative for grouped and
+pedigree models. It consumes sparse `RandomEffectTerm` designs and
+`SparsePrecisionMatrix` coefficient precisions directly. Its `Prepared` API
+owns the selected backend for an association scan and reuses one symbolic and
+numeric sparse Cholesky factor per worker, avoiding both observation-scale
+covariance matrices and repeated backend discovery. `GlmmLaplace` remains the
+dense reference implementation; adaptive quadrature is not implemented.
 
 The same PQL estimator is available with a numerator-relationship random
 effect through `PedigreeGlmmPql`:

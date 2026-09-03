@@ -350,6 +350,31 @@ First-order PQL is known to be least reliable for binary outcomes with small
 clusters, rare events, or substantial heterogeneity. These limitations are a
 property of the estimator rather than the linear-algebra backend.
 
+## Sparse Laplace GLMM
+
+`SparseGlmmLaplace` maximizes a first-order Laplace approximation rather than a
+PQL working likelihood. For coefficient precision
+`P = blockdiag(Q_k / variance_k)`, each PIRLS step factors the sparse matrix
+
+```text
+C = Z' W Z + P
+```
+
+and eliminates random modes through a Schur complement for `X`. The optimized
+objective is
+
+```text
+sum_i log p(y_i | eta_i) - 1/2 b' P b
+  + 1/2 log|P| - 1/2 log|C|.
+```
+
+Precision bases must be symmetric positive definite. Grouped identity
+precision and pedigree `A^-1` are supported directly. A prepared scan fixes the
+sparse pattern and variance start, owns its backend, and lazily retains one
+refactorable sparse Cholesky object per worker. Consequently, worker scheduling
+does not alter fitted estimates. Fixed-effect covariance is the inverse Schur
+complement and inference is asymptotic normal/Wald inference.
+
 ## Genomic relationship matrices and cryptic relatedness
 
 For each retained variant `j`, called alternate-allele dosages estimate

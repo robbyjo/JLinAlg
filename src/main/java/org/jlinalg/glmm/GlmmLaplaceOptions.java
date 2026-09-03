@@ -4,7 +4,7 @@
  */
 package org.jlinalg.glmm;
 
-/** Controls for dense first-order Laplace marginal-likelihood GLMM fitting. */
+/** Controls for first-order Laplace marginal-likelihood GLMM fitting. */
 public record GlmmLaplaceOptions(
         int maximumOuterIterations,
         int maximumModeIterations,

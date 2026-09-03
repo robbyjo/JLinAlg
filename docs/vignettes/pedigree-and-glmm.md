@@ -129,5 +129,34 @@ PedigreeGlmmPqlResult pedigreePql = PedigreeGlmmPql.fit(
     animal, pedigree);
 ```
 
+For a first-order Laplace marginal likelihood, build grouped designs and
+coefficient-space precision matrices directly:
+
+```java
+RandomEffectTerm levySet = RandomEffectTerm.randomIntercept(
+    "Levy_Set", levySetIds);
+PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
+    "animal", animal, pedigree);
+
+try (SparseGlmmLaplace.Prepared scan =
+        SparseGlmmLaplace.prepareWithPrecision(
+            binaryResponse.length,
+            GlmFamilies.binomial(),
+            List.of(levySet, additive.randomEffect()),
+            List.of(SparsePrecisionMatrix.identity(
+                levySet.coefficients()), additive.precision()),
+            GlmmLaplaceOptions.defaults(),
+            BackendPolicy.PREFERRED)) {
+    GlmmLaplaceResult fit = scan.fit(
+        binaryResponse, rowMajorFixedDesign, fixedColumns);
+}
+```
+
+`Prepared` owns one backend for the scan and lazily creates one reusable sparse
+Cholesky factor per calling worker. The random-effect Hessian is assembled as
+`Z'WZ + Q`, and fixed effects are solved through its Schur complement. Pedigree
+`A^-1` and grouped `Z` therefore remain sparse; neither `A` nor `ZAZ'` is
+materialized. Close the prepared scan only after all worker tasks finish.
+
 Satterthwaite and Kenward-Roger options describe the final PQL working model,
 not an exact finite-sample distribution for the original non-Gaussian model.

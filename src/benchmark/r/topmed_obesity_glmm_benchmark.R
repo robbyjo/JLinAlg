@@ -6,6 +6,7 @@ suppressPackageStartupMessages(library(data.table))
 parse_arguments <- function(arguments) {
   result <- list(
     prepared_dir = "build/benchmarks/topmed100",
+    output_prefix = NULL,
     genes = 20L,
     measurements = 3L,
     models = "glm,glmm,pedigree"
@@ -85,6 +86,7 @@ for (model in requested_models) {
       runtime = "R", model, threads = 1L, measurement,
       genes = nrow(features), seconds = elapsed,
       genes_per_second = nrow(features) / elapsed)
+    print(timing_rows[[length(timing_rows)]])
     if (measurement == 1L) {
       for (index in seq_along(fits)) {
         coefficients <- coef(summary(fits[[index]]))
@@ -101,9 +103,10 @@ for (model in requested_models) {
 
 timings <- rbindlist(timing_rows)
 results <- rbindlist(result_rows)
-fwrite(timings, file.path(options$prepared_dir,
-  "r_obesity_glmm_timings.csv"))
-fwrite(results, file.path(options$prepared_dir,
-  "r_obesity_glmm_results.csv"))
+output_prefix <- if (is.null(options$output_prefix))
+  file.path(options$prepared_dir, "r_obesity_glmm") else options$output_prefix
+dir.create(dirname(output_prefix), recursive = TRUE, showWarnings = FALSE)
+fwrite(timings, paste0(output_prefix, "_timings.csv"))
+fwrite(results, paste0(output_prefix, "_results.csv"))
 print(timings)
 if (length(warnings())) print(warnings())

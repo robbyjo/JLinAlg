@@ -27,14 +27,15 @@ import org.jlinalg.association.ParallelAssociationEngine;
 import org.jlinalg.association.VariableMissingPolicy;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
-import org.jlinalg.gam.GammCovariances;
 import org.jlinalg.glm.GlmFamilies;
 import org.jlinalg.glm.GlmOptions;
-import org.jlinalg.glmm.GlmmLaplace;
 import org.jlinalg.glmm.GlmmLaplaceOptions;
+import org.jlinalg.glmm.SparseGlmmLaplace;
+import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.jlinalg.pedigree.Pedigree;
 import org.jlinalg.pedigree.PedigreeIndividual;
-import org.jlinalg.reml.VarianceComponent;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 
 /** Exact logistic GLM and first-order Laplace GLMM TOPMed benchmark. */
 public final class TopmedObesityGlmmBenchmark {
@@ -58,69 +59,82 @@ public final class TopmedObesityGlmmBenchmark {
         }
 
         Map<String, AssociationFitter> fitters = new LinkedHashMap<>();
+        List<SparseGlmmLaplace.Prepared> preparedScans = new ArrayList<>();
         if (options.models.contains("glm")) {
             fitters.put("glm", AssociationModels.glm(
                 GlmFamilies.binomial(), GlmOptions.defaults()));
         }
-        VarianceComponent batch = null;
+        RandomEffectTerm batch = null;
         if (options.models.contains("glmm") || options.models.contains("pedigree")) {
-            batch = VarianceComponent.randomIntercept("Levy_Set", data.batch());
+            batch = RandomEffectTerm.randomIntercept("Levy_Set", data.batch());
         }
         if (options.models.contains("glmm")) {
-            List<VarianceComponent> components = List.of(batch);
-            fitters.put("glmm", laplace(components));
+            SparseGlmmLaplace.Prepared prepared = SparseGlmmLaplace.prepare(
+                data.rows(), GlmFamilies.binomial(), List.of(batch),
+                GlmmLaplaceOptions.defaults(), options.backend);
+            preparedScans.add(prepared);
+            fitters.put("glmm", laplace(prepared));
         }
         if (options.models.contains("pedigree")) {
             Pedigree pedigree = readPedigree(
                 options.preparedDirectory.resolve("pedigree.csv"));
-            VarianceComponent genetic = GammCovariances.pedigree(
-                "additive genetic", pedigree, data.animal());
-            List<VarianceComponent> components = List.of(batch, genetic);
-            fitters.put("pedigree", laplace(components));
+            PedigreeRandomEffectTerm genetic = PedigreeRandomEffectTerm.of(
+                "additive genetic", data.animal(), pedigree);
+            SparseGlmmLaplace.Prepared prepared =
+                SparseGlmmLaplace.prepareWithPrecision(data.rows(),
+                    GlmFamilies.binomial(),
+                    List.of(batch, genetic.randomEffect()),
+                    List.of(SparsePrecisionMatrix.identity(
+                        batch.coefficients()), genetic.precision()),
+                    GlmmLaplaceOptions.defaults(), options.backend);
+            preparedScans.add(prepared);
+            fitters.put("pedigree", laplace(prepared));
             System.out.printf(Locale.ROOT,
                 "loaded pedigree individuals=%d observations=%d%n",
                 pedigree.size(), data.rows());
         }
 
-        List<Timing> timings = new ArrayList<>();
-        List<Result> results = new ArrayList<>();
-        for (String model : options.models) {
-            AssociationFitter fitter = fitters.get(model);
-            if (fitter == null) throw new IllegalArgumentException(
-                "unknown model: " + model);
-            scan(data, firstPredictor(data), fitter, engine);
-            for (int measurement = 1; measurement <= options.measurements;
-                    measurement++) {
-                System.gc();
-                long started = System.nanoTime();
-                AssociationBatchResult result = scan(
-                    data, data.predictors(), fitter, engine);
-                double seconds = (System.nanoTime() - started) / 1e9;
-                consume(result);
-                timings.add(new Timing(model, options.backend.name(),
-                    options.threads, measurement, data.genes(), seconds));
-                if (measurement == 1) addResults(
-                    results, model, options.threads, data, result);
-                System.out.printf(Locale.ROOT,
-                    "JLinAlg model=%s threads=%d measurement=%d genes=%d "
-                        + "seconds=%.6f genes_per_second=%.3f failures=%d%n",
-                    model, options.threads, measurement, data.genes(), seconds,
-                    data.genes() / seconds, result.failures().size());
+        try {
+            List<Timing> timings = new ArrayList<>();
+            List<Result> results = new ArrayList<>();
+            for (String model : options.models) {
+                AssociationFitter fitter = fitters.get(model);
+                if (fitter == null) throw new IllegalArgumentException(
+                    "unknown model: " + model);
+                scan(data, firstPredictor(data), fitter, engine);
+                for (int measurement = 1; measurement <= options.measurements;
+                        measurement++) {
+                    System.gc();
+                    long started = System.nanoTime();
+                    AssociationBatchResult result = scan(
+                        data, data.predictors(), fitter, engine);
+                    double seconds = (System.nanoTime() - started) / 1e9;
+                    consume(result);
+                    timings.add(new Timing(model, options.backend.name(),
+                        options.threads, measurement, data.genes(), seconds));
+                    if (measurement == 1) addResults(
+                        results, model, options.threads, data, result);
+                    System.out.printf(Locale.ROOT,
+                        "JLinAlg model=%s threads=%d measurement=%d genes=%d "
+                            + "seconds=%.6f genes_per_second=%.3f failures=%d%n",
+                        model, options.threads, measurement, data.genes(), seconds,
+                        data.genes() / seconds, result.failures().size());
+                }
             }
+            writeTimings(options.outputPrefix + "_timings.csv", timings);
+            writeResults(options.outputPrefix + "_results.csv", results);
+        } finally {
+            for (int index = preparedScans.size() - 1; index >= 0; index--)
+                preparedScans.get(index).close();
         }
-        writeTimings(options.outputPrefix + "_timings.csv", timings);
-        writeResults(options.outputPrefix + "_results.csv", results);
         if (!Double.isFinite(checksum))
             throw new IllegalStateException("non-finite benchmark checksum");
     }
 
     private static AssociationFitter laplace(
-            List<VarianceComponent> components) {
-        return (response, design, rows, columns, backend) ->
-            GlmmLaplace.fit(response, design, rows, columns,
-                GlmFamilies.binomial(), components, null, null,
-                GlmmLaplaceOptions.defaults(), backend)
-                .associationStatistics();
+            SparseGlmmLaplace.Prepared prepared) {
+        return (response, design, rows, columns, ignoredBackend) ->
+            prepared.fit(response, design, columns).associationStatistics();
     }
 
     private static AssociationBatchResult scan(
