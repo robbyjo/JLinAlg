@@ -18,7 +18,16 @@ System.out.println(arma.aicc());
 
 MA signs match R: a positive MA coefficient enters the observation equation
 with a positive sign. The conditional fitter transforms parameters to preserve
-stationarity and invertibility.
+stationarity and invertibility. Pure nonseasonal AR models use their
+closed-form conditional least-squares solution. Other models use one
+deterministic optimizer start by default; request additional starts for a
+particularly irregular likelihood:
+
+```java
+ArimaOptions robust = ArimaOptions.builder()
+    .optimizationStarts(5)
+    .build();
+```
 
 ## Integrated and seasonal models
 
@@ -93,7 +102,8 @@ ExactArmaResult panel = ExactArma.fitPanel(
 
 Missing values are exactly marginalized for stationary ARMA. Integrated models
 are not accepted by `ExactArma`; JLinAlg does not currently claim a diffuse
-Kalman likelihood for them.
+Kalman likelihood for them. Complete stationary series use a Durbin-Levinson
+likelihood; missing series retain the dense marginal-covariance path.
 
 ## LMM with ARIMA errors
 

@@ -18,7 +18,57 @@ measurement.
 ```powershell
 .\gradlew.bat benchmarkAssociation
 .\gradlew.bat benchmarkMixedModels
+.\gradlew.bat benchmarkTimeSeries
 ```
+
+## Time-series benchmarks
+
+`benchmarkTimeSeries` loads six fixed real-world series from
+`src/benchmark/resources/timeseries`. The cases cover conditional AR, ARMA,
+ARIMA, seasonal ARIMA, exhaustive small-order selection, and exact stationary
+AR likelihood. Resource headers, row order, finite values, row counts, and
+SHA-256 checksums are validated before timing begins.
+
+Run a comma-separated subset while profiling a particular implementation:
+
+```powershell
+.\gradlew.bat `
+  "-Djlinalg.benchmark.cases=conditional_arma21_sunspots,exact_ar2_nile" `
+  "-Djlinalg.benchmark.warmups=3" `
+  "-Djlinalg.benchmark.measurements=7" `
+  benchmarkTimeSeries
+```
+
+Available cases are:
+
+- `conditional_ar2_nile`
+- `conditional_arima310_wwwusage`
+- `conditional_sarima_airline`
+- `conditional_sarima_ukgas`
+- `conditional_seasonal_ar_nottem`
+- `conditional_arma21_sunspots`
+- `automatic_nile`
+- `exact_ar2_nile`
+
+Output is CSV with median wall time, optimizer evaluations, and convergence.
+The automatic-order case reports `-1` evaluations because its public candidate
+results do not expose a total. Dataset provenance, source links, checksums, and
+licensing notes are in the
+[time-series data README](../src/benchmark/resources/timeseries/README.md).
+
+For an R `stats::arima` comparison, run the bundled script. Conditional cases
+use `method = "CSS"`; `exact_ar2_nile` uses `method = "ML"`. Its arguments are
+data directory, warm-ups, measurement batches, repetitions per batch, and an
+optional comma-separated case filter:
+
+```powershell
+Rscript src/benchmark/r/time_series_benchmark.R `
+  src/benchmark/resources/timeseries 1 7 50
+```
+
+Repeated fits are used because Windows R elapsed-time resolution is too coarse
+for the shortest cases. Compare `median_seconds` from Java with
+`median_seconds_per_fit` from R on the same otherwise-idle machine.
 
 Dimensions and execution can be controlled without editing source:
 

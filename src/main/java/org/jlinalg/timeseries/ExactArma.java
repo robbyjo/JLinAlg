@@ -57,13 +57,18 @@ public final class ExactArma {
             lower[parameters - 1] = mean - 10.0 * scale;
             upper[parameters - 1] = mean + 10.0 * scale;
         }
+        boolean conditionallyInitialized = initializeFromConditional(
+            series, observed, order, includeMean, initial, lower, upper);
         SeasonalArimaOrder seasonal = SeasonalArimaOrder.none();
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             ComputeBackend backend = context.backend();
             MultivariableFunction objective = point -> evaluate(
                 point, order, seasonal, includeMean, observed, backend).negativeLogLikelihood();
-            BoundedOptimizer.Result optimized = Arima.multiStart(
-                initial, lower, upper, objective, dynamic, 5_000, 1e-8);
+            BoundedOptimizer.Result optimized = conditionallyInitialized
+                ? BoundedOptimizer.minimize(
+                    initial, lower, upper, objective, 5_000, 1e-8)
+                : Arima.multiStart(
+                    initial, lower, upper, objective, dynamic, 5_000, 1e-8);
             Likelihood likelihood = evaluate(optimized.parameters(), order,
                 seasonal, includeMean, observed, backend);
             double[] rawCovariance = inverseHessian(
@@ -93,6 +98,37 @@ public final class ExactArma {
         }
     }
 
+    private static boolean initializeFromConditional(
+            List<double[]> series,
+            List<ObservedSeries> observed,
+            ArimaOrder order,
+            boolean includeMean,
+            double[] initial,
+            double[] lower,
+            double[] upper) {
+        if (series.size() != 1 || order.autoregressive() == 0
+                || order.movingAverage() != 0
+                || observed.get(0).values().length != series.get(0).length) {
+            return false;
+        }
+        ArimaResult conditional = Arima.fit(series.get(0), order,
+            ArimaOptions.builder().includeMean(includeMean).build());
+        double[] encoded = ArimaMath.encodeAutoregressive(
+            conditional.autoregressive());
+        if (encoded == null) return false;
+        for (int index = 0; index < encoded.length; index++) {
+            if (encoded[index] < lower[index] || encoded[index] > upper[index]) {
+                return false;
+            }
+        }
+        System.arraycopy(encoded, 0, initial, 0, encoded.length);
+        if (includeMean) {
+            int index = initial.length - 1;
+            initial[index] = Math.max(lower[index],
+                Math.min(upper[index], conditional.location()));
+        }
+        return true;
+    }
     private static Likelihood evaluate(
             double[] parameters, ArimaOrder order, SeasonalArimaOrder seasonal,
             boolean includeMean, List<ObservedSeries> series, ComputeBackend backend) {
@@ -102,16 +138,33 @@ public final class ExactArma {
         double logDeterminant = 0.0;
         int observations = 0;
         for (ObservedSeries value : series) {
-            double[] full = ArimaMath.correlationMatrix(
-                value.originalLength(), coefficients.effectiveAr(), coefficients.effectiveMa());
             int size = value.values().length;
-            double[] covariance = new double[size * size];
             double[] centered = new double[size];
             for (int row = 0; row < size; row++) {
                 centered[row] = value.values()[row] - coefficients.location();
+            }
+            if (size == value.originalLength()) {
+                double[] correlation = ArimaMath.autocorrelation(size,
+                    coefficients.effectiveAr(), coefficients.effectiveMa());
+                double[] contribution =
+                    toeplitzLikelihood(centered, correlation);
+                if (contribution == null) {
+                    return new Likelihood(Double.MAX_VALUE / 8.0, Double.NaN);
+                }
+                quadratic += contribution[0];
+                logDeterminant += contribution[1];
+                observations += size;
+                continue;
+            }
+            double[] full = ArimaMath.correlationMatrix(
+                value.originalLength(), coefficients.effectiveAr(),
+                coefficients.effectiveMa());
+            double[] covariance = new double[size * size];
+            for (int row = 0; row < size; row++) {
                 for (int column = 0; column < size; column++) {
                     covariance[row * size + column] = full[
-                        value.indices()[row] * value.originalLength() + value.indices()[column]];
+                        value.indices()[row] * value.originalLength()
+                            + value.indices()[column]];
                 }
             }
             try {
@@ -133,6 +186,42 @@ public final class ExactArma {
         return new Likelihood(nll, variance);
     }
 
+    static double[] toeplitzLikelihood(
+            double[] values, double[] correlation) {
+        int size = values.length;
+        double[] previous = new double[size];
+        double[] current = new double[size];
+        double variance = correlation[0];
+        double quadratic = values[0] * values[0] / variance;
+        double logDeterminant = Math.log(variance);
+        for (int order = 1; order < size; order++) {
+            double numerator = correlation[order];
+            for (int lag = 1; lag < order; lag++) {
+                numerator -= previous[lag] * correlation[order - lag];
+            }
+            double reflection = numerator / variance;
+            if (!Double.isFinite(reflection) || Math.abs(reflection) >= 1.0) {
+                return null;
+            }
+            for (int lag = 1; lag < order; lag++) {
+                current[lag] = previous[lag]
+                    - reflection * previous[order - lag];
+            }
+            current[order] = reflection;
+            variance *= 1.0 - reflection * reflection;
+            if (!(variance > 1e-14) || !Double.isFinite(variance)) return null;
+            double innovation = values[order];
+            for (int lag = 1; lag <= order; lag++) {
+                innovation -= current[lag] * values[order - lag];
+            }
+            quadratic += innovation * innovation / variance;
+            logDeterminant += Math.log(variance);
+            double[] temporary = previous;
+            previous = current;
+            current = temporary;
+        }
+        return new double[] {quadratic, logDeterminant};
+    }
     private static ObservedSeries observed(double[] series) {
         if (series == null || series.length < 3) {
             throw new IllegalArgumentException("each series must have at least three positions");

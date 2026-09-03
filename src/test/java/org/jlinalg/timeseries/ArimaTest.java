@@ -51,6 +51,7 @@ class ArimaTest {
         double[] arTwoSeries = simulateArma(800, 300, 0.5,
             new double[] {0.55, -0.2}, new double[0], 161803L);
         ArimaResult arTwo = Arima.fit(arTwoSeries, ArimaOrder.ar(2));
+        assertEquals(1, arTwo.functionEvaluations());
         assertEquals(2, arTwo.autoregressive().length);
         assertEquals(0.55, arTwo.autoregressive()[0], 0.1);
         assertEquals(-0.2, arTwo.autoregressive()[1], 0.1);
@@ -125,6 +126,16 @@ class ArimaTest {
     }
 
     @Test
+    void arTwoCorrelationUsesYuleWalkerRecursion() {
+        double[] correlation = Arima.correlationMatrix(
+            4, new double[] {0.5, -0.2}, new double[0]);
+
+        assertEquals(5.0 / 12.0, correlation[1], 1e-12);
+        assertEquals(1.0 / 120.0, correlation[2], 1e-12);
+        assertEquals(-19.0 / 240.0, correlation[3], 1e-12);
+    }
+
+    @Test
     void rejectsDriftWithoutExactlyOneDifference() {
         ArimaOptions options = ArimaOptions.builder()
             .includeDrift(true)
@@ -132,6 +143,14 @@ class ArimaTest {
         assertThrows(IllegalArgumentException.class,
             () -> Arima.fit(new double[] {1, 2, 3, 4, 5},
                 ArimaOrder.arma(1, 0), options));
+    }
+
+    @Test
+    void validatesOptimizerStartCount() {
+        assertThrows(IllegalArgumentException.class,
+            () -> ArimaOptions.builder().optimizationStarts(0).build());
+        assertThrows(IllegalArgumentException.class,
+            () -> ArimaOptions.builder().optimizationStarts(21).build());
     }
 
     private static double[] simulateArma(

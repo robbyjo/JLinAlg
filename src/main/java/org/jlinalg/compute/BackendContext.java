@@ -9,6 +9,7 @@ import jdistlib.accelerator.Compute;
 import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.ComputeBackends;
 import jdistlib.accelerator.ComputeSelection;
+import jdistlib.accelerator.CpuComputeBackend;
 
 /** Owns a JDistlib compute selection and closes its native resources. */
 public final class BackendContext implements AutoCloseable {
@@ -27,6 +28,12 @@ public final class BackendContext implements AutoCloseable {
         this(requested, selection, selection.backend());
     }
 
+    private BackendContext(BackendPolicy requested, ComputeBackend backend) {
+        this.requested = Objects.requireNonNull(requested, "requested");
+        this.selection = null;
+        this.backend = Objects.requireNonNull(backend, "backend");
+    }
+
     /** Selects the requested policy. Strict policies fail when unavailable. */
     public static BackendContext select(BackendPolicy policy) {
         Objects.requireNonNull(policy, "policy");
@@ -34,6 +41,9 @@ public final class BackendContext implements AutoCloseable {
             return preferred();
         }
         if (policy == BackendPolicy.CHOLMOD) return cholmod(policy);
+        if (policy == BackendPolicy.CPU) {
+            return new BackendContext(policy, new CpuComputeBackend());
+        }
         return new BackendContext(policy, ComputeBackends.select(toJdistlib(policy)));
     }
 
@@ -81,7 +91,8 @@ public final class BackendContext implements AutoCloseable {
 
     @Override
     public void close() {
-        selection.close();
+        if (selection == null) backend.close();
+        else selection.close();
     }
 
     private static boolean available(Compute compute) {

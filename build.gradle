@@ -312,6 +312,18 @@ tasks.register('benchmarkAssociation', JavaExec) {
     }
 }
 
+tasks.register('benchmarkTimeSeries', JavaExec) {
+    group = 'verification'
+    description = 'Runs real-data AR, ARMA, ARIMA, and seasonal macrobenchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TimeSeriesBenchmark'
+    jvmArgs '-Xms512m', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
 tasks.register('benchmarkMixedModels', JavaExec) {
     group = 'verification'
     description = 'Runs deterministic dense/sparse mixed-model macrobenchmarks.'

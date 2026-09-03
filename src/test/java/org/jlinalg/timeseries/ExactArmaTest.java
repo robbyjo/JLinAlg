@@ -12,6 +12,23 @@ import org.junit.jupiter.api.Test;
 
 class ExactArmaTest {
     @Test
+    void durbinLevinsonMatchesArOneInnovationLikelihood() {
+        double[] values = {1.0, -0.5, 0.25, 1.5};
+        double[] correlation = {1.0, 0.5, 0.25, 0.125};
+
+        double[] likelihood = ExactArma.toeplitzLikelihood(
+            values, correlation);
+
+        double quadratic = values[0] * values[0];
+        for (int index = 1; index < values.length; index++) {
+            double innovation = values[index] - 0.5 * values[index - 1];
+            quadratic += innovation * innovation / 0.75;
+        }
+        assertEquals(quadratic, likelihood[0], 1e-12);
+        assertEquals(3.0 * Math.log(0.75), likelihood[1], 1e-12);
+    }
+
+    @Test
     void exactArOneHandlesMissingValuesAndReturnsCoefficientSe() {
         double[] series = simulateAr(180, 0.65, 2.0, 1234L);
         series[20] = Double.NaN;

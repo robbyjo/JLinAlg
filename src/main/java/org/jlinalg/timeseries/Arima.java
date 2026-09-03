@@ -59,23 +59,31 @@ public final class Arima {
             lower[index] = mean - 10.0 * scale;
             upper[index] = mean + 10.0 * scale;
         }
+        boolean closedFormAutoregression = !seasonal.present()
+            && order.autoregressive() > 0 && order.movingAverage() == 0
+            && initializeAutoregression(
+                differenced, order.autoregressive(), locationIncluded,
+                initial, lower, upper);
 
+        double[] innovationWorkspace = new double[differenced.length];
         MultivariableFunction objective = parameters -> {
             ArimaMath.Coefficients coefficients = ArimaMath.decode(
                 parameters, order, seasonal, locationIncluded,
                 options.includeDrift());
-            ArimaMath.Innovations innovations = ArimaMath.innovations(
-                differenced, coefficients);
-            double variance = innovations.rss() / innovations.used();
+            int used = differenced.length - coefficients.effectiveAr().length;
+            double variance = ArimaMath.innovationRss(
+                differenced, coefficients, innovationWorkspace) / used;
             return variance > MINIMUM_VARIANCE && Double.isFinite(variance)
-                ? 0.5 * innovations.used() * Math.log(variance)
+                ? 0.5 * used * Math.log(variance)
                 : Double.MAX_VALUE / 4.0;
         };
-        BoundedOptimizer.Result optimized = multiStart(
-            initial, lower, upper, objective, parameterCount
+        BoundedOptimizer.Result optimized = closedFormAutoregression
+            ? new BoundedOptimizer.Result(
+                initial.clone(), objective.eval(initial), 1, true)
+            : multiStart(initial, lower, upper, objective, parameterCount
                 - (locationIncluded ? 1 : 0),
-            options.maximumFunctionEvaluations(),
-            options.optimizationTolerance());
+                options.maximumFunctionEvaluations(),
+                options.optimizationTolerance(), options.optimizationStarts());
         ArimaMath.Coefficients coefficients = ArimaMath.decode(
             optimized.parameters(), order, seasonal, locationIncluded,
             options.includeDrift());
@@ -129,6 +137,101 @@ public final class Arima {
         return Math.sqrt(sum / values.length);
     }
 
+    private static boolean initializeAutoregression(
+            double[] series,
+            int autoregressive,
+            boolean locationIncluded,
+            double[] initial,
+            double[] lower,
+            double[] upper) {
+        int columns = autoregressive + (locationIncluded ? 1 : 0);
+        double[] gram = new double[columns * columns];
+        double[] right = new double[columns];
+        double[] row = new double[columns];
+        for (int time = autoregressive; time < series.length; time++) {
+            for (int lag = 0; lag < autoregressive; lag++) {
+                row[lag] = series[time - lag - 1];
+            }
+            if (locationIncluded) row[columns - 1] = 1.0;
+            for (int first = 0; first < columns; first++) {
+                right[first] += row[first] * series[time];
+                for (int second = 0; second <= first; second++) {
+                    gram[first * columns + second] += row[first] * row[second];
+                }
+            }
+        }
+        for (int first = 0; first < columns; first++) {
+            for (int second = 0; second < first; second++) {
+                gram[second * columns + first] = gram[first * columns + second];
+            }
+        }
+        double[] solution = solve(gram, right, columns);
+        if (solution == null) return false;
+        double[] ar = Arrays.copyOf(solution, autoregressive);
+        double[] encoded = ArimaMath.encodeAutoregressive(ar);
+        if (encoded == null) return false;
+        for (int index = 0; index < encoded.length; index++) {
+            if (encoded[index] < lower[index] || encoded[index] > upper[index]) {
+                return false;
+            }
+        }
+        double location = 0.0;
+        if (locationIncluded) {
+            double denominator = 1.0;
+            for (double coefficient : ar) denominator -= coefficient;
+            if (Math.abs(denominator) <= 1e-10) return false;
+            location = solution[columns - 1] / denominator;
+            int index = initial.length - 1;
+            if (!Double.isFinite(location)
+                    || location < lower[index] || location > upper[index]) {
+                return false;
+            }
+        }
+        System.arraycopy(encoded, 0, initial, 0, autoregressive);
+        if (locationIncluded) initial[initial.length - 1] = location;
+        return true;
+    }
+
+    private static double[] solve(double[] matrix, double[] right, int size) {
+        double[] values = matrix.clone();
+        double[] result = right.clone();
+        for (int pivot = 0; pivot < size; pivot++) {
+            int selected = pivot;
+            for (int row = pivot + 1; row < size; row++) {
+                if (Math.abs(values[row * size + pivot])
+                        > Math.abs(values[selected * size + pivot])) {
+                    selected = row;
+                }
+            }
+            if (!(Math.abs(values[selected * size + pivot]) > 1e-12)) return null;
+            if (selected != pivot) {
+                for (int column = pivot; column < size; column++) {
+                    double temporary = values[pivot * size + column];
+                    values[pivot * size + column] = values[selected * size + column];
+                    values[selected * size + column] = temporary;
+                }
+                double temporary = result[pivot];
+                result[pivot] = result[selected];
+                result[selected] = temporary;
+            }
+            double diagonal = values[pivot * size + pivot];
+            for (int row = pivot + 1; row < size; row++) {
+                double factor = values[row * size + pivot] / diagonal;
+                for (int column = pivot + 1; column < size; column++) {
+                    values[row * size + column] -=
+                        factor * values[pivot * size + column];
+                }
+                result[row] -= factor * result[pivot];
+            }
+        }
+        for (int row = size - 1; row >= 0; row--) {
+            for (int column = row + 1; column < size; column++) {
+                result[row] -= values[row * size + column] * result[column];
+            }
+            result[row] /= values[row * size + row];
+        }
+        return result;
+    }
     static BoundedOptimizer.Result multiStart(
             double[] initial,
             double[] lower,
@@ -137,11 +240,24 @@ public final class Arima {
             int dynamicParameters,
             int maximumEvaluations,
             double tolerance) {
+        return multiStart(initial, lower, upper, objective, dynamicParameters,
+            maximumEvaluations, tolerance, 5);
+    }
+
+    private static BoundedOptimizer.Result multiStart(
+            double[] initial,
+            double[] lower,
+            double[] upper,
+            MultivariableFunction objective,
+            int dynamicParameters,
+            int maximumEvaluations,
+            double tolerance,
+            int startCount) {
         if (dynamicParameters == 0 || initial.length == 1) {
             return BoundedOptimizer.minimize(initial, lower, upper, objective,
                 maximumEvaluations, tolerance);
         }
-        double[][] starts = new double[5][];
+        double[][] starts = new double[startCount][];
         starts[0] = initial.clone();
         double[] levels = {0.55, -0.55, 0.3, -0.3};
         for (int start = 1; start < starts.length; start++) {

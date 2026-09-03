@@ -24,6 +24,7 @@ public final class AutomaticArima {
                     ArimaOptions options = ArimaOptions.builder()
                         .includeMean(differences == 0)
                         .includeDrift(differences == 1)
+                        .optimizationStarts(5)
                         .build();
                     try {
                         ArimaResult result = Arima.fit(series, order, options);

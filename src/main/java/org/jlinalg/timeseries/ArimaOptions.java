@@ -11,6 +11,7 @@ public final class ArimaOptions {
     private final SeasonalArimaOrder seasonalOrder;
     private final boolean includeMean;
     private final boolean includeDrift;
+    private final int optimizationStarts;
     private final int maximumFunctionEvaluations;
     private final double optimizationTolerance;
 
@@ -18,6 +19,7 @@ public final class ArimaOptions {
         seasonalOrder = builder.seasonalOrder;
         includeMean = builder.includeMean;
         includeDrift = builder.includeDrift;
+        optimizationStarts = builder.optimizationStarts;
         maximumFunctionEvaluations = builder.maximumFunctionEvaluations;
         optimizationTolerance = builder.optimizationTolerance;
     }
@@ -28,6 +30,7 @@ public final class ArimaOptions {
     public SeasonalArimaOrder seasonalOrder() { return seasonalOrder; }
     public boolean includeMean() { return includeMean; }
     public boolean includeDrift() { return includeDrift; }
+    public int optimizationStarts() { return optimizationStarts; }
     public int maximumFunctionEvaluations() { return maximumFunctionEvaluations; }
     public double optimizationTolerance() { return optimizationTolerance; }
 
@@ -36,6 +39,7 @@ public final class ArimaOptions {
         private SeasonalArimaOrder seasonalOrder = SeasonalArimaOrder.none();
         private boolean includeMean = true;
         private boolean includeDrift;
+        private int optimizationStarts = 1;
         private int maximumFunctionEvaluations = 5_000;
         private double optimizationTolerance = 1e-8;
 
@@ -56,6 +60,12 @@ public final class ArimaOptions {
             return this;
         }
 
+        /** Number of deterministic optimizer starts; one is fastest. */
+        public Builder optimizationStarts(int value) {
+            optimizationStarts = value;
+            return this;
+        }
+
         public Builder maximumFunctionEvaluations(int value) {
             maximumFunctionEvaluations = value;
             return this;
@@ -67,6 +77,10 @@ public final class ArimaOptions {
         }
 
         public ArimaOptions build() {
+            if (optimizationStarts < 1 || optimizationStarts > 20) {
+                throw new IllegalArgumentException(
+                    "optimizationStarts must be between 1 and 20");
+            }
             if (maximumFunctionEvaluations < 20) {
                 throw new IllegalArgumentException(
                     "maximumFunctionEvaluations must be at least 20");

@@ -70,6 +70,17 @@ final class ArimaMath {
 
     static Innovations innovations(double[] series, Coefficients coefficients) {
         double[] errors = new double[series.length];
+        double rss = innovationRss(series, coefficients, errors);
+        int warmup = coefficients.effectiveAr().length;
+        return new Innovations(errors, rss, series.length - warmup, warmup);
+    }
+
+    static double innovationRss(
+            double[] series, Coefficients coefficients, double[] errors) {
+        if (errors.length != series.length) {
+            throw new IllegalArgumentException(
+                "innovation workspace length does not match series");
+        }
         double[] ar = coefficients.effectiveAr();
         double[] ma = coefficients.effectiveMa();
         double location = coefficients.location();
@@ -84,39 +95,20 @@ final class ArimaMath {
             }
             errors[time] = series[time] - prediction;
         }
-        int warmup = ar.length;
-        int used = series.length - warmup;
         double rss = 0.0;
-        for (int time = warmup; time < series.length; time++) {
+        for (int time = ar.length; time < series.length; time++) {
             rss += errors[time] * errors[time];
         }
-        return new Innovations(errors, rss, used, warmup);
+        return rss;
     }
 
     static double[] correlationMatrix(
             int observations, double[] ar, double[] ma) {
-        if (observations < 1) {
-            throw new IllegalArgumentException("observations must be positive");
-        }
-        double[] psi = psiWeights(ar, ma,
-            Math.max(MINIMUM_PSI_TERMS, observations + 500));
-        double[] autocovariance = new double[observations];
-        for (int lag = 0; lag < observations; lag++) {
-            double sum = 0.0;
-            for (int index = 0; index + lag < psi.length; index++) {
-                sum += psi[index] * psi[index + lag];
-            }
-            autocovariance[lag] = sum;
-        }
-        if (!(autocovariance[0] > 0.0)
-                || !Double.isFinite(autocovariance[0])) {
-            throw new IllegalArgumentException(
-                "ARMA parameters do not define a finite stationary covariance");
-        }
+        double[] autocorrelation = autocorrelation(observations, ar, ma);
         double[] result = new double[observations * observations];
         for (int row = 0; row < observations; row++) {
             for (int column = 0; column <= row; column++) {
-                double value = autocovariance[row - column] / autocovariance[0];
+                double value = autocorrelation[row - column];
                 result[row * observations + column] = value;
                 result[column * observations + row] = value;
             }
@@ -124,6 +116,105 @@ final class ArimaMath {
         return result;
     }
 
+    static double[] autocorrelation(
+            int observations, double[] ar, double[] ma) {
+        if (observations < 1) {
+            throw new IllegalArgumentException("observations must be positive");
+        }
+        if (ma.length == 0 && ar.length > 0) {
+            double[] autoregressive = autoregressiveAutocorrelation(
+                observations, ar);
+            if (autoregressive != null) return autoregressive;
+        }
+        double[] psi = psiWeights(ar, ma, observations + 64);
+        double[] result = new double[observations];
+        for (int lag = 0; lag < observations; lag++) {
+            double sum = 0.0;
+            for (int index = 0; index + lag < psi.length; index++) {
+                sum += psi[index] * psi[index + lag];
+            }
+            result[lag] = sum;
+        }
+        if (!(result[0] > 0.0) || !Double.isFinite(result[0])) {
+            throw new IllegalArgumentException(
+                "ARMA parameters do not define a finite stationary covariance");
+        }
+        double scale = result[0];
+        for (int lag = 0; lag < result.length; lag++) result[lag] /= scale;
+        return result;
+    }
+    private static double[] autoregressiveAutocorrelation(
+            int observations, double[] ar) {
+        int order = ar.length;
+        double[] system = new double[order * order];
+        double[] right = new double[order];
+        for (int lag = 1; lag <= order; lag++) {
+            system[(lag - 1) * order + lag - 1] = 1.0;
+            for (int coefficient = 1; coefficient <= order; coefficient++) {
+                int correlationLag = Math.abs(lag - coefficient);
+                if (correlationLag == 0) {
+                    right[lag - 1] += ar[coefficient - 1];
+                } else {
+                    system[(lag - 1) * order + correlationLag - 1] -=
+                        ar[coefficient - 1];
+                }
+            }
+        }
+        double[] initial = solve(system, right, order);
+        if (initial == null) return null;
+        double[] result = new double[observations];
+        result[0] = 1.0;
+        int copied = Math.min(order, observations - 1);
+        System.arraycopy(initial, 0, result, 1, copied);
+        for (int lag = order + 1; lag < observations; lag++) {
+            for (int coefficient = 1; coefficient <= order; coefficient++) {
+                result[lag] += ar[coefficient - 1]
+                    * result[lag - coefficient];
+            }
+        }
+        return result;
+    }
+
+    private static double[] solve(double[] matrix, double[] right, int size) {
+        double[] values = matrix.clone();
+        double[] result = right.clone();
+        for (int pivot = 0; pivot < size; pivot++) {
+            int selected = pivot;
+            for (int row = pivot + 1; row < size; row++) {
+                if (Math.abs(values[row * size + pivot])
+                        > Math.abs(values[selected * size + pivot])) {
+                    selected = row;
+                }
+            }
+            if (!(Math.abs(values[selected * size + pivot]) > 1e-12)) return null;
+            if (selected != pivot) {
+                for (int column = pivot; column < size; column++) {
+                    double temporary = values[pivot * size + column];
+                    values[pivot * size + column] = values[selected * size + column];
+                    values[selected * size + column] = temporary;
+                }
+                double temporary = result[pivot];
+                result[pivot] = result[selected];
+                result[selected] = temporary;
+            }
+            double diagonal = values[pivot * size + pivot];
+            for (int row = pivot + 1; row < size; row++) {
+                double factor = values[row * size + pivot] / diagonal;
+                for (int column = pivot + 1; column < size; column++) {
+                    values[row * size + column] -=
+                        factor * values[pivot * size + column];
+                }
+                result[row] -= factor * result[pivot];
+            }
+        }
+        for (int row = size - 1; row >= 0; row--) {
+            for (int column = row + 1; column < size; column++) {
+                result[row] -= values[row * size + column] * result[column];
+            }
+            result[row] /= values[row * size + row];
+        }
+        return result;
+    }
     static double marginalVariancePerInnovation(double[] ar, double[] ma) {
         double[] psi = psiWeights(ar, ma, MINIMUM_PSI_TERMS);
         double result = 0.0;
@@ -265,14 +356,40 @@ final class ArimaMath {
         return coefficients;
     }
 
+    static double[] encodeAutoregressive(double[] coefficients) {
+        double[] current = coefficients.clone();
+        double[] result = new double[coefficients.length];
+        for (int order = coefficients.length; order > 0; order--) {
+            double reflection = current[order - 1];
+            if (!Double.isFinite(reflection) || Math.abs(reflection) >= 1.0) {
+                return null;
+            }
+            result[order - 1] = 0.5
+                * Math.log((1.0 + reflection) / (1.0 - reflection));
+            double denominator = 1.0 - reflection * reflection;
+            double[] previous = new double[order - 1];
+            for (int index = 0; index < previous.length; index++) {
+                previous[index] = (current[index]
+                    + reflection * current[order - index - 2]) / denominator;
+            }
+            current = previous;
+        }
+        return result;
+    }
     private static double[] psiWeights(double[] ar, double[] ma, int requested) {
-        int minimumLength = Math.max(requested, MINIMUM_PSI_TERMS);
-        int length = MAXIMUM_PSI_TERMS;
-        double[] psi = new double[length];
+        int minimumLength = Math.min(MAXIMUM_PSI_TERMS - 1,
+            Math.max(1, requested));
+        int capacity = Math.min(MAXIMUM_PSI_TERMS,
+            Math.max(256, minimumLength + 65));
+        double[] psi = new double[capacity];
         psi[0] = 1.0;
         int quiet = 0;
-        int used = length;
-        for (int index = 1; index < length; index++) {
+        int used = MAXIMUM_PSI_TERMS;
+        for (int index = 1; index < MAXIMUM_PSI_TERMS; index++) {
+            if (index == psi.length) {
+                psi = Arrays.copyOf(psi,
+                    Math.min(MAXIMUM_PSI_TERMS, psi.length * 2));
+            }
             double value = index <= ma.length ? ma[index - 1] : 0.0;
             for (int lag = 1; lag <= ar.length && lag <= index; lag++) {
                 value += ar[lag - 1] * psi[index - lag];
@@ -288,9 +405,8 @@ final class ArimaMath {
                 quiet = 0;
             }
         }
-        return used == length ? psi : Arrays.copyOf(psi, used);
+        return used == psi.length ? psi : Arrays.copyOf(psi, used);
     }
-
     private static double[] differenceOnce(double[] values, int lag) {
         if (values.length <= lag) {
             throw new IllegalArgumentException(
