@@ -27,7 +27,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           grep -F "version = '${VERSION}'" build.gradle
       - name: Build and verify release
-        run: ./gradlew check executableJar
+        run: bash ./gradlew check executableJar
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
