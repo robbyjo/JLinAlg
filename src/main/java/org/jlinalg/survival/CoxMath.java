@@ -39,13 +39,41 @@ final class CoxMath {
             for (int index = 0; index < dimension; index++)
                 regularized[index * dimension + index] += ridge;
             try {
-                return backend.dpotrf(regularized, dimension);
+                // JNI launch overhead dominates the tiny systems used by
+                // ordinary Cox models. Keep those factors in-process while
+                // retaining the selected backend for larger frailty systems.
+                return dimension <= 64
+                    ? factorSmall(regularized, dimension)
+                    : backend.dpotrf(regularized, dimension);
             } catch (IllegalArgumentException | ArithmeticException exception) {
                 if (attempt == 9) throw new IllegalArgumentException(
                     "Cox information matrix is not positive definite", exception);
             }
         }
         throw new IllegalStateException("unreachable Cox factorization path");
+    }
+
+    private static CholeskyFactor factorSmall(
+            double[] matrix, int dimension) {
+        double[] lower = new double[dimension * dimension];
+        for (int row = 0; row < dimension; row++) {
+            for (int column = 0; column <= row; column++) {
+                double value = matrix[row * dimension + column];
+                for (int inner = 0; inner < column; inner++)
+                    value -= lower[row * dimension + inner]
+                        * lower[column * dimension + inner];
+                if (row == column) {
+                    if (!(value > 0) || !Double.isFinite(value))
+                        throw new ArithmeticException(
+                            "matrix is not positive definite");
+                    lower[row * dimension + column] = Math.sqrt(value);
+                } else {
+                    lower[row * dimension + column] = value
+                        / lower[column * dimension + column];
+                }
+            }
+        }
+        return new CholeskyFactor(dimension, lower);
     }
 
     static double maximumAbsolute(double[] values) {

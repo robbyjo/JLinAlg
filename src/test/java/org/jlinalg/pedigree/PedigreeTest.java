@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.junit.jupiter.api.Test;
 
 class PedigreeTest {
@@ -86,5 +87,35 @@ class PedigreeTest {
         }
         assertArrayEquals(identity, product, 2e-15);
         assertEquals(inverse.get(0, 1), inverse.get(1, 0), 0.0);
+    }
+
+    @Test
+    void directSparseTermMatchesDensePedigreePrecision() {
+        List<PedigreeIndividual> individuals = List.of(
+            new PedigreeIndividual("C", "S", "D"),
+            PedigreeIndividual.founder("S"),
+            PedigreeIndividual.founder("D"),
+            new PedigreeIndividual("F", "S", "D"),
+            new PedigreeIndividual("G", "C", "F"));
+        Pedigree pedigree = Pedigree.of(individuals);
+        PedigreeRandomEffectTerm direct = PedigreeRandomEffectTerm.ofSparse(
+            "animal", List.of("G", "C"), individuals,
+            pedigree.inbreedingCoefficients());
+
+        assertArrayEquals(pedigree.sparseRelationshipMatrixInverse().toDense(),
+            dense(direct.precision()), 2e-15);
+        assertEquals(2, direct.randomEffect().observations());
+        assertEquals(5, direct.randomEffect().coefficients());
+    }
+
+    private static double[] dense(SparsePrecisionMatrix matrix) {
+        double[] result = new double[matrix.dimension() * matrix.dimension()];
+        int[] starts = matrix.rowStarts();
+        int[] columns = matrix.columnIndices();
+        double[] values = matrix.values();
+        for (int row = 0; row < matrix.dimension(); row++)
+            for (int index = starts[row]; index < starts[row + 1]; index++)
+                result[row * matrix.dimension() + columns[index]] = values[index];
+        return result;
     }
 }

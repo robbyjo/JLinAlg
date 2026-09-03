@@ -3,6 +3,7 @@
 package org.jlinalg.survival;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -21,12 +22,21 @@ final class CoxPartialLikelihood {
             double[] design, int columns,
             double[] coefficients, double[] offset,
             CoxTies ties) {
+        return evaluate(survival, design, columns, coefficients, offset,
+            ties, CoxRiskSetPlan.prepare(survival));
+    }
+
+    static Evaluation evaluate(
+            CoxSurvivalData survival,
+            double[] design, int columns,
+            double[] coefficients, double[] offset,
+            CoxTies ties, CoxRiskSetPlan plan) {
         int rows = survival.observations();
         double[] eta = linearPredictor(
             design, rows, columns, coefficients, offset);
-        if (rightCensored(survival))
+        if (plan != null)
             return evaluateRightCensored(
-                survival, design, columns, eta, ties);
+                survival, design, columns, eta, ties, plan);
         double logLikelihood = 0;
         double[] score = new double[columns];
         double[] information = new double[columns * columns];
@@ -106,11 +116,20 @@ final class CoxPartialLikelihood {
             double[] design, int columns,
             double[] coefficients, double[] offset,
             CoxTies ties) {
+        return baseline(survival, design, columns, coefficients, offset,
+            ties, CoxRiskSetPlan.prepare(survival));
+    }
+
+    static List<BaselineHazardPoint> baseline(
+            CoxSurvivalData survival,
+            double[] design, int columns,
+            double[] coefficients, double[] offset,
+            CoxTies ties, CoxRiskSetPlan plan) {
         int rows = survival.observations();
         double[] eta = linearPredictor(
             design, rows, columns, coefficients, offset);
-        if (rightCensored(survival))
-            return baselineRightCensored(survival, eta, ties);
+        if (plan != null)
+            return baselineRightCensored(survival, eta, ties, plan);
         List<BaselineHazardPoint> result = new ArrayList<>();
         int[] strata = survival.strataView();
         for (int stratum : distinctStrata(strata)) {
@@ -153,31 +172,38 @@ final class CoxPartialLikelihood {
         return List.copyOf(result);
     }
 
+    static List<BaselineHazardPoint> baselineFromLinearPredictor(
+            CoxSurvivalData survival, double[] linearPredictor,
+            CoxTies ties, CoxRiskSetPlan plan) {
+        if (plan == null)
+            throw new IllegalArgumentException(
+                "prepared baseline requires right-censored survival data");
+        return baselineRightCensored(
+            survival, linearPredictor, ties, plan);
+    }
+
     private static Evaluation evaluateRightCensored(
             CoxSurvivalData survival,
-            double[] design, int columns,
-            double[] eta, CoxTies ties) {
+            double[] design, int columns, double[] eta, CoxTies ties,
+            CoxRiskSetPlan plan) {
         double logLikelihood = 0;
         double[] score = new double[columns];
         double[] information = new double[columns * columns];
-        int[] strata = survival.strataView();
-        for (int stratum : distinctStrata(strata)) {
-            List<Integer> ordered = rowsInStratum(survival, stratum);
-            ordered.sort(Comparator.comparingDouble(
-                (Integer row) -> survival.stopView()[row]).reversed());
-            Map<Double, List<Integer>> deaths = deathsByTime(
-                survival, stratum);
-            List<Double> times = new ArrayList<>(deaths.keySet());
-            times.sort(Comparator.reverseOrder());
+        for (CoxRiskSetPlan.Stratum stratum : plan.strata()) {
+            int[] ordered = stratum.orderedRows();
             int riskPointer = 0;
             double maximumEta = Double.NEGATIVE_INFINITY;
             double risk0 = 0;
             double[] risk1 = new double[columns];
             double[] risk2 = new double[columns * columns];
-            for (double time : times) {
-                while (riskPointer < ordered.size()
-                        && survival.stopView()[ordered.get(riskPointer)] >= time) {
-                    int row = ordered.get(riskPointer++);
+            double[] death1 = new double[columns];
+            double[] death2 = new double[columns * columns];
+            double[] mean = new double[columns];
+            for (int group = 0; group < stratum.eventTimes().length; group++) {
+                double time = stratum.eventTimes()[group];
+                while (riskPointer < ordered.length
+                        && survival.stopView()[ordered[riskPointer]] >= time) {
+                    int row = ordered[riskPointer++];
                     if (eta[row] > maximumEta) {
                         double factor = Double.isFinite(maximumEta)
                             ? Math.exp(maximumEta - eta[row]) : 0;
@@ -188,20 +214,25 @@ final class CoxPartialLikelihood {
                     }
                     double risk = Math.exp(eta[row] - maximumEta);
                     risk0 += risk;
-                    addMoments(design, row, columns, risk, risk1, risk2);
+                    addLowerMoments(design, row, columns, risk,
+                        risk1, risk2);
                 }
-                List<Integer> eventRows = deaths.get(time);
-                int deathCount = eventRows.size();
+                int[] eventRows = stratum.deaths()[group];
+                int deathCount = eventRows.length;
                 double death0 = 0;
-                double[] death1 = new double[columns];
-                double[] death2 = new double[columns * columns];
+                if (deathCount > 1) {
+                    Arrays.fill(death1, 0);
+                    Arrays.fill(death2, 0);
+                }
                 for (int row : eventRows) {
                     logLikelihood += eta[row];
                     for (int column = 0; column < columns; column++)
                         score[column] += design[row * columns + column];
                     double risk = Math.exp(eta[row] - maximumEta);
                     death0 += risk;
-                    addMoments(design, row, columns, risk, death1, death2);
+                    if (deathCount > 1)
+                        addLowerMoments(design, row, columns, risk,
+                            death1, death2);
                 }
                 int steps = ties == CoxTies.EFRON ? deathCount : 1;
                 for (int step = 0; step < steps; step++) {
@@ -211,16 +242,17 @@ final class CoxPartialLikelihood {
                     double denominator = risk0 - fraction * death0;
                     logLikelihood -= multiplier
                         * (maximumEta + Math.log(denominator));
-                    double[] mean = new double[columns];
                     for (int column = 0; column < columns; column++) {
                         mean[column] = (risk1[column]
-                            - fraction * death1[column]) / denominator;
+                            - (deathCount > 1
+                                ? fraction * death1[column] : 0)) / denominator;
                         score[column] -= multiplier * mean[column];
                     }
                     for (int left = 0; left < columns; left++)
-                        for (int right = 0; right < columns; right++) {
+                        for (int right = 0; right <= left; right++) {
                             double second = (risk2[left * columns + right]
-                                - fraction * death2[left * columns + right])
+                                - (deathCount > 1 ? fraction
+                                    * death2[left * columns + right] : 0))
                                 / denominator;
                             information[left * columns + right] += multiplier
                                 * (second - mean[left] * mean[right]);
@@ -228,29 +260,25 @@ final class CoxPartialLikelihood {
                 }
             }
         }
+        symmetrizeLower(information, columns);
         return new Evaluation(logLikelihood, score, information);
     }
 
     private static List<BaselineHazardPoint> baselineRightCensored(
-            CoxSurvivalData survival, double[] eta, CoxTies ties) {
+            CoxSurvivalData survival, double[] eta, CoxTies ties,
+            CoxRiskSetPlan plan) {
         List<BaselineHazardPoint> result = new ArrayList<>();
-        int[] strata = survival.strataView();
-        for (int stratum : distinctStrata(strata)) {
-            List<Integer> ordered = rowsInStratum(survival, stratum);
-            ordered.sort(Comparator.comparingDouble(
-                (Integer row) -> survival.stopView()[row]).reversed());
-            Map<Double, List<Integer>> deaths = deathsByTime(
-                survival, stratum);
-            List<Double> times = new ArrayList<>(deaths.keySet());
-            times.sort(Comparator.reverseOrder());
+        for (CoxRiskSetPlan.Stratum stratum : plan.strata()) {
+            int[] ordered = stratum.orderedRows();
             int riskPointer = 0;
             double maximumEta = Double.NEGATIVE_INFINITY;
             double risk0 = 0;
             List<RawHazard> descending = new ArrayList<>();
-            for (double time : times) {
-                while (riskPointer < ordered.size()
-                        && survival.stopView()[ordered.get(riskPointer)] >= time) {
-                    int row = ordered.get(riskPointer++);
+            for (int group = 0; group < stratum.eventTimes().length; group++) {
+                double time = stratum.eventTimes()[group];
+                while (riskPointer < ordered.length
+                        && survival.stopView()[ordered[riskPointer]] >= time) {
+                    int row = ordered[riskPointer++];
                     if (eta[row] > maximumEta) {
                         risk0 *= Double.isFinite(maximumEta)
                             ? Math.exp(maximumEta - eta[row]) : 0;
@@ -258,8 +286,8 @@ final class CoxPartialLikelihood {
                     }
                     risk0 += Math.exp(eta[row] - maximumEta);
                 }
-                List<Integer> eventRows = deaths.get(time);
-                int deathCount = eventRows.size();
+                int[] eventRows = stratum.deaths()[group];
+                int deathCount = eventRows.length;
                 double death0 = 0;
                 for (int row : eventRows)
                     death0 += Math.exp(eta[row] - maximumEta);
@@ -276,7 +304,7 @@ final class CoxPartialLikelihood {
             for (int index = descending.size() - 1; index >= 0; index--) {
                 RawHazard value = descending.get(index);
                 cumulative += value.increment();
-                result.add(new BaselineHazardPoint(stratum, value.time(),
+                result.add(new BaselineHazardPoint(stratum.label(), value.time(),
                     value.events(), value.increment(), cumulative,
                     Math.exp(-cumulative)));
             }
@@ -301,11 +329,6 @@ final class CoxPartialLikelihood {
                 result.computeIfAbsent(survival.stopView()[row],
                     ignored -> new ArrayList<>()).add(row);
         return result;
-    }
-
-    private static boolean rightCensored(CoxSurvivalData survival) {
-        for (double value : survival.startView()) if (value != 0) return false;
-        return true;
     }
 
     private static void scale(double[] values, double factor) {
@@ -334,6 +357,26 @@ final class CoxPartialLikelihood {
                 second[left * columns + right] += weight * leftValue
                     * design[row * columns + right];
         }
+    }
+
+    private static void addLowerMoments(
+            double[] design, int row, int columns, double weight,
+            double[] first, double[] second) {
+        int start = row * columns;
+        for (int left = 0; left < columns; left++) {
+            double leftValue = design[start + left];
+            first[left] += weight * leftValue;
+            for (int right = 0; right <= left; right++)
+                second[left * columns + right] += weight * leftValue
+                    * design[start + right];
+        }
+    }
+
+    private static void symmetrizeLower(double[] matrix, int dimension) {
+        for (int row = 0; row < dimension; row++)
+            for (int column = 0; column < row; column++)
+                matrix[column * dimension + row] =
+                    matrix[row * dimension + column];
     }
 
     private static boolean atRisk(

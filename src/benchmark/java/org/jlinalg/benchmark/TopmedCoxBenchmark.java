@@ -25,8 +25,8 @@ import java.util.logging.Logger;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.mixed.RandomEffectTerm;
-import org.jlinalg.pedigree.Pedigree;
 import org.jlinalg.pedigree.PedigreeIndividual;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.jlinalg.survival.CoxMixedModel;
 import org.jlinalg.survival.CoxMixedOptions;
 import org.jlinalg.survival.CoxMixedResult;
@@ -35,6 +35,7 @@ import org.jlinalg.survival.CoxRandomEffectTerm;
 import org.jlinalg.survival.CoxRegression;
 import org.jlinalg.survival.CoxResult;
 import org.jlinalg.survival.CoxSurvivalData;
+import org.jlinalg.survival.SparseCoxMixedModel;
 
 /** TOPMed fixed and Gaussian-frailty Cox benchmark against survival/coxme. */
 public final class TopmedCoxBenchmark {
@@ -58,62 +59,77 @@ public final class TopmedCoxBenchmark {
             "cohort rows=%d events=%d genes=%d%n",
             data.rows(), data.events(), data.genes());
 
-        Map<String, Fitter> fitters = new LinkedHashMap<>();
+        Map<String, FitterFactory> fitters = new LinkedHashMap<>();
         if (options.models().contains("cox"))
-            fitters.put("cox", TopmedCoxBenchmark::fixed);
+            fitters.put("cox", () -> {
+                CoxRegression.Prepared prepared = CoxRegression.prepare(
+                    data.survival(), CoxOptions.defaults(), options.backend());
+                return new Worker() {
+                    @Override public Fit fit(GeneData value) {
+                        CoxResult result = prepared.fit(value.design(), null);
+                        return new Fit(result.beta()[0],
+                            result.standardErrors()[0], result.converged(), "");
+                    }
+                    @Override public void close() { prepared.close(); }
+                };
+            });
+        RandomEffectTerm batchDesign = null;
         CoxRandomEffectTerm batch = null;
         if (options.models().contains("coxme")
                 || options.models().contains("pedigree")) {
-            batch = CoxRandomEffectTerm.independent(
-                RandomEffectTerm.randomIntercept("Levy_Set", data.batch()));
+            batchDesign = RandomEffectTerm.randomIntercept(
+                "Levy_Set", data.batch());
+            batch = CoxRandomEffectTerm.independent(batchDesign);
         }
         if (options.models().contains("coxme")) {
             CoxRandomEffectTerm retainedBatch = batch;
-            fitters.put("coxme", (value, backend) -> mixed(
-                value, List.of(retainedBatch),
-                CoxMixedOptions.defaults(), backend));
+            fitters.put("coxme", mixedFactory(data, List.of(retainedBatch),
+                CoxMixedOptions.defaults(), options.backend()));
         }
         if (options.models().contains("pedigree")) {
-            CoxRandomEffectTerm genetic = pedigreeTerm(data, options);
-            CoxRandomEffectTerm retainedBatch = batch;
+            PedigreeRandomEffectTerm genetic = pedigreeTerm(data, options);
+            RandomEffectTerm retainedBatch = batchDesign;
             CoxMixedOptions mixedOptions = new CoxMixedOptions(
-                CoxOptions.defaults(), new double[] {0.5, 0.5},
+                CoxOptions.defaults(), new double[] {0.01, 0.06},
                 30, 1e-4, 1e-8, 1e4);
-            fitters.put("pedigree", (value, backend) -> mixed(value,
-                List.of(genetic, retainedBatch), mixedOptions, backend));
+            fitters.put("pedigree", sparseMixedFactory(data, genetic,
+                List.of(retainedBatch), mixedOptions,
+                options.backend(), options.fixedVariances()));
         }
 
         List<Timing> timings = new ArrayList<>();
         List<Result> results = new ArrayList<>();
         for (String model : options.models()) {
-            Fitter fitter = fitters.get(model);
+            FitterFactory fitter = fitters.get(model);
             if (fitter == null)
                 throw new IllegalArgumentException("unknown model: " + model);
-            run(data, fitter, options.backend(), options.threads(), 1);
-            for (int measurement = 1;
-                    measurement <= options.measurements(); measurement++) {
-                System.gc();
-                long started = System.nanoTime();
-                List<Fit> fitted = run(data, fitter, options.backend(),
-                    options.threads(), data.genes());
-                double seconds = (System.nanoTime() - started) / 1e9;
-                timings.add(new Timing(model, options.backend().name(),
-                    options.threads(), measurement, data.genes(),
-                    data.rows(), seconds));
-                for (Fit value : fitted) checksum += value.beta();
-                if (measurement == 1)
-                    for (int gene = 0; gene < fitted.size(); gene++) {
-                        Fit value = fitted.get(gene);
-                        results.add(new Result(model, options.threads(),
-                            data.featureKeys().get(gene),
-                            data.featureIds().get(gene), value.beta(),
-                            value.standardError(), value.converged()));
-                    }
-                System.out.printf(Locale.ROOT,
-                    "JLinAlg model=%s threads=%d measurement=%d rows=%d "
-                        + "genes=%d seconds=%.6f genes_per_second=%.3f%n",
-                    model, options.threads(), measurement, data.rows(),
-                    data.genes(), seconds, data.genes() / seconds);
+            try (Scan scan = new Scan(data, fitter, options.threads())) {
+                scan.fit(1);
+                for (int measurement = 1;
+                        measurement <= options.measurements(); measurement++) {
+                    System.gc();
+                    long started = System.nanoTime();
+                    List<Fit> fitted = scan.fit(data.genes());
+                    double seconds = (System.nanoTime() - started) / 1e9;
+                    timings.add(new Timing(model, options.backend().name(),
+                        options.threads(), measurement, data.genes(),
+                        data.rows(), seconds));
+                    for (Fit value : fitted) checksum += value.beta();
+                    if (measurement == 1)
+                        for (int gene = 0; gene < fitted.size(); gene++) {
+                            Fit value = fitted.get(gene);
+                            results.add(new Result(model, options.threads(),
+                                data.featureKeys().get(gene),
+                                data.featureIds().get(gene), value.beta(),
+                                value.standardError(), value.converged(),
+                                value.variances()));
+                        }
+                    System.out.printf(Locale.ROOT,
+                        "JLinAlg model=%s threads=%d measurement=%d rows=%d "
+                            + "genes=%d seconds=%.6f genes_per_second=%.3f%n",
+                        model, options.threads(), measurement, data.rows(),
+                        data.genes(), seconds, data.genes() / seconds);
+                }
             }
         }
         writeTimings(options.outputPrefix() + "_timings.csv", timings);
@@ -122,46 +138,101 @@ public final class TopmedCoxBenchmark {
             throw new IllegalStateException("non-finite benchmark checksum");
     }
 
-    private static Fit fixed(GeneData data, BackendPolicy backend) {
-        CoxResult fit = CoxRegression.fit(data.survival(), data.design(),
-            null, CoxOptions.defaults(), backend);
-        return new Fit(fit.beta()[0], fit.standardErrors()[0], fit.converged());
-    }
-
-    private static Fit mixed(
-            GeneData data, List<CoxRandomEffectTerm> randomEffects,
+    private static FitterFactory mixedFactory(
+            Data data, List<CoxRandomEffectTerm> randomEffects,
             CoxMixedOptions options, BackendPolicy backend) {
-        CoxMixedResult fit = CoxMixedModel.fit(data.survival(), data.design(),
-            randomEffects, null, options, backend);
-        return new Fit(fit.beta()[0], fit.standardErrors()[0], fit.converged());
+        return () -> {
+            CoxMixedModel.Prepared prepared = CoxMixedModel.prepare(
+                data.survival(), randomEffects, options, backend);
+            return new Worker() {
+                @Override public Fit fit(GeneData value) {
+                    CoxMixedResult result = prepared.fit(value.design(), null);
+                    return new Fit(result.beta()[0],
+                        result.standardErrors()[0], result.converged(),
+                        result.randomEffects().stream()
+                            .map(effect -> Double.toString(effect.variance()))
+                            .collect(java.util.stream.Collectors.joining(";")));
+                }
+                @Override public void close() { prepared.close(); }
+            };
+        };
     }
 
-    private static List<Fit> run(
-            Data data, Fitter fitter, BackendPolicy backend,
-            int threads, int genes) throws Exception {
-        if (threads == 1) {
-            List<Fit> result = new ArrayList<>(genes);
-            for (int gene = 0; gene < genes; gene++)
-                result.add(fitter.fit(data.gene(gene), backend));
-            return result;
+    private static FitterFactory sparseMixedFactory(
+            Data data, PedigreeRandomEffectTerm pedigree,
+            List<RandomEffectTerm> ordinaryEffects,
+            CoxMixedOptions options, BackendPolicy backend,
+            double[] fixedVariances) {
+        return () -> {
+            SparseCoxMixedModel.Prepared prepared = SparseCoxMixedModel.prepare(
+                data.survival(), pedigree, ordinaryEffects, options, backend);
+            return new Worker() {
+                @Override public Fit fit(GeneData value) {
+                    CoxMixedResult result = fixedVariances == null
+                        ? prepared.fit(value.design(), null)
+                        : prepared.fitAtVariances(value.design(), null,
+                            fixedVariances);
+                    return new Fit(result.beta()[0],
+                        result.standardErrors()[0], result.converged(),
+                        result.randomEffects().stream()
+                            .map(effect -> Double.toString(effect.variance()))
+                            .collect(java.util.stream.Collectors.joining(";")));
+                }
+                @Override public void close() { prepared.close(); }
+            };
+        };
+    }
+
+    private static final class Scan implements AutoCloseable {
+        private final Data data;
+        private final Worker[] workers;
+        private final ExecutorService executor;
+
+        private Scan(Data data, FitterFactory factory, int threads) {
+            this.data = data;
+            int workerCount = Math.min(threads, data.genes());
+            this.workers = new Worker[workerCount];
+            for (int index = 0; index < workerCount; index++)
+                workers[index] = factory.create();
+            this.executor = workerCount == 1 ? null
+                : Executors.newFixedThreadPool(workerCount);
         }
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
-        try {
-            List<Callable<Fit>> tasks = new ArrayList<>(genes);
-            for (int gene = 0; gene < genes; gene++) {
-                int selected = gene;
-                tasks.add(() -> fitter.fit(data.gene(selected), backend));
+
+        private List<Fit> fit(int genes) throws Exception {
+            if (workers.length == 1) {
+                List<Fit> result = new ArrayList<>(genes);
+                for (int gene = 0; gene < genes; gene++)
+                    result.add(workers[0].fit(data.gene(gene)));
+                return result;
             }
-            List<Fit> result = new ArrayList<>(genes);
-            for (Future<Fit> future : executor.invokeAll(tasks))
-                result.add(future.get());
-            return result;
-        } finally {
-            executor.shutdown();
+            List<Callable<List<IndexedFit>>> tasks =
+                new ArrayList<>(workers.length);
+            for (int workerIndex = 0; workerIndex < workers.length; workerIndex++) {
+                int selectedWorker = workerIndex;
+                tasks.add(() -> {
+                    List<IndexedFit> values = new ArrayList<>();
+                    Worker worker = workers[selectedWorker];
+                    for (int gene = selectedWorker; gene < genes;
+                            gene += workers.length)
+                        values.add(new IndexedFit(gene,
+                            worker.fit(data.gene(gene))));
+                    return values;
+                });
+            }
+            Fit[] result = new Fit[genes];
+            for (Future<List<IndexedFit>> future : executor.invokeAll(tasks))
+                for (IndexedFit value : future.get())
+                    result[value.index()] = value.fit();
+            return List.of(result);
+        }
+
+        @Override public void close() {
+            if (executor != null) executor.shutdown();
+            for (Worker worker : workers) worker.close();
         }
     }
 
-    private static CoxRandomEffectTerm pedigreeTerm(
+    private static PedigreeRandomEffectTerm pedigreeTerm(
             Data data, Options options) throws IOException {
         List<PedigreeIndividual> all = readPedigreeIndividuals(
             options.preparedDirectory().resolve("pedigree.csv"));
@@ -184,33 +255,11 @@ public final class TopmedCoxBenchmark {
         } while (changed);
         List<PedigreeIndividual> selected = all.stream()
             .filter(value -> retained.contains(value.id())).toList();
-        Pedigree pedigree = Pedigree.of(selected);
-
-        List<String> coefficientNames = new ArrayList<>();
-        Map<String, Integer> coefficientById = new LinkedHashMap<>();
-        for (String animal : data.animals())
-            coefficientById.computeIfAbsent(animal, value -> {
-                coefficientNames.add(value);
-                return coefficientNames.size() - 1;
-            });
-        int coefficients = coefficientNames.size();
-        double[][] incidence = new double[data.rows()][coefficients];
-        for (int row = 0; row < data.rows(); row++)
-            incidence[row][coefficientById.get(data.animals().get(row))] = 1.0;
-        double[] covariance = new double[coefficients * coefficients];
-        for (int row = 0; row < coefficients; row++)
-            for (int column = 0; column <= row; column++) {
-                double value = pedigree.relationship(
-                    coefficientNames.get(row), coefficientNames.get(column));
-                covariance[row * coefficients + column] = value;
-                covariance[column * coefficients + row] = value;
-            }
         System.out.printf(Locale.ROOT,
-            "pedigree observed=%d ancestor-closure=%d%n",
-            coefficients, pedigree.size());
-        return CoxRandomEffectTerm.fromCovariance(
-            "additive genetic", incidence, covariance, coefficientNames,
-            1e-10, options.backend());
+            "pedigree observed=%d ancestor-closure=%d inbreeding=assumed-zero%n",
+            new LinkedHashSet<>(data.animals()).size(), selected.size());
+        return PedigreeRandomEffectTerm.ofUninbred(
+            "additive genetic", data.animals(), selected);
     }
 
     private static Data readAnalysis(
@@ -396,13 +445,13 @@ public final class TopmedCoxBenchmark {
         Files.createDirectories(path.toAbsolutePath().getParent());
         try (BufferedWriter writer = Files.newBufferedWriter(
                 path, StandardCharsets.UTF_8)) {
-            writer.write("runtime,model,threads,feature_key,feature_id,beta,standard_error,converged\n");
+            writer.write("runtime,model,threads,feature_key,feature_id,beta,standard_error,converged,frailty_variances\n");
             for (Result value : values)
                 writer.write(String.format(Locale.ROOT,
-                    "JLinAlg,%s,%d,%s,%s,%.17g,%.17g,%s%n",
+                    "JLinAlg,%s,%d,%s,%s,%.17g,%.17g,%s,%s%n",
                     value.model(), value.threads(), value.featureKey(),
                     value.featureId(), value.beta(), value.standardError(),
-                    value.converged()));
+                    value.converged(), value.variances()));
         }
     }
 
@@ -450,22 +499,30 @@ public final class TopmedCoxBenchmark {
     }
 
     @FunctionalInterface
-    private interface Fitter {
-        Fit fit(GeneData data, BackendPolicy backend);
+    private interface FitterFactory {
+        Worker create();
     }
 
-    private record Fit(double beta, double standardError, boolean converged) { }
+    private interface Worker extends AutoCloseable {
+        Fit fit(GeneData data);
+        @Override void close();
+    }
+
+    private record Fit(double beta, double standardError, boolean converged,
+        String variances) { }
+    private record IndexedFit(int index, Fit fit) { }
     private record GeneData(CoxSurvivalData survival, double[][] design) { }
     private record Timing(String model, String backend, int threads,
         int measurement, int genes, int rows, double seconds) { }
     private record Result(String model, int threads, String featureKey,
         String featureId, double beta, double standardError,
-        boolean converged) { }
+        boolean converged, String variances) { }
 
     private record Options(
             Path preparedDirectory, int genes, int maximumRows,
             int threads, int measurements, Set<String> models,
-            BackendPolicy backend, String outputPrefix) {
+            BackendPolicy backend, String outputPrefix,
+            double[] fixedVariances) {
         static Options parse(String[] arguments) {
             Map<String, String> values = new LinkedHashMap<>();
             for (int index = 0; index < arguments.length; index += 2) {
@@ -488,8 +545,11 @@ public final class TopmedCoxBenchmark {
                 "backend", "preferred").toUpperCase(Locale.ROOT));
             String prefix = values.getOrDefault("output-prefix",
                 prepared.resolve("jlinalg_cox_t" + threads).toString());
+            double[] fixedVariances = values.containsKey("fixed-variances")
+                ? Arrays.stream(values.get("fixed-variances").split(","))
+                    .mapToDouble(Double::parseDouble).toArray() : null;
             return new Options(prepared, genes, maximumRows, threads,
-                measurements, models, backend, prefix);
+                measurements, models, backend, prefix, fixedVariances);
         }
 
         private static int integer(

@@ -215,12 +215,15 @@ for (model in requested_models) {
         beta <- if (model == "cox") coef(fit) else fixef(fit)
         standard_error <- sqrt(diag(vcov(fit)))
         coefficient <- match(genes[[gene_index]], names(beta))
+        frailty_variances <- if (model == "cox") "" else
+          paste(as.numeric(unlist(fit$vcoef)), collapse = ";")
         results[[length(results) + 1L]] <- data.table(
           runtime = "R", model = model, threads = 1L,
           feature_key = genes[[gene_index]],
           feature_id = features$feature_id[[gene_index]],
           beta = beta[[coefficient]],
-          standard_error = standard_error[[coefficient]])
+          standard_error = standard_error[[coefficient]],
+          frailty_variances = frailty_variances)
       }
     }
   }
