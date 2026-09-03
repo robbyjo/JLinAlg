@@ -20,6 +20,17 @@ public final class MetaAnalysis {
             BackendPolicy.PREFERRED);
     }
 
+    /**
+     * Prepares many independent intercept-only analyses from row-major effect
+     * and standard-error arrays. Preparation validates and copies inputs once.
+     */
+    public static PreparedMetaAnalysisBatch prepareBatch(
+            double[] effects, double[] standardErrors,
+            int analyses, int studies) {
+        return new PreparedMetaAnalysisBatch(
+            effects, standardErrors, analyses, studies);
+    }
+
     public static MetaAnalysisResult fit(
             List<MetaStudy> studies, MetaAnalysisOptions options,
             BackendPolicy backendPolicy) {

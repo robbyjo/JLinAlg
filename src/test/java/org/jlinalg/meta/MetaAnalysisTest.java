@@ -4,6 +4,7 @@ package org.jlinalg.meta;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -82,5 +83,72 @@ class MetaAnalysisTest {
         assertTrue(result.tauSquared() >= 0.0);
         assertTrue(Double.isFinite(result.standardError()));
         assertTrue(result.pValue() >= 0.0 && result.pValue() <= 1.0);
+    }
+
+    @Test
+    void preparedBatchMatchesScalarFixedDlAndRemlFits() {
+        double[] effects = STUDIES.stream()
+            .mapToDouble(MetaStudy::effectSize).toArray();
+        double[] errors = STUDIES.stream()
+            .mapToDouble(MetaStudy::standardError).toArray();
+        PreparedMetaAnalysisBatch prepared = MetaAnalysis.prepareBatch(
+            effects, errors, 1, STUDIES.size());
+
+        for (MetaAnalysisOptions options : List.of(
+                MetaAnalysisOptions.fixedEffect(),
+                MetaAnalysisOptions.builder()
+                    .tauSquaredEstimator(TauSquaredEstimator.DERSIMONIAN_LAIRD)
+                    .build(),
+                MetaAnalysisOptions.builder()
+                    .tauSquaredEstimator(TauSquaredEstimator.PAULE_MANDEL)
+                    .build(),
+                MetaAnalysisOptions.randomEffects())) {
+            MetaAnalysisResult scalar = MetaAnalysis.fit(
+                STUDIES, options, BackendPolicy.CPU);
+            MetaAnalysisBatchResult batch = prepared.fit(options);
+            assertEquals(scalar.pooledEffectSize(),
+                batch.pooledEffectSizes()[0], 2e-8);
+            assertEquals(scalar.standardError(),
+                batch.standardErrors()[0], 2e-8);
+            assertEquals(scalar.cochranQ(), batch.cochranQ()[0], 1e-12);
+            assertEquals(scalar.tauSquared(), batch.tauSquared()[0], 2e-8);
+            assertEquals(scalar.pValue(), batch.pValues()[0], 2e-8);
+        }
+    }
+
+    @Test
+    void preparedBatchParallelChunksAreDeterministic() {
+        int analyses = 4097;
+        double[] effects = new double[analyses * STUDIES.size()];
+        double[] errors = new double[effects.length];
+        for (int analysis = 0; analysis < analyses; analysis++) {
+            for (int study = 0; study < STUDIES.size(); study++) {
+                int index = analysis * STUDIES.size() + study;
+                effects[index] = STUDIES.get(study).effectSize()
+                    + analysis * 1e-7;
+                errors[index] = STUDIES.get(study).standardError();
+            }
+        }
+        PreparedMetaAnalysisBatch prepared = MetaAnalysis.prepareBatch(
+            effects, errors, analyses, STUDIES.size());
+        MetaAnalysisOptions options = MetaAnalysisOptions.builder()
+            .tauSquaredEstimator(TauSquaredEstimator.DERSIMONIAN_LAIRD)
+            .build();
+        MetaAnalysisBatchResult sequential = prepared.fit(options, 1);
+        MetaAnalysisBatchResult parallel = prepared.fit(options, 4);
+        assertArrayEquals(sequential.pooledEffectSizes(),
+            parallel.pooledEffectSizes());
+        assertArrayEquals(sequential.pValues(), parallel.pValues());
+        assertArrayEquals(sequential.tauSquared(), parallel.tauSquared());
+    }
+
+    @Test
+    void preparedBatchRejectsInvalidShapesAndValues() {
+        assertThrows(IllegalArgumentException.class,
+            () -> MetaAnalysis.prepareBatch(
+                new double[3], new double[3], 1, 2));
+        assertThrows(IllegalArgumentException.class,
+            () -> MetaAnalysis.prepareBatch(
+                new double[] {0.1, 0.2}, new double[] {0.1, 0.0}, 1, 2));
     }
 }

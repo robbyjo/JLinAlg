@@ -432,6 +432,18 @@ tasks.register('benchmarkTopmedGamm', JavaExec) {
     }.getOrElse([])
 }
 
+tasks.register('benchmarkTopmedMetaAnalysis', JavaExec) {
+    group = 'verification'
+    description = 'Runs four-cohort TOPMed fixed/random meta-analysis benchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedMetaAnalysisBenchmark'
+    jvmArgs '-Xms1g', '-Xmx4g'
+    args providers.gradleProperty('topmedMetaArgs').map {
+        it.split('\\s+') as List<String>
+    }.getOrElse([])
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {

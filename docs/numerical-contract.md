@@ -521,6 +521,14 @@ effects, multilevel meta-analysis, robust/sandwich variance, publication-bias
 diagnostics, and effect-size transformation are outside this first engine and
 must not be inferred from these results.
 
+`PreparedMetaAnalysisBatch` applies the same intercept-only definitions to a
+rectangular row-major batch. Every analysis must contain the same number of at
+least two studies, with finite effects and finite positive standard errors;
+callers must form complete study sets before preparation. The batch path is a
+CPU sufficient-statistic kernel and therefore does not report matrix-backend
+provenance. Parallel workers own disjoint result rows, so changing parallelism
+does not change reduction order within an analysis.
+
 ## Reproducibility
 
 Backend reductions can differ in order and rounding. Tests use the deterministic

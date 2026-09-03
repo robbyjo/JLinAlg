@@ -726,6 +726,22 @@ MetaAnalysisResult pooled = MetaAnalysis.fit(studies,
     BackendPolicy.PREFERRED);
 ```
 
+High-throughput scans can validate and copy row-major inputs once, then fit
+all independent rows without constructing per-study objects or routing tiny
+one-column systems through a general matrix backend:
+
+```java
+PreparedMetaAnalysisBatch scan = MetaAnalysis.prepareBatch(
+    rowMajorEffects, rowMajorStandardErrors, features, studiesPerFeature);
+MetaAnalysisBatchResult results = scan.fit(
+    MetaAnalysisOptions.randomEffects(), 8);
+```
+
+The batch result is columnar and includes pooled effects, errors, test
+statistics and p-values, intervals, Cochran Q, tau-squared, I-squared, and
+H-squared. See [the four-cohort TOPMed profile](docs/topmed-meta-analysis-performance.md)
+for the Java/R benchmark and reproduction commands.
+
 `MetaRegression` accepts one or more numeric moderator columns, optionally adds
 an intercept, and uses the same fixed/random heterogeneity estimators. It
 returns named coefficient effect sizes, SE/statistic/p-values (including log10
