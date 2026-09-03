@@ -1,5 +1,9 @@
 # Mendelian randomization
 
+> **v0.1.0 performance status:** This implementation is tested for numerical
+> behavior but is not yet optimized or benchmarked as a high-throughput MR
+> pipeline.
+
 ## Harmonize exposure and outcome associations
 
 Each summary association names the reported effect allele and other allele.

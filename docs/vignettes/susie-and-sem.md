@@ -1,5 +1,9 @@
 # SuSiE fine mapping and structural equation models
 
+> **v0.1.0 performance status:** These implementations are tested, but neither
+> SuSiE nor SEM is yet optimized or benchmarked for large or repeated
+> workloads.
+
 ## SuSiE with individual-level data
 
 Rows are samples and columns are candidate variables in the same order as the

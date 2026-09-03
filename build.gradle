@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'org.jlinalg'
-version = '0.1.0-SNAPSHOT'
+version = '0.1.0'
 
 def jdistlibVersion = '0.10.1'
 def jdistlibSha256 = 'c1912e1d10928a0df321c33c85d5f97b3921e40e9bbbdcddfc508358dfb2af03'

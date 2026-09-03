@@ -67,7 +67,7 @@ class SiteFooter extends HTMLElement {
             <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}index.html#features">Feature map</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
             <div class="footer-links"><strong>Project</strong><a href="https://github.com/robbyjo/JLinAlg">Source code</a><a href="https://github.com/robbyjo/JLinAlg/issues">Issues</a><a href="https://github.com/robbyjo/JDistlib">JDistlib</a></div>
           </div>
-          <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>Java 17+ · JDistlib 0.10.0 · FP64</span></div>
+          <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>JLinAlg v0.1.0 · Java 17+ · JDistlib 0.10.1 · FP64</span></div>
         </div>
       </footer>`;
     this.querySelector("[data-year]").textContent = new Date().getFullYear();

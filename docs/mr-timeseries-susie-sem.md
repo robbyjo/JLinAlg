@@ -1,5 +1,9 @@
 # MR, time-series, SuSiE, and SEM scope
 
+> **v0.1.0 performance status:** MR, SuSiE, and SEM are implemented and tested,
+> but have not yet been optimized or benchmarked for large or high-throughput
+> workloads. Their APIs should be treated as initial in this release.
+
 ## Mendelian randomization
 
 The core independent- and LD-aware estimators are supplemented by:

@@ -1,6 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked Mendelian randomization harmonization, IVW, Egger, LD, robustness, multivariable, and overlap examples in JLinAlg."><title>Mendelian randomization vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Mendelian randomization</span></div><h1>Align alleles before estimating causes.</h1><p>A worked summary-data flow from structured harmonization exclusions through core, LD-aware, robust, multivariable, and overlap-sensitive estimators.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<div class="note warning"><strong>v0.1.0 performance status</strong>The MR implementation is tested for numerical behavior but is not yet optimized or benchmarked as a high-throughput pipeline.</div>
 <h2 id="harmonize">Harmonize summary associations</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Exposure and outcome</span></div><pre><code>SummaryAssociation exposure =
     new SummaryAssociation(
         "rs1", "A", "C", .10, .02, .20);

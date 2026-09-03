@@ -4,18 +4,24 @@
 complete feature map and browser-friendly worked vignettes.
 
 JLinAlg implements Java linear and mixed-model algorithms on top of
-[JDistlib 0.10.0](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.0).
-The current release slice provides ordinary least squares (OLS), generalized
+[JDistlib 0.10.1](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.1).
+Version 0.1.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, and penalized-quasi-likelihood generalized linear
 mixed models (GLMM PQL). Gaussian ridge, LASSO, and elastic-net regression and
 a first summary-statistics Mendelian-randomization (MR) layer are also included.
 
+> **v0.1.0 performance status:** MR, SuSiE, and SEM are implemented and tested,
+> but have not yet received the large-workload optimization and benchmarking
+> applied to JLinAlg's performance-tuned model and association paths. Treat
+> their APIs as initial and profile them on representative data before
+> high-throughput use.
+
 ## Requirements and build
 
 - A JDK 17 or newer.
 - Network access on the first build. The build downloads the pinned
-  `jdistlib-all-0.10.0.jar` and verifies its SHA-256 digest before compiling.
+  `jdistlib-all-0.10.1.jar` and verifies its SHA-256 digest before compiling.
 
 On Windows:
 
@@ -43,7 +49,7 @@ The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
 runtime dependencies. A fixed-effect omics scan can then be run as:
 
 ```powershell
-java -jar build/cli/jlinalg-0.1.0-SNAPSHOT.jar \`
+java -jar build/cli/jlinalg-0.1.0.jar \`
   --omics methylation.tsv \`
   --pheno phenotype.tsv \`
   --id IID \`
@@ -67,7 +73,7 @@ repeated observations, `--individual-id COLUMN` names the phenotype column
 that maps rows to GRM individuals. It defaults to the `--id` column.
 
 ```powershell
-java -jar build/cli/jlinalg-0.1.0-SNAPSHOT.jar `
+java -jar build/cli/jlinalg-0.1.0.jar `
   --pheno phenotype.tsv --id observation_id --individual-id IID `
   --formula "trait ~ age + sex" --grm cohort `
   --out trait-grm.tsv
@@ -661,6 +667,9 @@ explicit current boundaries.
 
 ## Mendelian randomization
 
+The v0.1.0 MR implementation is tested for numerical behavior but is not yet
+optimized or benchmarked as a high-throughput pipeline.
+
 Freely available LD reference databases can be listed and installed with the
 CLI. Every source is normalized to the versioned, variant-major PLINK layout
 described in the [LD reference format](docs/ld-reference-format.md):
@@ -758,6 +767,9 @@ forms), the full coefficient covariance, residual `Q_E`, omnibus moderator
 
 ## SuSiE fine mapping
 
+The v0.1.0 SuSiE implementation is tested but is not yet optimized or
+benchmarked for large loci or repeated fine-mapping workloads.
+
 `Susie` implements iterative Bayesian stepwise selection for individual data,
 standardized z-score/LD summary data, or caller-supplied `X'X`, `X'y`, and
 `y'y` sufficient statistics. It reports posterior means, PIPs, per-effect
@@ -767,6 +779,9 @@ on their original coefficient scale. Summary LD is checked for correlation
 structure and positive semidefiniteness before iteration.
 
 ## Structural equation models
+
+The v0.1.0 SEM implementation is tested but is not yet optimized or benchmarked
+for large models or repeated fits.
 
 `SemModel` specifies observed-variable directed paths, variances, covariances,
 fixed values, and equality constraints through shared labels. `Sem` fits the

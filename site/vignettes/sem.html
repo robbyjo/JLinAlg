@@ -1,6 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked observed-variable SEM path, covariance, equality constraint, inference, and fit-index examples in JLinAlg."><title>SEM vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>SEM</span></div><h1>Specify paths, estimate the implied covariance.</h1><p>Observed-variable RAM structural models with free/fixed regressions, variances and covariances, equality constraints, Wald inference, and global fit indices.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<div class="note warning"><strong>v0.1.0 performance status</strong>SEM is tested but is not yet optimized or benchmarked for large models or repeated fits.</div>
 <h2 id="model">Specify a mediation path</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>x → m → y</span></div><pre><code>SemModel model = SemModel.builder("x", "m", "y")
     .regression("m", "x", .4)
     .regression("y", "m", .6)
