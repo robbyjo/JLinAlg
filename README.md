@@ -661,6 +661,14 @@ explicit current boundaries.
 
 ## Mendelian randomization
 
+Freely available LD reference databases can be listed and installed with the
+CLI. Every source is normalized to the versioned, variant-major PLINK layout
+described in the [LD reference format](docs/ld-reference-format.md):
+
+    java -jar jlinalg-<version>.jar ld-db list
+    java -jar jlinalg-<version>.jar ld-db download \
+      --database 1000g-phase3 --location /data/ld/1000g-phase3
+
 The first MR layer accepts validated biallelic SNP associations and explicitly
 harmonizes outcome effects to the exposure effect allele:
 

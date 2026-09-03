@@ -5,7 +5,9 @@
 package org.jlinalg.cli;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 /** Executable, bounded-memory statistical association command line. */
 public final class JLinAlgCli {
@@ -17,21 +19,29 @@ public final class JLinAlgCli {
     }
 
     static int run(String[] arguments) {
+        return run(arguments, System.out, System.err);
+    }
+
+    static int run(String[] arguments, PrintStream output,
+            PrintStream errorOutput) {
+        if (arguments.length > 0 && arguments[0].equals("ld-db"))
+            return LdDatabaseCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         CliOptions options;
         try {
             options = CliOptions.parse(arguments);
             if (options.help) {
-                System.out.println(help());
+                output.println(help());
                 return 0;
             }
             if (options.version) {
-                System.out.println(version());
+                output.println(version());
                 return 0;
             }
             options.validateForRun();
         } catch (RuntimeException exception) {
-            System.err.println("jlinalg: " + exception.getMessage());
-            System.err.println("Use --help for usage.");
+            errorOutput.println("jlinalg: " + exception.getMessage());
+            errorOutput.println("Use --help for usage.");
             return 2;
         }
 
@@ -73,15 +83,15 @@ public final class JLinAlgCli {
             } catch (IOException ignored) {
                 // Preserve the original failure.
             }
-            System.err.println("jlinalg: " + exception.getMessage());
-            if (log == null) exception.printStackTrace(System.err);
+            errorOutput.println("jlinalg: " + exception.getMessage());
+            if (log == null) exception.printStackTrace(errorOutput);
             return 1;
         } finally {
             if (log != null) {
                 try {
                     log.close();
                 } catch (IOException exception) {
-                    System.err.println(
+                    errorOutput.println(
                         "jlinalg: failed to close log: " + exception.getMessage());
                 }
             }
@@ -109,6 +119,9 @@ public final class JLinAlgCli {
             Usage:
               java -jar jlinalg-<version>.jar --pheno FILE --id COLUMN
                 --formula "y ~ covariates + <omics>" [--omics FILE] --out FILE
+              java -jar jlinalg-<version>.jar ld-db list
+              java -jar jlinalg-<version>.jar ld-db download
+                --database NAME [--location DIRECTORY]
 
             Core options:
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix
@@ -144,6 +157,12 @@ public final class JLinAlgCli {
               --omics-type auto|gwas|ewas|expression|proteomics|generic
               --annot FILE --annot-id COLUMN --annot-cols c1,c2,...
               --case-value VALUE --control-value VALUE
+
+            LD reference databases:
+              ld-db list                  Show freely available choices
+              ld-db download              Download and install a choice
+              --database NAME             Required database identifier
+              --location DIRECTORY        Install directory; default is .
             """;
     }
 }

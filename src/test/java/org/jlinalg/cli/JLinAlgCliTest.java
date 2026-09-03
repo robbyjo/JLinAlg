@@ -8,14 +8,64 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class JLinAlgCliTest {
     @TempDir Path temporaryDirectory;
+
+    @Test
+    void ldDatabaseListShowsDownloadChoice() {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream output = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {"ld-db", "list"},
+            output, output);
+
+        assertEquals(0, status);
+        String text = bytes.toString();
+        assertTrue(text.contains("1000g-phase3"));
+        assertTrue(text.contains("GRCh37"));
+        assertTrue(text.contains("--database 1000g-phase3"));
+    }
+
+    @Test
+    void ldDatabaseDownloadWithoutChoiceReturnsActionableError() {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream output = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {"ld-db", "download"},
+            output, output);
+
+        assertEquals(2, status);
+        String text = bytes.toString();
+        assertTrue(text.contains("no LD database was specified"));
+        assertTrue(text.contains("--database is required"));
+        assertTrue(text.contains("Database choices:"));
+        assertTrue(text.contains("ld-db download"));
+    }
+
+    @Test
+    void blankLdDatabaseLocationUsesCurrentDirectory() {
+        AtomicReference<Path> installedAt = new AtomicReference<>();
+        PrintStream output = new PrintStream(OutputStream.nullOutputStream());
+
+        int status = LdDatabaseCli.run(new String[] {
+            "download", "--database", "1000g-phase3", "--location", ""
+        }, output, output, temporaryDirectory,
+            (database, location, progress) -> installedAt.set(location));
+
+        assertEquals(0, status);
+        assertEquals(temporaryDirectory.toAbsolutePath().normalize(),
+            installedAt.get());
+    }
 
     @Test
     void phenotypeOnlyOlsWritesAllTermsFdrLogAndManifest() throws Exception {
