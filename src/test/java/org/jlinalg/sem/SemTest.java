@@ -5,6 +5,9 @@ package org.jlinalg.sem;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import org.jlinalg.compute.BackendPolicy;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +64,59 @@ class SemTest {
             .regression("equal", "y", "m", 0.4)
             .build();
         assertEquals(4, model.freeParameterCount());
+        double[] covariance = {
+            1.0, 0.4, 0.16,
+            0.4, 1.0, 0.4,
+            0.16, 0.4, 1.0
+        };
+        SemFitResult result = Sem.fitCovariance(covariance, 1_000, model,
+            SemOptions.defaults(), BackendPolicy.CPU);
+        assertTrue(result.converged());
+        assertEquals(0.4, result.parameter("equal").estimate(), 2e-7);
+        assertEquals(2, result.degreesOfFreedom());
+    }
+
+    @Test
+    void agreesWithLavaanForPathsResidualCovarianceAndFitIndices() throws IOException {
+        Properties reference = new Properties();
+        try (InputStream input = getClass().getResourceAsStream(
+                "/r-reference/sem-lavaan.properties")) {
+            reference.load(input);
+        }
+        double[] covariance = java.util.Arrays.stream(
+            reference.getProperty("covariance").split(","))
+            .mapToDouble(Double::parseDouble).toArray();
+        SemModel model = SemModel.builder("x", "w", "m", "y", "z")
+            .regression("m", "x", 0.4)
+            .regression("m", "w", -0.2)
+            .regression("y", "m", 0.5)
+            .regression("y", "x", 0.3)
+            .regression("z", "y", 0.5)
+            .covariance("x", "w", 0.2)
+            .covariance("m", "y", 0.1)
+            .build();
+        SemFitResult result = Sem.fitCovariance(covariance,
+            Integer.parseInt(reference.getProperty("observations")), model,
+            SemOptions.defaults(), BackendPolicy.CPU);
+
+        assertTrue(result.converged());
+        for (SemParameterEstimate parameter : result.parameters()) {
+            String key = parameter.label().replace("~", "_");
+            assertEquals(value(reference, key + ".estimate"),
+                parameter.estimate(), 2e-7, parameter.label() + " estimate");
+            assertEquals(value(reference, key + ".se"),
+                parameter.standardError(), 2e-7, parameter.label() + " SE");
+        }
+        assertEquals(value(reference, "logl"), result.logLikelihood(), 2e-7);
+        assertEquals(value(reference, "chisq"), result.chiSquare(), 2e-7);
+        assertEquals(value(reference, "df"), result.degreesOfFreedom());
+        assertEquals(value(reference, "cfi"), result.cfi(), 2e-9);
+        assertEquals(value(reference, "tli"), result.tli(), 2e-9);
+        assertEquals(value(reference, "rmsea"), result.rmsea(), 2e-9);
+        assertEquals(value(reference, "srmr"), result.srmr(), 2e-8);
+    }
+
+    private static double value(Properties values, String name) {
+        return Double.parseDouble(values.getProperty(name));
     }
 }

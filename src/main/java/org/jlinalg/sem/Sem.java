@@ -3,16 +3,12 @@
 package org.jlinalg.sem;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import jdistlib.ChiSquare;
 import jdistlib.Normal;
 import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.MatrixTranspose;
-import jdistlib.math.MultivariableFunction;
-import jdistlib.math.opt.Bobyqa;
-import jdistlib.math.opt.OptimizationResult;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.internal.MatrixOps;
@@ -34,33 +30,40 @@ public final class Sem {
             throw new IllegalArgumentException("data, model, options, and backend are required");
         }
         int variables = model.variables().size();
-        List<double[]> complete = new ArrayList<>();
+        int complete = 0;
+        double[] means = new double[variables];
         for (int row = 0; row < data.length; row++) {
             if (data[row] == null || data[row].length != variables)
                 throw new IllegalArgumentException("SEM data must be rectangular and match variables");
             boolean finite = true;
             for (double value : data[row]) finite &= Double.isFinite(value);
-            if (finite) complete.add(data[row]);
+            if (finite) {
+                complete++;
+                for (int variable = 0; variable < variables; variable++)
+                    means[variable] += data[row][variable];
+            }
             else if (options.missingDataPolicy() == MissingDataPolicy.ERROR)
                 throw new IllegalArgumentException("non-finite SEM row: " + row);
         }
-        if (complete.size() <= variables)
+        if (complete <= variables)
             throw new IllegalArgumentException("too few complete rows for SEM covariance");
-        double[] means = new double[variables];
-        for (double[] row : complete)
-            for (int variable = 0; variable < variables; variable++) means[variable] += row[variable];
-        for (int variable = 0; variable < variables; variable++) means[variable] /= complete.size();
+        for (int variable = 0; variable < variables; variable++) means[variable] /= complete;
         double[] covariance = new double[variables * variables];
-        for (double[] row : complete) {
+        for (double[] row : data) {
+            boolean finite = true;
+            for (double value : row) finite &= Double.isFinite(value);
+            if (!finite) continue;
             for (int first = 0; first < variables; first++) {
-                for (int second = 0; second < variables; second++) {
-                    covariance[first * variables + second] +=
-                        (row[first] - means[first]) * (row[second] - means[second]);
+                double centeredFirst = row[first] - means[first];
+                for (int second = 0; second <= first; second++) {
+                    double value = centeredFirst * (row[second] - means[second]);
+                    covariance[first * variables + second] += value;
+                    if (first != second) covariance[second * variables + first] += value;
                 }
             }
         }
-        for (int index = 0; index < covariance.length; index++) covariance[index] /= complete.size();
-        return fitCovariance(covariance, complete.size(), model, options, backendPolicy);
+        for (int index = 0; index < covariance.length; index++) covariance[index] /= complete;
+        return fitCovariance(covariance, complete, model, options, backendPolicy);
     }
 
     public static SemFitResult fitCovariance(
@@ -90,26 +93,26 @@ public final class Sem {
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 throw new IllegalArgumentException("sample covariance must be positive definite", exception);
             }
-            MultivariableFunction objective = point -> evaluate(
-                point, model, sampleCovariance, observations, backend).negativeLogLikelihood();
+            Objective objective = point -> evaluate(
+                point, model, sampleCovariance, observations, backend, true);
             Optimum optimum = optimize(initial, lower, upper, objective,
-                options.maximumEvaluations(), options.tolerance());
+                options.maximumEvaluations(), options.tolerance(), observations);
             Evaluation fitted = evaluate(optimum.parameters(), model,
-                sampleCovariance, observations, backend);
-            double[] rawCovariance = inverseHessian(
-                optimum.parameters(), objective, backend);
+                sampleCovariance, observations, backend, false);
+            double[] rawCovariance = parameterCovariance(
+                optimum.parameters(), model, fitted, observations, backend);
             List<SemParameterEstimate> estimates = parameterEstimates(
                 optimum.parameters(), rawCovariance, model);
             double logDetSample = sampleFactor.logDeterminant();
             double discrepancy = fitted.logDeterminant() + fitted.trace()
                 - logDetSample - variables;
-            double chiSquare = Math.max(0.0, (observations - 1.0) * discrepancy);
+            double chiSquare = Math.max(0.0, observations * discrepancy);
             double pValue = degreesOfFreedom > 0
                 ? ChiSquare.cumulative(chiSquare, degreesOfFreedom, false, false)
                 : Double.NaN;
             double baselineDiscrepancy = baselineDiscrepancy(
                 sampleCovariance, variables, logDetSample);
-            double baselineChi = (observations - 1.0) * baselineDiscrepancy;
+            double baselineChi = observations * baselineDiscrepancy;
             int baselineDf = variables * (variables - 1) / 2;
             double modelExcess = Math.max(0.0, chiSquare - degreesOfFreedom);
             double baselineExcess = Math.max(modelExcess,
@@ -121,7 +124,7 @@ public final class Sem {
             double rmsea = degreesOfFreedom > 0
                 ? Math.sqrt(Math.max(0.0,
                     (chiSquare - degreesOfFreedom)
-                        / (degreesOfFreedom * (observations - 1.0)))) : 0.0;
+                        / (degreesOfFreedom * observations))) : 0.0;
             double srmr = srmr(sampleCovariance, fitted.covariance(), variables);
             int free = model.freeParameterCount();
             double logLikelihood = -fitted.negativeLogLikelihood();
@@ -136,7 +139,7 @@ public final class Sem {
 
     private static Evaluation evaluate(
             double[] parameters, SemModel model, double[] sample,
-            int observations, ComputeBackend backend) {
+            int observations, ComputeBackend backend, boolean withGradient) {
         int size = model.variables().size();
         double[] paths = new double[size * size];
         double[] residual = new double[size * size];
@@ -175,7 +178,37 @@ public final class Sem {
             double logDet = factor.logDeterminant();
             double nll = 0.5 * observations
                 * (size * Math.log(2.0 * Math.PI) + logDet + trace);
-            return new Evaluation(implied, nll, logDet, trace);
+            if (!withGradient)
+                return new Evaluation(implied, inverse, nll, logDet, trace, null);
+            double[] precision = factor.solve(MatrixOps.identity(size), size);
+            double[] precisionSamplePrecision = MatrixOps.multiply(
+                backend, solved, size, size, precision, size);
+            double[] score = new double[size * size];
+            for (int index = 0; index < score.length; index++)
+                score[index] = 0.5 * (precision[index] - precisionSamplePrecision[index]);
+            double[] scoreTimesInverse = MatrixOps.multiply(
+                backend, score, size, size, inverse, size);
+            double[] residualScore = MatrixOps.transposeMultiply(
+                backend, inverse, size, size, scoreTimesInverse, size);
+            double[] covarianceScore = MatrixOps.multiply(
+                backend, implied, size, size, scoreTimesInverse, size);
+            double[] gradient = new double[model.freeParameterCount()];
+            for (SemModel.Element element : model.elements()) {
+                if (element.fixed()) continue;
+                int parameter = model.freeIndex(element.label());
+                if (element.kind() == SemModel.Kind.REGRESSION) {
+                    gradient[parameter] += 2.0 * covarianceScore[
+                        element.second() * size + element.first()];
+                } else if (element.kind() == SemModel.Kind.VARIANCE) {
+                    gradient[parameter] += residualScore[
+                        element.first() * size + element.first()]
+                        * Math.exp(parameters[parameter]);
+                } else {
+                    gradient[parameter] += 2.0 * residualScore[
+                        element.first() * size + element.second()];
+                }
+            }
+            return new Evaluation(implied, inverse, nll, logDet, trace, gradient);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             return Evaluation.invalid(size);
         }
@@ -214,71 +247,165 @@ public final class Sem {
     }
 
     private static Optimum optimize(double[] initial, double[] lower, double[] upper,
-            MultivariableFunction objective, int maximum, double tolerance) {
-        if (initial.length == 0) return new Optimum(initial, objective.eval(initial), 1, true);
-        try {
-            OptimizationResult result = Bobyqa.bobyqa(initial, lower, upper,
-                objective, 2 * initial.length + 1, 0.5, tolerance, maximum, true);
-            if (result.mX != null && Double.isFinite(result.mF))
-                return new Optimum(result.mX, result.mF, result.numFunctionCalls, true);
-        } catch (RuntimeException ignored) { }
+            Objective objective, int maximum, double tolerance, int objectiveScale) {
+        Evaluation current = objective.evaluate(initial);
+        if (initial.length == 0)
+            return new Optimum(initial, current.negativeLogLikelihood(), 1, true);
         double[] point = initial.clone();
-        double value = objective.eval(point);
+        int size = point.length;
+        double value = current.negativeLogLikelihood() / objectiveScale;
+        double[] gradient = current.gradient();
+        double[] inverseHessian = MatrixOps.identity(size);
         int evaluations = 1;
-        double step = 0.5;
-        while (evaluations < maximum && step > tolerance) {
-            boolean improved = false;
-            for (int dimension = 0; dimension < point.length && evaluations < maximum; dimension++) {
-                double original = point[dimension];
-                for (int direction : new int[] {-1, 1}) {
-                    point[dimension] = Math.max(lower[dimension],
-                        Math.min(upper[dimension], original + direction * step));
-                    double candidate = objective.eval(point);
-                    evaluations++;
-                    if (candidate < value) {
-                        value = candidate; original = point[dimension]; improved = true;
-                    } else point[dimension] = original;
-                }
+        boolean converged = gradientNorm(gradient)
+            <= tolerance * (1.0 + Math.abs(value));
+        while (evaluations < maximum && !converged) {
+            double[] direction = new double[size];
+            for (int row = 0; row < size; row++)
+                for (int column = 0; column < size; column++)
+                    direction[row] -= inverseHessian[row * size + column] * gradient[column];
+            double directionalDerivative = dot(gradient, direction);
+            if (!(directionalDerivative < 0.0)) {
+                for (int index = 0; index < size; index++) direction[index] = -gradient[index];
+                directionalDerivative = -dot(gradient, gradient);
+                inverseHessian = MatrixOps.identity(size);
             }
-            if (!improved) step *= 0.5;
+            double step = 1.0;
+            Evaluation candidate = null;
+            double[] candidatePoint = new double[size];
+            while (evaluations < maximum && step >= 1e-12) {
+                boolean moved = false;
+                for (int index = 0; index < size; index++) {
+                    candidatePoint[index] = Math.max(lower[index],
+                        Math.min(upper[index], point[index] + step * direction[index]));
+                    moved |= candidatePoint[index] != point[index];
+                }
+                if (!moved) break;
+                candidate = objective.evaluate(candidatePoint);
+                evaluations++;
+                double candidateValue = candidate.negativeLogLikelihood() / objectiveScale;
+                if (Double.isFinite(candidateValue)
+                        && candidateValue
+                            <= value + 1e-4 * step * directionalDerivative) break;
+                candidate = null;
+                step *= 0.5;
+            }
+            if (candidate == null) break;
+            double[] nextGradient = candidate.gradient();
+            double[] displacement = new double[size];
+            double[] gradientChange = new double[size];
+            for (int index = 0; index < size; index++) {
+                displacement[index] = candidatePoint[index] - point[index];
+                gradientChange[index] = nextGradient[index] - gradient[index];
+            }
+            double curvature = dot(displacement, gradientChange);
+            if (curvature > 1e-12 * Math.sqrt(
+                    dot(displacement, displacement) * dot(gradientChange, gradientChange))) {
+                double[] hessianTimesChange = new double[size];
+                for (int row = 0; row < size; row++)
+                    for (int column = 0; column < size; column++)
+                        hessianTimesChange[row] += inverseHessian[row * size + column]
+                            * gradientChange[column];
+                double changeQuadratic = dot(gradientChange, hessianTimesChange);
+                double coefficient = (curvature + changeQuadratic)
+                    / (curvature * curvature);
+                for (int row = 0; row < size; row++) {
+                    for (int column = 0; column < size; column++) {
+                        inverseHessian[row * size + column] += coefficient
+                            * displacement[row] * displacement[column]
+                            - (hessianTimesChange[row] * displacement[column]
+                                + displacement[row] * hessianTimesChange[column]) / curvature;
+                    }
+                }
+            } else inverseHessian = MatrixOps.identity(size);
+            double relativeStep = 0.0;
+            for (int index = 0; index < size; index++)
+                relativeStep = Math.max(relativeStep, Math.abs(displacement[index])
+                    / (1.0 + Math.abs(candidatePoint[index])));
+            point = candidatePoint.clone();
+            value = candidate.negativeLogLikelihood() / objectiveScale;
+            gradient = nextGradient;
+            converged = gradientNorm(gradient)
+                    <= tolerance * (1.0 + Math.abs(value))
+                || relativeStep <= tolerance;
         }
-        return new Optimum(point, value, evaluations, step <= Math.sqrt(tolerance));
+        return new Optimum(point, value * objectiveScale, evaluations, converged);
     }
 
-    private static double[] inverseHessian(
-            double[] point, MultivariableFunction objective, ComputeBackend backend) {
-        int size = point.length;
-        if (size == 0) return new double[0];
-        double[] hessian = new double[size * size];
-        double center = objective.eval(point);
-        for (int first = 0; first < size; first++) {
-            double h1 = 1e-4 * (1.0 + Math.abs(point[first]));
-            double[] plus = point.clone(); plus[first] += h1;
-            double[] minus = point.clone(); minus[first] -= h1;
-            hessian[first * size + first] =
-                (objective.eval(plus) - 2.0 * center + objective.eval(minus)) / (h1 * h1);
-            for (int second = 0; second < first; second++) {
-                double h2 = 1e-4 * (1.0 + Math.abs(point[second]));
-                double[] pp = point.clone(); pp[first] += h1; pp[second] += h2;
-                double[] pm = point.clone(); pm[first] += h1; pm[second] -= h2;
-                double[] mp = point.clone(); mp[first] -= h1; mp[second] += h2;
-                double[] mm = point.clone(); mm[first] -= h1; mm[second] -= h2;
-                double value = (objective.eval(pp) - objective.eval(pm)
-                    - objective.eval(mp) + objective.eval(mm)) / (4.0 * h1 * h2);
-                hessian[first * size + second] = value;
-                hessian[second * size + first] = value;
+    private static double[] parameterCovariance(double[] point, SemModel model,
+            Evaluation fitted, int observations, ComputeBackend backend) {
+        int parameters = point.length;
+        if (parameters == 0) return new double[0];
+        int variables = model.variables().size();
+        double[][] derivatives = new double[parameters][variables * variables];
+        for (SemModel.Element element : model.elements()) {
+            if (element.fixed()) continue;
+            int parameter = model.freeIndex(element.label());
+            double[] derivative = derivatives[parameter];
+            for (int row = 0; row < variables; row++) {
+                for (int column = 0; column < variables; column++) {
+                    double value;
+                    if (element.kind() == SemModel.Kind.REGRESSION) {
+                        value = fitted.inversePath()[row * variables + element.first()]
+                            * fitted.covariance()[element.second() * variables + column]
+                            + fitted.covariance()[row * variables + element.second()]
+                            * fitted.inversePath()[column * variables + element.first()];
+                    } else if (element.kind() == SemModel.Kind.VARIANCE) {
+                        value = Math.exp(point[parameter])
+                            * fitted.inversePath()[row * variables + element.first()]
+                            * fitted.inversePath()[column * variables + element.first()];
+                    } else {
+                        value = fitted.inversePath()[row * variables + element.first()]
+                            * fitted.inversePath()[column * variables + element.second()]
+                            + fitted.inversePath()[row * variables + element.second()]
+                            * fitted.inversePath()[column * variables + element.first()];
+                    }
+                    derivative[row * variables + column] += value;
+                }
+            }
+        }
+        CholeskyFactor factor = backend.dpotrf(fitted.covariance(), variables);
+        double[][] precisionDerivatives = new double[parameters][];
+        for (int parameter = 0; parameter < parameters; parameter++)
+            precisionDerivatives[parameter] = factor.solve(derivatives[parameter], variables);
+        double[] information = new double[parameters * parameters];
+        for (int first = 0; first < parameters; first++) {
+            for (int second = 0; second <= first; second++) {
+                double trace = 0.0;
+                for (int row = 0; row < variables; row++)
+                    for (int column = 0; column < variables; column++)
+                        trace += precisionDerivatives[first][row * variables + column]
+                            * precisionDerivatives[second][column * variables + row];
+                double informationValue = 0.5 * observations * trace;
+                information[first * parameters + second] = informationValue;
+                information[second * parameters + first] = informationValue;
             }
         }
         double ridge = 1e-8;
         for (int attempt = 0; attempt < 12; attempt++) {
-            double[] value = hessian.clone();
-            for (int index = 0; index < size; index++) value[index * size + index] += ridge;
+            double[] value = information.clone();
+            for (int index = 0; index < parameters; index++)
+                value[index * parameters + index] += ridge;
             try {
-                return backend.dpotrf(value, size).solve(MatrixOps.identity(size), size);
+                return backend.dpotrf(value, parameters)
+                    .solve(MatrixOps.identity(parameters), parameters);
             } catch (IllegalArgumentException | IllegalStateException ignored) { ridge *= 10.0; }
         }
-        double[] result = new double[size * size];
-        Arrays.fill(result, Double.NaN);
+        double[] result = new double[parameters * parameters];
+        java.util.Arrays.fill(result, Double.NaN);
+        return result;
+    }
+
+    private static double dot(double[] first, double[] second) {
+        double result = 0.0;
+        for (int index = 0; index < first.length; index++)
+            result += first[index] * second[index];
+        return result;
+    }
+
+    private static double gradientNorm(double[] gradient) {
+        double result = 0.0;
+        for (double value : gradient) result = Math.max(result, Math.abs(value));
         return result;
     }
 
@@ -296,7 +423,7 @@ public final class Sem {
                 double observed = sample[first * size + second]
                     / Math.sqrt(sample[first * size + first] * sample[second * size + second]);
                 double fitted = implied[first * size + second]
-                    / Math.sqrt(implied[first * size + first] * implied[second * size + second]);
+                    / Math.sqrt(sample[first * size + first] * sample[second * size + second]);
                 double difference = observed - fitted;
                 sum += difference * difference;
                 count++;
@@ -341,11 +468,16 @@ public final class Sem {
         return result;
     }
 
-    private record Evaluation(double[] covariance, double negativeLogLikelihood,
-                              double logDeterminant, double trace) {
+    @FunctionalInterface
+    private interface Objective { Evaluation evaluate(double[] point); }
+
+    private record Evaluation(double[] covariance, double[] inversePath,
+                              double negativeLogLikelihood,
+                              double logDeterminant, double trace,
+                              double[] gradient) {
         static Evaluation invalid(int size) {
-            return new Evaluation(new double[size * size],
-                Double.MAX_VALUE / 8.0, Double.NaN, Double.NaN);
+            return new Evaluation(new double[size * size], new double[size * size],
+                Double.MAX_VALUE / 8.0, Double.NaN, Double.NaN, null);
         }
     }
     private record Optimum(double[] parameters, double objective,

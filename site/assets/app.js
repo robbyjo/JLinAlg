@@ -26,7 +26,7 @@ class SiteHeader extends HTMLElement {
           <nav class="nav-links" aria-label="Primary navigation">
             <a href="${root}index.html#features">Features</a>
             <a href="${root}vignettes/index.html">Vignettes</a>
-            <a href="${root}index.html#performance">Performance</a>
+            <a href="${root}verification.html">Verification</a>
             <a href="${root}index.html#architecture">Architecture</a>
           </nav>
           <div class="nav-actions">
@@ -64,10 +64,10 @@ class SiteFooter extends HTMLElement {
         <div class="container">
           <div class="footer-grid">
             <div><a class="brand" href="${root}index.html"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><span>JLinAlg</span></a><p>High-performance Java statistical models for genetic association, causal inference, fine mapping, and quantitative research.</p></div>
-            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}index.html#features">Feature map</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
+            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}verification.html">Accuracy and performance</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
             <div class="footer-links"><strong>Project</strong><a href="https://github.com/robbyjo/JLinAlg">Source code</a><a href="https://github.com/robbyjo/JLinAlg/issues">Issues</a><a href="https://github.com/robbyjo/JDistlib">JDistlib</a></div>
           </div>
-          <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>JLinAlg v0.1.0 · Java 17+ · JDistlib 0.10.1 · FP64</span></div>
+          <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>JLinAlg v0.2.0 · Java 17+ · JDistlib 0.10.1 · FP64</span></div>
         </div>
       </footer>`;
     this.querySelector("[data-year]").textContent = new Date().getFullYear();

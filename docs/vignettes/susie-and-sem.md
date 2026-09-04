@@ -1,8 +1,8 @@
 # SuSiE fine mapping and structural equation models
 
-> **v0.1.0 performance status:** SuSiE is validated against susieR and benchmarked
-> on the official `N3finemapping` vignette data. SEM remains an initial
-> performance path.
+> **Performance status:** SuSiE is validated against susieR and benchmarked on
+> the official `N3finemapping` vignette data. SEM is validated against `lavaan`
+> and benchmarked on a TOPMed cardiometabolic path model.
 
 ## SuSiE with individual-level data
 
@@ -149,3 +149,5 @@ Current SEM scope is observed-variable covariance structure. Latent
 measurement models, mean structures, ordinal thresholds, robust sandwich
 corrections, modification indices, and FIML missingness are not silently
 approximated. See the [scope document](../mr-timeseries-susie-sem.md).
+Numerical agreement and timing commands are in the
+[TOPMed SEM report](../topmed-sem-performance.md).

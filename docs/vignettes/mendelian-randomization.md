@@ -1,8 +1,8 @@
 # Mendelian randomization
 
-> **v0.1.0 performance status:** This implementation is tested for numerical
-> behavior but is not yet optimized or benchmarked as a high-throughput MR
-> pipeline.
+> **v0.2.0 performance status:** Core estimators have independent numerical
+> fixtures. The bounded xWAS screening path has a reproducible 45,000-pair
+> Java/base-R benchmark; sensitivity paths remain workload-dependent.
 
 For a single workflow connecting CLI preparation through diagnostics and
 figures, start with the [end-to-end MR vignette](mr-end-to-end.md).

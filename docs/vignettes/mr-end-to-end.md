@@ -381,8 +381,9 @@ Recommended design points for high-throughput molecular MR:
 
 For thousands of features, stream and partition the formatted tables by
 `id.exposure`, keep a machine-readable exclusions table, and apply the same
-predeclared pipeline to every feature. The v0.1.0 MR APIs are tested but have
-not yet been optimized or benchmarked for a high-throughput molecular scan.
+predeclared pipeline to every feature. The v0.2.0 bounded xWAS screen is
+numerically checked against base R and benchmarked for a high-throughput
+molecular scan; hit-specific diagnostics remain workload-dependent.
 
 ## Reporting checklist
 

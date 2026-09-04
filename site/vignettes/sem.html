@@ -1,38 +1,86 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked observed-variable SEM path, covariance, equality constraint, inference, and fit-index examples in JLinAlg."><title>SEM vignette · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
-<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>SEM</span></div><h1>Specify paths, estimate the implied covariance.</h1><p>Observed-variable RAM structural models with free/fixed regressions, variances and covariances, equality constraints, Wald inference, and global fit indices.</p></div></section>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="JLinAlg v0.2.0 observed-variable SEM vignette with RAM specification, row and covariance fits, lavaan validation, and real TOPMed benchmark results."><title>SEM vignette · JLinAlg v0.2.0</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>SEM</span></div><h1>Specify paths. Verify the implied covariance.</h1><p>Continuous observed-variable RAM models with analytic maximum-likelihood gradients, expected-information inference, equality constraints, and global fit indices.</p></div></section>
 <div class="container page-layout"><article class="prose">
-<div class="note warning"><strong>v0.1.0 performance status</strong>SEM is tested but is not yet optimized or benchmarked for large models or repeated fits.</div>
-<h2 id="model">Specify a mediation path</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>x → m → y</span></div><pre><code>SemModel model = SemModel.builder("x", "m", "y")
-    .regression("m", "x", .4)
-    .regression("y", "m", .6)
-    .variance("x", 1.0)
-    .variance("m", .8)
-    .variance("y", .5)
-    .build();</code></pre></div><p>The last number in each call is an optimizer start, not a fixed value. Use <code>fixedRegression</code>, <code>fixedVariance</code>, or <code>fixedCovariance</code> for known parameters.</p>
-<h2 id="covariance">Fit a sample covariance</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Covariance ML</span></div><pre><code>double[] covariance = {
-    1.0, .5, .35,
-    .5, 1.0, .70,
-    .35, .70, 1.0
-};
+<div class="note"><strong>Validated and benchmarked in v0.2.0</strong>Paths, variances, exogenous and residual covariances, standard errors, likelihood, and fit indices are checked against lavaan 0.7-2. On the documented 4,680-row model, JLinAlg was 8.58x faster.</div>
 
-SemFitResult fit = Sem.fitCovariance(
-    covariance, 2_000, model,
-    SemOptions.defaults(),
-    BackendPolicy.PREFERRED);
+<h2 id="scope">Statistical contract</h2>
+<p>JLinAlg uses the observed-variable RAM relationship <code>Σ = (I − A)⁻¹ S (I − A)⁻ᵀ</code> and multivariate-normal covariance-structure ML. <code>A</code> contains directed paths; <code>S</code> contains residual variances and covariances. Free variances are optimized on the log scale.</p>
 
-SemParameterEstimate path =
-    fit.parameter("y~m");</code></pre></div><p>The covariance is row-major and ordered exactly like model variables. Inspect convergence, parameter SE/z/p, implied covariance, likelihood chi-square, CFI, TLI, RMSEA, SRMR, AIC, and BIC.</p>
-<h2 id="rows">Fit observed rows</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Complete-case covariance ML</span></div><pre><code>SemFitResult fromRows = Sem.fit(
+<h2 id="model">Specify a path model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Cardiometabolic path subset</span></div><pre><code>SemModel model = SemModel.builder(
+        "Age", "Sex", "BMI", "Waist", "Glucose")
+    .regression("BMI", "Age", 0.1)
+    .regression("BMI", "Sex", -0.1)
+    .regression("Waist", "BMI", 0.7)
+    .regression("Waist", "Sex", -0.1)
+    .regression("Glucose", "Age", 0.1)
+    .regression("Glucose", "BMI", 0.2)
+    .covariance("Age", "Sex", 0.0)
+    .variance("Age", 1.0)
+    .variance("Sex", 1.0)
+    .variance("BMI", 0.8)
+    .variance("Waist", 0.3)
+    .variance("Glucose", 0.8)
+    .build();</code></pre></div>
+<p>The final numeric argument is an optimizer start. Use <code>fixedRegression</code>, <code>fixedVariance</code>, or <code>fixedCovariance</code> for known values. Omitted variances are added as free parameters with start 1.0.</p>
+
+<h2 id="rows">Fit observed rows</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Complete-case covariance ML</span></div><pre><code>SemFitResult fit = Sem.fit(
     observedRows, model,
     new SemOptions(
         10_000, 1e-8,
         MissingDataPolicy.OMIT),
-    BackendPolicy.PREFERRED);</code></pre></div><p>Rows are observations and columns follow model variable order. <code>OMIT</code> uses complete-case covariance ML; it is not FIML.</p>
-<h2 id="constraints">Add equality constraints</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Shared parameter label</span></div><pre><code>SemModel constrained =
+    BackendPolicy.PREFERRED);
+
+if (!fit.converged()) {
+    throw new IllegalStateException(
+        "SEM did not converge");
+}</code></pre></div>
+<p>Rows are observations and columns follow model variable order. <code>OMIT</code> selects one jointly complete sample, centers it, and forms the ML covariance with denominator N. It is not FIML. Standardize strongly mismatched scales before fitting.</p>
+
+<h2 id="covariance">Fit sufficient statistics</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Dense row-major covariance</span></div><pre><code>SemFitResult covarianceFit =
+    Sem.fitCovariance(
+        covariance, observations, model,
+        SemOptions.defaults(),
+        BackendPolicy.PREFERRED);</code></pre></div>
+<p>The covariance must be positive definite and ordered exactly like the model variables. Pass an ML covariance when exact row-data likelihood and fit-index parity is required.</p>
+
+<h2 id="inference">Inspect parameters and fit</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Wald and global fit</span></div><pre><code>SemParameterEstimate path =
+    fit.parameter("Waist~BMI");
+
+System.out.printf(
+    "beta=%g se=%g z=%g p=%g%n",
+    path.estimate(),
+    path.standardError(),
+    path.zStatistic(),
+    path.pValue());
+
+System.out.printf(
+    "chi2=%g df=%d CFI=%g RMSEA=%g%n",
+    fit.chiSquare(),
+    fit.degreesOfFreedom(),
+    fit.cfi(), fit.rmsea());</code></pre></div>
+<p>The result also contains TLI, SRMR, log likelihood, AIC, BIC, implied covariance, sample size, optimizer evaluations, and backend provenance. Fit indices are informative only when model degrees of freedom are positive.</p>
+
+<h2 id="constraints">Equality constraints</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Shared parameter label</span></div><pre><code>SemModel equalPaths =
     SemModel.builder("x", "m", "y")
-        .regression("equal", "m", "x", .4)
-        .regression("equal", "y", "m", .4)
-        .build();</code></pre></div><p>Repeated labels share one free parameter. Fit indices need positive model DF; a just-identified model can reproduce the sample covariance by construction.</p>
-<div class="note warning"><strong>Current scope</strong>This is observed-variable covariance SEM. Latent measurement models, means, ordinal thresholds, robust corrections, modification indices, and FIML are not silently approximated.</div>
+        .regression(
+            "shared", "m", "x", .4)
+        .regression(
+            "shared", "y", "m", .4)
+        .build();</code></pre></div><p>Repeated labels share one free parameter. A label cannot mix variance and nonvariance parameters.</p>
+
+<h2 id="benchmark">TOPMed numerical and speed result</h2>
+<p>The benchmark uses 4,680 jointly complete observations on Sex, Age, BMI, Waist, systolic and diastolic blood pressure, Glucose, HDL, LnTG, LogInsulin, CRP, and eGFR. The original 57-column request has only five jointly complete rows, so it is not estimable by complete-case covariance ML.</p>
+<div class="result-table"><table><thead><tr><th>Quantity</th><th class="number">JLinAlg</th><th class="number">lavaan 0.7-2</th></tr></thead><tbody>
+<tr><td>Log likelihood</td><td class="number">-70763.3172885</td><td class="number">-70763.3172885</td></tr>
+<tr><td>Chi-square (42 df)</td><td class="number">4497.68284338</td><td class="number">4497.68284338</td></tr>
+<tr><td>CFI</td><td class="number">0.799908468824</td><td class="number">0.799908468824</td></tr>
+<tr><td>TLI</td><td class="number">0.685570451009</td><td class="number">0.685570451009</td></tr>
+<tr><td>RMSEA</td><td class="number">0.150559985169</td><td class="number">0.150559985169</td></tr>
+<tr><td>SRMR</td><td class="number">0.0855176490074</td><td class="number">0.0855176482142</td></tr>
+<tr><td>Median warmed fit</td><td class="number">0.0081623 s</td><td class="number">0.0700000 s</td></tr>
+</tbody></table></div>
+<p>All 36 estimates agreed below 1e-8 absolute and standard errors below 5e-10. The measured speedup was 8.58x. Both engines also agree that this illustrative model fits poorly; CFI and RMSEA are substantive warnings, not numerical disagreement. <a href="../verification.html">See the complete accuracy and performance matrix →</a></p>
+
+<div class="note warning"><strong>Current boundary</strong>This engine does not implement latent measurement variables, means/intercepts, ordinal thresholds, robust corrections, modification indices, indirect-effect delta-method inference, or FIML. Binary variables are treated as Gaussian continuous observations.</div>
 <div class="next-links"><a href="susie.html"><small>Previous</small><strong>SuSiE</strong></a><a href="formulas-backends.html"><small>Next</small><strong>Formulas and backends →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#model">Specify model</a><a href="#covariance">Fit covariance</a><a href="#rows">Fit rows</a><a href="#constraints">Constraints</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#scope">Contract</a><a href="#model">Specify model</a><a href="#rows">Fit rows</a><a href="#covariance">Fit covariance</a><a href="#inference">Inference</a><a href="#constraints">Constraints</a><a href="#benchmark">Real benchmark</a></aside></div></main><site-footer root="../"></site-footer></body></html>

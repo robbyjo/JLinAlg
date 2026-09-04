@@ -210,6 +210,13 @@ pre code { color: inherit; }
 .prose strong { color: var(--text); }
 .prose ul, .prose ol { padding-left: 22px; }
 .prose .code-window { margin: 20px 0 25px; box-shadow: none; }
+.result-table { margin: 22px 0 30px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.result-table table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.result-table th, .result-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; white-space: nowrap; }
+.result-table th { color: var(--text); background: var(--surface-2); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.result-table td { color: var(--muted); }
+.result-table tr:last-child td { border-bottom: 0; }
+.result-table td.number, .result-table th.number { text-align: right; font-variant-numeric: tabular-nums; }
 .note { margin: 24px 0; padding: 18px 20px; border-left: 3px solid var(--brand); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--brand-soft); color: var(--text); }
 .note.warning { border-left-color: var(--accent); background: var(--accent-soft); }
 .note strong { display: block; margin-bottom: 4px; }

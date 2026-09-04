@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'org.jlinalg'
-version = '0.1.0'
+version = '0.2.0'
 
 def jdistlibVersion = '0.10.1'
 def jdistlibSha256 = 'c1912e1d10928a0df321c33c85d5f97b3921e40e9bbbdcddfc508358dfb2af03'
@@ -213,6 +213,7 @@ tasks.register('checkWebsite') {
 
         List<String> requiredPages = [
             'index.html',
+            'verification.html',
             'vignettes/index.html',
             'vignettes/linear-models.html',
             'vignettes/penalized-regression.html',
@@ -372,6 +373,17 @@ tasks.register('benchmarkMixedModels', JavaExec) {
     mainClass = 'org.jlinalg.benchmark.MixedModelBenchmark'
     jvmArgs '-Xms1g', '-Xmx6g'
     systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkTopmedSem', JavaExec) {
+    group = 'verification'
+    description = 'Runs the TOPMed observed-variable SEM benchmark shared with lavaan.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.TopmedSemBenchmark'
+    systemProperties System.properties.findAll { key, value ->
         key.toString().startsWith('jlinalg.benchmark.')
     }
 }

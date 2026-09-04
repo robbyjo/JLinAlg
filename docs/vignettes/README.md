@@ -28,7 +28,8 @@ Run the complete verification suite before adapting an example:
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
 | [Meta-analysis](meta-analysis.md) | fixed/random pooling, heterogeneity estimators, Knapp-Hartung, prediction intervals, meta-regression |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
-| [SuSiE and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, observed-variable path models, fit indices, equality constraints |
+| [SuSiE and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, and a compact SEM introduction |
+| [Structural equation modeling](sem.md) | observed-variable RAM paths, covariance/row fitting, inference, lavaan validation, benchmark, and limitations |
 
 ## Common result pattern
 

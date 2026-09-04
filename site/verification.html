@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="JLinAlg v0.2.0 accuracy matrix and real Java/R performance results across statistical model families."><title>Accuracy and performance · JLinAlg v0.2.0</title><link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script></head><body><site-header root="./"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="index.html">Home</a><span>/</span><span>Verification</span></div><h1>Checked for accuracy. Measured for speed.</h1><p>Every shipped component family has automated correctness coverage and an executable performance route. Comparative claims below are real workload measurements with estimator scope and limitations preserved.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>What “checked” means</strong>Correctness is gated by unit, contract, cross-backend, and independent R/Python fixtures. Performance is exercised by deterministic or real-data benchmarks. A benchmark check does not imply that every API is faster than every alternative.</div>
+<p>The clean v0.2.0 release gate discovered 253 tests: 250 passed, zero failed, and three optional CHOLMOD-native tests were skipped because the native library was not staged in that portable build. The separately documented native profiles cover CHOLMOD on the development host.</p>
+
+<h2 id="accuracy">Accuracy matrix</h2>
+<div class="result-table"><table><thead><tr><th>Component family</th><th>Independent or contract reference</th><th>Quantities checked</th></tr></thead><tbody>
+<tr><td>OLS and GLM</td><td>R lm/glm; statsmodels</td><td>β, covariance, tests, likelihood/deviance</td></tr>
+<tr><td>REML and mixed models</td><td>nlme, lme4, rrBLUP, pedigreemm</td><td>fixed effects, variances, BLUP, PEV, sparse/dense parity</td></tr>
+<tr><td>GEE</td><td>geepack and geer</td><td>coefficients, robust covariance, working correlation</td></tr>
+<tr><td>GAM, GAMM, distributional</td><td>mgcv, lme4, gamlss, VGAM</td><td>fits, EDF, likelihood, parameter predictors, probabilities</td></tr>
+<tr><td>Cox and frailty</td><td>survival and coxme</td><td>β, SE, likelihood, grouped/pedigree frailty</td></tr>
+<tr><td>Penalized regression</td><td>glmnet; direct normal equations</td><td>paths, objective, deterministic CV, ridge solution</td></tr>
+<tr><td>Association and set tests</td><td>scalar/batch parity; GMMAT</td><td>OLS/GLM/REML scans, Burden, SKAT, SKAT-O</td></tr>
+<tr><td>MR and meta-analysis</td><td>MendelianRandomization; base R</td><td>effects, SEs, heterogeneity, LD, screening, moderators</td></tr>
+<tr><td>Time series</td><td>R stats::arima; identities</td><td>likelihood, coefficients, forecasts, diagnostics</td></tr>
+<tr><td>SuSiE and coloc</td><td>susieR and coloc</td><td>PIP, β, ELBO, credible sets, H0–H4 posteriors</td></tr>
+<tr><td>SEM</td><td>lavaan 0.7-2</td><td>paths, variances/covariances, SEs, likelihood, fit indices</td></tr>
+<tr><td>Backends and file pipelines</td><td>cross-backend/format fixtures</td><td>dense/sparse solves, parsing, deterministic parallel output</td></tr>
+</tbody></table></div>
+
+<h2 id="results">Real measured results</h2>
+<p>These are medians from the linked v0.2.0 workload reports on the Windows 11 Intel Core i9-9900K development host. JLinAlg uses the fastest documented production configuration for each row, commonly eight outer workers. Preparation exclusions and native-thread settings differ by workload and are documented in source.</p>
+<div class="result-table"><table><thead><tr><th>Workload</th><th>Reference</th><th class="number">Reference</th><th class="number">JLinAlg</th><th class="number">Speedup</th></tr></thead><tbody>
+<tr><td>20-gene OLS</td><td>R lm</td><td class="number">0.040 s</td><td class="number">0.006290 s</td><td class="number">6.36x</td></tr>
+<tr><td>20-gene batch REML</td><td>R lmer</td><td class="number">0.860 s</td><td class="number">0.211906 s</td><td class="number">4.06x</td></tr>
+<tr><td>20-gene pedigree REML</td><td>R pedigreemm</td><td class="number">17.620 s</td><td class="number">6.230680 s</td><td class="number">2.83x</td></tr>
+<tr><td>20-gene grouped GLMM</td><td>R glmer</td><td class="number">18.160 s</td><td class="number">0.556 s</td><td class="number">32.69x</td></tr>
+<tr><td>Three penalized paths</td><td>R glmnet</td><td class="number">0.086000 s</td><td class="number">0.020893 s</td><td class="number">4.12x</td></tr>
+<tr><td>100-gene GAM</td><td>R mgcv</td><td class="number">16.620 s</td><td class="number">0.337 s</td><td class="number">49.38x</td></tr>
+<tr><td>100-gene batch GAMM</td><td>R mgcv</td><td class="number">21.940 s</td><td class="number">0.559 s</td><td class="number">39.24x</td></tr>
+<tr><td>20-gene exchangeable GEE</td><td>R geer</td><td class="number">562.530 s</td><td class="number">0.169 s</td><td class="number">3332.2x</td></tr>
+<tr><td>20-gene fixed Cox</td><td>R coxph</td><td class="number">0.450 s</td><td class="number">0.052 s</td><td class="number">8.67x</td></tr>
+<tr><td>223,963 random meta-analyses</td><td>vectorized R</td><td class="number">8.470 s</td><td class="number">0.159 s</td><td class="number">53.2x</td></tr>
+<tr><td>45,000-pair xWAS MR</td><td>base-R loop</td><td class="number">0.310000 s</td><td class="number">0.052365 s</td><td class="number">5.92x</td></tr>
+<tr><td>Ten-window BMI set suite</td><td>R GMMAT</td><td class="number">42.220 s</td><td class="number">7.899 s</td><td class="number">5.35x</td></tr>
+<tr><td>SuSiE 574 × 1,001</td><td>susieR</td><td class="number">0.340 s</td><td class="number">0.0704391 s</td><td class="number">4.83x</td></tr>
+<tr><td>SEM, 4,680 rows</td><td>lavaan</td><td class="number">0.0700000 s</td><td class="number">0.0081623 s</td><td class="number">8.58x</td></tr>
+</tbody></table></div>
+
+<div class="note warning"><strong>Read ratios with their contracts</strong>The 3332.2x GEE result is a large-cluster structured-solve workload, not a universal GEE claim. Some rows time a complete scan and others one fit. File loading, preparation, and output are excluded only where the corresponding R path excludes them.</div>
+
+<h2 id="sem">SEM numerical result</h2>
+<p>On 4,680 complete TOPMed rows and a 36-parameter observed-variable model, JLinAlg and lavaan printed the same log likelihood (-70763.3172885), chi-square (4497.68284338), CFI (0.799908468824), TLI (0.685570451009), and RMSEA (0.150559985169). Maximum absolute parameter and SE differences were below 1e-8 and 5e-10. SRMR was 0.0855176490074 versus 0.0855176482142.</p>
+<p>The model's CFI/RMSEA indicate poor substantive fit; equality between engines establishes numerical parity, not biological validity. <a href="vignettes/sem.html">Read the SEM vignette and full path specification →</a></p>
+
+<h2 id="sources">Sources and reproduction</h2>
+<p>The complete matrix, links to every workload report, package versions, numerical tolerances, and commands are in <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/verification-and-performance.md">verification-and-performance.md</a>. Run the release gate with <code>.gradlew.bat clean check executableJar</code>.</p>
+</article><aside class="toc"><strong>On this page</strong><a href="#accuracy">Accuracy matrix</a><a href="#results">Measured results</a><a href="#sem">SEM result</a><a href="#sources">Sources</a></aside></div></main><site-footer root="./"></site-footer></body></html>

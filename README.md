@@ -5,17 +5,16 @@ complete feature map and browser-friendly worked vignettes.
 
 JLinAlg implements Java linear and mixed-model algorithms on top of
 [JDistlib 0.10.1](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.1).
-Version 0.1.0 provides ordinary least squares (OLS), generalized
+Version 0.2.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, and penalized-quasi-likelihood generalized linear
 mixed models (GLMM PQL). Gaussian ridge, LASSO, and elastic-net regression and
 a first summary-statistics Mendelian-randomization (MR) layer are also included.
 
-> **v0.1.0 performance status:** MR and SEM are implemented and tested, but have
-> not yet received the large-workload optimization and benchmarking
-> applied to JLinAlg's performance-tuned model and association paths. Treat
-> their APIs as initial and profile them on representative data before
-> high-throughput use.
+> **v0.2.0 verification status:** Every shipped component family has automated
+> correctness coverage and an executable performance check. Independent
+> Java/R comparisons and real measured results are published with their model
+> and workload limitations. Profile representative data before production use.
 
 ## Requirements and build
 
@@ -49,7 +48,7 @@ The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
 runtime dependencies. A fixed-effect omics scan can then be run as:
 
 ```powershell
-java -jar build/cli/jlinalg-0.1.0.jar \`
+java -jar build/cli/jlinalg-0.2.0.jar \`
   --omics methylation.tsv \`
   --pheno phenotype.tsv \`
   --id IID \`
@@ -73,7 +72,7 @@ repeated observations, `--individual-id COLUMN` names the phenotype column
 that maps rows to GRM individuals. It defaults to the `--id` column.
 
 ```powershell
-java -jar build/cli/jlinalg-0.1.0.jar `
+java -jar build/cli/jlinalg-0.2.0.jar `
   --pheno phenotype.tsv --id observation_id --individual-id IID `
   --formula "trait ~ age + sex" --grm cohort `
   --out trait-grm.tsv
@@ -667,7 +666,7 @@ explicit current boundaries.
 
 ## Mendelian randomization
 
-The v0.1.0 MR implementation is tested for numerical behavior but is not yet
+The v0.2.0 MR implementation is tested for numerical behavior but is not yet
 optimized or benchmarked as a high-throughput pipeline.
 The [end-to-end MR vignette](docs/vignettes/mr-end-to-end.md) connects public
 or custom instrument preparation, LD clumping, harmonization, estimation,
@@ -848,8 +847,12 @@ the O(signals1 * signals2 * variants) hot path.
 
 ## Structural equation models
 
-The v0.1.0 SEM implementation is tested but is not yet optimized or benchmarked
-for large models or repeated fits.
+The SEM implementation uses an analytic likelihood gradient and expected
+Fisher information. It is independently validated and benchmarked against
+`lavaan`; see [TOPMed SEM validation and performance](docs/topmed-sem-performance.md).
+The [standalone SEM vignette](docs/vignettes/sem.md) covers model
+construction, row and covariance inputs, inference, equality constraints,
+interpretation, and current limitations.
 
 `SemModel` specifies observed-variable directed paths, variances, covariances,
 fixed values, and equality constraints through shared labels. `Sem` fits the
@@ -870,6 +873,8 @@ Cross-language regression fixtures compare JLinAlg against base R, `nlme`,
 meta-analysis calculations. See
 [docs/r-reference-validation.md](docs/r-reference-validation.md) for exact
 versions, cases, tolerances, and the reproducible R generator.
+The [accuracy and performance matrix](docs/verification-and-performance.md)
+collects all component families and real benchmark results in one place.
 
 ## License
 

@@ -23,12 +23,15 @@ measurement.
 .\gradlew.bat benchmarkTopmedPenalized
 .\gradlew.bat benchmarkColocSusie
 .\gradlew.bat benchmarkSusie
+.\gradlew.bat benchmarkTopmedSem
 ```
 
 The real-data ridge/LASSO/elastic-net comparison with R `glmnet` is documented
 in [TOPMed penalized-regression performance](topmed-penalized-performance.md).
 The bounded parallel MR screen and its independent R numerical reference are
 documented in [xWAS MR CLI and performance](xwas-mr-cli-performance.md).
+The observed-variable path-model comparison with R `lavaan` is documented in
+[TOPMed SEM validation and performance](topmed-sem-performance.md).
 
 ## Time-series benchmarks
 

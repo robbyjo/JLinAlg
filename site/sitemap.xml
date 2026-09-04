@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://robbyjo.github.io/JLinAlg/</loc></url>
+  <url><loc>https://robbyjo.github.io/JLinAlg/verification.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/linear-models.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/penalized-regression.html</loc></url>

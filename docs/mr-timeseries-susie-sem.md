@@ -1,8 +1,9 @@
 # MR, time-series, SuSiE, and SEM scope
 
-> **v0.1.0 performance status:** MR and SEM remain initial performance paths.
-> SuSiE is directly validated against susieR and benchmarked on the package's
-> official `N3finemapping` vignette data.
+> **Performance status:** SEM is directly validated against `lavaan` and
+> benchmarked on a TOPMed cardiometabolic path model. MR remains an initial
+> performance path. SuSiE is directly validated against susieR and benchmarked
+> on the package's official `N3finemapping` vignette data.
 
 ## Mendelian randomization
 
@@ -49,3 +50,5 @@ the log scale. Shared labels impose equality constraints. Current estimation
 uses complete-case covariance ML; latent measurement variables, mean
 structures, ordinal likelihoods, robust corrections, modification indices,
 and FIML missingness are outside this first engine.
+Optimization uses an analytic RAM likelihood gradient and expected Fisher
+information. See [TOPMed SEM validation and performance](topmed-sem-performance.md).
