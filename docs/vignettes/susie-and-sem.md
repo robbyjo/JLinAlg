@@ -58,6 +58,34 @@ Use `fitSufficientStatistics` when `X'X`, `X'y`, and `y'y` are available on a
 different scale. Credible-set purity is the minimum absolute within-set LD;
 always inspect it alongside coverage and PIP.
 
+## Colocalize SuSiE signals
+
+Two JLinAlg fits can be colocalized directly:
+
+```java
+ColocSusieResult coloc = ColocSusie.analyze(exposureFineMap, outcomeFineMap);
+
+for (ColocSignalPair pair : coloc.signalPairs()) {
+    System.out.printf("effects %d/%d: H4=%.4f%n",
+        pair.trait1EffectIndex(), pair.trait2EffectIndex(),
+        pair.posteriorH4());
+}
+double[] sharedVariantPosterior = coloc.sharedVariantPosterior(0);
+```
+
+`ColocSusieInput` also accepts an L-by-P matrix of log Bayes factors, which is
+the direct equivalent of selected rows from `susieR`'s `lbf_variable` output.
+Variant IDs are intersected in the first input's order. Defaults match
+`coloc.susie`: p1 and p2 are 1e-4, p12 is 5e-6, and signal pairs with less
+than 0.5 posterior overlap are omitted. `ColocOptions` can disable trimming,
+change these priors, or provide positive per-variant prior weights.
+
+The regression fixture is generated from coloc 5.2.3's bundled
+`coloc_test_data` with susieR 0.14.2. Both the single-signal D1/D2 example and
+the multi-signal D3/D4 example match R's H0-H4 and conditional-H4 variant
+posteriors to numerical precision. Regenerate it with
+`src/test/resources/r-reference/generate-coloc-susie-reference.R`.
+
 ## Observed-variable SEM from covariance
 
 This path model estimates `x -> m -> y` and free residual variances:

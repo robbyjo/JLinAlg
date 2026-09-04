@@ -1,5 +1,15 @@
 # JLinAlg 0.1.0
 
+## Unreleased
+
+- Added `ColocSusie` multi-signal colocalization compatible with R coloc,
+  including ID alignment, posterior-overlap trimming, scalar and weighted
+  priors, H0-H4 summaries, and per-variant H4 posteriors.
+- Added coloc 5.2.3/susieR 0.14.2 example-data regression fixtures and a
+  deterministic combination benchmark.
+- Exposed per-effect log Bayes factors from `SusieResult` and removed repeated
+  hot-loop allocations from SuSiE IBSS updates.
+
 JLinAlg 0.1.0 is the first tagged release of the Java statistical modeling
 and statistical-genetics library.
 

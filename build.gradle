@@ -337,6 +337,18 @@ tasks.register('benchmarkTimeSeries', JavaExec) {
     }
 }
 
+tasks.register('benchmarkColocSusie', JavaExec) {
+    group = 'verification'
+    description = 'Runs the deterministic coloc.susie combination benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.ColocSusieBenchmark'
+    jvmArgs '-Xms256m', '-Xmx2g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.coloc.')
+    }
+}
+
 tasks.register('benchmarkMixedModels', JavaExec) {
     group = 'verification'
     description = 'Runs deterministic dense/sparse mixed-model macrobenchmarks.'

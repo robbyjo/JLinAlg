@@ -25,6 +25,7 @@ class SusieTest {
         assertTrue(result.pip()[0] > 0.99);
         assertTrue(result.pip()[3] > 0.99);
         assertEquals(2, result.credibleSets().size());
+        assertEquals(10, result.logBayesFactors().length);
     }
 
     @Test

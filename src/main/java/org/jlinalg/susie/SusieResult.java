@@ -12,6 +12,7 @@ public final class SusieResult {
     private final double[] posteriorMean;
     private final double[] alpha;
     private final double[] effectPosteriorMean;
+    private final double[] logBayesFactors;
     private final List<CredibleSet> credibleSets;
     private final double intercept;
     private final double residualVariance;
@@ -23,6 +24,7 @@ public final class SusieResult {
 
     SusieResult(List<String> variableNames, double[] pip, double[] posteriorMean,
             double[] alpha, double[] effectPosteriorMean,
+            double[] logBayesFactors,
             List<CredibleSet> credibleSets, double intercept,
             double residualVariance, int effects, int iterations,
             boolean converged, double objective, BackendProvenance backend) {
@@ -31,6 +33,7 @@ public final class SusieResult {
         this.posteriorMean = posteriorMean.clone();
         this.alpha = alpha.clone();
         this.effectPosteriorMean = effectPosteriorMean.clone();
+        this.logBayesFactors = logBayesFactors.clone();
         this.credibleSets = List.copyOf(credibleSets);
         this.intercept = intercept;
         this.residualVariance = residualVariance;
@@ -48,6 +51,8 @@ public final class SusieResult {
     public double[] alpha() { return alpha.clone(); }
     /** Row-major L-by-P unconditional single-effect means. */
     public double[] effectPosteriorMean() { return effectPosteriorMean.clone(); }
+    /** Row-major L-by-P single-effect log Bayes factors. */
+    public double[] logBayesFactors() { return logBayesFactors.clone(); }
     public List<CredibleSet> credibleSets() { return credibleSets; }
     public double intercept() { return intercept; }
     public double residualVariance() { return residualVariance; }

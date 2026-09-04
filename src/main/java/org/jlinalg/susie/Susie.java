@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import jdistlib.accelerator.ComputeBackend;
+import jdistlib.accelerator.MatrixTranspose;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.internal.MatrixOps;
@@ -135,24 +136,28 @@ public final class Susie {
         double[] alpha = new double[effects * variables];
         double[] mu = new double[effects * variables];
         double[] second = new double[effects * variables];
+        double[] logBayesFactors = new double[effects * variables];
         double[] total = new double[variables];
+        double[] previous = new double[variables];
+        double[] fittedCross = new double[variables];
+        double[] logBf = new double[variables];
+        double[] conditionalMean = new double[variables];
+        double[] conditionalVariance = new double[variables];
+        double[] product = new double[variables];
         double residualVariance = Math.max(1e-8, yty / observations);
         boolean converged = false;
         int iterations = 0;
         double objective = Double.NEGATIVE_INFINITY;
         for (int iteration = 1; iteration <= options.maximumIterations(); iteration++) {
             iterations = iteration;
-            double[] previous = total.clone();
+            System.arraycopy(total, 0, previous, 0, variables);
             objective = 0.0;
             for (int effect = 0; effect < effects; effect++) {
                 int offset = effect * variables;
                 for (int variable = 0; variable < variables; variable++) total[variable] -= mu[offset + variable];
-                double[] fittedCross = MatrixOps.multiply(
-                    backend, xtx, variables, variables, total);
+                backend.dgemv(MatrixTranspose.NONE, variables, variables,
+                    1.0, xtx, total, 0.0, fittedCross);
                 double maximumLogBf = Double.NEGATIVE_INFINITY;
-                double[] logBf = new double[variables];
-                double[] conditionalMean = new double[variables];
-                double[] conditionalVariance = new double[variables];
                 for (int variable = 0; variable < variables; variable++) {
                     double diagonal = xtx[variable * variables + variable];
                     if (!(diagonal > 0.0)) throw new IllegalArgumentException("X'X has nonpositive diagonal");
@@ -175,6 +180,7 @@ public final class Susie {
                 for (int variable = 0; variable < variables; variable++) {
                     double probability = Math.exp(logBf[variable] - maximumLogBf) / sum;
                     alpha[offset + variable] = probability;
+                    logBayesFactors[offset + variable] = logBf[variable];
                     mu[offset + variable] = probability * conditionalMean[variable];
                     second[offset + variable] = probability
                         * (conditionalVariance[variable]
@@ -183,22 +189,22 @@ public final class Susie {
                 }
             }
             if (options.estimateResidualVariance()) {
-                double[] xtxTotal = MatrixOps.multiply(
-                    backend, xtx, variables, variables, total);
+                backend.dgemv(MatrixTranspose.NONE, variables, variables,
+                    1.0, xtx, total, 0.0, fittedCross);
                 double rss = yty;
                 for (int variable = 0; variable < variables; variable++) {
-                    rss += total[variable] * xtxTotal[variable]
+                    rss += total[variable] * fittedCross[variable]
                         - 2.0 * total[variable] * xty[variable];
                 }
                 for (int effect = 0; effect < effects; effect++) {
                     int offset = effect * variables;
-                    double[] effectMean = Arrays.copyOfRange(mu, offset, offset + variables);
-                    double[] product = MatrixOps.multiply(
-                        backend, xtx, variables, variables, effectMean);
+                    backend.dgemv(MatrixTranspose.NONE, variables, variables,
+                        1.0, xtx, 0, variables, mu, offset, 1,
+                        0.0, product, 0, 1);
                     double meanQuadratic = 0.0;
                     double diagonalSecond = 0.0;
                     for (int variable = 0; variable < variables; variable++) {
-                        meanQuadratic += effectMean[variable] * product[variable];
+                        meanQuadratic += mu[offset + variable] * product[variable];
                         diagonalSecond += xtx[variable * variables + variable]
                             * second[offset + variable];
                     }
@@ -214,7 +220,7 @@ public final class Susie {
                 break;
             }
         }
-        return new Core(alpha, mu, total, residualVariance,
+        return new Core(alpha, mu, logBayesFactors, total, residualVariance,
             effects, iterations, converged, objective);
     }
 
@@ -232,7 +238,8 @@ public final class Susie {
         }
         List<CredibleSet> sets = credibleSets(
             core.alpha(), core.effects(), names, xtx, options);
-        return new SusieResult(names, pip, beta, core.alpha(), effectMean, sets,
+        return new SusieResult(names, pip, beta, core.alpha(), effectMean,
+            core.logBayesFactors(), sets,
             intercept, core.residualVariance(), core.effects(), core.iterations(),
             core.converged(), core.objective(), context.provenance());
     }
@@ -312,7 +319,8 @@ public final class Susie {
         return List.copyOf(names);
     }
 
-    private record Core(double[] alpha, double[] mu, double[] posteriorMean,
+    private record Core(double[] alpha, double[] mu, double[] logBayesFactors,
+                        double[] posteriorMean,
                         double residualVariance, int effects, int iterations,
                         boolean converged, double objective) { }
 }

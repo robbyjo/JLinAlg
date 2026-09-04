@@ -826,6 +826,22 @@ sets with LD purity. Individual inputs are centered/scaled once and returned
 on their original coefficient scale. Summary LD is checked for correlation
 structure and positive semidefiniteness before iteration.
 
+## SuSiE colocalization
+
+`ColocSusie` implements the multi-signal method exposed by R
+`coloc::coloc.susie`. It compares every retained pair of credible signals and
+returns posterior probabilities for H0 through H4 together with the
+variant-level posterior conditional on a shared causal variant. Inputs are
+aligned by variant identifier, and low-posterior-overlap signal pairs are
+trimmed with the same defaults as coloc.
+
+Use `ColocSusie.analyze(firstFit, secondFit)` with JLinAlg `SusieResult`
+objects. For fits produced by `susieR`, pass the selected `lbf_variable` rows
+through `ColocSusieInput`; this avoids refitting and gives direct numerical
+interoperability. The combination loop precomputes variant alignment and
+per-signal reductions, and performs no maps or temporary allocations inside
+the O(signals1 * signals2 * variants) hot path.
+
 ## Structural equation models
 
 The v0.1.0 SEM implementation is tested but is not yet optimized or benchmarked

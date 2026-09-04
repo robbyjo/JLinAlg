@@ -21,6 +21,7 @@ measurement.
 .\gradlew.bat benchmarkTimeSeries
 .\gradlew.bat benchmarkXwasMr
 .\gradlew.bat benchmarkTopmedPenalized
+.\gradlew.bat benchmarkColocSusie
 ```
 
 The real-data ridge/LASSO/elastic-net comparison with R `glmnet` is documented
@@ -94,6 +95,21 @@ Output is CSV with median wall time and variables per second. Record the Java
 version, CPU/GPU model, backend, thread environment, heap settings, and power
 mode alongside published results. Run on an otherwise idle machine and compare
 multiple repetitions before changing routing thresholds.
+
+## SuSiE colocalization benchmark
+
+`benchmarkColocSusie` measures the Bayes-factor combination step after SuSiE
+fine mapping. Its default workload uses 10,000 variants and 10 signals per
+trait (100 signal pairs), with deterministic inputs, three warmups, and the
+median of seven measured runs. Override dimensions with
+`jlinalg.benchmark.coloc.variants` and `jlinalg.benchmark.coloc.signals`.
+
+On an Intel Core i9-9900K with Java 25, two verification runs completed in
+median times of 0.0236 and 0.0279 seconds, or 35.9-42.3 million
+signal-pair/variant updates per second.
+The implementation performs variant matching and per-signal log-sums once,
+then uses contiguous primitive arrays in the pairwise hot loop. The returned
+100-by-10,000 conditional-H4 posterior matrix is included in the timing.
 
 The default workload deliberately fits only 100 exact OLS models because that
 path is a correctness/per-fit baseline; the fast paths scan the full requested
