@@ -1,3 +1,10 @@
+# Unreleased
+
+- Added deterministic all-screened-pairs xWAS MR output with disk-backed
+  Benjamini-Hochberg adjustment through `mr-xwas --fdr-output`.
+- Corrected MR and SuSiE documentation to reflect the implemented
+  `ColocSusie` workflow.
+
 # JLinAlg 0.2.0
 
 JLinAlg 0.2.0 adds independently validated, performance-tuned structural

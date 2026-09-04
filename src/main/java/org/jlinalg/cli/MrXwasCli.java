@@ -13,6 +13,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PushbackInputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -43,10 +44,18 @@ import org.jlinalg.mr.XwasMrOptions;
 import org.jlinalg.mr.XwasMrOutcome;
 import org.jlinalg.mr.XwasMrPipeline;
 import org.jlinalg.mr.XwasMrScreeningMethod;
+import org.jlinalg.mr.XwasMrScreeningResult;
 import org.jlinalg.mr.XwasMrSignificanceFilter;
 
 /** File-to-file parallel xWAS Mendelian-randomization command. */
 final class MrXwasCli {
+    private static final List<String> FDR_HEADER = List.of(
+        "exposure_id", "exposure_label", "outcome_category", "outcome_id",
+        "outcome_label", "screen_method", "nsnp", "beta", "se", "statistic",
+        "p_value", "log10_p_value", "negative_log10_p_value", "ci_lower",
+        "ci_upper", "cochran_q", "heterogeneity_df",
+        "heterogeneity_p_value", "i_squared", "threshold_passed");
+
     private MrXwasCli() { }
 
     static int run(String[] arguments, PrintStream output,
@@ -77,15 +86,35 @@ final class MrXwasCli {
         List<XwasMrExposure> exposures = exposures(exposureTable, options);
         List<XwasMrOutcome> outcomes = outcomes(outcomeTable, options);
         XwasMrPipeline pipeline = XwasMrPipeline.prepare(exposures, outcomes);
-        XwasMrBatchResult result = pipeline.scan(new XwasMrOptions(
+        XwasMrOptions scanOptions = new XwasMrOptions(
             options.threads, options.pairBlockSize, options.screeningMethod,
             options.filter, new MrOptions(options.confidenceLevel,
-                options.bootstrapReplicates, options.seed)));
+                options.bootstrapReplicates, options.seed));
+        Path failures = options.failures == null
+            ? failurePath(options.output) : options.failures;
+        validateOutputs(options, failures);
+
+        XwasMrBatchResult result;
+        long adjustedTests = 0L;
+        if (options.fdrOutput == null) {
+            result = pipeline.scan(scanOptions);
+        } else {
+            try (ExternalBh fdr = new ExternalBh(options.fdrOutput,
+                    options.overwrite)) {
+                fdr.writeHeader(FDR_HEADER);
+                try {
+                    result = pipeline.scan(scanOptions,
+                        screened -> writeFdr(fdr, screened));
+                } catch (UncheckedIOException exception) {
+                    throw exception.getCause();
+                }
+                fdr.finish();
+                adjustedTests = fdr.tests();
+            }
+        }
 
         writeAtomic(options.output, options.overwrite,
             writer -> writeHits(writer, delimiter(options.output), result));
-        Path failures = options.failures == null
-            ? failurePath(options.output) : options.failures;
         writeAtomic(failures, options.overwrite,
             writer -> writeFailures(writer, delimiter(failures), result));
 
@@ -100,6 +129,56 @@ final class MrXwasCli {
             result.elapsedNanoseconds() / 1e9);
         output.println("Wrote " + options.output);
         output.println("Wrote " + failures);
+        if (options.fdrOutput != null) {
+            output.println("BH-adjusted " + adjustedTests
+                + " successfully screened pairs");
+            output.println("Wrote " + options.fdrOutput);
+        }
+    }
+
+    private static void validateOutputs(Options options, Path failures)
+            throws IOException {
+        if (options.output.equals(failures))
+            throw new IllegalArgumentException(
+                "--output and --failures must be different files");
+        if (options.fdrOutput != null) {
+            if (options.fdrOutput.equals(options.output)
+                    || options.fdrOutput.equals(failures))
+                throw new IllegalArgumentException(
+                    "--fdr-output must differ from result and failure files");
+            if (gzip(options.fdrOutput)
+                    || delimiter(options.fdrOutput) != '\t')
+                throw new IllegalArgumentException(
+                    "--fdr-output must be an uncompressed TSV file");
+        }
+        if (!options.overwrite) {
+            for (Path path : List.of(options.output, failures))
+                if (Files.exists(path)) throw new IOException(
+                    "output exists; use --overwrite: " + path);
+        }
+    }
+
+    private static void writeFdr(ExternalBh output,
+            XwasMrScreeningResult result) {
+        MrEstimate estimate = result.estimate();
+        try {
+            output.write(List.of(result.exposureId(), result.exposureLabel(),
+                result.outcomeCategory(), result.outcomeId(),
+                result.outcomeLabel(), estimate.method().name(),
+                integer(estimate.instrumentCount()), number(estimate.estimate()),
+                number(estimate.standardError()), number(estimate.statistic()),
+                number(estimate.pValue()), number(log10(estimate.pValue())),
+                number(result.negativeLog10PValue()),
+                number(estimate.confidenceLower()),
+                number(estimate.confidenceUpper()), number(estimate.cochranQ()),
+                integer(estimate.heterogeneityDegreesOfFreedom()),
+                number(estimate.heterogeneityPValue()),
+                number(estimate.iSquared()),
+                Boolean.toString(result.thresholdPassed())),
+                estimate.pValue());
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
     }
 
     private static List<XwasMrExposure> exposures(Table table,
@@ -357,10 +436,13 @@ final class MrXwasCli {
               --outcome-id-column NAME
               --category-column NAME
               --failures FILE             Default: RESULTS.failures.ext
+              --fdr-output FILE            All screened pairs plus BH q-values;
+                                           uncompressed TSV
               --overwrite
 
             Threshold directions are inclusive: p <= X, log10(p) <= X,
             and -log10(p) >= X. Full diagnostics run only for retained pairs.
+            BH uses every successfully screened pair, without prefiltering.
             """;
     }
 
@@ -540,6 +622,7 @@ final class MrXwasCli {
         Path outcome;
         Path output;
         Path failures;
+        Path fdrOutput;
         String exposureIdColumn;
         String outcomeIdColumn;
         String categoryColumn;
@@ -567,6 +650,8 @@ final class MrXwasCli {
                         currentDirectory, value(arguments, ++index, option));
                     case "--failures" -> result.failures = path(currentDirectory,
                         value(arguments, ++index, option));
+                    case "--fdr-output" -> result.fdrOutput = path(
+                        currentDirectory, value(arguments, ++index, option));
                     case "--threads" -> result.threads = positiveInteger(
                         value(arguments, ++index, option), option);
                     case "--pair-block-size" -> result.pairBlockSize =

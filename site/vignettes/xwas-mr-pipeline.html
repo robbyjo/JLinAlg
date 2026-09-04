@@ -20,6 +20,7 @@
   --exposure molecular-traits.clumped.tsv &#92;
   --outcome phenotypes.tsv.gz &#92;
   --output xwas-mr-results.tsv &#92;
+  --fdr-output xwas-mr-all-pairs.tsv &#92;
   --p-threshold 5e-8 &#92;
   --threads 8 &#92;
   --pair-block-size 256</code></pre></div>
@@ -37,7 +38,7 @@ other_allele.outcome  eaf.outcome  id.outcome  category</code></pre></div>
 
 <h2 id="thresholds">Choose one threshold scale</h2>
 <ul><li><code>--p-threshold 5e-8</code> retains p ≤ 5×10<sup>−8</sup>.</li><li><code>--log10-p-threshold -7.30103</code> retains log<sub>10</sub>(p) ≤ −7.30103.</li><li><code>--negative-log10-p-threshold 7.30103</code> retains −log<sub>10</sub>(p) ≥ 7.30103.</li></ul>
-<p>Exactly one representation is required. Multiplicative-random IVW is the default screen; use <code>--screen-method fixed</code> for fixed-effect IVW. Correct across the complete prespecified exposure-by-outcome family. Applying BH only after discarding nominally nonsignificant rows is not valid FDR control.</p>
+<p>Exactly one representation is required. Multiplicative-random IVW is the default screen; use <code>--screen-method fixed</code> for fixed-effect IVW. Correct across the complete prespecified exposure-by-outcome family. <code>--fdr-output</code> writes every successfully screened pair to an uncompressed TSV and appends <code>fdr_bh</code> using the complete analyzable family, including pairs below the diagnostic threshold.</p>
 
 <h2 id="execution">Understand the fast path</h2>
 <p>The pipeline indexes outcomes by SNP, looks up only each exposure's clumped variants, harmonizes alleles, and runs the selected IVW screen. It processes bounded blocks in parallel and merges results in exposure-major, outcome-major order, so output remains deterministic for fixed inputs, options, and seed.</p>
@@ -45,6 +46,7 @@ other_allele.outcome  eaf.outcome  id.outcome  category</code></pre></div>
 
 <h2 id="results">Read results and diagnostics</h2>
 <p>The primary table reports screening beta, SE, statistic, p on three scales, confidence limits, Cochran Q, heterogeneity p-value, I², mean F, MR-Egger slope and intercept, I²GX, weighted-median estimates, harmonization exclusions, and warnings. A sibling failures table is always produced; choose its location with <code>--failures FILE</code>.</p>
+<p>The optional all-pairs FDR table reports the primary IVW fields, <code>threshold_passed</code>, and <code>fdr_bh</code> in deterministic grid order. Pairs with fewer than three harmonized instruments have no screening p-value and are not counted as BH tests; the command reports the exact adjusted count.</p>
 <p>For retained hits, interpret heterogeneity, Egger intercept, instrument strength, and leave-one-out behavior together. Run Steiger directionality and additional robust tests as follow-up analyses; the batch table does not compute them automatically. Use the exported estimates with R, Python, or another plotting tool for forest, funnel, scatter, and leave-one-out figures. Two-way MR is two prespecified runs with exposure and outcome roles reversed, independently selected instruments, and direction-specific harmonization.</p>
 
 <h2 id="benchmark">Reproduce the benchmark</h2>

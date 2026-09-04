@@ -6,11 +6,12 @@ clumping, harmonization, estimation, diagnostics, plotting, bidirectional MR,
 and molecular-trait studies.
 
 > **Current interface boundary:** `ld-db`, `mr-instruments`, and `clump` are
-> executable CLI commands. MR estimation is currently a Java API; there is no
-> `mr analyze` file-to-file command yet. JLinAlg also exposes plot-ready result
-> objects but does not currently render plots. The plotting section below gives
-> an explicit export schema and R examples so these boundaries are reproducible
-> rather than hidden.
+> executable CLI commands. Single-analysis MR estimation is currently a Java
+> API; the file-to-file `mr-xwas` command provides bounded high-throughput
+> screening, hit-only diagnostics, and optional all-pairs BH/FDR output. JLinAlg
+> exposes plot-ready result objects but does not currently render plots. The
+> plotting section below gives an explicit export schema and R examples so
+> these boundaries are reproducible rather than hidden.
 
 ## Workflow at a glance
 
@@ -368,7 +369,9 @@ Recommended design points for high-throughput molecular MR:
   procedure; do not reinterpret nominal MR p-values as study-wide evidence.
 - For cis molecular MR, investigate colocalization or fine-mapping. LD clumping
   alone does not establish that the molecular trait and outcome share a causal
-  variant. JLinAlg does not currently implement a colocalization model.
+  variant. JLinAlg's `ColocSusie` implements multi-signal colocalization for
+  aligned SuSiE fits; see the
+  [colocalization example](susie-and-sem.md#colocalize-susie-signals).
 - Consider correlated cis-MR rather than discarding all but one signal when a
   scientifically justified allele-aligned LD matrix is available.
 - Record sample overlap, winner's-curse risk, weak instruments, and tissue

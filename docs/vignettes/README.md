@@ -23,12 +23,12 @@ Run the complete verification suite before adapting an example:
 | [Formulas and compute backends](formulas-and-backends.md) | model tables, contrasts, offsets, mixed formulas, nested/correlated terms, GPU/oneMKL/OpenBLAS policy |
 | [Association, GWAS, and omics QTL](association-gwas-twas.md) | CSV/TSV/VCF/BCF/BGEN, cohort QC, cryptic-relatedness GRMs, fast OLS/GLM, P3D/EMMAX, omics transforms, Burden/SKAT/SKAT-O |
 | [End-to-end Mendelian randomization](mr-end-to-end.md) | database installation, public/custom instruments, LD clumping, analysis, diagnostics, plotting exports, bidirectional and molecular MR |
-| [Parallel xWAS MR](xwas-mr-pipeline.md) | reusable clumped instruments, phenotype families, bounded parallel exposure-outcome scans, scale-safe thresholds and two-stage diagnostics |
+| [Parallel xWAS MR](xwas-mr-pipeline.md) | reusable clumped instruments, phenotype families, bounded parallel exposure-outcome scans, all-pairs BH/FDR, scale-safe thresholds, and two-stage diagnostics |
 | [xWAS MR CLI and benchmark](../xwas-mr-cli-performance.md) | long-format CLI, output schema, reproducible R validation, timing protocol and measured speedup |
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
 | [Meta-analysis](meta-analysis.md) | fixed/random pooling, heterogeneity estimators, Knapp-Hartung, prediction intervals, meta-regression |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
-| [SuSiE and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, and a compact SEM introduction |
+| [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
 | [Structural equation modeling](sem.md) | observed-variable RAM paths, covariance/row fitting, inference, lavaan validation, benchmark, and limitations |
 
 ## Common result pattern

@@ -41,6 +41,10 @@ class XwasMrPipelineTest {
         XwasMrBatchResult parallel = pipeline.scan(new XwasMrOptions(4, 3,
             XwasMrScreeningMethod.IVW_MULTIPLICATIVE_RANDOM, filter,
             diagnostics));
+        List<XwasMrScreeningResult> screened = new ArrayList<>();
+        XwasMrBatchResult streamed = pipeline.scan(new XwasMrOptions(4, 3,
+            XwasMrScreeningMethod.IVW_MULTIPLICATIVE_RANDOM, filter,
+            diagnostics), screened::add);
 
         assertEquals(6, serial.totalPairs());
         assertEquals(4, serial.analyzablePairs());
@@ -52,6 +56,20 @@ class XwasMrPipelineTest {
         assertEquals(List.of("cardiovascular", "kidney"), serial.hits().stream()
             .map(XwasMrHit::outcomeCategory).toList());
         assertEquals(serial.hits(), parallel.hits());
+        assertEquals(serial.hits(), streamed.hits());
+        assertEquals(serial.failures(), streamed.failures());
+        assertEquals(serial.totalPairs(), streamed.totalPairs());
+        assertEquals(serial.analyzablePairs(), streamed.analyzablePairs());
+        assertEquals(serial.belowThresholdPairs(),
+            streamed.belowThresholdPairs());
+        assertEquals(serial.insufficientInstrumentPairs(),
+            streamed.insufficientInstrumentPairs());
+        assertEquals(List.of("GENE1->CAD", "GENE1->CKD", "PROT1->CAD",
+            "PROT1->CKD"), screened.stream()
+                .map(value -> value.exposureId() + "->" + value.outcomeId())
+                .toList());
+        assertEquals(List.of(true, false, false, true), screened.stream()
+            .map(XwasMrScreeningResult::thresholdPassed).toList());
         assertEquals(3, expression.clumpedInstruments().size());
         assertEquals(3, protein.clumpedInstruments().size());
     }

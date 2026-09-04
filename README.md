@@ -128,6 +128,11 @@ vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
 contract.
 
+The [development inventory](TODO.md) collects explicit future-work statements
+from those vignettes, separates major and medium priorities from uncommitted
+scope candidates, and records a concrete completion condition for each active
+item.
+
 The same material is organized as a responsive, system-themed website under
 [`site/`](site/index.html). GitHub Pages deploys that directory after changes
 land on `main`; visitors can follow their operating-system theme or select an
@@ -666,14 +671,16 @@ explicit current boundaries.
 
 ## Mendelian randomization
 
-The v0.2.0 MR implementation is tested for numerical behavior but is not yet
-optimized or benchmarked as a high-throughput pipeline.
+The v0.2.0 MR implementation has independent numerical fixtures, and its
+bounded xWAS screening path has a reproducible Java/base-R benchmark.
 The [end-to-end MR vignette](docs/vignettes/mr-end-to-end.md) connects public
 or custom instrument preparation, LD clumping, harmonization, estimation,
 diagnostics, plotting exports, bidirectional MR, and molecular-trait designs.
 The [parallel xWAS MR vignette](docs/vignettes/xwas-mr-pipeline.md) adds a
 bounded two-stage exposure-by-phenotype scan that reuses clumped instruments
-and reserves full MR diagnostics for threshold-passing pairs.
+and reserves full MR diagnostics for threshold-passing pairs. The CLI can also
+stream all successfully screened pairs through disk-backed BH/FDR adjustment
+without retaining the complete grid in memory.
 The file-to-file CLI and reproducible Java/R results are documented in the
 [xWAS MR performance report](docs/xwas-mr-cli-performance.md).
 

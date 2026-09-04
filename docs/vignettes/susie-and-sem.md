@@ -1,8 +1,9 @@
-# SuSiE fine mapping and structural equation models
+# SuSiE fine mapping, colocalization, and structural equation models
 
-> **Performance status:** SuSiE is validated against susieR and benchmarked on
-> the official `N3finemapping` vignette data. SEM is validated against `lavaan`
-> and benchmarked on a TOPMed cardiometabolic path model.
+> **Performance status:** SuSiE and multi-signal colocalization are validated
+> against susieR and coloc. SuSiE is benchmarked on the official
+> `N3finemapping` vignette data, and SEM is validated against `lavaan` and
+> benchmarked on a TOPMed cardiometabolic path model.
 
 ## SuSiE with individual-level data
 

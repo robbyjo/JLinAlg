@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
@@ -76,8 +77,22 @@ public final class XwasMrPipeline {
      * {@link MendelianRandomization#analyze(List, MrOptions)} analysis.</p>
      */
     public XwasMrBatchResult scan(XwasMrOptions options) {
+        return scan(options, ignored -> { });
+    }
+
+    /**
+     * Screens the grid and streams every successful primary IVW result.
+     *
+     * <p>The sink is called serially in exposure-major, outcome-major order
+     * after each bounded parallel block. It therefore does not need to be
+     * thread safe. Pairs that cannot be screened are represented by the batch
+     * accounting and failure collections rather than sink calls.</p>
+     */
+    public XwasMrBatchResult scan(XwasMrOptions options,
+            XwasMrScreeningSink sink) {
         if (options == null)
             throw new IllegalArgumentException("xWAS MR options are required");
+        Objects.requireNonNull(sink, "sink");
         long totalPairs = Math.multiplyExact((long) exposures.size(),
             outcomes.size());
         int workers = (int) Math.min((long) options.parallelism(), totalPairs);
@@ -97,6 +112,8 @@ public final class XwasMrPipeline {
                 PairEvaluation[] block = new PairEvaluation[size];
                 evaluateBlock(pool, from, block, options);
                 for (PairEvaluation evaluation : block) {
+                    if (evaluation.screening() != null)
+                        sink.accept(evaluation.screening());
                     switch (evaluation.status()) {
                         case HIT -> {
                             analyzable++;
@@ -150,25 +167,42 @@ public final class XwasMrPipeline {
         if (harmonized.instruments().size()
                 < MINIMUM_DIAGNOSTIC_INSTRUMENTS)
             return PairEvaluation.insufficient();
+        MrEstimate screening;
         try {
-            MrEstimate screening = screen(harmonized.instruments(), options);
-            if (!options.significanceFilter().includes(screening.pValue()))
-                return PairEvaluation.below();
+            screening = screen(harmonized.instruments(), options);
+        } catch (RuntimeException exception) {
+            return PairEvaluation.failed(failure(exposureIndex, outcomeIndex,
+                exposure, outcome, exception), null);
+        }
+        boolean thresholdPassed = options.significanceFilter().includes(
+            screening.pValue());
+        double negativeLog10 = screening.pValue() == 0.0
+            ? Double.POSITIVE_INFINITY : -Math.log10(screening.pValue());
+        XwasMrScreeningResult screened = new XwasMrScreeningResult(
+            exposureIndex, outcomeIndex, exposure.id(), exposure.label(),
+            outcome.id(), outcome.label(), outcome.category(), screening,
+            negativeLog10, thresholdPassed);
+        if (!thresholdPassed) return PairEvaluation.below(screened);
+        try {
             MrAnalysisResult analysis = MendelianRandomization.analyze(
                 harmonized.instruments(), options.diagnosticOptions());
-            double negativeLog10 = screening.pValue() == 0.0
-                ? Double.POSITIVE_INFINITY : -Math.log10(screening.pValue());
             return PairEvaluation.hit(new XwasMrHit(exposureIndex,
                 outcomeIndex, exposure.id(), exposure.label(), outcome.id(),
                 outcome.label(), outcome.category(), screening,
-                negativeLog10, analysis, harmonized.exclusions()));
+                negativeLog10, analysis, harmonized.exclusions()), screened);
         } catch (RuntimeException exception) {
-            String message = exception.getMessage() == null
-                ? "" : exception.getMessage();
-            return PairEvaluation.failed(new XwasMrFailure(exposureIndex,
-                outcomeIndex, exposure.id(), outcome.id(),
-                exception.getClass().getSimpleName(), message));
+            return PairEvaluation.failed(failure(exposureIndex, outcomeIndex,
+                exposure, outcome, exception), screened);
         }
+    }
+
+    private static XwasMrFailure failure(int exposureIndex, int outcomeIndex,
+            XwasMrExposure exposure, XwasMrOutcome outcome,
+            RuntimeException exception) {
+        String message = exception.getMessage() == null
+            ? "" : exception.getMessage();
+        return new XwasMrFailure(exposureIndex, outcomeIndex, exposure.id(),
+            outcome.id(), exception.getClass().getSimpleName(), message);
     }
 
     private static MrEstimate screen(List<HarmonizedInstrument> instruments,
@@ -225,19 +259,23 @@ public final class XwasMrPipeline {
     }
 
     private record PairEvaluation(PairStatus status, XwasMrHit hit,
-            XwasMrFailure failure) {
-        static PairEvaluation hit(XwasMrHit hit) {
-            return new PairEvaluation(PairStatus.HIT, hit, null);
+            XwasMrFailure failure, XwasMrScreeningResult screening) {
+        static PairEvaluation hit(XwasMrHit hit,
+                XwasMrScreeningResult screening) {
+            return new PairEvaluation(PairStatus.HIT, hit, null, screening);
         }
-        static PairEvaluation below() {
-            return new PairEvaluation(PairStatus.BELOW_THRESHOLD, null, null);
+        static PairEvaluation below(XwasMrScreeningResult screening) {
+            return new PairEvaluation(PairStatus.BELOW_THRESHOLD, null, null,
+                screening);
         }
         static PairEvaluation insufficient() {
             return new PairEvaluation(
-                PairStatus.INSUFFICIENT_INSTRUMENTS, null, null);
+                PairStatus.INSUFFICIENT_INSTRUMENTS, null, null, null);
         }
-        static PairEvaluation failed(XwasMrFailure failure) {
-            return new PairEvaluation(PairStatus.FAILED, null, failure);
+        static PairEvaluation failed(XwasMrFailure failure,
+                XwasMrScreeningResult screening) {
+            return new PairEvaluation(PairStatus.FAILED, null, failure,
+                screening);
         }
     }
 }

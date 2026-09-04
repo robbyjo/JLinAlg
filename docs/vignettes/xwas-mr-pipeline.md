@@ -101,7 +101,7 @@ requiring Java code. Supply one long-format table of already-clumped exposure
 instruments and one long-format outcome table containing all phenotypes:
 
 ```console
-java -jar jlinalg-<version>.jar mr-xwas --exposure molecular-traits.clumped.tsv --outcome phenotypes.tsv.gz --output xwas-mr-results.tsv --p-threshold 5e-8 --threads 8 --pair-block-size 256
+java -jar jlinalg-<version>.jar mr-xwas --exposure molecular-traits.clumped.tsv --outcome phenotypes.tsv.gz --output xwas-mr-results.tsv --fdr-output xwas-mr-all-pairs.tsv --p-threshold 5e-8 --threads 8 --pair-block-size 256
 ```
 
 Each exposure row needs a SNP, beta, SE, effect allele, other allele, and an
@@ -126,6 +126,14 @@ hit-only MR-Egger, weighted-median, instrument-strength, harmonization, and
 warning fields. A sibling failures table is written automatically; use
 `--failures FILE` to choose its location. Run `mr-xwas --help` for all options,
 including bootstrap replicates, confidence level, seed, and overwrite control.
+
+When `--fdr-output FILE` is supplied, the CLI also writes an uncompressed TSV
+containing every successfully screened pair in deterministic grid order. Its
+`threshold_passed` field identifies pairs sent to full diagnostics, and its
+`fdr_bh` field is adjusted over all finite screening p-values in that file.
+Pairs with insufficient instruments cannot be screened and are not members of
+the BH family; screening or diagnostic exceptions remain explicit in the
+failure table.
 
 See [xWAS MR CLI and performance](../xwas-mr-cli-performance.md) for the full
 input/output contract, reproducible benchmark commands, numerical comparison
@@ -164,11 +172,11 @@ XwasMrSignificanceFilter filter =
     XwasMrSignificanceFilter.pValueAtMost(alpha);
 ```
 
-If FDR is planned, retain a sufficiently broad set of screening results or run
-an unfiltered p-value export stage before applying BH across the declared
-family. Filtering first at nominal 0.05 and then applying BH only to retained
-rows is invalid. The current pipeline retains threshold-passing pairs and is
-therefore best suited to a prespecified fixed or Bonferroni threshold.
+For FDR, pass `--fdr-output xwas-mr-all-pairs.tsv`. The disk-backed BH pass uses
+every successfully screened pair, including pairs that do not pass the primary
+diagnostic threshold, and appends `fdr_bh` without changing bounded scan memory.
+Filtering first at nominal 0.05 and then applying BH only to retained rows would
+be invalid; the all-pairs file avoids that error.
 
 ## Run the two-dimensional scan
 

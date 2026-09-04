@@ -11,6 +11,7 @@ java -jar jlinalg-<version>.jar mr-xwas \
   --exposure molecular-traits.clumped.tsv \
   --outcome phenotypes.tsv.gz \
   --output xwas-mr-results.tsv \
+  --fdr-output xwas-mr-all-pairs.tsv \
   --p-threshold 5e-8 \
   --threads 8 \
   --pair-block-size 256
@@ -43,6 +44,7 @@ controls are:
 --confidence-level X
 --seed N
 --failures FILE
+--fdr-output FILE
 --overwrite
 ```
 
@@ -51,6 +53,14 @@ confidence interval, Q, heterogeneity p-value, I-squared, mean F, MR-Egger
 slope and intercept, I-squared GX, weighted-median estimates, harmonization
 exclusion counts, and warnings. A sibling failure table is always written so a
 later diagnostic failure cannot silently remove a significant screen.
+
+`--fdr-output` writes a separate uncompressed TSV with every successfully
+screened pair, a `threshold_passed` indicator, and a final `fdr_bh` column.
+The disk-backed adjustment includes all finite primary IVW p-values in the
+declared analyzable family, not only threshold-passing hits. Pairs with fewer
+than three harmonized instruments have no screening p-value and are excluded;
+screening and downstream diagnostic failures remain visible in the failure
+table. The command reports the exact number of tests entering BH.
 
 ## Reproducible benchmark
 
