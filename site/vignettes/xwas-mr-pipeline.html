@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Run parallel xWAS Mendelian-randomization scans across molecular exposures and phenotype families with the JLinAlg CLI.">
+  <title>Parallel xWAS MR pipeline · JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Parallel xWAS MR</span></div><h1>Clump once. Scan every phenotype.</h1><p>A command-line workflow for bounded, parallel Mendelian-randomization screens across many molecular exposures and cardiovascular, kidney, lung, or other phenotype families.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>Designed for two-level scans</strong>Each exposure keeps one already-clumped instrument set. JLinAlg indexes each outcome once, evaluates the full exposure-by-phenotype grid, and reserves expensive sensitivity analyses for threshold-passing pairs.</div>
+
+<h2 id="workflow">The end-to-end workflow</h2>
+<ol><li>Download an ancestry-matched LD panel and record its manifest.</li><li>Search public GWAS results or format custom exposure summary statistics.</li><li>Clump each exposure once with the chosen LD threshold and window.</li><li>Combine clumped exposures and all outcomes into two long-format tables.</li><li>Run <code>mr-xwas</code>, then inspect retained hits, failures, and multiplicity.</li></ol>
+<p>The single-outcome <a href="mendelian-randomization.html">MR vignette</a> explains harmonization and estimator interpretation. This page concentrates on the high-throughput command and its operational safeguards.</p>
+
+<h2 id="command">Run the multi-phenotype CLI</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Bounded parallel xWAS MR</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-xwas &#92;
+  --exposure molecular-traits.clumped.tsv &#92;
+  --outcome phenotypes.tsv.gz &#92;
+  --output xwas-mr-results.tsv &#92;
+  --p-threshold 5e-8 &#92;
+  --threads 8 &#92;
+  --pair-block-size 256</code></pre></div>
+<p><code>--threads</code> bounds worker concurrency. <code>--pair-block-size</code> bounds the number of exposure-outcome results held in one work block; it is a memory control, not a statistical batch. Start around four to thirty-two pairs per worker and profile representative data.</p>
+
+<h2 id="inputs">Use long-format, clumped inputs</h2>
+<p>Every exposure row requires a SNP, beta, standard error, effect allele, other allele, and exposure ID. Outcome rows require the equivalent outcome fields and an outcome ID. Effect-allele frequency is optional but improves palindromic-variant harmonization.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Representative columns</span></div><pre><code>SNP  beta.exposure  se.exposure  effect_allele.exposure
+other_allele.exposure  eaf.exposure  id.exposure
+
+SNP  beta.outcome  se.outcome  effect_allele.outcome
+other_allele.outcome  eaf.outcome  id.outcome  category</code></pre></div>
+<p>Common TwoSampleMR-style names are detected automatically. Use <code>--exposure-id-column</code> or <code>--outcome-id-column</code> for custom identifiers. The optional <code>category</code> or <code>phenotype_category</code> column carries labels such as <em>cardiovascular</em>, <em>kidney-risk-factor</em>, or <em>lung</em> into the results. CSV, TSV, and gzip-compressed inputs and outputs are supported.</p>
+<div class="note warning"><strong>Do not clump inside the phenotype loop</strong>Reclump only when the exposure candidates, ancestry panel, LD build, window, or r-squared threshold changes. Outcome selection does not change an exposure instrument set.</div>
+
+<h2 id="thresholds">Choose one threshold scale</h2>
+<ul><li><code>--p-threshold 5e-8</code> retains p ≤ 5×10<sup>−8</sup>.</li><li><code>--log10-p-threshold -7.30103</code> retains log<sub>10</sub>(p) ≤ −7.30103.</li><li><code>--negative-log10-p-threshold 7.30103</code> retains −log<sub>10</sub>(p) ≥ 7.30103.</li></ul>
+<p>Exactly one representation is required. Multiplicative-random IVW is the default screen; use <code>--screen-method fixed</code> for fixed-effect IVW. Correct across the complete prespecified exposure-by-outcome family. Applying BH only after discarding nominally nonsignificant rows is not valid FDR control.</p>
+
+<h2 id="execution">Understand the fast path</h2>
+<p>The pipeline indexes outcomes by SNP, looks up only each exposure's clumped variants, harmonizes alleles, and runs the selected IVW screen. It processes bounded blocks in parallel and merges results in exposure-major, outcome-major order, so output remains deterministic for fixed inputs, options, and seed.</p>
+<p>Only threshold-passing pairs enter the full diagnostic path. Pairs with fewer than three harmonized instruments are counted separately; a downstream diagnostic failure is written with its exposure and outcome IDs instead of terminating the complete scan.</p>
+
+<h2 id="results">Read results and diagnostics</h2>
+<p>The primary table reports screening beta, SE, statistic, p on three scales, confidence limits, Cochran Q, heterogeneity p-value, I², mean F, MR-Egger slope and intercept, I²GX, weighted-median estimates, harmonization exclusions, and warnings. A sibling failures table is always produced; choose its location with <code>--failures FILE</code>.</p>
+<p>For retained hits, interpret heterogeneity, Egger intercept, instrument strength, and leave-one-out behavior together. Run Steiger directionality and additional robust tests as follow-up analyses; the batch table does not compute them automatically. Use the exported estimates with R, Python, or another plotting tool for forest, funnel, scatter, and leave-one-out figures. Two-way MR is two prespecified runs with exposure and outcome roles reversed, independently selected instruments, and direction-specific harmonization.</p>
+
+<h2 id="benchmark">Reproduce the benchmark</h2>
+<p>The checked-in benchmark evaluates 300 exposures against 150 outcomes with 10 already-clumped instruments each: 45,000 IVW pairs. Against an equivalent base-R nested loop, the measured median throughput was 2.20× faster with one Java thread and 5.92× faster with eight threads. Across the first 25 pairs, maximum absolute discrepancies were below 5.6×10<sup>−16</sup> for estimates, uncertainty, p-values, Q, and heterogeneity measures.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Java benchmark</span></div><pre><code>./gradlew benchmarkXwasMr
+
+# Inspect every CLI option
+java -jar jlinalg-&lt;version&gt;.jar mr-xwas --help</code></pre></div>
+<div class="note warning"><strong>Benchmark scope</strong>The timing compares the dominant all-pairs multiplicative-random IVW screen after data preparation. It does not claim an end-to-end speedup over TwoSampleMR, and full hit-only bootstrap diagnostics are intentionally outside the timed kernel.</div>
+
+<h2 id="provenance">Keep the run auditable</h2>
+<ul><li>Record LD panel, population, genome build, window, r² threshold, and absent variants.</li><li>Save input checksums, CLI version, threshold, screen method, thread count, block size, confidence level, bootstrap count, and seed.</li><li>Report total, analyzable, below-threshold, insufficient-instrument, failed, and retained pair counts.</li><li>Define phenotype families and the multiple-testing strategy before inspecting hits.</li></ul>
+
+<div class="next-links"><a href="mendelian-randomization.html"><small>Previous</small><strong>Mendelian randomization</strong></a><a href="meta-analysis.html"><small>Next</small><strong>Meta-analysis →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#workflow">Workflow</a><a href="#command">CLI command</a><a href="#inputs">Inputs</a><a href="#thresholds">Thresholds</a><a href="#execution">Fast path</a><a href="#results">Diagnostics</a><a href="#benchmark">Benchmark</a><a href="#provenance">Provenance</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>

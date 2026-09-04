@@ -4,6 +4,62 @@
 > behavior but is not yet optimized or benchmarked as a high-throughput MR
 > pipeline.
 
+For a single workflow connecting CLI preparation through diagnostics and
+figures, start with the [end-to-end MR vignette](mr-end-to-end.md).
+
+## Find and prepare instruments from the CLI
+
+Search the public NHGRI-EBI GWAS Catalog by trait. The search returns only
+studies with downloadable full summary statistics and includes accession,
+ontology trait, ancestry, sample description, license, and source URL:
+
+```console
+java -jar jlinalg-<version>.jar mr-instruments search --trait BMI --limit 20
+```
+
+`BMI` and a small set of common genetic-epidemiology acronyms are expanded to
+their trait names before the ontology-backed search. Select a study after
+checking phenotype definition, ancestry, sample composition, genome build,
+and license, then stream its significant candidate variants to a local table:
+
+```console
+java -jar jlinalg-<version>.jar mr-instruments download \
+  --study GCST... --out bmi-instruments.tsv --p-threshold 5e-8
+```
+
+For a local GWAS or molecular-QTL result, common column aliases are detected
+automatically. Explicit mappings use canonical-target-to-source order:
+
+```console
+java -jar jlinalg-<version>.jar mr-instruments format \
+  --input exposure.csv.gz --out exposure.mr.tsv --trait BMI \
+  --map SNP=rsid,beta=estimate,se=stderr,eaf=frequency,\
+    effect_allele=allele1,other_allele=allele2,pval=p_value
+```
+
+Output follows the MRInstruments/TwoSampleMR naming convention: `Phenotype`,
+`SNP`, `beta`, `se`, `eaf`, `effect_allele`, `other_allele`, `pval`, `units`,
+`ncase`, `ncontrol`, `samplesize`, and `gene`. Rows above the optional p-value
+threshold or incompatible with the current biallelic-SNP MR layer are counted.
+P-value filtering creates candidates, not independent instruments; perform
+ancestry-matched LD clumping before using the independent-instrument methods:
+
+```console
+java -jar jlinalg-<version>.jar ld-db download \
+  --database 1000g-phase3 --location /data/ld/1000g-phase3
+java -jar jlinalg-<version>.jar clump \
+  --database /data/ld/1000g-phase3 --population EUR \
+  --instrument bmi-instruments.tsv --ld-threshold 0.001 \
+  --output bmi-instruments.clumped.tsv
+```
+
+The default population (`EUR`), window (10,000 kb), r-squared threshold
+(`0.001`), and index p-value threshold (`1`) match
+`TwoSampleMR::clump_data`. Select a panel matching the exposure GWAS ancestry.
+The command uses `pval.exposure`, `pval.outcome`, or `pval` automatically and
+clumps each `id.exposure`/`id` group separately. It preserves every input column
+for retained variants and writes retained rows in their original order.
+
 ## Harmonize exposure and outcome associations
 
 Each summary association names the reported effect allele and other allele.

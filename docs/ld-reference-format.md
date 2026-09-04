@@ -53,3 +53,35 @@ Install into a selected directory:
 
 An omitted or empty --location means the current directory. Downloaded
 archives are removed after successful normalization.
+
+## LD clumping
+
+Clump MR candidates against a panel from an installed database:
+
+    java -jar jlinalg-<version>.jar clump \
+      --database /data/ld/1000g-phase3 \
+      --instrument exposure.mr.tsv \
+      --population EUR \
+      --ld-threshold 0.001 \
+      --output exposure.clumped.tsv
+
+The defaults match `TwoSampleMR::clump_data`: population `EUR`, a 10,000 kb
+window, r-squared threshold 0.001, and index p-value threshold 1. Override the
+last two non-r-squared settings with `--clump-kb` and `--p-threshold`.
+
+The command recognizes `SNP`/`rsid`, uses `pval.exposure` before
+`pval.outcome` and `pval`, and groups by `id.exposure` or `id`. Explicit column
+overrides are available as `--snp-column`, `--pval-column`, and `--id-column`.
+CSV, TSV, and gzip-compressed inputs are supported.
+
+Within each multi-variant group, the lowest-p-value candidate is considered
+first. Nearby candidates are removed when the founder-only haplotype maximum-
+likelihood r-squared is strictly greater than the requested threshold, matching
+PLINK 1.9 clumping semantics. Candidates absent from the reference panel are
+removed. For compatibility with `ieugwasr::ld_clump`, a group containing only
+one candidate is returned without consulting the panel. The output contains
+the retained original rows and columns in input order.
+
+Use `--overwrite` to replace an existing output. JLinAlg validates the database
+manifest and BED/BIM/FAM sizes before clumping, and writes through a temporary
+file so a failed run cannot leave a partial result.

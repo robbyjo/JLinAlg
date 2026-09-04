@@ -27,6 +27,15 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("ld-db"))
             return LdDatabaseCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mr-instruments"))
+            return MrInstrumentCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("clump"))
+            return LdClumpCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mr-xwas"))
+            return MrXwasCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         CliOptions options;
         try {
             options = CliOptions.parse(arguments);
@@ -122,6 +131,15 @@ public final class JLinAlgCli {
               java -jar jlinalg-<version>.jar ld-db list
               java -jar jlinalg-<version>.jar ld-db download
                 --database NAME [--location DIRECTORY]
+              java -jar jlinalg-<version>.jar mr-instruments search --trait TEXT
+              java -jar jlinalg-<version>.jar mr-instruments download
+                --study GCST... --out FILE [--p-threshold 5e-8]
+              java -jar jlinalg-<version>.jar mr-instruments format
+                --input FILE --out FILE [--map TARGET=SOURCE,...]
+              java -jar jlinalg-<version>.jar clump --database DIRECTORY
+                --instrument FILE --ld-threshold 0.001 --output FILE
+              java -jar jlinalg-<version>.jar mr-xwas --exposure FILE
+                --outcome FILE --output FILE --p-threshold X
 
             Core options:
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix
@@ -163,6 +181,26 @@ public final class JLinAlgCli {
               ld-db download              Download and install a choice
               --database NAME             Required database identifier
               --location DIRECTORY        Install directory; default is .
+
+            MR instrument preparation:
+              mr-instruments search       Find downloadable GWAS by trait
+              mr-instruments download     Stream significant MR candidates
+              mr-instruments format       Normalize user GWAS/QTL columns
+
+            LD clumping:
+              clump --database DIRECTORY --instrument FILE --output FILE
+              --population PANEL          AFR, AMR, EAS, EUR (default), or SAS
+              --clump-kb N                Window in kilobases; default 10000
+              --ld-threshold X            LD r-squared cutoff; default 0.001
+              --p-threshold X             Index p-value cutoff; default 1
+              --overwrite                 Replace an existing output file
+
+            Parallel xWAS MR:
+              mr-xwas --exposure FILE --outcome FILE --output FILE
+              --p-threshold X             Retain screening p <= X
+              --threads N                 Bounded exposure-outcome workers
+              --pair-block-size N         Maximum resident pair evaluations
+              Run mr-xwas --help for log-scale thresholds and table columns.
             """;
     }
 }

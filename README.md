@@ -669,6 +669,44 @@ explicit current boundaries.
 
 The v0.1.0 MR implementation is tested for numerical behavior but is not yet
 optimized or benchmarked as a high-throughput pipeline.
+The [end-to-end MR vignette](docs/vignettes/mr-end-to-end.md) connects public
+or custom instrument preparation, LD clumping, harmonization, estimation,
+diagnostics, plotting exports, bidirectional MR, and molecular-trait designs.
+The [parallel xWAS MR vignette](docs/vignettes/xwas-mr-pipeline.md) adds a
+bounded two-stage exposure-by-phenotype scan that reuses clumped instruments
+and reserves full MR diagnostics for threshold-passing pairs.
+The file-to-file CLI and reproducible Java/R results are documented in the
+[xWAS MR performance report](docs/xwas-mr-cli-performance.md).
+
+Candidate instruments can be discovered by trait in the public NHGRI-EBI GWAS
+Catalog and streamed directly into MRInstruments-compatible columns. Common
+trait acronyms such as `BMI` are expanded before the ontology-backed search:
+
+    java -jar jlinalg-<version>.jar mr-instruments search \
+      --trait BMI --limit 20
+    java -jar jlinalg-<version>.jar mr-instruments download \
+      --study GCST... --out bmi-instruments.tsv --p-threshold 5e-8
+
+The download command reads the Catalog's standardized summary-statistics file
+as a stream, keeps candidate rows at the requested p-value threshold, converts
+odds or hazard ratios to log effects when necessary, and reports invalid or
+non-biallelic rows. It does not claim that significance alone establishes a
+valid instrument: ancestry-matched LD clumping and the usual relevance,
+independence, and exclusion-restriction checks remain required.
+
+User-provided GWAS or QTL tables can be normalized in the same way. CSV, TSV,
+and gzip-compressed files are supported; common names are detected
+automatically, while `--map` resolves study-specific headers:
+
+    java -jar jlinalg-<version>.jar mr-instruments format \
+      --input exposure.csv.gz --out exposure.mr.tsv --trait BMI \
+      --map SNP=rsid,beta=estimate,se=stderr,eaf=frequency,\
+        effect_allele=allele1,other_allele=allele2,pval=p_value
+
+The canonical output is `Phenotype`, `SNP`, `beta`, `se`, `eaf`,
+`effect_allele`, `other_allele`, `pval`, `units`, `ncase`, `ncontrol`,
+`samplesize`, and `gene`. Use `--effect-scale odds-ratio` or
+`--effect-scale hazard-ratio` when an explicitly mapped effect is a ratio.
 
 Freely available LD reference databases can be listed and installed with the
 CLI. Every source is normalized to the versioned, variant-major PLINK layout
@@ -677,6 +715,16 @@ described in the [LD reference format](docs/ld-reference-format.md):
     java -jar jlinalg-<version>.jar ld-db list
     java -jar jlinalg-<version>.jar ld-db download \
       --database 1000g-phase3 --location /data/ld/1000g-phase3
+
+Clump the candidate table directly against an ancestry-matched installed panel:
+
+    java -jar jlinalg-<version>.jar clump \
+      --database /data/ld/1000g-phase3 --population EUR \
+      --instrument bmi-instruments.tsv --ld-threshold 0.001 \
+      --output bmi-instruments.clumped.tsv
+
+The TwoSampleMR-compatible defaults are a 10,000 kb window, r-squared 0.001,
+and index p-value threshold 1. The output preserves all input columns.
 
 The first MR layer accepts validated biallelic SNP associations and explicitly
 harmonizes outcome effects to the exposure effect allele:

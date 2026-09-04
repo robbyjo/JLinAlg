@@ -219,6 +219,7 @@ tasks.register('checkWebsite') {
             'vignettes/glmm.html',
             'vignettes/association.html',
             'vignettes/mendelian-randomization.html',
+            'vignettes/xwas-mr-pipeline.html',
             'vignettes/meta-analysis.html',
             'vignettes/time-series.html',
             'vignettes/susie.html',
@@ -306,6 +307,18 @@ tasks.register('benchmarkAssociation', JavaExec) {
     dependsOn tasks.named('benchmarkClasses')
     classpath = sourceSets.benchmark.runtimeClasspath
     mainClass = 'org.jlinalg.benchmark.AssociationBenchmark'
+    jvmArgs '-Xms1g', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkXwasMr', JavaExec) {
+    group = 'verification'
+    description = 'Runs the parallel xWAS MR benchmark shared with R.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.XwasMrBenchmark'
     jvmArgs '-Xms1g', '-Xmx4g'
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.')
