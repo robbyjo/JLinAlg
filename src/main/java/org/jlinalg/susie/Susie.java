@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 import jdistlib.accelerator.ComputeBackend;
-import jdistlib.accelerator.MatrixTranspose;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.internal.MatrixOps;
@@ -20,7 +20,7 @@ public final class Susie {
     public static SusieResult fit(
             double[] response, double[][] design, List<String> variableNames) {
         return fit(response, design, variableNames,
-            SusieOptions.defaults(), BackendPolicy.PREFERRED);
+            SusieOptions.defaults(), BackendPolicy.CPU);
     }
 
     public static SusieResult fit(
@@ -30,39 +30,63 @@ public final class Susie {
             throw new IllegalArgumentException("response and design dimensions are invalid");
         }
         int rows = response.length;
-        double[] matrix = MatrixOps.rowMajor(design, rows);
+        if (rows < 2 || design[0] == null || design[0].length < 1) {
+            throw new IllegalArgumentException("response and design dimensions are invalid");
+        }
         int columns = design[0].length;
+        for (double[] row : design) {
+            if (row == null || row.length != columns) {
+                throw new IllegalArgumentException("design must be rectangular");
+            }
+        }
         List<String> names = names(variableNames, columns);
         double responseMean = Arrays.stream(response).average().orElseThrow();
+        if (!Double.isFinite(responseMean)) throw new IllegalArgumentException("response must be finite");
         double[] centeredResponse = new double[rows];
+        double[] matrix = new double[rows * columns];
         double[] means = new double[columns];
         double[] scales = new double[columns];
         for (int row = 0; row < rows; row++) centeredResponse[row] = response[row] - responseMean;
         for (int column = 0; column < columns; column++) {
-            for (int row = 0; row < rows; row++) means[column] += matrix[row * columns + column];
+            int offset = column * rows;
+            for (int row = 0; row < rows; row++) {
+                double value = design[row][column];
+                if (!Double.isFinite(value)) throw new IllegalArgumentException("design must be finite");
+                means[column] += value;
+            }
             means[column] /= rows;
             for (int row = 0; row < rows; row++) {
-                double centered = matrix[row * columns + column] - means[column];
+                double centered = design[row][column] - means[column];
+                matrix[offset + row] = centered;
                 scales[column] += centered * centered;
             }
-            scales[column] = Math.sqrt(scales[column] / rows);
+            scales[column] = Math.sqrt(scales[column] / (rows - 1.0));
             if (!(scales[column] > 0.0)) {
                 throw new IllegalArgumentException("constant design column: " + names.get(column));
             }
             for (int row = 0; row < rows; row++) {
-                matrix[row * columns + column] =
-                    (matrix[row * columns + column] - means[column]) / scales[column];
+                matrix[offset + row] /= scales[column];
             }
         }
+        double yty = 0.0;
+        for (double value : centeredResponse) yty += value * value;
+        double[] xtx = new double[columns * columns];
+        double[] xty = new double[columns];
+        IntStream columnStream = IntStream.range(0, columns);
+        if ((long) rows * columns * columns >= 10_000_000L) {
+            columnStream = columnStream.parallel();
+        }
+        columnStream.forEach(column -> {
+            int offset = column * rows;
+            xty[column] = dot(matrix, offset, centeredResponse, 0, rows);
+            for (int other = 0; other <= column; other++) {
+                double product = dot(matrix, offset, matrix, other * rows, rows);
+                xtx[column * columns + other] = product;
+                xtx[other * columns + column] = product;
+            }
+        });
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             ComputeBackend backend = context.backend();
-            double[] xtx = MatrixOps.transposeMultiply(
-                backend, matrix, rows, columns, matrix, columns);
-            double[] xty = new double[columns];
-            backend.dgemv(jdistlib.accelerator.MatrixTranspose.TRANSPOSE,
-                rows, columns, 1.0, matrix, centeredResponse, 0.0, xty);
-            double yty = backend.ddot(rows, centeredResponse, 0, 1,
-                centeredResponse, 0, 1);
             Core core = fitCore(xtx, xty, yty, rows, names, options, backend);
             double[] beta = core.posteriorMean().clone();
             double[] effectMean = core.mu().clone();
@@ -92,16 +116,18 @@ public final class Susie {
         double[] ld = MatrixOps.rowMajor(ldCorrelation, columns);
         validateLd(ld, columns);
         double[] xtx = ld.clone();
-        for (int index = 0; index < xtx.length; index++) xtx[index] *= sampleSize;
+        double degreesOfFreedom = sampleSize - 1.0;
+        for (int index = 0; index < xtx.length; index++) xtx[index] *= degreesOfFreedom;
         double[] xty = new double[columns];
         for (int column = 0; column < columns; column++) {
             if (!Double.isFinite(zScores[column])) throw new IllegalArgumentException("z scores must be finite");
-            xty[column] = Math.sqrt(sampleSize) * zScores[column];
+            double adjustment = degreesOfFreedom
+                / (zScores[column] * zScores[column] + sampleSize - 2.0);
+            xty[column] = Math.sqrt(degreesOfFreedom * adjustment) * zScores[column];
         }
         List<String> names = names(variableNames, columns);
         try (BackendContext context = BackendContext.select(backendPolicy)) {
-            validatePositiveSemidefinite(ld, columns, context.backend());
-            Core core = fitCore(xtx, xty, sampleSize, (int) Math.round(sampleSize),
+            Core core = fitCore(xtx, xty, degreesOfFreedom, (int) Math.round(sampleSize),
                 names, options, context.backend());
             return result(core, core.posteriorMean(), core.mu(), 0.0,
                 names, xtx, options, context);
@@ -138,25 +164,25 @@ public final class Susie {
         double[] second = new double[effects * variables];
         double[] logBayesFactors = new double[effects * variables];
         double[] total = new double[variables];
-        double[] previous = new double[variables];
         double[] fittedCross = new double[variables];
+        double[] effectCross = new double[effects * variables];
         double[] logBf = new double[variables];
         double[] conditionalMean = new double[variables];
         double[] conditionalVariance = new double[variables];
-        double[] product = new double[variables];
-        double residualVariance = Math.max(1e-8, yty / observations);
+        double[] kl = new double[effects];
+        double residualVariance = Math.max(1e-8, yty / (observations - 1.0));
         boolean converged = false;
         int iterations = 0;
         double objective = Double.NEGATIVE_INFINITY;
         for (int iteration = 1; iteration <= options.maximumIterations(); iteration++) {
             iterations = iteration;
-            System.arraycopy(total, 0, previous, 0, variables);
-            objective = 0.0;
+            double previousObjective = objective;
             for (int effect = 0; effect < effects; effect++) {
                 int offset = effect * variables;
-                for (int variable = 0; variable < variables; variable++) total[variable] -= mu[offset + variable];
-                backend.dgemv(MatrixTranspose.NONE, variables, variables,
-                    1.0, xtx, total, 0.0, fittedCross);
+                for (int variable = 0; variable < variables; variable++) {
+                    total[variable] -= mu[offset + variable];
+                    fittedCross[variable] -= effectCross[offset + variable];
+                }
                 double maximumLogBf = Double.NEGATIVE_INFINITY;
                 for (int variable = 0; variable < variables; variable++) {
                     double diagonal = xtx[variable * variables + variable];
@@ -176,7 +202,9 @@ public final class Susie {
                 double sum = 0.0;
                 for (int variable = 0; variable < variables; variable++)
                     sum += Math.exp(logBf[variable] - maximumLogBf);
-                objective += maximumLogBf + Math.log(sum / variables);
+                double modelLogBayesFactor = maximumLogBf
+                    + Math.log(sum * (1.0 / variables
+                        + Math.sqrt(Math.ulp(1.0))));
                 for (int variable = 0; variable < variables; variable++) {
                     double probability = Math.exp(logBf[variable] - maximumLogBf) / sum;
                     alpha[offset + variable] = probability;
@@ -187,37 +215,52 @@ public final class Susie {
                             + conditionalMean[variable] * conditionalMean[variable]);
                     total[variable] += mu[offset + variable];
                 }
-            }
-            if (options.estimateResidualVariance()) {
-                backend.dgemv(MatrixTranspose.NONE, variables, variables,
-                    1.0, xtx, total, 0.0, fittedCross);
-                double rss = yty;
+                if ("cpu".equals(backend.selectedBackend())) {
+                    multiply(xtx, variables, mu, offset, effectCross, offset);
+                } else {
+                    backend.dgemv(jdistlib.accelerator.MatrixTranspose.NONE,
+                        variables, variables, 1.0, xtx, 0, variables,
+                        mu, offset, 1, 0.0, effectCross, offset, 1);
+                }
+                double posteriorExpectedLogLikelihood = 0.0;
                 for (int variable = 0; variable < variables; variable++) {
-                    rss += total[variable] * fittedCross[variable]
-                        - 2.0 * total[variable] * xty[variable];
-                }
-                for (int effect = 0; effect < effects; effect++) {
-                    int offset = effect * variables;
-                    backend.dgemv(MatrixTranspose.NONE, variables, variables,
-                        1.0, xtx, 0, variables, mu, offset, 1,
-                        0.0, product, 0, 1);
-                    double meanQuadratic = 0.0;
-                    double diagonalSecond = 0.0;
-                    for (int variable = 0; variable < variables; variable++) {
-                        meanQuadratic += mu[offset + variable] * product[variable];
-                        diagonalSecond += xtx[variable * variables + variable]
+                    double residualCross = xty[variable] - fittedCross[variable];
+                    posteriorExpectedLogLikelihood +=
+                        -2.0 * mu[offset + variable] * residualCross
+                        + xtx[variable * variables + variable]
                             * second[offset + variable];
-                    }
-                    rss += diagonalSecond - meanQuadratic;
+                    fittedCross[variable] += effectCross[offset + variable];
                 }
-                residualVariance = Math.max(1e-8, rss / observations);
+                posteriorExpectedLogLikelihood *= -0.5 / residualVariance;
+                kl[effect] = -modelLogBayesFactor
+                    + posteriorExpectedLogLikelihood;
             }
-            double change = 0.0;
-            for (int variable = 0; variable < variables; variable++)
-                change = Math.max(change, Math.abs(total[variable] - previous[variable]));
-            if (change <= options.convergenceTolerance()) {
+            double expectedResidualSumSquares = yty;
+            for (int variable = 0; variable < variables; variable++) {
+                expectedResidualSumSquares += total[variable]
+                    * (fittedCross[variable] - 2.0 * xty[variable]);
+            }
+            for (int effect = 0; effect < effects; effect++) {
+                int offset = effect * variables;
+                for (int variable = 0; variable < variables; variable++) {
+                    expectedResidualSumSquares +=
+                        xtx[variable * variables + variable]
+                            * second[offset + variable]
+                        - mu[offset + variable]
+                            * effectCross[offset + variable];
+                }
+            }
+            objective = -0.5 * observations
+                * Math.log(2.0 * Math.PI * residualVariance)
+                - 0.5 * expectedResidualSumSquares / residualVariance;
+            for (double divergence : kl) objective -= divergence;
+            if (objective - previousObjective < options.convergenceTolerance()) {
                 converged = true;
                 break;
+            }
+            if (options.estimateResidualVariance()) {
+                residualVariance = Math.max(1e-8,
+                    expectedResidualSumSquares / observations);
             }
         }
         return new Core(alpha, mu, logBayesFactors, total, residualVariance,
@@ -242,6 +285,33 @@ public final class Susie {
             core.logBayesFactors(), sets,
             intercept, core.residualVariance(), core.effects(), core.iterations(),
             core.converged(), core.objective(), context.provenance());
+    }
+
+    private static double dot(
+            double[] first, int firstOffset, double[] second,
+            int secondOffset, int length) {
+        double result = 0.0;
+        for (int index = 0; index < length; index++) {
+            result = Math.fma(first[firstOffset + index],
+                second[secondOffset + index], result);
+        }
+        return result;
+    }
+
+    private static void multiply(
+            double[] matrix, int size, double[] vector, int vectorOffset,
+            double[] result, int resultOffset) {
+        IntStream rows = IntStream.range(0, size);
+        if (size >= 256) rows = rows.parallel();
+        rows.forEach(row -> {
+            double sum = 0.0;
+            int offset = row * size;
+            for (int column = 0; column < size; column++) {
+                sum = Math.fma(matrix[offset + column],
+                    vector[vectorOffset + column], sum);
+            }
+            result[resultOffset + row] = sum;
+        });
     }
 
     private static List<CredibleSet> credibleSets(
@@ -289,23 +359,6 @@ public final class Susie {
                     throw new IllegalArgumentException("LD must be a symmetric correlation matrix");
             }
         }
-    }
-
-    private static void validatePositiveSemidefinite(
-            double[] ld, int size, ComputeBackend backend) {
-        double ridge = 1e-12;
-        for (int attempt = 0; attempt < 10; attempt++) {
-            double[] regularized = ld.clone();
-            for (int index = 0; index < size; index++)
-                regularized[index * size + index] += ridge;
-            try {
-                backend.dpotrf(regularized, size);
-                return;
-            } catch (IllegalArgumentException | IllegalStateException ignored) {
-                ridge *= 10.0;
-            }
-        }
-        throw new IllegalArgumentException("LD matrix is not positive semidefinite");
     }
 
     private static List<String> names(List<String> names, int columns) {

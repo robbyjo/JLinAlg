@@ -22,6 +22,7 @@ measurement.
 .\gradlew.bat benchmarkXwasMr
 .\gradlew.bat benchmarkTopmedPenalized
 .\gradlew.bat benchmarkColocSusie
+.\gradlew.bat benchmarkSusie
 ```
 
 The real-data ridge/LASSO/elastic-net comparison with R `glmnet` is documented
@@ -95,6 +96,34 @@ Output is CSV with median wall time and variables per second. Record the Java
 version, CPU/GPU model, backend, thread environment, heap settings, and power
 mode alongside published results. Run on an otherwise idle machine and compare
 multiple repetitions before changing routing thresholds.
+
+## SuSiE benchmark
+
+`benchmarkSusie` runs the complete individual-data fit on response replicate 1
+of the 574-by-1,001 `N3finemapping` data from the official susieR fine-mapping
+vignette. The timed region includes centering, scaling, sufficient-statistic
+construction, nine IBSS iterations, and credible-set calculation; data loading
+is excluded. The matching R script uses the same fixed absolute prior variance,
+residual-variance estimation, tolerance, and credible-set settings:
+
+```powershell
+.\gradlew.bat benchmarkSusie
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src/benchmark/r/susie_vignette_benchmark.R
+```
+
+On Windows 11 with an Intel Core i9-9900K, Eclipse Adoptium Java 21.0.4, and
+R 4.6.1/susieR 0.14.2, three warmups followed by seven measurements produced
+median end-to-end times of 0.0704391 seconds for JLinAlg's portable CPU path
+and 0.340 seconds for R: JLinAlg was 4.83 times faster. Both fits converged in
+nine iterations, returned three credible sets, and estimated residual variance
+as 6.36378419836.
+
+The speedup comes from computing only one triangle of the symmetric cross-product
+in parallel, caching every effect's `X'X b` contribution, and reusing it for
+both residual and ELBO updates. Override warmups, measurements, or backend with
+`jlinalg.benchmark.susie.warmups`, `jlinalg.benchmark.susie.measurements`, and
+`jlinalg.benchmark.susie.backend`.
 
 ## SuSiE colocalization benchmark
 

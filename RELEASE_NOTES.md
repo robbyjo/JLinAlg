@@ -9,6 +9,12 @@
   deterministic combination benchmark.
 - Exposed per-effect log Bayes factors from `SusieResult` and removed repeated
   hot-loop allocations from SuSiE IBSS updates.
+- Matched susieR's sample scaling, finite-sample z transformation, and ELBO
+  convergence, with direct N3finemapping PIP/coefficient regression fixtures.
+- Optimized individual-data SuSiE with a parallel symmetric cross-product and
+  cached per-effect `X'X b` updates. On the documented 574-by-1,001 susieR
+  vignette case, median end-to-end time fell to 0.0704 seconds versus 0.340
+  seconds for susieR 0.14.2 on the same host.
 
 JLinAlg 0.1.0 is the first tagged release of the Java statistical modeling
 and statistical-genetics library.

@@ -1,8 +1,8 @@
 # SuSiE fine mapping and structural equation models
 
-> **v0.1.0 performance status:** These implementations are tested, but neither
-> SuSiE nor SEM is yet optimized or benchmarked for large or repeated
-> workloads.
+> **v0.1.0 performance status:** SuSiE is validated against susieR and benchmarked
+> on the official `N3finemapping` vignette data. SEM remains an initial
+> performance path.
 
 ## SuSiE with individual-level data
 
@@ -14,14 +14,14 @@ SusieOptions options = new SusieOptions(
     5,      // maximum single effects
     200,    // iterations
     1e-8,   // convergence tolerance
-    0.2,    // prior effect variance
+    0.2,    // absolute prior effect variance on standardized X
     true,   // estimate residual variance
     0.95,   // credible-set coverage
     0.5);   // minimum credible-set purity
 
 SusieResult fineMap = Susie.fit(
     phenotype, genotypeMatrix, variantNames,
-    options, BackendPolicy.PREFERRED);
+    options, BackendPolicy.CPU);
 
 if (!fineMap.converged()) {
     throw new IllegalStateException("SuSiE did not converge");
@@ -49,14 +49,22 @@ double[][] ld = {
 SusieResult summary = Susie.fitSummary(
     z, ld, 1_000, List.of("a", "b", "c", "d", "e"),
     new SusieOptions(2, 200, 1e-8, 0.2, false, 0.95, 0.5),
-    BackendPolicy.PREFERRED);
+    BackendPolicy.CPU);
 ```
 
-Summary mode assumes standardized quantitative traits/predictors and a
-positive-semidefinite LD correlation matrix from an ancestry-matched reference.
+Summary mode uses the same finite-sample z transformation as `susieR::susie_rss`.
+It validates a finite symmetric correlation matrix from an ancestry-matched
+reference, but—like susieR's default `check_input = FALSE`—does not run an
+eager cubic positive-semidefinite factorization.
 Use `fitSufficientStatistics` when `X'X`, `X'y`, and `y'y` are available on a
 different scale. Credible-set purity is the minimum absolute within-set LD;
 always inspect it alongside coverage and PIP.
+
+On the bundled 574-by-1,001 vignette benchmark, the portable CPU path matches
+fixed-prior susieR PIPs and coefficients within `2e-10` and is 4.83 times faster
+on the documented i9-9900K run. See
+[performance benchmarks](../performance-benchmarks.md) for exact commands and
+environment.
 
 ## Colocalize SuSiE signals
 

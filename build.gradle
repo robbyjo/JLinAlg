@@ -32,6 +32,9 @@ sourceSets {
         compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
         runtimeClasspath += output + compileClasspath
     }
+    test {
+        resources.srcDir 'src/benchmark/resources'
+    }
 }
 
 def cholmodSourceDir = layout.projectDirectory.dir('src/main/native/cholmod')
@@ -346,6 +349,18 @@ tasks.register('benchmarkColocSusie', JavaExec) {
     jvmArgs '-Xms256m', '-Xmx2g'
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.coloc.')
+    }
+}
+
+tasks.register('benchmarkSusie', JavaExec) {
+    group = 'verification'
+    description = 'Runs SuSiE on the official N3finemapping vignette data.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.SusieBenchmark'
+    jvmArgs '-Xms1g', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.susie.')
     }
 }
 

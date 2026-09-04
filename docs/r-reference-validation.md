@@ -22,6 +22,8 @@ be installed into the ignored project-local `.r-reference-lib` directory.
 The SuSiE colocalization fixture was generated on 2026-09-04 with `coloc`
 5.2.3 and `susieR` 0.14.2.
 
+The direct SuSiE fixture uses susieR 0.14.2's bundled `N3finemapping` data and
+a fixed absolute prior variance of 0.2.
 The source examples and contracts are documented by
 [base R `lm`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/lm.html),
 [base R `glm`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/glm.html),
@@ -45,6 +47,7 @@ and the CRAN
 | Binomial Laplace GLMM | `lme4::glmer` | coefficients, random-intercept variance, likelihood, and selected fitted probabilities |
 | Distributional/vector models | `gamlss::gamlss`, `VGAM::vglm` | Gaussian location/scale coefficients, fitted parameters, and likelihood; multinomial logits, likelihood, and category probabilities |
 | SuSiE colocalization | `coloc::coloc.susie` | bundled D1/D2 and multi-signal D3/D4 examples; H0-H4 and conditional-H4 variant posteriors |
+| SuSiE fine mapping | `susieR::susie`, `susieR::susie_rss` | official `N3finemapping` vignette PIPs, coefficients, residual variance, ELBO and iterations; finite-sample z/LD transformation |
 
 R and JLinAlg use different optimizers and termination rules. Closed-form and
 direct linear-model quantities use tolerances near floating-point rounding.
@@ -86,6 +89,15 @@ The coloc fixture uses the package's bundled `coloc_test_data`:
 ```powershell
 & 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
   'src\test\resources\r-reference\generate-coloc-susie-reference.R'
+```
+
+The individual-data fixture and its susieR result are regenerated with:
+
+```powershell
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src/benchmark/r/generate_susie_vignette_data.R
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src/benchmark/r/generate_susie_reference.R
 ```
 
 Review package-version changes and numerical differences before updating Java

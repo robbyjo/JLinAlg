@@ -11,8 +11,8 @@ pedigree animal-model REML, and penalized-quasi-likelihood generalized linear
 mixed models (GLMM PQL). Gaussian ridge, LASSO, and elastic-net regression and
 a first summary-statistics Mendelian-randomization (MR) layer are also included.
 
-> **v0.1.0 performance status:** MR, SuSiE, and SEM are implemented and tested,
-> but have not yet received the large-workload optimization and benchmarking
+> **v0.1.0 performance status:** MR and SEM are implemented and tested, but have
+> not yet received the large-workload optimization and benchmarking
 > applied to JLinAlg's performance-tuned model and association paths. Treat
 > their APIs as initial and profile them on representative data before
 > high-throughput use.
@@ -815,8 +815,6 @@ forms), the full coefficient covariance, residual `Q_E`, omnibus moderator
 
 ## SuSiE fine mapping
 
-The v0.1.0 SuSiE implementation is tested but is not yet optimized or
-benchmarked for large loci or repeated fine-mapping workloads.
 
 `Susie` implements iterative Bayesian stepwise selection for individual data,
 standardized z-score/LD summary data, or caller-supplied `X'X`, `X'y`, and
@@ -824,7 +822,13 @@ standardized z-score/LD summary data, or caller-supplied `X'X`, `X'y`, and
 posterior inclusion matrices, residual variance, convergence, and credible
 sets with LD purity. Individual inputs are centered/scaled once and returned
 on their original coefficient scale. Summary LD is checked for correlation
-structure and positive semidefiniteness before iteration.
+structure before iteration; as in susieR's default `check_input = FALSE`, an
+eager cubic positive-semidefinite factorization is not performed.
+
+The implementation matches fixed-prior susieR results on its official
+`N3finemapping` vignette data within `2e-10` and is benchmarked end to end.
+On the documented i9-9900K run it took 0.0704 seconds, 4.8 times faster than
+susieR 0.14.2 on the same data and host.
 
 ## SuSiE colocalization
 

@@ -29,6 +29,29 @@ class SusieTest {
     }
 
     @Test
+    void summaryFitMatchesSusieRFiniteSampleTransformation() {
+        double[] z = {4.0, 0.2, -0.1, -3.0, 0.3};
+        double[][] ld = new double[5][5];
+        for (int index = 0; index < 5; index++) ld[index][index] = 1.0;
+        SusieResult result = Susie.fitSummary(z, ld, 1_000,
+            List.of("a", "b", "c", "d", "e"),
+            new SusieOptions(2, 200, 1e-10, 0.2, false, 0.95, 0.0),
+            BackendPolicy.CPU);
+
+        double[] expected = {
+            0.99841612463509866, 0.011857211080162244,
+            0.011681719972597371, 0.95427514126503576,
+            0.012155529839802393
+        };
+        double[] actual = result.pip();
+        for (int index = 0; index < expected.length; index++) {
+            assertEquals(expected[index], actual[index], 2e-13);
+        }
+        assertEquals(5, result.iterations());
+        assertEquals(-1414.6268787538825, result.objective(), 2e-10);
+    }
+
+    @Test
     void individualFitReturnsOriginalScaleCoefficientAndIntercept() {
         double[][] design = new double[80][2];
         double[] response = new double[80];
