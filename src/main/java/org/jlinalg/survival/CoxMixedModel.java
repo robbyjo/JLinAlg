@@ -91,6 +91,26 @@ public final class CoxMixedModel {
             return outcome.result();
         }
 
+        /** Fits conditional modes with caller-fixed frailty variances. */
+        public CoxMixedResult fitAtVariances(
+                double[][] fixedEffects, double[] offset,
+                double... variances) {
+            if (closed)
+                throw new IllegalStateException("prepared mixed Cox fit is closed");
+            if (variances == null || variances.length != randomEffects.size())
+                throw new IllegalArgumentException(
+                    "one fixed variance is required per Cox frailty term");
+            for (double variance : variances)
+                if (!(variance >= options.minimumVariance()
+                        && variance <= options.maximumVariance())
+                        || !Double.isFinite(variance))
+                    throw new IllegalArgumentException(
+                        "fixed frailty variances must lie within bounds");
+            return fitPreparedAtVariances(survival, fixedEffects,
+                randomEffects, offset, options, backend,
+                context.provenance(), riskSets, variances);
+        }
+
         @Override
         public void close() {
             if (!closed) {
@@ -98,6 +118,64 @@ public final class CoxMixedModel {
                 context.close();
             }
         }
+    }
+
+    private static CoxMixedResult fitPreparedAtVariances(
+            CoxSurvivalData survival,
+            double[][] fixedEffects,
+            List<CoxRandomEffectTerm> randomEffects,
+            double[] offset,
+            CoxMixedOptions options,
+            ComputeBackend backend,
+            BackendProvenance provenance,
+            CoxRiskSetPlan riskSets,
+            double[] variances) {
+        if (fixedEffects == null || fixedEffects.length == 0)
+            throw new IllegalArgumentException("mixed Cox fixed effects are required");
+        int rows = survival.observations();
+        if (fixedEffects.length != rows || fixedEffects[0] == null
+                || fixedEffects[0].length == 0)
+            throw new IllegalArgumentException(
+                "fixed-effect rows must match survival observations");
+        int fixedColumns = fixedEffects[0].length;
+        double[] fixed = MatrixOps.rowMajor(fixedEffects, rows);
+        validateFixedColumns(fixed, rows, fixedColumns);
+        double[] modelOffset = offset == null ? new double[rows]
+            : MatrixOps.finiteCopy(offset, "offset");
+        if (modelOffset.length != rows)
+            throw new IllegalArgumentException(
+                "one Cox offset is required per observation");
+        Combined combined = combine(fixed, rows, fixedColumns, randomEffects);
+        ModeFit current = mode(survival, combined, randomEffects,
+            variances.clone(), modelOffset, options,
+            new double[combined.columns()], backend, riskSets);
+        double[] jointCovariance = CoxMath.inversePositive(backend,
+            current.penalizedInformation(), combined.columns(),
+            options.coxOptions().informationRidge());
+        double[] fixedCovariance = new double[fixedColumns * fixedColumns];
+        for (int row = 0; row < fixedColumns; row++)
+            for (int column = 0; column < fixedColumns; column++)
+                fixedCovariance[row * fixedColumns + column] =
+                    jointCovariance[row * combined.columns() + column];
+        double[] beta = java.util.Arrays.copyOf(
+            current.coefficients(), fixedColumns);
+        List<CoxRandomEffectEstimates> estimates = new ArrayList<>();
+        int start = fixedColumns;
+        for (int term = 0; term < randomEffects.size(); term++) {
+            CoxRandomEffectTerm value = randomEffects.get(term);
+            estimates.add(new CoxRandomEffectEstimates(value.name(),
+                value.coefficientNames(), variances[term],
+                java.util.Arrays.copyOfRange(current.coefficients(), start,
+                    start + value.coefficients())));
+            start += value.coefficients();
+        }
+        return new CoxMixedResult(beta, fixedCovariance, estimates,
+            CoxPartialLikelihood.baseline(survival, combined.design(),
+                combined.columns(), current.coefficients(), modelOffset,
+                options.coxOptions().ties(), riskSets),
+            current.partialLogLikelihood(), current.penalizedLogLikelihood(),
+            current.laplaceLogLikelihood(), options, 0, current.converged(),
+            current.message(), provenance, CoxMixedSolver.DENSE, 0, 0, 0);
     }
 
     private static FitOutcome fitPrepared(
@@ -275,7 +353,7 @@ public final class CoxMixedModel {
                 current.penalizedLogLikelihood(),
                 current.laplaceLogLikelihood(), options,
                 varianceIterations, converged, message,
-                provenance);
+                provenance, CoxMixedSolver.DENSE, 0, 0, 0);
             return new FitOutcome(result, logVariances.clone());
     }
 

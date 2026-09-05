@@ -1,5 +1,60 @@
 # TOPMed Cox/coxme performance profile
 
+## Reproducible sparse-pedigree correctness gate
+
+A checked-in synthetic fixture now validates the sparse pedigree Cox path
+against R `coxme` without requiring the private TOPMed inputs. The fixture has
+800 right-censored rows, 508 events, 200 pedigree members, four repeated
+observations per member, 20 batches, and eight gene scans. Both runtimes hold
+the pedigree and batch variances at `0.35` and `0.20`, respectively, so this
+gate tests the conditional-mode solve independently of variance optimization.
+
+On 2026-09-05, R 4.6.1 with survival 3.8-6, coxme 2.2-22, and data.table
+1.18.6.1 was compared with Java 25. After one complete warm scan, the median
+elapsed times were 0.360 seconds for single-threaded R and 0.035909 seconds for
+JLinAlg with eight scan workers: **10.03x faster**. All JLinAlg fits converged.
+Across the eight genes, the maximum absolute differences were `1.76e-8` for
+the gene coefficient, `1.02e-4` for its standard error, and `2.81e-7` standard
+errors for the coefficient itself. The automated gate uses thresholds of
+`1e-6`, `2e-4`, and `1e-5`, and requires JLinAlg's median time to be lower.
+
+The R reference deliberately passes the relationship matrix to `coxmeMlist`
+as a base-R dense matrix. Passing the numerically identical relationship as a
+sparse `Matrix` object changed coxme's result on this fixture (maximum beta
+difference `0.0238` from the dense representation). This is a coxme input-path
+effect: the relationship inverse computed in R agreed exactly with JLinAlg's
+Henderson precision, while JLinAlg's dense and sparse conditional solves also
+agreed. The dense R representation is therefore the correctness oracle; the
+JLinAlg implementation still factors the sparse precision and does not form a
+dense relationship covariance.
+
+```powershell
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src\benchmark\r\generate_sparse_cox_fixture.R `
+  --output_dir build\benchmarks\sparse-cox-validation
+
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src\benchmark\r\topmed_cox_benchmark.R `
+  --prepared_dir build\benchmarks\sparse-cox-validation `
+  --genes 8 --measurements 3 --models pedigree `
+  --fixed_variances 0.35,0.20 --pedigree_covariance dense `
+  --output_prefix build\benchmarks\sparse-cox-validation\r_validation
+
+.\gradlew.bat benchmarkTopmedCox --no-daemon `
+  '-PtopmedCoxArgs=--prepared-dir build/benchmarks/sparse-cox-validation --genes 8 --threads 8 --measurements 5 --models pedigree --backend preferred --fixed-variances 0.35,0.20 --output-prefix build/benchmarks/sparse-cox-validation/java_validation'
+
+& 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src\benchmark\r\verify_sparse_cox_benchmark.R `
+  --directory build\benchmarks\sparse-cox-validation `
+  --r_prefix r_validation --java_prefix java_validation `
+  --beta_tolerance 0.000001 --standard_error_tolerance 0.0002 `
+  --standardized_beta_tolerance 0.00001 --minimum_speedup 1.0
+```
+
+Elapsed-time ratios are host- and workload-specific. This gate establishes the
+measured result for the stated fixture and worker counts; it is not a promise
+that every cohort or thread count will have the same ratio.
+
 Profiled on 2026-09-03 using the prepared TOPMed transcriptome cohort and the
 first 20 genes. The fixed-effects model was:
 
@@ -62,9 +117,14 @@ search error; it is less than 0.01 standard errors.
   dense 10,103-by-10,103 relationship matrix used by this data set.
 - The benchmark owns a persistent worker pool and one prepared model per
   worker, so neither executors nor native factors are recreated per gene.
+- Each measurement now samples JVM heap use and writes baseline, peak, and peak
+  delta bytes. Result rows also record solver type, sparse coefficient count,
+  equation nonzeros, and numeric-factor nonzeros. The historical timings above
+  predate those columns and should not be read as a memory result.
 
 The sparse pedigree kernel currently requires one stratum, right-censored
-data, distinct event times, and one unit-valued pedigree incidence per row.
+data, distinct event times, and one unit-valued pedigree incidence per row;
+multiple rows may map to the same pedigree individual.
 Unsupported data should continue to use the general dense `CoxMixedModel`.
 
 ## Synthetic survival phenotype

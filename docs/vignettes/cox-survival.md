@@ -117,8 +117,40 @@ Map<String, Double> allModes = pedigreeFit.ranef();
 
 The model uses the pedigree's directly constructed sparse `A^-1` as its unit
 Gaussian precision, avoiding a numerical inverse of the relationship matrix.
-The current Laplace solve materializes the random-effect information block, so
-very large pedigrees still need the planned sparse Cox precision engine.
+The default `fit` path materializes the random-effect information block.
+
+For one-stratum right-censored data with distinct event times, opt into the
+sparse precision solve:
+
+```java
+PedigreeRandomEffectTerm sparseTerm =
+    PedigreeRandomEffectTerm.ofSparse(
+        "pedigree", observationAnimalIds, pedigreeEntries,
+        inbreedingCoefficients);
+
+CoxPedigreeResult sparsePedigree = CoxPedigreeFrailty.fitSparse(
+    survival, covariates, sparseTerm,
+    offset, mixedOptions, BackendPolicy.PREFERRED);
+
+CoxMixedResult diagnostics = sparsePedigree.mixedModel();
+int equationNnz = diagnostics.sparseEquationNonzeroCount();
+int factorNnz = diagnostics.sparseFactorNonzeroCount();
+boolean boundaryFit = diagnostics.isSingular(1e-6);
+```
+
+Building the term with `ofSparse` (or `ofUninbred` when justified) avoids
+materializing dense `A`; the convenience `fitSparse` overload accepting an
+already-built `Pedigree` only makes the Cox equation solve sparse. The sparse
+path supports repeated rows per pedigree individual and retains unobserved
+ancestors. `SparseCoxMixedModel` can also consume a generic
+unit-incidence `RandomEffectTerm` and caller-supplied `SparsePrecisionMatrix`,
+which covers independent shared frailty and externally prepared sparse
+precision models. It keeps the exact penalized score, but approximates the
+profiled random-effect information by its diagonal plus the full sparse
+precision. Consequently conditional modes agree with the dense score solution
+when both converge, while Laplace-profiled variances and fixed-effect covariance
+need not be identical. Use the dense path when the approximation or sparse
+kernel restrictions are unsuitable.
 
 ## Interpretation and current boundaries
 
@@ -127,6 +159,10 @@ very large pedigrees still need the planned sparse Cox precision engine.
 - Baseline survival is `exp(-cumulativeHazard)` within each stratum.
 - Mixed, GRM, and pedigree estimates use Gaussian log frailty and a Laplace
   approximation. Gamma frailty and adaptive quadrature are not implemented.
+- `solver()` distinguishes dense and sparse-precision results. Sparse results
+  additionally report coefficient, equation-nonzero, and factor-nonzero counts;
+  `isSingular(tolerance)`, `converged()`, `convergenceMessage()`, and `backend()`
+  expose the boundary, optimization, and compute-backend state.
 - Schoenfeld residual proportional-hazards tests, martingale/deviance
   residuals, robust cluster sandwich covariance, recurrent-event robust
   inference, time-varying coefficient builders, and high-throughput prepared
@@ -134,5 +170,6 @@ very large pedigrees still need the planned sparse Cox precision engine.
 
 Numerical regression tests lock fixed Efron, Breslow, and delayed-entry results
 to an independent `statsmodels` Cox implementation. Mixed and pedigree tests
-exercise positive variance profiles, hazard-ratio inference, named modes, and
-a non-identity parent-offspring relationship.
+exercise positive variance profiles, hazard-ratio inference, named modes, a
+non-identity parent-offspring relationship, repeated sparse incidence, and
+dense/sparse conditional-mode parity.

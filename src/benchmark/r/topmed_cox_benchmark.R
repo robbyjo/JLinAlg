@@ -14,6 +14,9 @@ parse_arguments <- function(arguments) {
     max_rows = .Machine$integer.max,
     measurements = 3L,
     models = "cox,coxme,pedigree",
+    fixed_variances = NULL,
+    sparse_calc = NULL,
+    pedigree_covariance = "sparse",
     output_prefix = NULL
   )
   index <- 1L
@@ -26,6 +29,11 @@ parse_arguments <- function(arguments) {
   result$genes <- as.integer(result$genes)
   result$max_rows <- as.integer(result$max_rows)
   result$measurements <- as.integer(result$measurements)
+  if (!is.null(result$fixed_variances))
+    result$fixed_variances <- as.numeric(strsplit(
+      result$fixed_variances, ",", fixed = TRUE)[[1L]])
+  if (!is.null(result$sparse_calc)) result$sparse_calc <-
+    as.integer(result$sparse_calc)
   result
 }
 
@@ -127,6 +135,12 @@ build_relationship <- function(pedigree, observed_ids) {
 }
 
 options <- parse_arguments(commandArgs(trailingOnly = TRUE))
+setDTthreads(1L)
+cat(sprintf("R=%s survival=%s coxme=%s data.table=%s\n",
+  paste(R.version$major, R.version$minor, sep = "."),
+  as.character(packageVersion("survival")),
+  as.character(packageVersion("coxme")),
+  as.character(packageVersion("data.table"))))
 analysis <- fread(file.path(options$prepared_dir, "analysis.csv"))
 survival_path <- file.path(options$prepared_dir, "survival.csv")
 if (!file.exists(survival_path)) {
@@ -163,6 +177,10 @@ features <- features[variable]
 cat(sprintf("R cohort rows=%d events=%d genes=%d\n",
   nrow(analysis), sum(analysis$event), nrow(features)))
 requested_models <- strsplit(options$models, ",", fixed = TRUE)[[1L]]
+coxme_control <- if (is.null(options$sparse_calc)) coxme.control() else
+  coxme.control(sparse.calc = options$sparse_calc)
+cat(sprintf("R coxme sparse.calc=%s\n",
+  if (is.null(options$sparse_calc)) "automatic" else options$sparse_calc))
 
 fixed_terms <- c("GENE", "Sex", "Age", "WBC_Pred", "LY_PER_Pred",
   "MO_PER_Pred", "EO_PER_Pred", "BA_PER_Pred")
@@ -173,12 +191,42 @@ pedigree_formula <- function(gene) update(fixed_formula(gene),
   . ~ . + (1 | animal_id) + (1 | Levy_Set))
 
 pedigree_variance <- NULL
-if ("pedigree" %in% requested_models) {
+if (any(c("pedigree", "pedigree-dense") %in% requested_models)) {
   pedigree <- fread(file.path(options$prepared_dir, "pedigree.csv"),
     colClasses = "character", na.strings = c("", "NA"))
   pedigree_variance <- build_relationship(pedigree, levels(analysis$animal_id))
   cat(sprintf("R pedigree covariance dimension=%d nonzeros=%d\n",
     nrow(pedigree_variance), length(pedigree_variance@x)))
+  if (identical(Sys.getenv("JLINALG_COX_VALIDATE_PRECISION"), "true") &&
+      setequal(as.character(pedigree$id), levels(analysis$animal_id))) {
+    ids <- as.character(pedigree$id)
+    index <- setNames(seq_along(ids), ids)
+    precision <- matrix(0, length(ids), length(ids))
+    for (individual in seq_along(ids)) {
+      sire <- if (is.na(pedigree$sire[[individual]])) NA_integer_ else
+        unname(index[[as.character(pedigree$sire[[individual]])]])
+      dam <- if (is.na(pedigree$dam[[individual]])) NA_integer_ else
+        unname(index[[as.character(pedigree$dam[[individual]])]])
+      mendelian <- if (is.na(sire) && is.na(dam)) 1 else
+        if (is.na(sire) || is.na(dam)) 0.75 else 0.5
+      relatives <- c(individual, sire, dam)
+      coefficients <- c(1, -0.5, -0.5)
+      retained <- !is.na(relatives)
+      precision[relatives[retained], relatives[retained]] <-
+        precision[relatives[retained], relatives[retained]] +
+        tcrossprod(coefficients[retained]) / mendelian
+    }
+    covariance_ordered <- as.matrix(pedigree_variance[ids, ids])
+    cat(sprintf("R pedigree precision parity max_abs=%.12g\n",
+      max(abs(solve(covariance_ordered) - precision))))
+  }
+  if (options$pedigree_covariance == "dense") {
+    pedigree_variance <- as.matrix(pedigree_variance)
+  } else if (options$pedigree_covariance != "sparse") {
+    stop("--pedigree_covariance must be sparse or dense")
+  }
+  cat(sprintf("R pedigree covariance representation=%s\n",
+    options$pedigree_covariance))
 }
 
 fit_gene <- function(model, gene) {
@@ -186,11 +234,16 @@ fit_gene <- function(model, gene) {
     coxph(fixed_formula(gene), data = analysis, ties = "efron",
       model = FALSE, x = FALSE, y = FALSE)
   } else if (model == "coxme") {
-    coxme(mixed_formula(gene), data = analysis, ties = "efron")
-  } else if (model == "pedigree") {
+    coxme(mixed_formula(gene), data = analysis, ties = "efron",
+      control = coxme_control,
+      vfixed = if (is.null(options$fixed_variances)) NULL
+        else options$fixed_variances[[length(options$fixed_variances)]])
+  } else if (model %in% c("pedigree", "pedigree-dense")) {
     coxme(pedigree_formula(gene), data = analysis, ties = "efron",
+      control = coxme_control,
       varlist = list(coxmeMlist(pedigree_variance, rescale = FALSE),
-        coxmeFull()))
+        coxmeFull()), vfixed = if (is.null(options$fixed_variances)) NULL
+          else as.list(options$fixed_variances))
   } else stop(paste("unknown model", model))
 }
 
@@ -198,7 +251,10 @@ timings <- list()
 results <- list()
 genes <- features$feature_key
 for (model in requested_models) {
-  invisible(fit_gene(model, genes[[1L]]))
+  warm_fits <- lapply(genes, function(gene) fit_gene(model, gene))
+  if (model != "cox")
+    cat(sprintf("R model=%s variance_terms=%s\n", model,
+      paste(names(warm_fits[[1L]]$vcoef), collapse = ";")))
   for (measurement in seq_len(options$measurements)) {
     gc()
     elapsed <- system.time(fits <- lapply(genes, function(gene)

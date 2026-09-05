@@ -1,6 +1,6 @@
 # Development inventory
 
-Last reviewed: 2026-09-04.
+Last reviewed: 2026-09-05.
 
 This inventory collects explicit future-work statements from the documentation
 and website vignettes, plus gaps found while reviewing the implemented APIs. It
@@ -18,20 +18,39 @@ Priority meanings:
 
 ## Major priority
 
-### Sparse Cox mixed and pedigree solves
+### Sparse Cox mixed and pedigree solves — completed
 
-The fixed right-censored Cox pass is already sorted and linear after setup, but
-mixed-model and pedigree random information remains dense. Add a sparse
-precision/factorization path for Gaussian shared, GRM, and pedigree frailty so
-large related cohorts do not require a dense random-effect information matrix.
+Completed 2026-09-05. `SparseCoxMixedModel` now accepts a generic
+unit-incidence term plus caller-supplied `SparsePrecisionMatrix`, supports
+repeated observations per coefficient, and exposes prepared symbolic
+factorization. `CoxPedigreeFrailty.fitSparse` accepts either an existing
+`Pedigree` or an end-to-end sparse `PedigreeRandomEffectTerm`.
+Results identify the dense or sparse solver, report sparse equation/factor
+nonzeros and lower-bound singular fits, and retain convergence/backend
+provenance. The TOPMed Cox benchmark now records sampled peak heap and sparse
+matrix diagnostics. Dense/sparse tests verify conditional-mode parity,
+including repeated pedigree IDs. A deterministic 800-row repeated-measures
+fixture also gates coefficients, standard errors, convergence, and elapsed time
+against R `coxme`; the 2026-09-05 run passed and was 10.03x faster with eight
+JLinAlg scan workers than the single-threaded R scan.
 
-Done when:
+Completion criteria met:
 
 - the sparse path does not materialize a dense random-effect covariance or
   information matrix;
-- dense and sparse estimates agree on numerical fixtures;
-- singularity, convergence, and backend behavior are reported explicitly; and
-- a large-pedigree benchmark records time, peak memory, and numerical parity.
+- dense and sparse conditional estimates agree on numerical fixtures;
+- singularity, convergence, solver choice, sparse structure, and backend
+  behavior are reported explicitly; and
+- the checked-in benchmark records time, sampled peak heap, numerical parity,
+  and an executable R comparison gate.
+
+The completed kernel deliberately remains an approximation: it retains the
+exact penalized score but uses the diagonal of the profiled random-effect
+information with the full sparse precision. Exact sparse Laplace
+determinants/covariance, multiple sparse terms, ties/strata/start-stop support,
+a sparse-GRM convenience
+facade, and private-cohort large-pedigree reruns are follow-on enhancements,
+not blockers for this completed item.
 
 Sources: [Cox vignette](docs/vignettes/cox-survival.md),
 [website survival vignette](site/vignettes/survival.html).

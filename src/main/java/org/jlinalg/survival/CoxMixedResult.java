@@ -26,6 +26,11 @@ public final class CoxMixedResult {
     private final boolean converged;
     private final String convergenceMessage;
     private final BackendProvenance backend;
+    private final CoxMixedSolver solver;
+    private final int sparseCoefficientCount;
+    private final int sparseEquationNonzeroCount;
+    private final int sparseFactorNonzeroCount;
+    private final double minimumVariance;
 
     CoxMixedResult(
             double[] beta, double[] covariance,
@@ -34,7 +39,9 @@ public final class CoxMixedResult {
             double partialLogLikelihood, double penalizedLogLikelihood,
             double laplaceLogLikelihood, CoxMixedOptions options,
             int iterations, boolean converged, String convergenceMessage,
-            BackendProvenance backend) {
+            BackendProvenance backend, CoxMixedSolver solver,
+            int sparseCoefficientCount, int sparseEquationNonzeroCount,
+            int sparseFactorNonzeroCount) {
         this.beta = beta.clone();
         this.covariance = covariance.clone();
         double[] standardErrors = new double[beta.length];
@@ -68,6 +75,11 @@ public final class CoxMixedResult {
         this.converged = converged;
         this.convergenceMessage = convergenceMessage;
         this.backend = backend;
+        this.solver = solver;
+        this.sparseCoefficientCount = sparseCoefficientCount;
+        this.sparseEquationNonzeroCount = sparseEquationNonzeroCount;
+        this.sparseFactorNonzeroCount = sparseFactorNonzeroCount;
+        this.minimumVariance = options.minimumVariance();
     }
 
     public double[] beta() { return beta.clone(); }
@@ -109,4 +121,21 @@ public final class CoxMixedResult {
     public boolean converged() { return converged; }
     public String convergenceMessage() { return convergenceMessage; }
     public BackendProvenance backend() { return backend; }
+    public CoxMixedSolver solver() { return solver; }
+    public int sparseCoefficientCount() { return sparseCoefficientCount; }
+    public int sparseEquationNonzeroCount() {
+        return sparseEquationNonzeroCount;
+    }
+    public int sparseFactorNonzeroCount() { return sparseFactorNonzeroCount; }
+
+    /** Reports a frailty variance fitted at the configured lower boundary. */
+    public boolean isSingular(double relativeTolerance) {
+        if (!(relativeTolerance >= 0.0) || !Double.isFinite(relativeTolerance))
+            throw new IllegalArgumentException(
+                "singularity tolerance must be finite and nonnegative");
+        double boundary = minimumVariance * (1.0 + relativeTolerance);
+        for (CoxRandomEffectEstimates effect : randomEffects)
+            if (effect.variance() <= boundary) return true;
+        return false;
+    }
 }

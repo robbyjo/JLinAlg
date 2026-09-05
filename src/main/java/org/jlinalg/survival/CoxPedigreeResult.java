@@ -13,11 +13,19 @@ public final class CoxPedigreeResult {
     private final CoxMixedResult mixed;
     private final List<String> individualIds;
     private final Map<String, Double> frailties;
+    private final String pedigreeTermName;
 
     CoxPedigreeResult(CoxMixedResult mixed, List<String> individualIds) {
+        this(mixed, individualIds, "pedigree");
+    }
+
+    CoxPedigreeResult(
+            CoxMixedResult mixed, List<String> individualIds,
+            String pedigreeTermName) {
         this.mixed = mixed;
         this.individualIds = List.copyOf(individualIds);
-        double[] modes = mixed.randomEffects("pedigree").modes();
+        this.pedigreeTermName = pedigreeTermName;
+        double[] modes = mixed.randomEffects(pedigreeTermName).modes();
         Map<String, Double> values = new LinkedHashMap<>();
         for (int index = 0; index < modes.length; index++)
             values.put(this.individualIds.get(index), modes[index]);
@@ -38,7 +46,7 @@ public final class CoxPedigreeResult {
         return mixed.associationStatistics();
     }
     public double frailtyVariance() {
-        return mixed.randomEffects("pedigree").variance();
+        return mixed.randomEffects(pedigreeTermName).variance();
     }
     public List<String> individualIds() { return individualIds; }
     public Map<String, Double> ranef() { return frailties; }

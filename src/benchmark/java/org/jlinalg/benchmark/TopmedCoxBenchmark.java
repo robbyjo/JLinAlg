@@ -20,11 +20,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.jlinalg.pedigree.PedigreeIndividual;
 import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.jlinalg.survival.CoxMixedModel;
@@ -49,12 +51,6 @@ public final class TopmedCoxBenchmark {
         Options options = Options.parse(arguments);
         Data data = readAnalysis(options.preparedDirectory(), options.genes(),
             options.maximumRows()).variableGenes();
-        try (BackendContext context = BackendContext.select(options.backend())) {
-            System.out.printf("backend requested=%s selected=%s device=%s%n",
-                context.provenance().requested(),
-                context.provenance().selectedBackend(),
-                context.provenance().deviceDescription());
-        }
         System.out.printf(Locale.ROOT,
             "cohort rows=%d events=%d genes=%d%n",
             data.rows(), data.events(), data.genes());
@@ -68,7 +64,9 @@ public final class TopmedCoxBenchmark {
                     @Override public Fit fit(GeneData value) {
                         CoxResult result = prepared.fit(value.design(), null);
                         return new Fit(result.beta()[0],
-                            result.standardErrors()[0], result.converged(), "");
+                            result.standardErrors()[0], result.converged(), "",
+                            "FIXED", result.backend().selectedBackend(),
+                            0, 0, 0);
                     }
                     @Override public void close() { prepared.close(); }
                 };
@@ -76,25 +74,45 @@ public final class TopmedCoxBenchmark {
         RandomEffectTerm batchDesign = null;
         CoxRandomEffectTerm batch = null;
         if (options.models().contains("coxme")
-                || options.models().contains("pedigree")) {
+                || options.models().contains("pedigree")
+                || options.models().contains("pedigree-dense")) {
             batchDesign = RandomEffectTerm.randomIntercept(
                 "Levy_Set", data.batch());
             batch = CoxRandomEffectTerm.independent(batchDesign);
         }
         if (options.models().contains("coxme")) {
             CoxRandomEffectTerm retainedBatch = batch;
-            fitters.put("coxme", mixedFactory(data, List.of(retainedBatch),
-                CoxMixedOptions.defaults(), options.backend()));
+            fitters.put("coxme", options.fixedVariances() == null
+                ? mixedFactory(data, List.of(retainedBatch),
+                    CoxMixedOptions.defaults(), options.backend())
+                : fixedMixedFactory(data, List.of(retainedBatch),
+                    CoxMixedOptions.defaults(), options.backend(),
+                    new double[] {options.fixedVariances()[
+                        options.fixedVariances().length - 1]}));
         }
-        if (options.models().contains("pedigree")) {
+        if (options.models().contains("pedigree")
+                || options.models().contains("pedigree-dense")) {
             PedigreeRandomEffectTerm genetic = pedigreeTerm(data, options);
             RandomEffectTerm retainedBatch = batchDesign;
             CoxMixedOptions mixedOptions = new CoxMixedOptions(
                 CoxOptions.defaults(), new double[] {0.01, 0.06},
                 30, 1e-4, 1e-8, 1e4);
-            fitters.put("pedigree", sparseMixedFactory(data, genetic,
-                List.of(retainedBatch), mixedOptions,
-                options.backend(), options.fixedVariances()));
+            if (options.models().contains("pedigree"))
+                fitters.put("pedigree", sparseMixedFactory(data, genetic,
+                    List.of(retainedBatch), mixedOptions,
+                    options.backend(), options.fixedVariances()));
+            if (options.models().contains("pedigree-dense")) {
+                CoxRandomEffectTerm denseGenetic = new CoxRandomEffectTerm(
+                    genetic.randomEffect().name(),
+                    dense(genetic.randomEffect()),
+                    dense(genetic.precision()),
+                    genetic.randomEffect().coefficientNames());
+                fitters.put("pedigree-dense", fixedMixedFactory(data,
+                    List.of(denseGenetic,
+                        CoxRandomEffectTerm.independent(retainedBatch)),
+                    mixedOptions, options.backend(),
+                    options.fixedVariances()));
+            }
         }
 
         List<Timing> timings = new ArrayList<>();
@@ -104,16 +122,38 @@ public final class TopmedCoxBenchmark {
             if (fitter == null)
                 throw new IllegalArgumentException("unknown model: " + model);
             try (Scan scan = new Scan(data, fitter, options.threads())) {
-                scan.fit(1);
+                scan.fit(data.genes());
                 for (int measurement = 1;
                         measurement <= options.measurements(); measurement++) {
                     System.gc();
+                    long baselineHeap = usedHeap();
+                    AtomicLong peakHeap = new AtomicLong(baselineHeap);
+                    AtomicBoolean sampling = new AtomicBoolean(true);
+                    Thread sampler = new Thread(() -> {
+                        while (sampling.get()) {
+                            peakHeap.accumulateAndGet(usedHeap(), Math::max);
+                            try {
+                                Thread.sleep(1);
+                            } catch (InterruptedException interrupted) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        }
+                    }, "jlinalg-cox-memory-sampler");
+                    sampler.setDaemon(true);
+                    sampler.start();
                     long started = System.nanoTime();
-                    List<Fit> fitted = scan.fit(data.genes());
+                    List<Fit> fitted;
+                    try {
+                        fitted = scan.fit(data.genes());
+                    } finally {
+                        sampling.set(false);
+                        sampler.join();
+                    }
                     double seconds = (System.nanoTime() - started) / 1e9;
-                    timings.add(new Timing(model, options.backend().name(),
+                    timings.add(new Timing(model, fitted.get(0).backend(),
                         options.threads(), measurement, data.genes(),
-                        data.rows(), seconds));
+                        data.rows(), seconds, baselineHeap, peakHeap.get()));
                     for (Fit value : fitted) checksum += value.beta();
                     if (measurement == 1)
                         for (int gene = 0; gene < fitted.size(); gene++) {
@@ -122,13 +162,20 @@ public final class TopmedCoxBenchmark {
                                 data.featureKeys().get(gene),
                                 data.featureIds().get(gene), value.beta(),
                                 value.standardError(), value.converged(),
-                                value.variances()));
+                                value.variances(), value.solver(),
+                                value.sparseCoefficients(),
+                                value.sparseEquationNonzeros(),
+                                value.sparseFactorNonzeros()));
                         }
                     System.out.printf(Locale.ROOT,
-                        "JLinAlg model=%s threads=%d measurement=%d rows=%d "
-                            + "genes=%d seconds=%.6f genes_per_second=%.3f%n",
-                        model, options.threads(), measurement, data.rows(),
-                        data.genes(), seconds, data.genes() / seconds);
+                        "JLinAlg model=%s backend=%s threads=%d measurement=%d rows=%d "
+                            + "genes=%d seconds=%.6f genes_per_second=%.3f "
+                            + "peak_heap_mb=%.3f peak_heap_delta_mb=%.3f%n",
+                        model, fitted.get(0).backend(), options.threads(),
+                        measurement, data.rows(),
+                        data.genes(), seconds, data.genes() / seconds,
+                        peakHeap.get() / 1_048_576.0,
+                        (peakHeap.get() - baselineHeap) / 1_048_576.0);
                 }
             }
         }
@@ -151,7 +198,42 @@ public final class TopmedCoxBenchmark {
                         result.standardErrors()[0], result.converged(),
                         result.randomEffects().stream()
                             .map(effect -> Double.toString(effect.variance()))
-                            .collect(java.util.stream.Collectors.joining(";")));
+                            .collect(java.util.stream.Collectors.joining(";")),
+                        result.solver().name(),
+                        result.backend().selectedBackend(),
+                        result.sparseCoefficientCount(),
+                        result.sparseEquationNonzeroCount(),
+                        result.sparseFactorNonzeroCount());
+                }
+                @Override public void close() { prepared.close(); }
+            };
+        };
+    }
+
+    private static FitterFactory fixedMixedFactory(
+            Data data, List<CoxRandomEffectTerm> randomEffects,
+            CoxMixedOptions options, BackendPolicy backend,
+            double[] fixedVariances) {
+        if (fixedVariances == null)
+            throw new IllegalArgumentException(
+                "pedigree-dense requires --fixed-variances");
+        return () -> {
+            CoxMixedModel.Prepared prepared = CoxMixedModel.prepare(
+                data.survival(), randomEffects, options, backend);
+            return new Worker() {
+                @Override public Fit fit(GeneData value) {
+                    CoxMixedResult result = prepared.fitAtVariances(
+                        value.design(), null, fixedVariances);
+                    return new Fit(result.beta()[0],
+                        result.standardErrors()[0], result.converged(),
+                        result.randomEffects().stream()
+                            .map(effect -> Double.toString(effect.variance()))
+                            .collect(java.util.stream.Collectors.joining(";")),
+                        result.solver().name(),
+                        result.backend().selectedBackend(),
+                        result.sparseCoefficientCount(),
+                        result.sparseEquationNonzeroCount(),
+                        result.sparseFactorNonzeroCount());
                 }
                 @Override public void close() { prepared.close(); }
             };
@@ -176,7 +258,12 @@ public final class TopmedCoxBenchmark {
                         result.standardErrors()[0], result.converged(),
                         result.randomEffects().stream()
                             .map(effect -> Double.toString(effect.variance()))
-                            .collect(java.util.stream.Collectors.joining(";")));
+                            .collect(java.util.stream.Collectors.joining(";")),
+                        result.solver().name(),
+                        result.backend().selectedBackend(),
+                        result.sparseCoefficientCount(),
+                        result.sparseEquationNonzeroCount(),
+                        result.sparseFactorNonzeroCount());
                 }
                 @Override public void close() { prepared.close(); }
             };
@@ -260,6 +347,28 @@ public final class TopmedCoxBenchmark {
             new LinkedHashSet<>(data.animals()).size(), selected.size());
         return PedigreeRandomEffectTerm.ofUninbred(
             "additive genetic", data.animals(), selected);
+    }
+
+    private static double[] dense(SparsePrecisionMatrix matrix) {
+        int dimension = matrix.dimension();
+        double[] result = new double[dimension * dimension];
+        int[] starts = matrix.rowStarts();
+        int[] columns = matrix.columnIndices();
+        double[] values = matrix.values();
+        for (int row = 0; row < dimension; row++)
+            for (int index = starts[row]; index < starts[row + 1]; index++)
+                result[row * dimension + columns[index]] = values[index];
+        return result;
+    }
+
+    private static double[][] dense(RandomEffectTerm term) {
+        int rows = term.observations();
+        int columns = term.coefficients();
+        double[] source = term.design();
+        double[][] result = new double[rows][columns];
+        for (int row = 0; row < rows; row++)
+            System.arraycopy(source, row * columns, result[row], 0, columns);
+        return result;
     }
 
     private static Data readAnalysis(
@@ -429,13 +538,15 @@ public final class TopmedCoxBenchmark {
         Files.createDirectories(path.toAbsolutePath().getParent());
         try (BufferedWriter writer = Files.newBufferedWriter(
                 path, StandardCharsets.UTF_8)) {
-            writer.write("runtime,model,backend,threads,measurement,genes,rows,seconds,genes_per_second\n");
+            writer.write("runtime,model,backend,threads,measurement,genes,rows,seconds,genes_per_second,baseline_heap_bytes,peak_heap_bytes,peak_heap_delta_bytes\n");
             for (Timing value : values)
                 writer.write(String.format(Locale.ROOT,
-                    "JLinAlg,%s,%s,%d,%d,%d,%d,%.9f,%.9f%n",
+                    "JLinAlg,%s,%s,%d,%d,%d,%d,%.9f,%.9f,%d,%d,%d%n",
                     value.model(), value.backend(), value.threads(),
                     value.measurement(), value.genes(), value.rows(),
-                    value.seconds(), value.genes() / value.seconds()));
+                    value.seconds(), value.genes() / value.seconds(),
+                    value.baselineHeapBytes(), value.peakHeapBytes(),
+                    value.peakHeapBytes() - value.baselineHeapBytes()));
         }
     }
 
@@ -445,14 +556,22 @@ public final class TopmedCoxBenchmark {
         Files.createDirectories(path.toAbsolutePath().getParent());
         try (BufferedWriter writer = Files.newBufferedWriter(
                 path, StandardCharsets.UTF_8)) {
-            writer.write("runtime,model,threads,feature_key,feature_id,beta,standard_error,converged,frailty_variances\n");
+            writer.write("runtime,model,threads,feature_key,feature_id,beta,standard_error,converged,frailty_variances,solver,sparse_coefficients,sparse_equation_nonzeros,sparse_factor_nonzeros\n");
             for (Result value : values)
                 writer.write(String.format(Locale.ROOT,
-                    "JLinAlg,%s,%d,%s,%s,%.17g,%.17g,%s,%s%n",
+                    "JLinAlg,%s,%d,%s,%s,%.17g,%.17g,%s,%s,%s,%d,%d,%d%n",
                     value.model(), value.threads(), value.featureKey(),
                     value.featureId(), value.beta(), value.standardError(),
-                    value.converged(), value.variances()));
+                    value.converged(), value.variances(), value.solver(),
+                    value.sparseCoefficients(),
+                    value.sparseEquationNonzeros(),
+                    value.sparseFactorNonzeros()));
         }
+    }
+
+    private static long usedHeap() {
+        Runtime runtime = Runtime.getRuntime();
+        return runtime.totalMemory() - runtime.freeMemory();
     }
 
     private record SurvivalRow(double time, boolean event) { }
@@ -509,14 +628,18 @@ public final class TopmedCoxBenchmark {
     }
 
     private record Fit(double beta, double standardError, boolean converged,
-        String variances) { }
+        String variances, String solver, String backend, int sparseCoefficients,
+        int sparseEquationNonzeros, int sparseFactorNonzeros) { }
     private record IndexedFit(int index, Fit fit) { }
     private record GeneData(CoxSurvivalData survival, double[][] design) { }
     private record Timing(String model, String backend, int threads,
-        int measurement, int genes, int rows, double seconds) { }
+        int measurement, int genes, int rows, double seconds,
+        long baselineHeapBytes, long peakHeapBytes) { }
     private record Result(String model, int threads, String featureKey,
         String featureId, double beta, double standardError,
-        boolean converged, String variances) { }
+        boolean converged, String variances, String solver,
+        int sparseCoefficients, int sparseEquationNonzeros,
+        int sparseFactorNonzeros) { }
 
     private record Options(
             Path preparedDirectory, int genes, int maximumRows,

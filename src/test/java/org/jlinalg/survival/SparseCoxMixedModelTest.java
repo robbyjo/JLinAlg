@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
+import org.jlinalg.pedigree.Pedigree;
 import org.jlinalg.pedigree.PedigreeIndividual;
 import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.junit.jupiter.api.Test;
@@ -61,5 +63,82 @@ class SparseCoxMixedModelTest {
             assertEquals(fixedSecond.standardErrors()[0],
                 sparseSecond.standardErrors()[0], 2e-6);
         }
+    }
+
+    @Test
+    void repeatedIncidenceMatchesDenseConditionalModes() {
+        double[] time = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+        boolean[] event = {
+            true, false, true, true, false, true,
+            true, false, true, true, false, true};
+        double[][] fixed = new double[time.length][1];
+        List<String> groups = new ArrayList<>();
+        for (int row = 0; row < time.length; row++) {
+            fixed[row][0] = ((row * 5) % 11) - 5.0;
+            groups.add("g" + (row % 4));
+        }
+        CoxSurvivalData survival = CoxSurvivalData.rightCensored(time, event);
+        RandomEffectTerm shared = RandomEffectTerm.randomIntercept(
+            "shared", groups);
+        CoxMixedOptions nearlyFixed = new CoxMixedOptions(
+            CoxOptions.defaults(), new double[] {0.4}, 2, 1e-4,
+            0.399999, 0.400001);
+
+        CoxMixedResult dense = CoxMixedModel.fit(survival, fixed,
+            List.of(CoxRandomEffectTerm.independent(shared)), null,
+            nearlyFixed, BackendPolicy.CPU);
+        CoxMixedResult sparse = SparseCoxMixedModel.fit(survival, fixed,
+            shared, SparsePrecisionMatrix.identity(shared.coefficients()),
+            List.of(), null, nearlyFixed, BackendPolicy.CPU);
+
+        assertEquals(dense.beta()[0], sparse.beta()[0], 2e-6);
+        double[] denseModes = dense.randomEffects("shared").modes();
+        double[] sparseModes = sparse.randomEffects("shared").modes();
+        for (int index = 0; index < denseModes.length; index++)
+            assertEquals(denseModes[index], sparseModes[index], 2e-6);
+        assertEquals(CoxMixedSolver.SPARSE_PRECISION, sparse.solver());
+        assertEquals(shared.coefficients(), sparse.sparseCoefficientCount());
+        assertTrue(sparse.sparseEquationNonzeroCount()
+            <= shared.coefficients());
+        assertTrue(sparse.sparseFactorNonzeroCount()
+            <= shared.coefficients());
+        assertTrue(sparse.isSingular(1e-4));
+    }
+
+    @Test
+    void pedigreeFacadeUsesSparsePrecisionWithRepeatedIndividuals() {
+        double[] time = {1, 2, 3, 4, 5, 6, 7, 8};
+        boolean[] event = {true, false, true, true, false, true, false, true};
+        double[][] fixed = {
+            {-2}, {-1}, {0}, {1}, {2}, {-2}, {-1}, {1}
+        };
+        List<PedigreeIndividual> individuals = List.of(
+            PedigreeIndividual.founder("A"),
+            PedigreeIndividual.founder("B"),
+            new PedigreeIndividual("C", "A", "B"));
+        Pedigree pedigree = Pedigree.of(individuals);
+        List<String> ids = List.of("A", "A", "B", "B", "C", "C", "A", "C");
+        CoxMixedOptions options = new CoxMixedOptions(CoxOptions.defaults(),
+            new double[] {0.2}, 2, 1e-4, 0.199999, 0.200001);
+
+        CoxPedigreeResult dense = CoxPedigreeFrailty.fit(
+            CoxSurvivalData.rightCensored(time, event), fixed, ids, pedigree,
+            null, options, BackendPolicy.CPU);
+        PedigreeRandomEffectTerm sparseTerm =
+            PedigreeRandomEffectTerm.ofUninbred(
+                "additive genetic", ids, individuals);
+        CoxPedigreeResult result = CoxPedigreeFrailty.fitSparse(
+            CoxSurvivalData.rightCensored(time, event), fixed, sparseTerm,
+            null, options, BackendPolicy.CPU);
+
+        assertEquals(dense.beta()[0], result.beta()[0], 2e-6);
+        for (String id : pedigree.individualIds())
+            assertEquals(dense.frailty(id), result.frailty(id), 2e-6);
+        assertEquals(CoxMixedSolver.SPARSE_PRECISION,
+            result.mixedModel().solver());
+        assertEquals(pedigree.size(),
+            result.mixedModel().sparseCoefficientCount());
+        assertTrue(Double.isFinite(result.beta()[0]));
+        assertTrue(Double.isFinite(result.frailty("C")));
     }
 }

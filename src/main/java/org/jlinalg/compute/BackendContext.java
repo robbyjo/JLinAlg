@@ -73,6 +73,22 @@ public final class BackendContext implements AutoCloseable {
             BackendPolicy.PREFERRED, ComputeBackends.select(Compute.CPU));
     }
 
+    /**
+     * Selects a sparse-factorization backend without routing small sparse
+     * Newton systems through a GPU dense delegate. CHOLMOD remains first;
+     * otherwise the portable CPU sparse kernel is used. Dense BLAS delegates
+     * add dispatch overhead here without supplying a native sparse factorizer.
+     */
+    public static BackendContext preferredSparse() {
+        try {
+            return cholmod(BackendPolicy.PREFERRED);
+        } catch (IllegalStateException | LinkageError unavailable) {
+            // Continue through CPU backends that suit sparse host-side assembly.
+        }
+        return new BackendContext(
+            BackendPolicy.PREFERRED, ComputeBackends.select(Compute.CPU));
+    }
+
     /** Returns the selected JDistlib backend. The context retains ownership. */
     public ComputeBackend backend() {
         return backend;

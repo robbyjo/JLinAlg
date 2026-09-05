@@ -59,6 +59,17 @@ final class CholmodBackendTest {
     }
 
     @Test
+    void preferredSparseUsesCholmodOrPortableCpu() {
+        try (BackendContext context = BackendContext.preferredSparse()) {
+            String selected = context.provenance().selectedBackend();
+            assertTrue("cpu".equals(selected)
+                || selected.startsWith("cholmod+"), selected);
+            assertEquals(BackendPolicy.PREFERRED,
+                context.provenance().requested());
+        }
+    }
+
+    @Test
     void acceptsUpperTriangleCsr() {
         BackendContext selected;
         try {

@@ -529,6 +529,19 @@ CoxPedigreeResult pedigreeFit = CoxPedigreeFrailty.fit(
     survival, covariates, animalIds, pedigree);
 ```
 
+For one-stratum right-censored data with distinct event times, large pedigree
+fits can opt into `CoxPedigreeFrailty.fitSparse`. Pass a
+`PedigreeRandomEffectTerm` built with `ofSparse` or `ofUninbred` to avoid both
+dense pedigree covariance and dense random-information matrices end to end;
+the convenience overload accepting an existing `Pedigree` still benefits from
+the sparse Cox solve. Repeated rows per individual are supported.
+`SparseCoxMixedModel` also accepts a generic unit-incidence `RandomEffectTerm`
+with caller-supplied `SparsePrecisionMatrix`. This path keeps the exact
+penalized score but uses a diagonal random-information approximation; inspect
+`solver()`, sparse coefficient/equation/factor counts,
+`isSingular(tolerance)`, `converged()`, and `backend()` before treating a fit as
+operationally valid.
+
 The fixed model is an ordinary Cox partial-likelihood estimator. Mixed and
 pedigree models are explicitly Laplace-approximated Gaussian frailty models,
 not Gaussian REML and not gamma frailty. See the

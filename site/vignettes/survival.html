@@ -37,15 +37,19 @@ CoxMixedResult relatedFit =
     CoxKinshipFrailty.fit(
         right, covariates,
         observationSampleIds, grm);</code></pre></div><p>The GRM is converted to named Gaussian precision internally. Repeated start-stop rows may map to the same sample. Explicit diagonal regularization handles duplicate samples and finite-marker rank.</p>
-<h2 id="pedigree">Use pedigree-correlated frailty</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Additive A-inverse precision</span></div><pre><code>CoxPedigreeResult pedigreeFit =
-    CoxPedigreeFrailty.fit(
-        right, covariates,
-        observationAnimalIds, pedigree);
+<h2 id="pedigree">Use pedigree-correlated frailty</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Additive A-inverse precision</span></div><pre><code>PedigreeRandomEffectTerm sparseTerm =
+    PedigreeRandomEffectTerm.ofSparse(
+        "pedigree", observationAnimalIds,
+        pedigreeEntries, inbreedingCoefficients);
+
+CoxPedigreeResult pedigreeFit =
+    CoxPedigreeFrailty.fitSparse(
+        right, covariates, sparseTerm);
 
 double geneticVariance =
     pedigreeFit.frailtyVariance();
 double mode = pedigreeFit
-    .frailty("offspring");</code></pre></div><p>The pedigree facade uses directly constructed <code>A⁻¹</code> and returns named modes for every pedigree member, including unobserved ancestors retained in the coefficient system.</p>
-<div class="note warning"><strong>Current boundary</strong>The fixed right-censored risk pass is sorted and linear after setup. Start-stop data use the general reference path. Mixed/pedigree random information is currently dense; robust sandwich inference, PH diagnostics, gamma frailty, and sparse large-pedigree Cox solves remain planned.</div>
+    .frailty("offspring");</code></pre></div><p>A term built with <code>ofSparse</code> or justified <code>ofUninbred</code> avoids dense pedigree covariance end to end. The sparse facade supports repeated rows per individual and returns named modes for every pedigree member, including unobserved ancestors. Results expose solver type, sparse equation/factor nonzeros, convergence, boundary singularity, and backend provenance.</p>
+<div class="note warning"><strong>Current boundary</strong>The sparse path requires one-stratum right-censored data with distinct event times and unit incidence. It keeps the exact penalized score but uses a diagonal approximation to profiled random-effect information, so Laplace variance and covariance can differ from the dense fit. Start-stop data, ties, strata, and cases needing exact dense information should use the general path. Robust sandwich inference, PH diagnostics, and gamma frailty remain planned.</div>
 <div class="next-links"><a href="mixed-models.html"><small>Previous</small><strong>REML and LMM</strong></a><a href="pedigree.html"><small>Next</small><strong>Pedigree models →</strong></a></div>
 </article><aside class="toc"><strong>On this page</strong><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>

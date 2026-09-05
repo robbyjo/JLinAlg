@@ -21,12 +21,14 @@ import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 
 /**
- * Block-plus-dense Laplace Cox model for a pedigree frailty and small ordinary
- * random-effect terms. Pedigree precision is factored directly in coefficient
- * space without materializing an observation-scale covariance.
+ * Block-plus-dense Laplace Cox model for one sparse-precision frailty and
+ * small ordinary random-effect terms. The sparse precision is factored
+ * directly in coefficient space without materializing an observation-scale
+ * covariance.
  *
  * <p>The sparse kernel currently supports one-stratum right-censored data,
- * distinct event times, and one unit-valued pedigree incidence per row.</p>
+ * distinct event times, and one unit-valued sparse incidence per row. Multiple
+ * rows may refer to the same random-effect coefficient.</p>
  */
 public final class SparseCoxMixedModel {
     private SparseCoxMixedModel() { }
@@ -43,21 +45,50 @@ public final class SparseCoxMixedModel {
         }
     }
 
+    /** Fits one caller-supplied sparse-precision frailty term. */
+    public static CoxMixedResult fit(
+            CoxSurvivalData survival, double[][] fixedEffects,
+            RandomEffectTerm sparseEffect,
+            SparsePrecisionMatrix sparsePrecision,
+            List<RandomEffectTerm> ordinaryEffects,
+            double[] offset, CoxMixedOptions options,
+            BackendPolicy backendPolicy) {
+        try (Prepared prepared = prepare(survival, sparseEffect,
+                sparsePrecision, ordinaryEffects, options, backendPolicy)) {
+            return prepared.fit(fixedEffects, offset);
+        }
+    }
+
     public static Prepared prepare(
             CoxSurvivalData survival,
             PedigreeRandomEffectTerm pedigreeEffect,
             List<RandomEffectTerm> ordinaryEffects,
             CoxMixedOptions options, BackendPolicy backendPolicy) {
-        return new Prepared(survival, pedigreeEffect, ordinaryEffects,
-            options, backendPolicy);
+        if (pedigreeEffect == null)
+            throw new IllegalArgumentException(
+                "sparse pedigree Cox effect is required");
+        return prepare(survival, pedigreeEffect.randomEffect(),
+            pedigreeEffect.precision(), ordinaryEffects, options,
+            backendPolicy);
     }
 
-    /** Reusable single-worker sparse pedigree Cox scan. */
+    /** Prepares one reusable caller-supplied sparse-precision frailty term. */
+    public static Prepared prepare(
+            CoxSurvivalData survival,
+            RandomEffectTerm sparseEffect,
+            SparsePrecisionMatrix sparsePrecision,
+            List<RandomEffectTerm> ordinaryEffects,
+            CoxMixedOptions options, BackendPolicy backendPolicy) {
+        return new Prepared(survival, sparseEffect, sparsePrecision,
+            ordinaryEffects, options, backendPolicy);
+    }
+
+    /** Reusable single-worker sparse-precision Cox scan. */
     public static final class Prepared implements AutoCloseable {
         private final CoxSurvivalData survival;
         private final CoxRiskSetPlan riskSets;
         private final SurvivalPlan survivalPlan;
-        private final RandomEffectTerm pedigreeDesign;
+        private final RandomEffectTerm sparseDesign;
         private final SparsePrecisionMatrix precision;
         private final List<RandomEffectTerm> ordinaryEffects;
         private final CoxMixedOptions options;
@@ -65,7 +96,7 @@ public final class SparseCoxMixedModel {
         private final int sparseColumns;
         private final int ordinaryColumns;
         private final int[] observationCoefficient;
-        private final int[] coefficientObservation;
+        private final int[][] coefficientRows;
         private final int[] ordinaryStarts;
         private final double[] ordinaryDesign;
         private final SparsePattern pattern;
@@ -74,33 +105,37 @@ public final class SparseCoxMixedModel {
         private final PreparedSparseCholesky factor;
         private final double precisionLogDeterminant;
         private double[] sharedLogVariances;
+        private Mode sharedMode;
         private boolean closed;
 
         private Prepared(
                 CoxSurvivalData survival,
-                PedigreeRandomEffectTerm pedigreeEffect,
+                RandomEffectTerm sparseEffect,
+                SparsePrecisionMatrix sparsePrecision,
                 List<RandomEffectTerm> ordinaryEffects,
                 CoxMixedOptions options, BackendPolicy backendPolicy) {
-            if (survival == null || pedigreeEffect == null
+            if (survival == null || sparseEffect == null
+                    || sparsePrecision == null
                     || ordinaryEffects == null || options == null
                     || backendPolicy == null)
                 throw new IllegalArgumentException(
-                    "sparse pedigree Cox inputs are required");
+                    "sparse Cox inputs are required");
             rows = survival.observations();
             this.survival = survival;
             riskSets = CoxRiskSetPlan.prepare(survival);
             if (riskSets == null)
                 throw new IllegalArgumentException(
-                    "sparse pedigree Cox currently requires right-censored data");
+                    "sparse Cox currently requires right-censored data");
             survivalPlan = SurvivalPlan.prepare(survival);
-            pedigreeDesign = pedigreeEffect.randomEffect();
-            precision = pedigreeEffect.precision();
+            sparseDesign = sparseEffect;
+            precision = sparsePrecision;
             this.ordinaryEffects = List.copyOf(ordinaryEffects);
             this.options = options;
-            if (pedigreeDesign.observations() != rows
-                    || !pedigreeDesign.sparse())
+            if (sparseDesign.observations() != rows
+                    || !sparseDesign.sparse()
+                    || sparseDesign.coefficients() != precision.dimension())
                 throw new IllegalArgumentException(
-                    "pedigree incidence must be sparse and row-aligned");
+                    "sparse incidence and precision must be dimension-compatible");
             for (RandomEffectTerm term : this.ordinaryEffects)
                 if (term == null || term.observations() != rows)
                     throw new IllegalArgumentException(
@@ -109,10 +144,10 @@ public final class SparseCoxMixedModel {
                     != 1 + this.ordinaryEffects.size())
                 throw new IllegalArgumentException(
                     "one variance is required per sparse and ordinary frailty term");
-            sparseColumns = pedigreeDesign.coefficients();
-            observationCoefficient = incidence(pedigreeDesign, rows);
-            coefficientObservation = inverseIncidence(
-                observationCoefficient, sparseColumns);
+            sparseColumns = sparseDesign.coefficients();
+            observationCoefficient = incidence(sparseDesign, rows);
+            coefficientRows = coefficientRows(observationCoefficient,
+                sparseColumns, survivalPlan.lastEvent());
             ordinaryStarts = new int[this.ordinaryEffects.size()];
             int ordinaryCount = 0;
             for (int term = 0; term < this.ordinaryEffects.size(); term++) {
@@ -123,7 +158,9 @@ public final class SparseCoxMixedModel {
             ordinaryDesign = ordinaryDesign(this.ordinaryEffects,
                 ordinaryStarts, rows, ordinaryColumns);
             pattern = SparsePattern.prepare(precision);
-            BackendContext selected = BackendContext.select(backendPolicy);
+            BackendContext selected = backendPolicy == BackendPolicy.PREFERRED
+                ? BackendContext.preferredSparse()
+                : BackendContext.select(backendPolicy);
             PreparedSparseCholesky selectedFactor = null;
             double selectedLogDeterminant;
             try {
@@ -163,8 +200,9 @@ public final class SparseCoxMixedModel {
                 throw new IllegalArgumentException(
                     "one offset is required per observation");
             Fit fit = optimize(fixed, fixedColumns, offsets,
-                sharedLogVariances.clone());
+                sharedLogVariances.clone(), compatibleMode(fixedColumns));
             sharedLogVariances = fit.logVariances().clone();
+            sharedMode = fit.mode();
             return result(fit, fixedColumns);
         }
 
@@ -196,14 +234,16 @@ public final class SparseCoxMixedModel {
             if (offsets.length != rows)
                 throw new IllegalArgumentException(
                     "one offset is required per observation");
-            Mode mode = mode(fixed, fixedColumns, offsets, logs, null);
+            Mode mode = mode(fixed, fixedColumns, offsets, logs,
+                compatibleMode(fixedColumns));
+            sharedMode = mode;
             return result(new Fit(mode, logs, 0, mode.converged()), fixedColumns);
         }
 
         private Fit optimize(
                 double[] fixed, int fixedColumns, double[] offset,
-                double[] logVariances) {
-            Mode current = mode(fixed, fixedColumns, offset, logVariances, null);
+                double[] logVariances, Mode start) {
+            Mode current = mode(fixed, fixedColumns, offset, logVariances, start);
             double step = 1.0;
             boolean converged = false;
             int iterations = 0;
@@ -457,23 +497,37 @@ public final class SparseCoxMixedModel {
             double[] sparseScore = new double[sparseColumns];
             double[] cross = new double[sparseColumns * denseColumns];
             double[] sparseInformation = new double[pattern.nonzeros()];
-            for (int coefficient = 0; coefficient < sparseColumns; coefficient++) {
-                int row = coefficientObservation[coefficient];
-                if (row < 0) continue;
+            for (int row = 0; row < rows; row++) {
                 int last = survivalPlan.lastEvent()[row];
                 if (last < 0) continue;
+                int coefficient = observationCoefficient[row];
                 double weight = risk[row];
                 double a = prefixA[last];
-                double b = prefixB[last];
-                sparseScore[coefficient] =
+                sparseScore[coefficient] +=
                     (survival.eventView()[row] ? 1.0 : 0.0) - weight * a;
                 sparseInformation[pattern.diagonalPositions()[coefficient]] +=
-                    weight * a - weight * weight * b;
+                    weight * a;
                 int denseStart = row * denseColumns;
                 for (int column = 0; column < denseColumns; column++)
-                    cross[coefficient * denseColumns + column] = weight
+                    cross[coefficient * denseColumns + column] += weight
                         * (dense[denseStart + column] * a
                             - prefixC[last * denseColumns + column]);
+            }
+            for (int coefficient = 0; coefficient < sparseColumns;
+                    coefficient++) {
+                double laterWeight = 0.0;
+                for (int row : coefficientRows[coefficient])
+                    laterWeight += risk[row];
+                double squaredRiskContribution = 0.0;
+                for (int row : coefficientRows[coefficient]) {
+                    int last = survivalPlan.lastEvent()[row];
+                    double weight = risk[row];
+                    laterWeight -= weight;
+                    squaredRiskContribution += weight
+                        * (weight + 2.0 * laterWeight) * prefixB[last];
+                }
+                sparseInformation[pattern.diagonalPositions()[coefficient]] -=
+                    squaredRiskContribution;
             }
             double sparseVariance = Math.exp(logVariances[0]);
             double[] precisionProduct = multiply(precision, sparseCoefficients);
@@ -594,8 +648,8 @@ public final class SparseCoxMixedModel {
                     covariance[row * fixedColumns + column] =
                         mode.denseCovariance()[row * denseColumns + column];
             List<CoxRandomEffectEstimates> effects = new ArrayList<>();
-            effects.add(new CoxRandomEffectEstimates(pedigreeDesign.name(),
-                pedigreeDesign.coefficientNames(),
+            effects.add(new CoxRandomEffectEstimates(sparseDesign.name(),
+                sparseDesign.coefficientNames(),
                 Math.exp(fit.logVariances()[0]), mode.sparse()));
             for (int term = 0; term < ordinaryEffects.size(); term++) {
                 RandomEffectTerm value = ordinaryEffects.get(term);
@@ -614,7 +668,9 @@ public final class SparseCoxMixedModel {
                 fit.converged(), fit.converged()
                     ? "sparse Laplace variance and mode tolerances reached"
                     : "sparse Laplace optimization did not converge",
-                context.provenance());
+                context.provenance(), CoxMixedSolver.SPARSE_PRECISION,
+                sparseColumns, pattern.nonzeros(),
+                factor.factorNonzeroCount());
         }
 
         private double[] denseDesign(double[] fixed, int fixedColumns) {
@@ -634,6 +690,12 @@ public final class SparseCoxMixedModel {
                 Math.min(Math.log(options.maximumVariance()), value));
         }
 
+        private Mode compatibleMode(int fixedColumns) {
+            return sharedMode != null
+                    && sharedMode.dense().length == fixedColumns + ordinaryColumns
+                ? sharedMode : null;
+        }
+
         @Override public void close() {
             if (closed) return;
             closed = true;
@@ -651,21 +713,25 @@ public final class SparseCoxMixedModel {
             if (starts[row + 1] - starts[row] != 1
                     || values[starts[row]] != 1.0)
                 throw new IllegalArgumentException(
-                    "sparse pedigree Cox requires one unit incidence per row");
+                    "sparse Cox requires one unit incidence per row");
             result[row] = columns[starts[row]];
         }
         return result;
     }
 
-    private static int[] inverseIncidence(int[] incidence, int columns) {
-        int[] result = new int[columns];
-        Arrays.fill(result, -1);
-        for (int row = 0; row < incidence.length; row++) {
-            int column = incidence[row];
-            if (result[column] >= 0)
-                throw new IllegalArgumentException(
-                    "sparse pedigree Cox requires at most one row per individual");
-            result[column] = row;
+    private static int[][] coefficientRows(
+            int[] incidence, int columns, int[] lastEvent) {
+        List<List<Integer>> grouped = new ArrayList<>(columns);
+        for (int column = 0; column < columns; column++)
+            grouped.add(new ArrayList<>());
+        for (int row = 0; row < incidence.length; row++)
+            if (lastEvent[row] >= 0) grouped.get(incidence[row]).add(row);
+        int[][] result = new int[columns][];
+        for (int column = 0; column < columns; column++) {
+            grouped.get(column).sort(Comparator.comparingInt(
+                row -> lastEvent[row]));
+            result[column] = grouped.get(column).stream()
+                .mapToInt(Integer::intValue).toArray();
         }
         return result;
     }
@@ -801,7 +867,7 @@ public final class SparseCoxMixedModel {
             for (int row = 0; row < survival.observations(); row++) {
                 if (survival.strataView()[row] != firstStratum)
                     throw new IllegalArgumentException(
-                        "sparse pedigree Cox currently supports one stratum");
+                        "sparse Cox currently supports one stratum");
                 rows.add(row);
                 if (survival.eventView()[row]) events.add(row);
             }
@@ -814,7 +880,7 @@ public final class SparseCoxMixedModel {
                 double time = survival.stopView()[row];
                 if (time == previous)
                     throw new IllegalArgumentException(
-                        "sparse pedigree Cox currently requires distinct event times");
+                        "sparse Cox currently requires distinct event times");
                 previous = time;
             }
             int[] eventRows = events.stream().mapToInt(Integer::intValue).toArray();
