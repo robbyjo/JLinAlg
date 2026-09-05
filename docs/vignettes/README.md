@@ -20,7 +20,7 @@ Run the complete verification suite before adapting an example:
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
 | [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
 | [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |
-| [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, combined random terms, GLMM PQL, pedigree GLMM PQL |
+| [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, GLMM PQL/Laplace, frequentist ZIP/ZINB mixed models |
 | [Cox and frailty survival models](cox-survival.md) | right-censoring, delayed entry, strata, Efron/Breslow ties, hazard ratios, Gaussian, GRM, and pedigree frailty |
 | [Formulas and compute backends](formulas-and-backends.md) | model tables, contrasts, offsets, mixed formulas, nested/correlated terms, GPU/oneMKL/OpenBLAS policy |
 | [Association, GWAS, and omics QTL](association-gwas-twas.md) | CSV/TSV/VCF/BCF/BGEN, cohort QC, cryptic-relatedness GRMs, fast OLS/GLM, P3D/EMMAX, omics transforms, Burden/SKAT/SKAT-O |

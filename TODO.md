@@ -118,6 +118,42 @@ Source: [Cox vignette](docs/vignettes/cox-survival.md).
 
 ## Medium priority
 
+### Complete frequentist zero-inflated mixed and pedigree models — in progress
+
+The first vertical slice landed 2026-09-05. `SparseZeroInflatedMixedModel`
+fits zero-inflated Poisson and NB2 models with separate fixed count,
+structural-zero, and NB2-size designs. One or more ordinary or pedigree random
+effects may enter the count process. BOBYQA optimizes the non-random parameters;
+the high-dimensional random-effect mode uses analytic observed curvature,
+sparse damped Newton steps, and the same Hessian for the first-order Laplace
+determinant. Pedigree fits consume Henderson `A^-1` directly and retain
+unphenotyped ancestors.
+
+The following work remains:
+
+1. admit random effects in the structural-zero predictor and assemble the full
+   count/zero cross-Hessian for zero observations;
+2. support independent and correlated two-process pedigree effects, with the
+   latter using the Kronecker precision `inverse(G) kron inverse(A)` and guarded
+   correlation transforms;
+3. add the observed numerical Hessian of the marginal Laplace objective,
+   fixed-effect/dispersion covariance, profile likelihood, and parametric
+   bootstrap for boundary-prone variance and zero-inflation parameters;
+4. add a prepared repeated-fit API with one symbolic sparse factorization and
+   one numeric factor per worker;
+5. gate grouped ZIP/ZINB values against `glmmTMB` and pedigree values against an
+   independent frequentist TMB sparse-GMRF template; and
+6. add formula compilation, simulation/recovery tests, singularity diagnostics,
+   and representative sparse pedigree performance/heap benchmarks.
+
+Done when both distributional processes can carry sparse random effects,
+correlated pedigree structure has an explicit estimable covariance contract,
+reported marginal inference is independently validated, and prepared large-
+pedigree fitting is demonstrably sparse and reproducible.
+
+Sources: [pedigree and GLMM vignette](docs/vignettes/pedigree-and-glmm.md) and
+[`SparseZeroInflatedMixedModel`](src/main/java/org/jlinalg/distributional/SparseZeroInflatedMixedModel.java).
+
 ### xWAS all-pairs output and BH/FDR correction — completed
 
 The xWAS MR pipeline retains threshold-passing pairs for full diagnostics and

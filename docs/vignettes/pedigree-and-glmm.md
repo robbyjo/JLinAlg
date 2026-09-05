@@ -166,5 +166,43 @@ Cholesky factor per calling worker. The random-effect Hessian is assembled as
 `A^-1` and grouped `Z` therefore remain sparse; neither `A` nor `ZAZ'` is
 materialized. Close the prepared scan only after all worker tasks finish.
 
+## Zero-inflated Poisson and negative-binomial mixed models
+
+`SparseZeroInflatedMixedModel` maximizes a frequentist first-order Laplace
+likelihood. BOBYQA sees only fixed effects, NB2 size coefficients, and
+log-variance components. Each objective evaluation finds the potentially large
+random-effect mode with sparse damped Newton iterations; its observed Hessian
+is reused for the Laplace determinant rather than computing expected Fisher
+information for BOBYQA.
+
+The current vertical slice accepts ordinary or pedigree random effects in the
+conditional count process. For an NB2 pedigree model:
+
+```java
+PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
+    "individual", observationIndividualIds, pedigree);
+
+ZeroInflatedMixedResult fit =
+    SparseZeroInflatedMixedModel.fitNegativeBinomial(
+        count, countFixed, countColumns,
+        zeroFixed, zeroColumns,
+        sizeFixed, sizeColumns,
+        List.of(additive.randomEffect()),
+        List.of(additive.precision()),
+        countOffset,
+        ZeroInflatedMixedOptions.defaults(),
+        BackendPolicy.PREFERRED);
+```
+
+The NB2 conditional variance is `mu + mu^2 / size`. The result distinguishes
+the conditional count mean, structural-zero probability, unconditional fitted
+mean, and total fitted zero mass. Pedigree `A^-1` remains in coefficient space,
+so unobserved ancestors are retained without forming dense `A` or `ZAZ'`.
+
+Random effects in the structural-zero predictor and correlated mean/zero
+pedigree effects are deliberately deferred until the full cross-predictor
+observed Hessian, marginal inference, and independent TMB comparison are
+gated. See `TODO.md` for that completion contract.
+
 Satterthwaite and Kenward-Roger options describe the final PQL working model,
 not an exact finite-sample distribution for the original non-Gaussian model.

@@ -7,8 +7,9 @@ JLinAlg implements Java linear and mixed-model algorithms on top of
 [JDistlib 0.10.1](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.1).
 Version 0.2.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
-pedigree animal-model REML, and penalized-quasi-likelihood generalized linear
-mixed models (GLMM PQL). Gaussian ridge, LASSO, and elastic-net regression and
+pedigree animal-model REML, penalized-quasi-likelihood generalized linear
+mixed models (GLMM PQL), and frequentist ZIP/ZINB sparse Laplace mixed models.
+Gaussian ridge, LASSO, and elastic-net regression and
 a first summary-statistics Mendelian-randomization (MR) layer are also included.
 Direct one-dimensional LOESS supplies weighted or robust local-polynomial
 fitting, prediction, leverage, and reusable predictor geometry.
@@ -489,6 +490,38 @@ owns the selected backend for an association scan and reuses one symbolic and
 numeric sparse Cholesky factor per worker, avoiding both observation-scale
 covariance matrices and repeated backend discovery. `GlmmLaplace` remains the
 dense reference implementation; adaptive quadrature is not implemented.
+
+`SparseZeroInflatedMixedModel` fits frequentist zero-inflated Poisson and NB2
+mixed models. Separate fixed designs control the conditional count mean,
+structural-zero probability, and (for NB2) size. Count-side ordinary and
+pedigree effects are integrated by first-order Laplace approximation. BOBYQA
+optimizes only the fixed, dispersion, and log-variance parameters; sparse
+damped Newton iterations find the high-dimensional random-effect mode and the
+same observed Hessian supplies the Laplace determinant:
+
+```java
+PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
+    "individual", observationIndividualIds, pedigree);
+
+ZeroInflatedMixedResult zinb =
+    SparseZeroInflatedMixedModel.fitNegativeBinomial(
+        counts,
+        countDesign, countColumns,
+        zeroDesign, zeroColumns,
+        sizeDesign, sizeColumns,
+        List.of(additive.randomEffect()),
+        List.of(additive.precision()),
+        logExposure,
+        ZeroInflatedMixedOptions.defaults(),
+        BackendPolicy.PREFERRED);
+```
+
+NB2 uses `variance = mu + mu^2 / size`. `conditionalCountMeans()` reports the
+count-process mean, while `fittedMeans()` includes structural-zero probability;
+`fittedZeroProbabilities()` includes both structural and sampling zeros. The
+current implementation permits random effects in the count process only.
+Zero-process random effects, cross-process pedigree covariance, marginal
+Hessian inference, and a prepared repeated-fit API are tracked in `TODO.md`.
 
 The same PQL estimator is available with a numerator-relationship random
 effect through `PedigreeGlmmPql`:
