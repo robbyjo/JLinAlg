@@ -130,6 +130,14 @@ vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
 contract.
 
+Basic base-R-style hypothesis tests are available through the uniform
+`org.jlinalg.stats.StatisticalTests` facade. It delegates tests already in
+JDistlib and supplies the missing correlation, contingency-table,
+blocked-design, one-way ANOVA, proportion/trend, and ANOVA-power families.
+Every hypothesis test returns `StatisticalTestResult`; see the
+[basic statistical tests vignette](docs/vignettes/basic-statistical-tests.md)
+for the full method list, exact/asymptotic behavior, and examples.
+
 The [development inventory](TODO.md) collects explicit future-work statements
 from those vignettes, separates major and medium priorities from uncommitted
 scope candidates, and records a concrete completion condition for each active

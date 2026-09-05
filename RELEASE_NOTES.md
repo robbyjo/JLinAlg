@@ -1,5 +1,9 @@
 # Unreleased
 
+- Added a uniform `org.jlinalg.stats.StatisticalTests` facade for the basic
+  base R test families. Existing JDistlib tests are delegated; JLinAlg adds
+  correlation, Fisher exact, Friedman, Cochran-Mantel-Haenszel, McNemar,
+  one-way ANOVA, ANOVA power, proportion/trend, and Quade implementations.
 - Added deterministic all-screened-pairs xWAS MR output with disk-backed
   Benjamini-Hochberg adjustment through `mr-xwas --fdr-output`.
 - Corrected MR and SuSiE documentation to reflect the implemented

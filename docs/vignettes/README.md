@@ -15,6 +15,7 @@ Run the complete verification suite before adapting an example:
 
 | Vignette | Features covered |
 | --- | --- |
+| [Basic statistical tests](basic-statistical-tests.md) | uniform base-R-style tests, exact and asymptotic methods, contingency tables, blocked designs, ANOVA power |
 | [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
 | [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
