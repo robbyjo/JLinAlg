@@ -20,7 +20,7 @@ public final class AssociationBatchResult {
     private final int parallelism;
     private final long elapsedNanoseconds;
 
-    AssociationBatchResult(List<String> names, double[] beta, double[] standardErrors,
+    public AssociationBatchResult(List<String> names, double[] beta, double[] standardErrors,
             double[] statistics, double[] pValues, double[] degreesOfFreedom,
             double[] negativeLog10PValues,
             List<AssociationFailure> failures, int coefficientIndex,

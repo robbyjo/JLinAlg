@@ -45,6 +45,34 @@ Repository baseline: `main` at `9389698` (`origin/main`)
 - **2026-09-05 16:57 EDT / 20:57 UTC** — marked the sparse Cox mixed and
   pedigree TODO item completed, with approximation boundaries retained as
   explicitly separate follow-on enhancements.
+- **2026-09-05 17:05 EDT / 21:05 UTC** — reviewed every remaining Major and
+  Medium inventory item and separated stale documentation from substantive
+  implementation gaps.
+- **2026-09-05 17:14 EDT / 21:14 UTC** — added a reusable counting-process
+  risk-set sweep, prepared Cox score scanning, cluster/relatedness variance,
+  diagnostic residuals, proportional-hazards tests, and shared gamma frailty.
+- **2026-09-05 17:18 EDT / 21:18 UTC** — replaced the sparse pedigree PEV
+  cutoff with fixed-size inverse-column batches and exposed PEV/reliability plus
+  selected-member lookup.
+- **2026-09-05 17:21 EDT / 21:21 UTC** — completed hit-only xWAS robust
+  follow-up, including a CLI output for RAPS, contamination-mixture, and
+  PRESSO-style results.
+- **2026-09-05 17:24 EDT / 21:24 UTC** — added the dedicated colocalization
+  Markdown/website workflow and repaired stale MR, pedigree, Cox, and omics
+  documentation.
+- **2026-09-05 17:26 EDT / 21:26 UTC** — ran the Cox pipeline benchmark:
+  28,748 prepared score tests/second versus 2,202 full refits/second, with a
+  2,000-row start-stop fit taking 0.004636 seconds.
+- **2026-09-05 17:27 EDT / 21:27 UTC** — ran the sparse pedigree uncertainty
+  benchmark: all 500 PEVs were finite for 1,000 observations in 0.076384
+  seconds using 32-column solve batches.
+- **2026-09-05 17:28 EDT / 21:28 UTC** — verified fixed-theta gamma frailty
+  coefficients, SEs, and modes and recurrent-event cluster sandwich SEs against
+  R `survival` 3.8-3 under R 4.6.1; the checked-in tolerances are `1e-6`.
+- **2026-09-05 17:34 EDT / 21:34 UTC** — ran the checked-in conventional R
+  Cox scan comparator at 2,000 rows and 512 predictors. R processed 1,829
+  predictors/second versus JLinAlg prepared score scanning at 28,748/second,
+  a 15.72x measured advantage on this host.
 
 ## What changed
 
@@ -75,6 +103,13 @@ Repository baseline: `main` at `9389698` (`origin/main`)
 - Updated the benchmark to perform a complete untimed warm scan, report the
   actually selected per-fit backend, and compare the same fixed variance model
   in Java and R.
+- Added `CoxCountingProcessPlan`, `FastCoxAssociation`, `CoxDiagnostics`, and
+  `CoxGammaFrailty`, with streaming omics integration and reproducible
+  throughput benchmarks.
+- Added batched sparse diagonal PEV/reliability extraction with dense-reference
+  and beyond-former-cutoff tests plus a scale benchmark.
+- Added retained-hit-only xWAS instrument hand-off and optional robust CLI
+  output, plus a standalone colocalization vignette in Markdown and HTML.
 
 ## Numerical contract and remaining work
 
@@ -86,11 +121,12 @@ target the dense score solution when both paths converge, while profiled
 variance estimates and fixed-effect covariance are not promised to be
 identical.
 
-The sparse path currently requires one-stratum right-censored data, distinct
-event times, and one unit-valued incidence per observation. Exact sparse
-Laplace information/determinants, multiple sparse terms, ties, strata,
-start-stop data, a sparse-GRM convenience facade, and a freshly executed
-large-pedigree peak-memory benchmark remain open in `TODO.md`.
+The sparse Cox mixed path still requires one-stratum right-censored data,
+distinct event times, and one unit-valued incidence per observation. Exact
+sparse Laplace information/determinants, multiple sparse terms, ties, strata,
+start-stop sparse frailty, and a sparse-GRM convenience facade remain optional
+follow-on enhancements outside the completed Major/Medium inventory. Fixed
+Cox start-stop data use the new exact indexed sweep.
 
 The historical TOPMed data were not present in this fresh checkout, so its
 published large-cohort numbers were not regenerated. The new synthetic gate

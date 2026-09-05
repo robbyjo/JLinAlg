@@ -55,7 +55,16 @@ not blockers for this completed item.
 Sources: [Cox vignette](docs/vignettes/cox-survival.md),
 [website survival vignette](site/vignettes/survival.html).
 
-### Scalable pedigree prediction uncertainty
+### Scalable pedigree prediction uncertainty — completed
+
+Completed 2026-09-05. Sparse LMM diagonal PEV extraction now solves inverse
+columns in batches of 32 rather than disabling uncertainty above 256 random
+coefficients. `SparsePedigreeRemlResult` exposes all PEVs/reliabilities and
+selected-member lookup. Small-pedigree values match the dense reference; a
+300-member regression test crosses the former cutoff. The checked-in benchmark
+measured 500 finite PEVs from 1,000 observations in 0.076384 seconds on the
+documented development host. A full covariance is deliberately not promised:
+its output alone is quadratic.
 
 Provide prediction-error variance and reliability from the sparse combined
 pedigree model. The API and documentation should use population-neutral terms
@@ -79,7 +88,16 @@ Sources: [pedigree vignette](docs/vignettes/pedigree-and-glmm.md),
 [website pedigree vignette](site/vignettes/pedigree.html), and the
 [compatibility roadmap](docs/lme4-pedigreemm-roadmap.md).
 
-### Prepared Cox score-scan pipeline
+### Prepared Cox score-scan pipeline — completed
+
+Completed 2026-09-05. `FastCoxAssociation` fits one null model and reuses the
+risk-set plan for deterministic bounded blocks with model-based,
+cluster-robust, or caller-correlation variance. File-backed omics scans stream
+through `scanPredictorsCoxTo` and the existing sink/failure accounting. The
+checked-in 2,000-by-512 benchmark measured 28,748 predictors/second versus
+2,202 predictors/second for Java full Cox refits and 1,829 predictors/second
+for conventional R `survival::coxph.fit` refits on the same host. The prepared
+path was 15.72x faster than R for this representative throughput fixture.
 
 Add a prepared null-model score scan for many genetic or molecular predictors,
 including file-backed blocks and the existing cohort/QC conventions. This is
@@ -122,7 +140,14 @@ Completed behavior:
 Sources: [xWAS pipeline vignette](docs/vignettes/xwas-mr-pipeline.md) and
 [`ExternalBh`](src/main/java/org/jlinalg/cli/ExternalBh.java).
 
-### xWAS hit hand-off and robust follow-up
+### xWAS hit hand-off and robust follow-up — completed
+
+Completed 2026-09-05. Only retained hits keep their immutable harmonized
+instrument list. `XwasMrBatchResult.followUp` runs RAPS, contamination mixture,
+and PRESSO-style analysis in deterministic hit order while preserving method
+warnings and partial results. `mr-xwas --follow-up-output` persists estimates,
+convergence, likelihood/probability, global p-values, distortion, outliers,
+and warnings without rerunning the exposure-outcome grid.
 
 Make retained hits easy to pass into RAPS, contamination-mixture, and
 PRESSO-style analyses without redoing the full scan. Prefer a bounded design:
@@ -133,7 +158,12 @@ method-specific p-values.
 
 Source: [xWAS hit follow-up](docs/vignettes/xwas-mr-pipeline.md#follow-up-analyses-for-hits).
 
-### Dedicated colocalization vignette and MR documentation repair
+### Dedicated colocalization vignette and MR documentation repair — completed
+
+Completed 2026-09-05. The standalone Markdown and synchronized website
+vignettes cover alignment, priors, overlap trimming, H0-H4, conditional shared
+variant posterior, diagnostics, and MR/xWAS hand-off. Both vignette indexes
+link the new page and the end-to-end MR guide now points to it.
 
 `ColocSusie` is implemented, tested against `coloc::coloc.susie`, benchmarked,
 and briefly demonstrated inside the combined SuSiE/SEM vignette. What is
@@ -149,7 +179,14 @@ Sources: [current compact example](docs/vignettes/susie-and-sem.md),
 [stale MR statement](docs/vignettes/mr-end-to-end.md), and
 [colocalization implementation](src/main/java/org/jlinalg/coloc/ColocSusie.java).
 
-### Cox inference and diagnostics
+### Cox inference and diagnostics — completed
+
+Completed 2026-09-05 as separate APIs: `CoxDiagnostics` provides cluster-
+robust covariance plus martingale, deviance, score, dfbeta, and Schoenfeld
+exports; `CoxProportionalHazardsTest` provides term/global log-time score tests;
+and `CoxGammaFrailty` provides multiplicative shared gamma frailty with fixed
+or Laplace-profiled variance. Fixed Cox coefficients, cluster sandwich SEs,
+and fixed-theta gamma estimates are gated against R `survival` fixtures.
 
 Add the following as separable deliverables so they can land independently:
 
@@ -165,7 +202,13 @@ These should be validated independently rather than hidden behind one broad
 Sources: [Cox vignette](docs/vignettes/cox-survival.md),
 [website survival boundary](site/vignettes/survival.html).
 
-### Start-stop Cox performance path
+### Start-stop Cox performance path — completed
+
+Completed 2026-09-05. `CoxCountingProcessPlan` indexes starts, stops, and event
+groups once per stratum. An ascending sweep maintains risk moments while rows
+enter and leave, preserving Efron/Breslow behavior and the independent
+statsmodels delayed-entry fixture. The checked-in benchmark measured a
+2,000-row start-stop fit in 0.004636 seconds on the development host.
 
 Start-stop observations currently use the general risk-set reference path.
 Profile representative recurrent-event and time-dependent-covariate workloads,
@@ -174,7 +217,13 @@ bottleneck. Preserve the reference path for parity tests.
 
 Source: [Cox vignette](docs/vignettes/cox-survival.md).
 
-### Incremental omics result sink
+### Incremental omics result sink — completed
+
+Completed before this review and confirmed 2026-09-05.
+`OmicsAssociationSink`, `OmicsAssociationSummary`, `scanPredictorsTo`, and
+`scanPredictorsGlmTo` already provide deterministic incremental estimates,
+failures, and accounting; the stale guide was repaired. The new Cox streaming
+entry point uses the same contract.
 
 Complete the planned incremental sink for omics response scans so large
 feature-by-predictor results need not be retained in memory. Match the existing

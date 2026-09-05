@@ -21,7 +21,7 @@ class SparsePedigreeRemlTest {
         Pedigree pedigree = Pedigree.of(List.of(
             PedigreeIndividual.founder("A"),
             PedigreeIndividual.founder("B"),
-            PedigreeIndividual.founder("C")));
+            new PedigreeIndividual("C", "A", "B")));
         List<String> observed = List.of(
             "A", "A", "A", "B", "B", "B", "C", "C", "C");
         RemlOptions options = RemlOptions.builder()
@@ -38,6 +38,11 @@ class SparsePedigreeRemlTest {
         assertArrayEquals(dense.beta(), sparse.beta(), 1e-8);
         assertArrayEquals(dense.breedingValues(),
             sparse.breedingValues(), 2e-5);
+        assertArrayEquals(dense.predictionErrorVariances(),
+            sparse.predictionErrorVariances(), 2e-5);
+        assertArrayEquals(dense.reliabilities(), sparse.reliabilities(), 2e-5);
+        assertEquals(sparse.predictionErrorVariances()[1],
+            sparse.predictionErrorVariances(List.of("B")).get("B"), 0.0);
         assertEquals(dense.heritability(), sparse.heritability(), 2e-6);
         assertTrue(sparse.mixedModel().equationNonzeroCount()
             <= pedigree.sparseRelationshipMatrixInverse().nonzeroCount());
@@ -70,5 +75,34 @@ class SparsePedigreeRemlTest {
         assertEquals(2, result.randomEffects().size());
         assertEquals(pedigree.size(), result.randomEffects("animal").estimates().length);
         assertTrue(Double.isFinite(result.logLikelihood()));
+    }
+
+    @Test
+    void diagonalPevScalesBeyondFormerCoefficientCutoff() {
+        int individuals = 300;
+        double[] response = new double[individuals * 2];
+        double[][] fixed = new double[response.length][1];
+        java.util.ArrayList<PedigreeIndividual> members = new java.util.ArrayList<>();
+        java.util.ArrayList<String> observed = new java.util.ArrayList<>();
+        for (int individual = 0; individual < individuals; individual++) {
+            String id = "member-" + individual;
+            members.add(PedigreeIndividual.founder(id));
+            for (int repeat = 0; repeat < 2; repeat++) {
+                int row = 2 * individual + repeat;
+                fixed[row][0] = 1.0;
+                response[row] = individual % 11 + (repeat == 0 ? -0.25 : 0.25);
+                observed.add(id);
+            }
+        }
+        SparsePedigreeRemlResult result = SparsePedigreeReml.fit(response,
+            fixed, observed, Pedigree.of(members), RemlOptions.builder()
+                .initialVariances(5.0, 1.0).maximumIterations(40).build(),
+            BackendPolicy.CPU);
+
+        assertEquals(individuals, result.predictionErrorVariances().length);
+        assertTrue(java.util.Arrays.stream(result.predictionErrorVariances())
+            .allMatch(Double::isFinite));
+        assertTrue(java.util.Arrays.stream(result.reliabilities())
+            .allMatch(value -> value >= 0.0 && value <= 1.0));
     }
 }

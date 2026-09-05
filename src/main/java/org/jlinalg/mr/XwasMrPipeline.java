@@ -189,7 +189,8 @@ public final class XwasMrPipeline {
             return PairEvaluation.hit(new XwasMrHit(exposureIndex,
                 outcomeIndex, exposure.id(), exposure.label(), outcome.id(),
                 outcome.label(), outcome.category(), screening,
-                negativeLog10, analysis, harmonized.exclusions()), screened);
+                negativeLog10, analysis, harmonized.instruments(),
+                harmonized.exclusions()), screened);
         } catch (RuntimeException exception) {
             return PairEvaluation.failed(failure(exposureIndex, outcomeIndex,
                 exposure, outcome, exception), screened);

@@ -25,6 +25,7 @@ class MrXwasCliTest {
         Path outcome = temporaryDirectory.resolve("outcomes.tsv");
         Path result = temporaryDirectory.resolve("mr-results.tsv");
         Path fdr = temporaryDirectory.resolve("mr-all-pairs.tsv");
+        Path followUp = temporaryDirectory.resolve("mr-follow-up.tsv");
         Files.writeString(exposure, exposureTable(), StandardCharsets.UTF_8);
         Files.writeString(outcome, outcomeTable(), StandardCharsets.UTF_8);
         ByteArrayOutputStream standard = new ByteArrayOutputStream();
@@ -34,6 +35,8 @@ class MrXwasCliTest {
             "--exposure", exposure.toString(), "--outcome", outcome.toString(),
             "--output", result.toString(), "--p-threshold", "1e-4",
             "--fdr-output", fdr.toString(),
+            "--follow-up-output", followUp.toString(),
+            "--contamination-grid-points", "201",
             "--threads", "4", "--pair-block-size", "3",
             "--bootstrap-replicates", "50", "--seed", "42"
         }, new PrintStream(standard), new PrintStream(error));
@@ -68,6 +71,11 @@ class MrXwasCliTest {
         double[] expected = bh(pValues);
         for (int index = 0; index < expected.length; index++)
             assertEquals(expected[index], qValues[index], 1e-14);
+        List<String> robust = Files.readAllLines(followUp);
+        assertEquals(3, robust.size());
+        assertTrue(robust.get(0).contains("raps_converged"));
+        assertTrue(robust.get(1).startsWith("GENE1\tCAD\t3\t"));
+        assertTrue(robust.get(1).contains("PRESSO:"));
         String report = standard.toString(StandardCharsets.UTF_8);
         assertTrue(report.contains("6 exposure-outcome pairs (2 x 3)"));
         assertTrue(report.contains("Retained 2; below threshold 2"));

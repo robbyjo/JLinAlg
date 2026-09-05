@@ -46,6 +46,7 @@ public final class CoxRegression {
         private final BackendContext context;
         private final ComputeBackend backend;
         private final CoxRiskSetPlan riskSets;
+        private final CoxCountingProcessPlan countingRiskSets;
         private boolean closed;
 
         private Prepared(
@@ -57,6 +58,8 @@ public final class CoxRegression {
             this.survival = survival;
             this.options = options;
             this.riskSets = CoxRiskSetPlan.prepare(survival);
+            this.countingRiskSets = riskSets == null
+                ? CoxCountingProcessPlan.prepare(survival) : null;
             this.context = BackendContext.select(backendPolicy);
             this.backend = context.backend();
         }
@@ -65,7 +68,7 @@ public final class CoxRegression {
         public CoxResult fit(double[][] covariates, double[] offset) {
             if (closed) throw new IllegalStateException("prepared Cox fit is closed");
             return fitPrepared(survival, covariates, offset, options,
-                backend, context.provenance(), riskSets);
+                backend, context.provenance(), riskSets, countingRiskSets);
         }
 
         @Override
@@ -81,6 +84,16 @@ public final class CoxRegression {
             CoxSurvivalData survival, double[][] covariates, double[] offset,
             CoxOptions options, ComputeBackend backend,
             BackendProvenance provenance, CoxRiskSetPlan riskSets) {
+        return fitPrepared(survival, covariates, offset, options, backend,
+            provenance, riskSets, riskSets == null
+                ? CoxCountingProcessPlan.prepare(survival) : null);
+    }
+
+    private static CoxResult fitPrepared(
+            CoxSurvivalData survival, double[][] covariates, double[] offset,
+            CoxOptions options, ComputeBackend backend,
+            BackendProvenance provenance, CoxRiskSetPlan riskSets,
+            CoxCountingProcessPlan countingRiskSets) {
         if (covariates == null || covariates.length == 0)
             throw new IllegalArgumentException("Cox covariates are required");
         int rows = survival.observations();
@@ -100,7 +113,8 @@ public final class CoxRegression {
         double[] beta = new double[columns];
         CoxPartialLikelihood.Evaluation evaluation =
             CoxPartialLikelihood.evaluate(survival, design, columns,
-                beta, modelOffset, options.ties(), riskSets);
+                beta, modelOffset, options.ties(), riskSets,
+                countingRiskSets);
         boolean converged = false;
         int iterations = 0;
         String message = "maximum iterations reached";
@@ -126,7 +140,7 @@ public final class CoxRegression {
                     next[column] += scale * step[column];
                 candidate = CoxPartialLikelihood.evaluate(
                     survival, design, columns, next, modelOffset,
-                    options.ties(), riskSets);
+                    options.ties(), riskSets, countingRiskSets);
                 if (candidate.logLikelihood()
                         >= evaluation.logLikelihood() - 1e-12) break;
                 scale *= 0.5;
@@ -156,7 +170,8 @@ public final class CoxRegression {
             options.informationRidge());
         return new CoxResult(beta, covariance,
             CoxPartialLikelihood.baseline(survival, design, columns,
-                beta, modelOffset, options.ties(), riskSets),
+                beta, modelOffset, options.ties(), riskSets,
+                countingRiskSets),
             evaluation.logLikelihood(), options, iterations, converged,
             message, provenance);
     }

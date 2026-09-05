@@ -72,6 +72,11 @@ SparsePedigreeRemlResult sparse = SparsePedigreeReml.fit(
     y, x, animal, pedigree,
     RemlOptions.builder().initialVariances(1, 1).build(),
     BackendPolicy.PREFERRED);
+
+double[] pev = sparse.predictionErrorVariances();
+double[] reliability = sparse.reliabilities();
+Map<String, Double> selected = sparse.predictionErrorVariances(
+    List.of("member-17", "member-42"));
 ```
 
 To combine several pedigree structures with ordinary effects, construct named
@@ -89,9 +94,12 @@ SparseLinearMixedModelResult combined = SparsePedigreeMixedModel.fit(
     BackendPolicy.PREFERRED);
 ```
 
-The variance order is pedigree terms, ordinary terms, then residual. The
-sparse combined result currently does not provide the dense animal model's
-full scalable PEV/reliability matrix.
+The variance order is pedigree terms, ordinary terms, then residual. Sparse
+diagonal PEVs are extracted in fixed-size solve batches without materializing
+the full inverse, so working memory is linear in coefficient count times the
+batch size. A complete covariance matrix remains intentionally unavailable
+because its storage is quadratic; request selected individuals when only
+named diagonal uncertainty is needed.
 
 ## Generalized linear mixed models
 

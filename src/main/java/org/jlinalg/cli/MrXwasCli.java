@@ -34,12 +34,16 @@ import org.jlinalg.mr.HarmonizationExclusion;
 import org.jlinalg.mr.MrAnalysisResult;
 import org.jlinalg.mr.MrEggerResult;
 import org.jlinalg.mr.MrEstimate;
+import org.jlinalg.mr.MrPressoResult;
+import org.jlinalg.mr.MrRapsResult;
+import org.jlinalg.mr.ContaminationMixtureResult;
 import org.jlinalg.mr.MrOptions;
 import org.jlinalg.mr.SummaryAssociation;
 import org.jlinalg.mr.XwasMrBatchResult;
 import org.jlinalg.mr.XwasMrExposure;
 import org.jlinalg.mr.XwasMrFailure;
 import org.jlinalg.mr.XwasMrHit;
+import org.jlinalg.mr.XwasMrFollowUp;
 import org.jlinalg.mr.XwasMrOptions;
 import org.jlinalg.mr.XwasMrOutcome;
 import org.jlinalg.mr.XwasMrPipeline;
@@ -117,6 +121,13 @@ final class MrXwasCli {
             writer -> writeHits(writer, delimiter(options.output), result));
         writeAtomic(failures, options.overwrite,
             writer -> writeFailures(writer, delimiter(failures), result));
+        if (options.followUpOutput != null) {
+            List<XwasMrFollowUp> followUps = result.followUp(
+                options.contaminationGridPoints, options.pressoAlpha);
+            writeAtomic(options.followUpOutput, options.overwrite,
+                writer -> writeFollowUps(writer,
+                    delimiter(options.followUpOutput), followUps));
+        }
 
         output.println("Scanned " + result.totalPairs() + " exposure-outcome "
             + "pairs (" + exposures.size() + " x " + outcomes.size() + ") with "
@@ -134,6 +145,8 @@ final class MrXwasCli {
                 + " successfully screened pairs");
             output.println("Wrote " + options.fdrOutput);
         }
+        if (options.followUpOutput != null)
+            output.println("Wrote " + options.followUpOutput);
     }
 
     private static void validateOutputs(Options options, Path failures)
@@ -151,8 +164,16 @@ final class MrXwasCli {
                 throw new IllegalArgumentException(
                     "--fdr-output must be an uncompressed TSV file");
         }
+        if (options.followUpOutput != null
+                && (options.followUpOutput.equals(options.output)
+                    || options.followUpOutput.equals(failures)
+                    || options.followUpOutput.equals(options.fdrOutput)))
+            throw new IllegalArgumentException(
+                "--follow-up-output must differ from other output files");
         if (!options.overwrite) {
-            for (Path path : List.of(options.output, failures))
+            List<Path> outputs = new ArrayList<>(List.of(options.output, failures));
+            if (options.followUpOutput != null) outputs.add(options.followUpOutput);
+            for (Path path : outputs)
                 if (Files.exists(path)) throw new IOException(
                     "output exists; use --overwrite: " + path);
         }
@@ -308,6 +329,56 @@ final class MrXwasCli {
                 failure.outcomeId(), failure.exceptionType(), failure.message()));
     }
 
+    private static void writeFollowUps(BufferedWriter output, char delimiter,
+            List<XwasMrFollowUp> values) throws IOException {
+        row(output, delimiter, List.of("exposure_id", "outcome_id", "nsnp",
+            "raps_beta", "raps_se", "raps_p_value", "raps_overdispersion",
+            "raps_iterations", "raps_converged", "contamination_beta",
+            "contamination_se", "contamination_p_value",
+            "valid_instrument_probability", "contamination_log_likelihood",
+            "presso_raw_beta", "presso_corrected_beta", "presso_global_p_value",
+            "presso_distortion_percent", "presso_outliers", "warnings"));
+        for (XwasMrFollowUp value : values) {
+            XwasMrHit hit = value.hit();
+            MrRapsResult raps = value.raps();
+            ContaminationMixtureResult contamination =
+                value.contaminationMixture();
+            MrPressoResult presso = value.presso();
+            row(output, delimiter, List.of(hit.exposureId(), hit.outcomeId(),
+                integer(hit.harmonizedInstruments().size()),
+                estimate(raps == null ? null : raps.estimate(), 0),
+                estimate(raps == null ? null : raps.estimate(), 1),
+                estimate(raps == null ? null : raps.estimate(), 2),
+                raps == null ? "" : number(raps.overdispersion()),
+                raps == null ? "" : integer(raps.iterations()),
+                raps == null ? "" : Boolean.toString(raps.converged()),
+                estimate(contamination == null ? null : contamination.estimate(), 0),
+                estimate(contamination == null ? null : contamination.estimate(), 1),
+                estimate(contamination == null ? null : contamination.estimate(), 2),
+                contamination == null ? "" : number(
+                    contamination.validInstrumentProbability()),
+                contamination == null ? "" : number(
+                    contamination.logLikelihood()),
+                presso == null ? "" : number(presso.rawEstimate().estimate()),
+                presso == null ? "" : number(
+                    presso.outlierCorrectedEstimate().estimate()),
+                presso == null ? "" : number(presso.globalPValue()),
+                presso == null ? "" : number(presso.distortionPercent()),
+                presso == null ? "" : String.join(" | ",
+                    presso.outlierVariants()),
+                String.join(" | ", value.warnings())));
+        }
+    }
+
+    private static String estimate(MrEstimate value, int field) {
+        if (value == null) return "";
+        return number(switch (field) {
+            case 0 -> value.estimate();
+            case 1 -> value.standardError();
+            default -> value.pValue();
+        });
+    }
+
     private static String exclusions(List<HarmonizationExclusion> values) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (HarmonizationExclusion value : values)
@@ -438,6 +509,10 @@ final class MrXwasCli {
               --failures FILE             Default: RESULTS.failures.ext
               --fdr-output FILE            All screened pairs plus BH q-values;
                                            uncompressed TSV
+              --follow-up-output FILE      Hit-only RAPS, contamination-mixture,
+                                           and PRESSO-style table
+              --contamination-grid-points N  Default: 1001
+              --presso-alpha X             Default: 0.05
               --overwrite
 
             Threshold directions are inclusive: p <= X, log10(p) <= X,
@@ -623,6 +698,7 @@ final class MrXwasCli {
         Path output;
         Path failures;
         Path fdrOutput;
+        Path followUpOutput;
         String exposureIdColumn;
         String outcomeIdColumn;
         String categoryColumn;
@@ -634,6 +710,8 @@ final class MrXwasCli {
         XwasMrScreeningMethod screeningMethod =
             XwasMrScreeningMethod.IVW_MULTIPLICATIVE_RANDOM;
         XwasMrSignificanceFilter filter;
+        int contaminationGridPoints = 1001;
+        double pressoAlpha = 0.05;
         boolean overwrite;
         boolean help;
 
@@ -652,6 +730,13 @@ final class MrXwasCli {
                         value(arguments, ++index, option));
                     case "--fdr-output" -> result.fdrOutput = path(
                         currentDirectory, value(arguments, ++index, option));
+                    case "--follow-up-output" -> result.followUpOutput = path(
+                        currentDirectory, value(arguments, ++index, option));
+                    case "--contamination-grid-points" ->
+                        result.contaminationGridPoints = positiveInteger(
+                            value(arguments, ++index, option), option);
+                    case "--presso-alpha" -> result.pressoAlpha = probability(
+                        value(arguments, ++index, option), option, true);
                     case "--threads" -> result.threads = positiveInteger(
                         value(arguments, ++index, option), option);
                     case "--pair-block-size" -> result.pairBlockSize =
@@ -698,6 +783,9 @@ final class MrXwasCli {
             if (result.bootstrapReplicates < 2)
                 throw new IllegalArgumentException(
                     "--bootstrap-replicates must be at least 2");
+            if (result.contaminationGridPoints < 101)
+                throw new IllegalArgumentException(
+                    "--contamination-grid-points must be at least 101");
             return result;
         }
 

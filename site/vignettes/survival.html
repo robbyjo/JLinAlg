@@ -16,7 +16,14 @@ CoxSurvivalData delayed =
 
 double hr = fit.hazardRatios()[0];
 double se = fit.standardErrors()[0];
-double p = fit.pValues()[0];</code></pre></div><p>Outputs include beta, hazard ratio, SE, z, ordinary and −log₁₀ p-values, hazard-ratio confidence intervals, convergence, backend provenance, and baseline cumulative hazard/survival.</p>
+double p = fit.pValues()[0];</code></pre></div><p>Outputs include beta, hazard ratio, SE, z, ordinary and −log₁₀ p-values, hazard-ratio confidence intervals, convergence, backend provenance, and baseline cumulative hazard/survival. Start-stop rows use an indexed event-time sweep.</p>
+<h2 id="diagnostics">Diagnostics and prepared scans</h2><pre><code>CoxDiagnosticsResult diagnostics = CoxDiagnostics.analyze(
+    survival, covariates, fit, offset, subjectIds);
+FastCoxAssociation scan = FastCoxAssociation.prepare(
+    survival, covariates, offset, options, engineOptions);</code></pre><p>Cluster-robust covariance supports repeated start-stop rows. Martingale, deviance, score, dfbeta, and Schoenfeld residuals are exported with per-term and global proportional-hazards tests. Prepared score scans reuse one null fit and risk-set plan.</p>
+<h2 id="gamma">Shared gamma frailty</h2><pre><code>CoxGammaFrailtyResult gamma = CoxGammaFrailty.fitAtVariance(
+    survival, covariates, centerIds, offset, 0.2,
+    CoxGammaFrailtyOptions.defaults(), BackendPolicy.PREFERRED);</code></pre><p>The multiplicative gamma frailty has mean one and variance theta. Fixed-theta estimates match R survival references; optional variance profiling uses an explicit Laplace approximation.</p>
 <h2 id="mixed">Add Gaussian shared frailty</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Laplace-profiled variance</span></div><pre><code>CoxRandomEffectTerm center =
     CoxRandomEffectTerm.independent(
         RandomEffectTerm.randomIntercept(
@@ -50,6 +57,6 @@ double geneticVariance =
     pedigreeFit.frailtyVariance();
 double mode = pedigreeFit
     .frailty("offspring");</code></pre></div><p>A term built with <code>ofSparse</code> or justified <code>ofUninbred</code> avoids dense pedigree covariance end to end. The sparse facade supports repeated rows per individual and returns named modes for every pedigree member, including unobserved ancestors. Results expose solver type, sparse equation/factor nonzeros, convergence, boundary singularity, and backend provenance.</p>
-<div class="note warning"><strong>Current boundary</strong>The sparse path requires one-stratum right-censored data with distinct event times and unit incidence. It keeps the exact penalized score but uses a diagonal approximation to profiled random-effect information, so Laplace variance and covariance can differ from the dense fit. Start-stop data, ties, strata, and cases needing exact dense information should use the general path. Robust sandwich inference, PH diagnostics, and gamma frailty remain planned.</div>
+<div class="note warning"><strong>Current boundary</strong>The sparse path requires one-stratum right-censored data with distinct event times and unit incidence. It keeps the exact penalized score but uses a diagonal approximation to profiled random-effect information, so Laplace variance and covariance can differ from the dense fit. Cases needing exact dense frailty information should use the general path.</div>
 <div class="next-links"><a href="mixed-models.html"><small>Previous</small><strong>REML and LMM</strong></a><a href="pedigree.html"><small>Next</small><strong>Pedigree models →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#diagnostics">Diagnostics and scans</a><a href="#gamma">Gamma frailty</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>

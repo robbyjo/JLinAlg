@@ -12,6 +12,7 @@ java -jar jlinalg-<version>.jar mr-xwas \
   --outcome phenotypes.tsv.gz \
   --output xwas-mr-results.tsv \
   --fdr-output xwas-mr-all-pairs.tsv \
+  --follow-up-output xwas-mr-follow-up.tsv \
   --p-threshold 5e-8 \
   --threads 8 \
   --pair-block-size 256
@@ -45,6 +46,9 @@ controls are:
 --seed N
 --failures FILE
 --fdr-output FILE
+--follow-up-output FILE
+--contamination-grid-points N
+--presso-alpha X
 --overwrite
 ```
 
@@ -61,6 +65,11 @@ declared analyzable family, not only threshold-passing hits. Pairs with fewer
 than three harmonized instruments have no screening p-value and are excluded;
 screening and downstream diagnostic failures remain visible in the failure
 table. The command reports the exact number of tests entering BH.
+
+`--follow-up-output` runs only for retained hits and writes RAPS convergence
+and overdispersion, contamination-mixture estimates and likelihood, and
+PRESSO-style global p-values, distortion, outlier IDs, and warnings. The hit
+objects retain harmonized instruments; null and below-threshold pairs do not.
 
 ## Reproducible benchmark
 

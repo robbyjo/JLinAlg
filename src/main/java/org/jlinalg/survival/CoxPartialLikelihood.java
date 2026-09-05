@@ -31,12 +31,26 @@ final class CoxPartialLikelihood {
             double[] design, int columns,
             double[] coefficients, double[] offset,
             CoxTies ties, CoxRiskSetPlan plan) {
+        return evaluate(survival, design, columns, coefficients, offset,
+            ties, plan, plan == null
+                ? CoxCountingProcessPlan.prepare(survival) : null);
+    }
+
+    static Evaluation evaluate(
+            CoxSurvivalData survival,
+            double[] design, int columns,
+            double[] coefficients, double[] offset,
+            CoxTies ties, CoxRiskSetPlan plan,
+            CoxCountingProcessPlan countingPlan) {
         int rows = survival.observations();
         double[] eta = linearPredictor(
             design, rows, columns, coefficients, offset);
         if (plan != null)
             return evaluateRightCensored(
                 survival, design, columns, eta, ties, plan);
+        if (countingPlan != null)
+            return evaluateCountingProcess(
+                survival, design, columns, eta, ties, countingPlan);
         double logLikelihood = 0;
         double[] score = new double[columns];
         double[] information = new double[columns * columns];
@@ -125,11 +139,24 @@ final class CoxPartialLikelihood {
             double[] design, int columns,
             double[] coefficients, double[] offset,
             CoxTies ties, CoxRiskSetPlan plan) {
+        return baseline(survival, design, columns, coefficients, offset,
+            ties, plan, plan == null
+                ? CoxCountingProcessPlan.prepare(survival) : null);
+    }
+
+    static List<BaselineHazardPoint> baseline(
+            CoxSurvivalData survival,
+            double[] design, int columns,
+            double[] coefficients, double[] offset,
+            CoxTies ties, CoxRiskSetPlan plan,
+            CoxCountingProcessPlan countingPlan) {
         int rows = survival.observations();
         double[] eta = linearPredictor(
             design, rows, columns, coefficients, offset);
         if (plan != null)
             return baselineRightCensored(survival, eta, ties, plan);
+        if (countingPlan != null)
+            return baselineCountingProcess(survival, eta, ties, countingPlan);
         List<BaselineHazardPoint> result = new ArrayList<>();
         int[] strata = survival.strataView();
         for (int stratum : distinctStrata(strata)) {
@@ -264,6 +291,88 @@ final class CoxPartialLikelihood {
         return new Evaluation(logLikelihood, score, information);
     }
 
+    private static Evaluation evaluateCountingProcess(
+            CoxSurvivalData survival, double[] design, int columns,
+            double[] eta, CoxTies ties, CoxCountingProcessPlan plan) {
+        double logLikelihood = 0.0;
+        double[] score = new double[columns];
+        double[] information = new double[columns * columns];
+        for (CoxCountingProcessPlan.Stratum stratum : plan.strata()) {
+            double maximumEta = Double.NEGATIVE_INFINITY;
+            for (int row : stratum.rowsByStart())
+                maximumEta = Math.max(maximumEta, eta[row]);
+            double risk0 = 0.0;
+            double[] risk1 = new double[columns];
+            double[] risk2 = new double[columns * columns];
+            double[] death1 = new double[columns];
+            double[] death2 = new double[columns * columns];
+            double[] mean = new double[columns];
+            int entering = 0;
+            int leaving = 0;
+            for (int group = 0; group < stratum.eventTimes().length; group++) {
+                double time = stratum.eventTimes()[group];
+                while (entering < stratum.rowsByStart().length
+                        && survival.startView()[stratum.rowsByStart()[entering]]
+                            < time) {
+                    int row = stratum.rowsByStart()[entering++];
+                    double risk = Math.exp(eta[row] - maximumEta);
+                    risk0 += risk;
+                    addLowerMoments(design, row, columns, risk, risk1, risk2);
+                }
+                while (leaving < stratum.rowsByStop().length
+                        && survival.stopView()[stratum.rowsByStop()[leaving]]
+                            < time) {
+                    int row = stratum.rowsByStop()[leaving++];
+                    double risk = Math.exp(eta[row] - maximumEta);
+                    risk0 -= risk;
+                    addLowerMoments(design, row, columns, -risk, risk1, risk2);
+                }
+                int[] eventRows = stratum.deaths()[group];
+                int deathCount = eventRows.length;
+                double death0 = 0.0;
+                Arrays.fill(death1, 0.0);
+                Arrays.fill(death2, 0.0);
+                for (int row : eventRows) {
+                    logLikelihood += eta[row];
+                    for (int column = 0; column < columns; column++)
+                        score[column] += design[row * columns + column];
+                    double risk = Math.exp(eta[row] - maximumEta);
+                    death0 += risk;
+                    addLowerMoments(design, row, columns, risk,
+                        death1, death2);
+                }
+                int steps = ties == CoxTies.EFRON ? deathCount : 1;
+                for (int step = 0; step < steps; step++) {
+                    double fraction = ties == CoxTies.EFRON
+                        ? step / (double) deathCount : 0.0;
+                    double multiplier = ties == CoxTies.EFRON ? 1.0
+                        : deathCount;
+                    double denominator = risk0 - fraction * death0;
+                    if (!(denominator > 0.0))
+                        throw new IllegalArgumentException(
+                            "Cox risk-set denominator is nonpositive");
+                    logLikelihood -= multiplier
+                        * (maximumEta + Math.log(denominator));
+                    for (int column = 0; column < columns; column++) {
+                        mean[column] = (risk1[column]
+                            - fraction * death1[column]) / denominator;
+                        score[column] -= multiplier * mean[column];
+                    }
+                    for (int left = 0; left < columns; left++)
+                        for (int right = 0; right <= left; right++) {
+                            double second = (risk2[left * columns + right]
+                                - fraction * death2[left * columns + right])
+                                / denominator;
+                            information[left * columns + right] += multiplier
+                                * (second - mean[left] * mean[right]);
+                        }
+                }
+            }
+        }
+        symmetrizeLower(information, columns);
+        return new Evaluation(logLikelihood, score, information);
+    }
+
     private static List<BaselineHazardPoint> baselineRightCensored(
             CoxSurvivalData survival, double[] eta, CoxTies ties,
             CoxRiskSetPlan plan) {
@@ -306,6 +415,53 @@ final class CoxPartialLikelihood {
                 cumulative += value.increment();
                 result.add(new BaselineHazardPoint(stratum.label(), value.time(),
                     value.events(), value.increment(), cumulative,
+                    Math.exp(-cumulative)));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<BaselineHazardPoint> baselineCountingProcess(
+            CoxSurvivalData survival, double[] eta, CoxTies ties,
+            CoxCountingProcessPlan plan) {
+        List<BaselineHazardPoint> result = new ArrayList<>();
+        for (CoxCountingProcessPlan.Stratum stratum : plan.strata()) {
+            double maximumEta = Double.NEGATIVE_INFINITY;
+            for (int row : stratum.rowsByStart())
+                maximumEta = Math.max(maximumEta, eta[row]);
+            double risk0 = 0.0;
+            int entering = 0;
+            int leaving = 0;
+            double cumulative = 0.0;
+            for (int group = 0; group < stratum.eventTimes().length; group++) {
+                double time = stratum.eventTimes()[group];
+                while (entering < stratum.rowsByStart().length
+                        && survival.startView()[stratum.rowsByStart()[entering]]
+                            < time) {
+                    int row = stratum.rowsByStart()[entering++];
+                    risk0 += Math.exp(eta[row] - maximumEta);
+                }
+                while (leaving < stratum.rowsByStop().length
+                        && survival.stopView()[stratum.rowsByStop()[leaving]]
+                            < time) {
+                    int row = stratum.rowsByStop()[leaving++];
+                    risk0 -= Math.exp(eta[row] - maximumEta);
+                }
+                int[] deaths = stratum.deaths()[group];
+                double death0 = 0.0;
+                for (int row : deaths)
+                    death0 += Math.exp(eta[row] - maximumEta);
+                double increment = 0.0;
+                if (ties == CoxTies.EFRON) {
+                    for (int step = 0; step < deaths.length; step++)
+                        increment += Math.exp(-maximumEta)
+                            / (risk0 - step / (double) deaths.length * death0);
+                } else {
+                    increment = deaths.length * Math.exp(-maximumEta) / risk0;
+                }
+                cumulative += increment;
+                result.add(new BaselineHazardPoint(stratum.label(), time,
+                    deaths.length, increment, cumulative,
                     Math.exp(-cumulative)));
             }
         }

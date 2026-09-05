@@ -26,4 +26,11 @@ public record XwasMrBatchResult(
                 || workersUsed < 1 || elapsedNanoseconds < 0L)
             throw new IllegalArgumentException("invalid xWAS scan provenance");
     }
+
+    /** Runs robust estimators only for retained hits, preserving hit order. */
+    public List<XwasMrFollowUp> followUp(
+            int contaminationGridPoints, double pressoAlpha) {
+        return hits.stream().map(hit -> XwasMrFollowUp.analyze(
+            hit, contaminationGridPoints, pressoAlpha)).toList();
+    }
 }

@@ -29,6 +29,7 @@ Run the complete verification suite before adapting an example:
 | [Meta-analysis](meta-analysis.md) | fixed/random pooling, heterogeneity estimators, Knapp-Hartung, prediction intervals, meta-regression |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
+| [Multi-signal colocalization](colocalization.md) | alignment, priors, posterior-overlap trimming, H0-H4, shared-variant posterior, diagnostics, and MR/xWAS follow-up |
 | [Structural equation modeling](sem.md) | observed-variable RAM paths, covariance/row fitting, inference, lavaan validation, benchmark, and limitations |
 
 ## Common result pattern

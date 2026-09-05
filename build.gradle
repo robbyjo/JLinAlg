@@ -329,6 +329,30 @@ tasks.register('benchmarkXwasMr', JavaExec) {
     }
 }
 
+tasks.register('benchmarkCoxPipeline', JavaExec) {
+    group = 'verification'
+    description = 'Runs prepared Cox score-scan and start-stop sweep benchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.CoxPipelineBenchmark'
+    jvmArgs '-Xms512m', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkSparsePedigreePev', JavaExec) {
+    group = 'verification'
+    description = 'Profiles batched sparse pedigree PEV and reliability extraction.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.SparsePedigreePevBenchmark'
+    jvmArgs '-Xms512m', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
 tasks.register('benchmarkTimeSeries', JavaExec) {
     group = 'verification'
     description = 'Runs real-data AR, ARMA, ARIMA, and seasonal macrobenchmarks.'

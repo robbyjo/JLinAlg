@@ -371,7 +371,7 @@ Recommended design points for high-throughput molecular MR:
   alone does not establish that the molecular trait and outcome share a causal
   variant. JLinAlg's `ColocSusie` implements multi-signal colocalization for
   aligned SuSiE fits; see the
-  [colocalization example](susie-and-sem.md#colocalize-susie-signals).
+  [dedicated colocalization workflow](colocalization.md).
 - Consider correlated cis-MR rather than discarding all but one signal when a
   scientifically justified allele-aligned LD matrix is available.
 - Record sample overlap, winner's-curse risk, weak instruments, and tissue

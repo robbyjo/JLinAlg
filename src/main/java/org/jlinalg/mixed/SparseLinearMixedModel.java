@@ -30,7 +30,7 @@ import org.jlinalg.reml.VarianceEstimation;
 public final class SparseLinearMixedModel {
     private static final double LOG_TWO_PI = Math.log(2.0 * Math.PI);
     private static final double INVALID_OBJECTIVE = Double.MAX_VALUE / 16.0;
-    private static final int MAXIMUM_PEV_COEFFICIENTS = 256;
+    private static final int PEV_SOLVE_BATCH_SIZE = 32;
     private static final double INACTIVE_STATIC_VARIANCE_RATIO = 1e-6;
 
     private SparseLinearMixedModel() { }
@@ -280,9 +280,7 @@ public final class SparseLinearMixedModel {
                 rows, columns, terms, design, pattern, factor,
                 precisionLogDeterminants,
                 options.varianceEstimation(), backend,
-                design.columns() <= MAXIMUM_PEV_COEFFICIENTS ? 0 : -1,
-                design.columns() <= MAXIMUM_PEV_COEFFICIENTS
-                    ? design.columns() : 0);
+                0, design.columns());
             OptimizationResult optimized = optimize(initial, objective);
             Evaluation fitted = objective.evaluate(optimized.mX);
             int factorNonzeroCount = factor.factorNonzeroCount();
@@ -1021,28 +1019,30 @@ public final class SparseLinearMixedModel {
             double[] result = new double[randomColumns];
             Arrays.fill(result, Double.NaN);
             if (pevStart < 0 || pevCount == 0) return result;
-            double[] rightHandSides =
-                new double[randomColumns * pevCount];
-            for (int selected = 0; selected < pevCount; selected++) {
-                rightHandSides[
-                    (pevStart + selected) * pevCount + selected] = 1.0;
-            }
-            double[] inverseColumns =
-                factor.solve(rightHandSides, pevCount);
-            for (int selected = 0; selected < pevCount; selected++) {
-                int random = pevStart + selected;
-                double value = residualVariance
-                    * inverseColumns[random * pevCount + selected];
-                for (int left = 0; left < columns; left++) {
-                    double leftValue =
-                        adjustedCross[random * columns + left];
-                    for (int right = 0; right < columns; right++) {
-                        value += leftValue
-                            * fixedCovariance[left * columns + right]
-                            * adjustedCross[random * columns + right];
-                    }
+            for (int first = 0; first < pevCount;
+                    first += PEV_SOLVE_BATCH_SIZE) {
+                int count = Math.min(PEV_SOLVE_BATCH_SIZE, pevCount - first);
+                double[] rightHandSides = new double[randomColumns * count];
+                for (int selected = 0; selected < count; selected++) {
+                    int random = pevStart + first + selected;
+                    rightHandSides[random * count + selected] = 1.0;
                 }
-                result[random] = Math.max(0.0, value);
+                double[] inverseColumns = factor.solve(rightHandSides, count);
+                for (int selected = 0; selected < count; selected++) {
+                    int random = pevStart + first + selected;
+                    double value = residualVariance
+                        * inverseColumns[random * count + selected];
+                    for (int left = 0; left < columns; left++) {
+                        double leftValue =
+                            adjustedCross[random * columns + left];
+                        for (int right = 0; right < columns; right++) {
+                            value += leftValue
+                                * fixedCovariance[left * columns + right]
+                                * adjustedCross[random * columns + right];
+                        }
+                    }
+                    result[random] = Math.max(0.0, value);
+                }
             }
             return result;
         }

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 import com.github.luben.zstd.Zstd;
@@ -33,6 +34,9 @@ import org.jlinalg.gwas.RemlAssociationScanner;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.reml.RemlOptions;
 import org.jlinalg.reml.VarianceComponent;
+import org.jlinalg.survival.CoxOptions;
+import org.jlinalg.survival.CoxScoreVariance;
+import org.jlinalg.survival.CoxSurvivalData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -256,6 +260,45 @@ class PipelineInputTest {
         assertTrue(result.estimates().get(0).beta() > 0.8);
         assertTrue(Math.abs(result.estimates().get(1).beta()) < 0.2);
         assertTrue(result.failures().isEmpty());
+    }
+
+    @Test
+    void omicsMatrixStreamsPreparedCoxScoreBlocksToSink() throws Exception {
+        Path input = temporaryDirectory.resolve("survival-omics.csv");
+        Files.writeString(input,
+            "feature,S1,S2,S3,S4,S5,S6,S7,S8\n"
+            + "geneA,-1,0,1,2,-1,0,1,2\n"
+            + "geneB,0,1,0,1,2,2,3,3\n");
+        NumericMatrixSource source = DelimitedMatrixSource.open(input);
+        CoxSurvivalData survival = CoxSurvivalData.rightCensored(
+            new double[] {1, 2, 3, 4, 5, 6, 7, 8},
+            new boolean[] {true, false, true, true, false, true, false, true});
+        double[][] covariates = {{-1}, {0}, {1}, {-1}, {0}, {1}, {-1}, {1}};
+        List<OmicsAssociationEstimate> estimates = new ArrayList<>();
+        List<AssociationPipelineFailure> failures = new ArrayList<>();
+        OmicsAssociationSink sink = new OmicsAssociationSink() {
+            @Override public void acceptEstimate(OmicsAssociationEstimate value) {
+                estimates.add(value);
+            }
+            @Override public void acceptFailure(AssociationPipelineFailure value) {
+                failures.add(value);
+            }
+        };
+
+        OmicsAssociationSummary summary =
+            StreamingOmicsAssociationPipeline.scanPredictorsCoxTo(source,
+                source.metadata().sampleIds(), survival, covariates,
+                CoxScoreVariance.MODEL_BASED, null, null,
+                OmicsTransforms.identity(), OmicsMissingPolicy.ERROR, 1,
+                null, CoxOptions.defaults(),
+                AssociationEngineOptions.acceleratedSerial()
+                    .withBackendPolicy(BackendPolicy.CPU), sink);
+
+        assertEquals(2, summary.sourceFeatures());
+        assertEquals(2, summary.testedFeatures());
+        assertEquals(List.of("geneA", "geneB"), estimates.stream()
+            .map(OmicsAssociationEstimate::featureId).toList());
+        assertTrue(failures.isEmpty());
     }
 
     @Test

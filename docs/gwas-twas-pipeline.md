@@ -139,8 +139,11 @@ OmicsAssociationResult results =
 
 Identity, empirical-quantile Winsorization, `log1p`, shifted log, sample
 z-score, tie-aware Blom rank inverse-normal, and transform composition are
-implemented. These matrix scans currently return in-memory results; an
-incremental omics sink is still planned.
+implemented. Use `scanPredictorsTo` or `scanPredictorsGlmTo` with an
+`OmicsAssociationSink` to stream deterministic estimates and failures instead
+of retaining the complete result. `OmicsAssociationSummary` reports source,
+tested, and failed feature counts. The Cox analogue is
+`scanPredictorsCoxTo`.
 
 ## Burden, SKAT, and SKAT-O
 

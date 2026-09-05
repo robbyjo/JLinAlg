@@ -43,7 +43,7 @@ SparsePedigreeRemlResult sparse =
         phenotype, fixedDesign, animal, pedigree,
         RemlOptions.builder()
             .initialVariances(1, 1).build(),
-        BackendPolicy.PREFERRED);</code></pre></div><p>This path never constructs dense A or observation-scale ZAZ′ during variance fitting.</p>
+        BackendPolicy.PREFERRED);</code></pre></div><p>This path never constructs dense A or observation-scale ZAZ′ during variance fitting. Diagonal prediction-error variances are extracted in fixed-size sparse solve batches, with reliabilities for every pedigree member and selected-member lookup by ID.</p>
 <h2 id="combine">Combine pedigree and ordinary terms</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Animal plus batch</span></div><pre><code>PedigreeRandomEffectTerm additive =
     PedigreeRandomEffectTerm.of(
         "animal", animal, pedigree);
@@ -57,6 +57,6 @@ SparseLinearMixedModelResult combined =
         List.of(additive), List.of(batch),
         RemlOptions.builder()
             .initialVariances(1, 1, 1).build(),
-        BackendPolicy.PREFERRED);</code></pre></div><div class="note warning"><strong>Current sparse boundary</strong>The dense animal model provides full PEV and reliability. Scalable extraction of the same full conditional covariance from the sparse combined model remains future work.</div>
+        BackendPolicy.PREFERRED);</code></pre></div><div class="note warning"><strong>Covariance boundary</strong>Diagonal PEV and reliability scale linearly in output size. A full prediction covariance remains intentionally unavailable because its storage is quadratic; request named diagonal uncertainty when a full covariance block is unnecessary.</div>
 <div class="next-links"><a href="survival.html"><small>Previous</small><strong>Cox survival models</strong></a><a href="glmm.html"><small>Next</small><strong>GLMM PQL →</strong></a></div>
 </article><aside class="toc"><strong>On this page</strong><a href="#build">Build pedigree</a><a href="#dense">Dense animal REML</a><a href="#simulate">Simulation and bootstrap</a><a href="#sparse">Sparse A-inverse</a><a href="#combine">Combined terms</a></aside></div></main><site-footer root="../"></site-footer></body></html>

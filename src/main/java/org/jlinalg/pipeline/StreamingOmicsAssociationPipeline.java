@@ -16,6 +16,10 @@ import org.jlinalg.association.FastOlsAssociation;
 import org.jlinalg.glm.GlmFamily;
 import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.ols.OlsOptions;
+import org.jlinalg.survival.CoxOptions;
+import org.jlinalg.survival.CoxScoreVariance;
+import org.jlinalg.survival.CoxSurvivalData;
+import org.jlinalg.survival.FastCoxAssociation;
 
 /** Block-streamed fast OLS scans for transformed omics feature matrices. */
 public final class StreamingOmicsAssociationPipeline {
@@ -134,6 +138,37 @@ public final class StreamingOmicsAssociationPipeline {
             transform, missingPolicy,
             (matrix, names) -> prepared.scan(matrix, names, engineOptions),
             sink);
+    }
+
+    /** Streams prepared-null Cox score tests for file-backed omics rows. */
+    public static OmicsAssociationSummary scanPredictorsCoxTo(
+            NumericMatrixSource source,
+            List<String> analysisSampleIds,
+            CoxSurvivalData survival,
+            double[][] covariates,
+            CoxScoreVariance scoreVariance,
+            List<String> clusterIds,
+            double[] scoreCorrelation,
+            OmicsTransform transform,
+            OmicsMissingPolicy missingPolicy,
+            int featureBlockSize,
+            double[] offset,
+            CoxOptions coxOptions,
+            AssociationEngineOptions engineOptions,
+            OmicsAssociationSink sink) throws IOException {
+        validate(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy);
+        if (sink == null || survival == null || covariates == null
+                || survival.observations() != analysisSampleIds.size()
+                || covariates.length != analysisSampleIds.size())
+            throw new IllegalArgumentException(
+                "survival, covariates, and sink must match analysis samples");
+        FastCoxAssociation prepared = FastCoxAssociation.prepare(survival,
+            covariates, offset, coxOptions, engineOptions,
+            clusterIds, scoreCorrelation);
+        return scanTo(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy, (matrix, names) -> prepared.scan(
+                matrix, names, engineOptions, scoreVariance), sink);
     }
 
     private static OmicsAssociationResult scan(

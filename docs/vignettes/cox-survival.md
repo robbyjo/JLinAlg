@@ -45,8 +45,52 @@ present; Breslow is available explicitly. Results include ordinary and
 backend provenance, and stratum-specific baseline hazard/survival steps.
 
 The right-censored fast path sorts once per stratum and accumulates risk-set
-moments. Start-stop input uses a general reference path because membership can
-both enter and leave as time changes.
+moments. Start-stop input builds one counting-process plan and sweeps event
+times in ascending order, adding rows with `start < time` and removing rows
+with `stop < time`. Both paths are reused by `CoxRegression.Prepared`.
+
+## Robust inference and diagnostics
+
+```java
+CoxDiagnosticsResult diagnostics = CoxDiagnostics.analyze(
+    survival, covariates, fit, offset, recurrentSubjectIds);
+
+double[] robustSe = diagnostics.robustStandardErrors();
+CoxProportionalHazardsTest ph = diagnostics.proportionalHazardsTest();
+CoxResiduals residuals = diagnostics.residuals();
+```
+
+The sandwich meat is aggregated by cluster, supporting repeated start-stop
+rows. Residual exports include martingale, deviance, per-row score, dfbeta,
+and event-row Schoenfeld residuals. The proportional-hazards interface returns
+per-term and global score tests using log event time.
+
+## Prepared score scans
+
+`FastCoxAssociation.prepare` fits the null model once and reuses its risk-set
+plan for blockwise model-based, cluster-robust, or caller-correlation-aware
+score tests. `StreamingOmicsAssociationPipeline.scanPredictorsCoxTo` connects
+the same engine to file-backed blocks and an incremental result sink. Run
+`benchmarkCoxPipeline` for prepared-score/full-refit and start-stop timings.
+On the 2026-09-05 development-host run (2,000 rows, 512 predictors), the
+prepared engine processed 28,748 predictors/second versus 1,829 for
+single-threaded R `survival::coxph.fit` refits, a 15.72x throughput advantage.
+The R comparator is `src/benchmark/r/cox_pipeline_benchmark.R`.
+
+## Shared gamma frailty
+
+```java
+CoxGammaFrailtyResult gamma = CoxGammaFrailty.fitAtVariance(
+    survival, covariates, centerIds, offset, 0.2,
+    CoxGammaFrailtyOptions.defaults(), BackendPolicy.PREFERRED);
+```
+
+Frailties are multiplicative gamma variables with mean one and variance
+`theta`; logged conditional modes enter the linear predictor. Fixed-`theta`
+coefficients, SEs, and modes are regression-tested against
+`survival::coxph(... + frailty(..., distribution="gamma", method="fixed"))`.
+`fit` profiles `theta` with a Laplace approximation on its log scale; that
+explicit approximation need not equal R's gamma-specific EM/profile criterion.
 
 ## Add Gaussian shared frailty
 
@@ -158,15 +202,14 @@ kernel restrictions are unsuitable.
 - Fixed-effect p-values are asymptotic Wald z tests.
 - Baseline survival is `exp(-cumulativeHazard)` within each stratum.
 - Mixed, GRM, and pedigree estimates use Gaussian log frailty and a Laplace
-  approximation. Gamma frailty and adaptive quadrature are not implemented.
+  approximation. Gamma frailty uses its separately documented multiplicative
+  gamma/Laplace path. Adaptive quadrature is not implemented.
 - `solver()` distinguishes dense and sparse-precision results. Sparse results
   additionally report coefficient, equation-nonzero, and factor-nonzero counts;
   `isSingular(tolerance)`, `converged()`, `convergenceMessage()`, and `backend()`
   expose the boundary, optimization, and compute-backend state.
-- Schoenfeld residual proportional-hazards tests, martingale/deviance
-  residuals, robust cluster sandwich covariance, recurrent-event robust
-  inference, time-varying coefficient builders, and high-throughput prepared
-  Cox score scans remain future work.
+- Time-varying coefficient builders remain caller-defined; diagnostics expose
+  the evidence needed to motivate them.
 
 Numerical regression tests lock fixed Efron, Breslow, and delayed-entry results
 to an independent `statsmodels` Cox implementation. Mixed and pedigree tests

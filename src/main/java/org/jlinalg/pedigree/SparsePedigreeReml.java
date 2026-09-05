@@ -70,6 +70,7 @@ public final class SparsePedigreeReml {
                 options, backendPolicy);
         return new SparsePedigreeRemlResult(fitted,
             pedigree.individualIds(),
-            fitted.randomEffects("additive genetic").estimates());
+            fitted.randomEffects("additive genetic").estimates(),
+            pedigree.inbreedingCoefficients());
     }
 }

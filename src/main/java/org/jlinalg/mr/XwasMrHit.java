@@ -18,9 +18,11 @@ public record XwasMrHit(
         MrEstimate screeningEstimate,
         double negativeLog10PValue,
         MrAnalysisResult analysis,
+        List<HarmonizedInstrument> harmonizedInstruments,
         List<HarmonizationExclusion> harmonizationExclusions) {
-    /** Makes diagnostic exclusions immutable. */
+    /** Makes hit-only instruments and diagnostic exclusions immutable. */
     public XwasMrHit {
+        harmonizedInstruments = List.copyOf(harmonizedInstruments);
         harmonizationExclusions = List.copyOf(harmonizationExclusions);
     }
 }

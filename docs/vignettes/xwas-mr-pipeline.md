@@ -210,8 +210,8 @@ Both screening choices use the same harmonized instruments:
 
 Only a threshold-passing pair runs MR-Egger, weighted median, bootstrap,
 leave-one-out, instrument-strength warnings, and the remaining combined
-analysis. Robust methods such as RAPS, contamination mixture, and the
-PRESSO-style diagnostic can then be added for the much smaller hit list.
+analysis. Harmonized instruments are retained only for those hits, allowing
+robust methods to run without rebuilding the complete scan.
 
 ## Inspect results and accounting
 
@@ -252,22 +252,18 @@ and seed. They remain in the same order with one thread or many threads.
 Apply sensitivity analysis to each retained hit rather than to every null cell:
 
 ```java
-for (XwasMrHit hit : result.hits()) {
-    List<HarmonizedInstrument> instruments = /* retain during input mapping */;
-    MrRapsResult raps = RobustMendelianRandomization.raps(instruments);
-    ContaminationMixtureResult mixture =
-        ContaminationMixture.fit(instruments, 1001);
-    MrPressoResult presso = MrPresso.analyze(instruments, 0.05);
-    // Persist estimates, convergence, outliers, and diagnostic p-values.
-}
+List<XwasMrFollowUp> followUps = result.followUp(1001, 0.05);
+for (XwasMrFollowUp followUp : followUps)
+    followUp.warnings().forEach(System.out::println);
 ```
 
 `XwasMrHit.analysis()` already contains IVW, MR-Egger, weighted median, Wald
 ratios, F statistics, heterogeneity, Egger intercept, leave-one-out, and
-warnings. The pipeline retains harmonization exclusions but does not currently
-retain the full harmonized instrument list in each hit to keep result memory
-smaller. Applications needing additional robust calls should cache or rebuild
-the small harmonized list for hits only.
+warnings. `XwasMrFollowUp` records RAPS convergence/overdispersion,
+contamination-mixture likelihood/probability, PRESSO global p-value,
+distortion and outlier IDs, plus method-specific warnings. The CLI runs this
+bounded second stage only when `--follow-up-output FILE` is supplied; tune it
+with `--contamination-grid-points` and `--presso-alpha`.
 
 Generate forest, funnel, scatter, and leave-one-out figures from the hit result
 objects using the export schema in the

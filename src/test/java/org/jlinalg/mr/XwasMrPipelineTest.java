@@ -72,6 +72,14 @@ class XwasMrPipelineTest {
             .map(XwasMrScreeningResult::thresholdPassed).toList());
         assertEquals(3, expression.clumpedInstruments().size());
         assertEquals(3, protein.clumpedInstruments().size());
+        List<XwasMrFollowUp> followUps = serial.followUp(201, 0.05);
+        assertEquals(2, followUps.size());
+        assertEquals("GENE1", followUps.get(0).hit().exposureId());
+        assertEquals(3, followUps.get(0).hit().harmonizedInstruments().size());
+        assertTrue(Double.isFinite(
+            followUps.get(0).contaminationMixture().estimate().estimate()));
+        assertTrue(followUps.get(0).warnings().stream()
+            .anyMatch(value -> value.startsWith("PRESSO:")));
     }
 
     @Test
