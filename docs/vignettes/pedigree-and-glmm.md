@@ -175,23 +175,25 @@ random-effect mode with sparse damped Newton iterations; its observed Hessian
 is reused for the Laplace determinant rather than computing expected Fisher
 information for BOBYQA.
 
-The current vertical slice accepts ordinary or pedigree random effects in the
-conditional count process. For an NB2 pedigree model:
+Independent ordinary or pedigree random effects may enter either predictor.
+For a correlated two-process NB2 pedigree model:
 
 ```java
 PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
     "individual", observationIndividualIds, pedigree);
 
-ZeroInflatedMixedResult fit =
-    SparseZeroInflatedMixedModel.fitNegativeBinomial(
+CorrelatedZeroInflatedRandomEffect joint =
+    CorrelatedZeroInflatedRandomEffect.pedigree("additive", additive);
+
+try (SparseZeroInflatedMixedModel.Prepared prepared =
+        SparseZeroInflatedMixedModel.prepareNegativeBinomial(
+            count.length, List.of(), List.of(), List.of(), List.of(),
+            List.of(joint), ZeroInflatedMixedOptions.defaults(),
+            BackendPolicy.PREFERRED)) {
+    ZeroInflatedMixedResult fit = prepared.fitWithInference(
         count, countFixed, countColumns,
-        zeroFixed, zeroColumns,
-        sizeFixed, sizeColumns,
-        List.of(additive.randomEffect()),
-        List.of(additive.precision()),
-        countOffset,
-        ZeroInflatedMixedOptions.defaults(),
-        BackendPolicy.PREFERRED);
+        zeroFixed, zeroColumns, sizeFixed, sizeColumns, countOffset);
+}
 ```
 
 The NB2 conditional variance is `mu + mu^2 / size`. The result distinguishes
@@ -199,10 +201,27 @@ the conditional count mean, structural-zero probability, unconditional fitted
 mean, and total fitted zero mass. Pedigree `A^-1` remains in coefficient space,
 so unobserved ancestors are retained without forming dense `A` or `ZAZ'`.
 
-Random effects in the structural-zero predictor and correlated mean/zero
-pedigree effects are deliberately deferred until the full cross-predictor
-observed Hessian, marginal inference, and independent TMB comparison are
-gated. See `TODO.md` for that completion contract.
+For correlated effects, `G` has separate count/zero variances and a correlation
+represented as `0.99 * tanh(z)`. The random precision is
+`inverse(G) kron inverse(A)` and stays sparse. Zero observations contribute the
+full observed 2-by-2 predictor curvature, including the cross term; positive
+observations have a zero cross term.
+
+BOBYQA remains derivative-free. `fitWithInference` performs a separate
+post-fit numerical Hessian of the marginal Laplace objective, including the
+variance/correlation nuisance parameters, and exposes fixed/dispersion
+covariance and standard errors. `profile` refits the nuisance parameters over a
+caller grid; `parametricBootstrap` records failed replicates as `NaN`. Prepared
+state holds one symbolic analysis and lazily creates one numeric factor per
+calling worker.
+
+`ZeroInflatedMixedFormula` compiles count and zero formulas, plus an NB2 size
+formula when needed. Checked-in fixtures compare grouped ZIP/ZINB fits and ZIP
+standard errors with `glmmTMB`; a separately compiled TMB sparse-GMRF template
+checks correlated pedigree fixed effects, variances, correlation, and marginal
+likelihood. The default benchmark fits 1,500 observations and 1,000 random
+coefficients with 4,900 sparse equation/factor entries in 2.576353 seconds on
+the documented development host; use `benchmarkZeroInflatedMixed` to rerun it.
 
 Satterthwaite and Kenward-Roger options describe the final PQL working model,
 not an exact finite-sample distribution for the original non-Gaussian model.

@@ -493,35 +493,41 @@ dense reference implementation; adaptive quadrature is not implemented.
 
 `SparseZeroInflatedMixedModel` fits frequentist zero-inflated Poisson and NB2
 mixed models. Separate fixed designs control the conditional count mean,
-structural-zero probability, and (for NB2) size. Count-side ordinary and
-pedigree effects are integrated by first-order Laplace approximation. BOBYQA
-optimizes only the fixed, dispersion, and log-variance parameters; sparse
-damped Newton iterations find the high-dimensional random-effect mode and the
-same observed Hessian supplies the Laplace determinant:
+structural-zero probability, and (for NB2) size. Ordinary and pedigree random
+effects may enter either process and are integrated by first-order Laplace
+approximation. BOBYQA optimizes only the low-dimensional fixed, dispersion,
+variance, and guarded-correlation parameters; sparse damped Newton iterations
+find the high-dimensional random-effect mode. The full observed count/zero
+cross-Hessian supplies the Laplace determinant:
 
 ```java
 PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
     "individual", observationIndividualIds, pedigree);
 
-ZeroInflatedMixedResult zinb =
-    SparseZeroInflatedMixedModel.fitNegativeBinomial(
-        counts,
-        countDesign, countColumns,
-        zeroDesign, zeroColumns,
-        sizeDesign, sizeColumns,
-        List.of(additive.randomEffect()),
-        List.of(additive.precision()),
-        logExposure,
-        ZeroInflatedMixedOptions.defaults(),
-        BackendPolicy.PREFERRED);
+CorrelatedZeroInflatedRandomEffect jointAdditive =
+    CorrelatedZeroInflatedRandomEffect.pedigree("additive", additive);
+
+try (SparseZeroInflatedMixedModel.Prepared model =
+        SparseZeroInflatedMixedModel.prepareNegativeBinomial(
+            counts.length, List.of(), List.of(), List.of(), List.of(),
+            List.of(jointAdditive), ZeroInflatedMixedOptions.defaults(),
+            BackendPolicy.PREFERRED)) {
+    ZeroInflatedMixedResult zinb = model.fitWithInference(
+        counts, countDesign, countColumns, zeroDesign, zeroColumns,
+        sizeDesign, sizeColumns, logExposure);
+}
 ```
 
 NB2 uses `variance = mu + mu^2 / size`. `conditionalCountMeans()` reports the
 count-process mean, while `fittedMeans()` includes structural-zero probability;
-`fittedZeroProbabilities()` includes both structural and sampling zeros. The
-current implementation permits random effects in the count process only.
-Zero-process random effects, cross-process pedigree covariance, marginal
-Hessian inference, and a prepared repeated-fit API are tracked in `TODO.md`.
+`fittedZeroProbabilities()` includes both structural and sampling zeros.
+`fitWithInference` computes a post-optimization observed numerical Hessian—this
+is not Fisher information supplied to BOBYQA—and returns nuisance-adjusted
+marginal covariance and standard errors. The prepared object reuses symbolic
+sparse analysis and one numeric factor per worker; it also provides profile
+likelihood and deterministic conditional parametric bootstrap. Checked-in
+fixtures gate grouped models against `glmmTMB` and correlated pedigree models
+against an independent TMB sparse-GMRF template.
 
 The same PQL estimator is available with a numerator-relationship random
 effect through `PedigreeGlmmPql`:

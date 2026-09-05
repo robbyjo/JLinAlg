@@ -365,6 +365,18 @@ tasks.register('benchmarkSparsePedigreePev', JavaExec) {
     }
 }
 
+tasks.register('benchmarkZeroInflatedMixed', JavaExec) {
+    group = 'verification'
+    description = 'Profiles sparse correlated-pedigree zero-inflated fitting.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.ZeroInflatedMixedBenchmark'
+    jvmArgs '-Xms512m', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
 tasks.register('benchmarkTimeSeries', JavaExec) {
     group = 'verification'
     description = 'Runs real-data AR, ARMA, ARIMA, and seasonal macrobenchmarks.'

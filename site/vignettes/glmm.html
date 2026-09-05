@@ -25,18 +25,26 @@ AssociationStatistics inference =
         "individual", observationIndividualIds,
         pedigree);
 
-ZeroInflatedMixedResult fit =
-    SparseZeroInflatedMixedModel
-        .fitNegativeBinomial(
-            counts,
-            countDesign, countColumns,
+CorrelatedZeroInflatedRandomEffect joint =
+    CorrelatedZeroInflatedRandomEffect
+        .pedigree("additive", additive);
+
+try (SparseZeroInflatedMixedModel.Prepared prepared =
+        SparseZeroInflatedMixedModel
+            .prepareNegativeBinomial(
+                counts.length,
+                List.of(), List.of(),
+                List.of(), List.of(),
+                List.of(joint),
+                ZeroInflatedMixedOptions.defaults(),
+                BackendPolicy.PREFERRED)) {
+    ZeroInflatedMixedResult fit =
+        prepared.fitWithInference(
+            counts, countDesign, countColumns,
             zeroDesign, zeroColumns,
             sizeDesign, sizeColumns,
-            List.of(additive.randomEffect()),
-            List.of(additive.precision()),
-            logExposure,
-            ZeroInflatedMixedOptions.defaults(),
-            BackendPolicy.PREFERRED);</code></pre></div><p>BOBYQA optimizes fixed, NB2-size, and log-variance parameters. Sparse damped Newton iterations find the count-side random-effect mode, and the same observed Hessian supplies the Laplace determinant. The result distinguishes the conditional count mean, structural-zero probability, unconditional mean, and total zero mass. Zero-process random effects and correlated two-process pedigree covariance remain explicitly tracked work.</p>
+            logExposure);
+}</code></pre></div><p>Random effects may enter either process. A correlated pedigree effect estimates two variances and a guarded correlation with precision <code>inverse(G) kron inverse(A)</code>. Zero observations contribute the full observed count/zero cross-Hessian. BOBYQA itself remains derivative-free; optional covariance comes from a separate post-fit numerical Hessian of the marginal Laplace objective.</p><p>Prepared fits reuse one symbolic sparse analysis and one numeric factor per worker, and also support profile grids and deterministic conditional parametric bootstrap. Checked-in <code>glmmTMB</code> and independent TMB sparse-GMRF fixtures gate estimates, marginal likelihood, and standard errors. The result distinguishes the conditional count mean, structural-zero probability, unconditional mean, and total zero mass.</p>
 <h2 id="interpret">Interpret the working fit</h2><p>Each outer iteration creates a GLM working response and known diagonal residual covariance, estimates random covariance scales by REML, then updates the random linear predictor.</p><div class="note warning"><strong>PQL is not a marginal GLMM likelihood</strong>It can be biased for rare binary events, small clusters, and large random-effect variance. Satterthwaite or Kenward–Roger options apply to the final working linearization—not the exact non-Gaussian model.</div><p>Report the estimator as PQL, check both inner and outer convergence, and avoid likelihood comparisons with future Laplace/AGQ fits.</p>
 <div class="next-links"><a href="pedigree.html"><small>Previous</small><strong>Pedigree REML</strong></a><a href="association.html"><small>Next</small><strong>Association engines →</strong></a></div>
 </article><aside class="toc"><strong>On this page</strong><a href="#random">Random covariance</a><a href="#poisson">Count model</a><a href="#binary">Pedigree binary</a><a href="#zero-inflated">Zero-inflated Laplace</a><a href="#interpret">Interpretation</a></aside></div></main><site-footer root="../"></site-footer></body></html>

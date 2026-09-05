@@ -14,6 +14,7 @@ public final class ZeroInflatedMixedResult {
     private final double[] dispersionCoefficients;
     private final List<String> componentNames;
     private final double[] variances;
+    private final Map<String, Double> correlations;
     private final Map<String, double[]> randomEffects;
     private final double[] conditionalCountMeans;
     private final double[] structuralZeroProbabilities;
@@ -27,6 +28,11 @@ public final class ZeroInflatedMixedResult {
     private final int randomCoefficientCount;
     private final int sparseEquationNonzeroCount;
     private final int factorNonzeroCount;
+    private final List<String> marginalParameterNames;
+    private final double[] marginalCovariance;
+    private final List<String> warnings;
+    private final List<String> outerParameterNames;
+    private final double[] outerParameterEstimates;
 
     ZeroInflatedMixedResult(
             String family,
@@ -35,6 +41,7 @@ public final class ZeroInflatedMixedResult {
             double[] dispersionCoefficients,
             List<String> componentNames,
             double[] variances,
+            Map<String, Double> correlations,
             Map<String, double[]> randomEffects,
             double[] conditionalCountMeans,
             double[] structuralZeroProbabilities,
@@ -47,13 +54,19 @@ public final class ZeroInflatedMixedResult {
             boolean converged,
             int randomCoefficientCount,
             int sparseEquationNonzeroCount,
-            int factorNonzeroCount) {
+            int factorNonzeroCount,
+            List<String> marginalParameterNames,
+            double[] marginalCovariance,
+            List<String> warnings,
+            List<String> outerParameterNames,
+            double[] outerParameterEstimates) {
         this.family = family;
         this.countCoefficients = countCoefficients.clone();
         this.zeroCoefficients = zeroCoefficients.clone();
         this.dispersionCoefficients = dispersionCoefficients.clone();
         this.componentNames = List.copyOf(componentNames);
         this.variances = variances.clone();
+        this.correlations = Map.copyOf(correlations);
         Map<String, double[]> copied = new LinkedHashMap<>();
         randomEffects.forEach((name, values) ->
             copied.put(name, values.clone()));
@@ -71,6 +84,11 @@ public final class ZeroInflatedMixedResult {
         this.randomCoefficientCount = randomCoefficientCount;
         this.sparseEquationNonzeroCount = sparseEquationNonzeroCount;
         this.factorNonzeroCount = factorNonzeroCount;
+        this.marginalParameterNames = List.copyOf(marginalParameterNames);
+        this.marginalCovariance = marginalCovariance.clone();
+        this.warnings = List.copyOf(warnings);
+        this.outerParameterNames = List.copyOf(outerParameterNames);
+        this.outerParameterEstimates = outerParameterEstimates.clone();
     }
 
     public String family() { return family; }
@@ -81,6 +99,8 @@ public final class ZeroInflatedMixedResult {
     }
     public List<String> componentNames() { return componentNames; }
     public double[] varianceComponents() { return variances.clone(); }
+    /** Estimated count/zero correlations for named two-process effects. */
+    public Map<String, Double> correlations() { return correlations; }
     public Map<String, double[]> randomEffects() {
         Map<String, double[]> result = new LinkedHashMap<>();
         randomEffects.forEach((name, values) ->
@@ -123,4 +143,32 @@ public final class ZeroInflatedMixedResult {
         return sparseEquationNonzeroCount;
     }
     public int factorNonzeroCount() { return factorNonzeroCount; }
+    /** Names for the count, zero, and log-size marginal covariance. */
+    public List<String> marginalParameterNames() {
+        return marginalParameterNames;
+    }
+    /** Row-major observed-Hessian covariance; empty unless requested. */
+    public double[] marginalCovariance() { return marginalCovariance.clone(); }
+    public boolean inferenceAvailable() { return marginalCovariance.length > 0; }
+    public double[] standardErrors() {
+        int dimension = marginalParameterNames.size();
+        double[] result = new double[dimension];
+        for (int index = 0; index < dimension; index++) {
+            double variance = marginalCovariance[index * dimension + index];
+            result[index] = variance >= 0.0 ? Math.sqrt(variance) : Double.NaN;
+        }
+        return result;
+    }
+    /** Convergence, singularity, and boundary diagnostics. */
+    public List<String> warnings() { return warnings; }
+    public boolean singular() {
+        return warnings.stream().anyMatch(value ->
+            value.contains("boundary") || value.contains("singular"));
+    }
+    /** Optimizer-scale names, including log variances and Fisher-z terms. */
+    public List<String> outerParameterNames() { return outerParameterNames; }
+    /** Optimizer-scale estimates in {@link #outerParameterNames()} order. */
+    public double[] outerParameterEstimates() {
+        return outerParameterEstimates.clone();
+    }
 }
