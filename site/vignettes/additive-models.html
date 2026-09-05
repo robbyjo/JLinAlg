@@ -1,6 +1,13 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Worked GAM, GAMM, GAMLSS, and vector additive model examples in JLinAlg."><title>Additive models · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Additive models</span></div><h1>Smooth the mean—or the whole distribution.</h1><p>Compile bases once, select single or marginal penalties, add pedigree and correlated covariance, and reuse the result for high-throughput association.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<h2 id="loess">Fit a direct LOESS curve</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Tricube local polynomial</span></div><pre><code>LoessResult local = Loess.fit(
+    x, y, weights,
+    new LoessOptions(0.6, 2,
+        LoessFamily.GAUSSIAN, 4));
+
+double[] prediction = local.predict(queryX);
+double trace = local.effectiveDegreesOfFreedom();</code></pre></div><p>The one-dimensional direct surface supports degree zero through two, prior weights, R-compatible robust symmetric passes, diagonal leverage, and prepared repeated fits. Weighted, robust, prediction, and trace fixtures match <code>stats::loess</code>; the measured 5,000-row end-to-end fit was 3.80× faster than R's direct surface.</p>
 <h2 id="gam">Fit a REML GAM</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Gaussian P-spline</span></div><pre><code>PSplineTerm age = PSplineTerm.of(
     "s(age)", ageYears, 12);
 GamResult fit = Gam.fitGaussian(
@@ -55,4 +62,4 @@ GeneralizedGammLaplaceResult fit =
         scan.scan(genotypes, variantNames);
 }</code></pre></div><p>The null penalty factorization is retained. Each marker block uses a batched cross-product and returns beta, SE, t, regular p, log10-p, and −log10-p. <code>DiscretePSplineBasis</code> aggregates repeated covariate rows for BAM-like cross-products.</p>
 <div class="next-links"><a href="linear-models.html"><small>Previous</small><strong>OLS and GLM</strong></a><a href="penalized-regression.html"><small>Next</small><strong>Penalized regression →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#gam">REML GAM</a><a href="#tensor">Tensor penalties</a><a href="#bases">Smooth bases</a><a href="#gamm">GAMM and pedigree</a><a href="#distribution">Distributional models</a><a href="#scan">Association scans</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#loess">LOESS</a><a href="#gam">REML GAM</a><a href="#tensor">Tensor penalties</a><a href="#bases">Smooth bases</a><a href="#gamm">GAMM and pedigree</a><a href="#distribution">Distributional models</a><a href="#scan">Association scans</a></aside></div></main><site-footer root="../"></site-footer></body></html>

@@ -10,6 +10,8 @@ linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, and penalized-quasi-likelihood generalized linear
 mixed models (GLMM PQL). Gaussian ridge, LASSO, and elastic-net regression and
 a first summary-statistics Mendelian-randomization (MR) layer are also included.
+Direct one-dimensional LOESS supplies weighted or robust local-polynomial
+fitting, prediction, leverage, and reusable predictor geometry.
 
 > **v0.2.0 verification status:** Every shipped component family has automated
 > correctness coverage and an executable performance check. Independent
@@ -121,7 +123,7 @@ service-provider mechanism, and are loaded with `--transform-plugin FILE.jar`.
 
 The [vignette index](docs/vignettes/README.md) provides end-to-end examples for
 every implemented feature group: OLS/GLM and penalized regression, REML/LMM,
-GAM/GAMM and distributional/vector additive models, pedigree and GLMM
+LOESS, GAM/GAMM and distributional/vector additive models, pedigree and GLMM
 PQL/Laplace, formulas/backends, association and GWAS/TWAS, Mendelian
 randomization, meta-analysis/meta-regression, time series, SuSiE, and SEM. Each
 vignette explains input layout, result interpretation, performance choices,

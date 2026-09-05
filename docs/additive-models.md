@@ -5,6 +5,10 @@ The iterative path therefore performs dense linear algebra through JDistlib
 instead of interpreting formula terms. `BackendPolicy.PREFERRED` tries
 auto-routed GPU execution first, then oneMKL, OpenBLAS, and portable Java CPU.
 
+For direct local-polynomial smoothing rather than a global basis/penalty
+model, use [`Loess`](loess.md). It provides R-compatible tricube fits,
+Tukey-bisquare robust passes, prepared repeated fits, and direct prediction.
+
 ## Gaussian and generalized additive models
 
 `Gam.fitGaussian` estimates ordinary P-spline smoothing parameters by exact

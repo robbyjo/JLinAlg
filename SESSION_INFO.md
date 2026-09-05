@@ -73,6 +73,23 @@ Repository baseline: `main` at `9389698` (`origin/main`)
   Cox scan comparator at 2,000 rows and 512 predictors. R processed 1,829
   predictors/second versus JLinAlg prepared score scanning at 28,748/second,
   a 15.72x measured advantage on this host.
+- **2026-09-05 17:38 EDT / 21:38 UTC** — designed LOESS as a separate direct
+  local-polynomial API rather than treating it as a penalized GAM basis.
+- **2026-09-05 17:43 EDT / 21:43 UTC** — implemented one-dimensional tricube
+  LOESS with degree 0-2, prior weights, Gaussian and Tukey-bisquare symmetric
+  families, fitted/residual/leverage outputs, direct prediction, and reusable
+  sorted predictor geometry.
+- **2026-09-05 17:47 EDT / 21:47 UTC** — matched weighted fitted values,
+  arbitrary predictions, exact smoother trace, robust fitted values, and final
+  robustness weights to R 4.6.1 `stats::loess` direct-surface fixtures.
+- **2026-09-05 17:51 EDT / 21:51 UTC** — ran the matched 5,000-row benchmark.
+  R direct LOESS required 0.090000 seconds; JLinAlg required 0.023688 seconds
+  end to end and 0.022872 seconds with prepared geometry, corresponding to
+  3.80x and 3.93x speedups. Both runtimes produced checksum 0.001584182714.
+- **2026-09-05 17:55 EDT / 21:55 UTC** — regenerated the R reference artifact,
+  forced the complete Gradle test and website suite, compiled every benchmark,
+  and ran `git diff --check`; all passed. The three optional native-CHOLMOD
+  tests remained skipped because that library is not packaged locally.
 
 ## What changed
 
@@ -110,6 +127,9 @@ Repository baseline: `main` at `9389698` (`origin/main`)
   and beyond-former-cutoff tests plus a scale benchmark.
 - Added retained-hit-only xWAS instrument hand-off and optional robust CLI
   output, plus a standalone colocalization vignette in Markdown and HTML.
+- Added R-compatible direct-surface LOESS fitting, robust reweighting,
+  prediction, exact diagonal leverage/trace, a prepared repeated-fit path,
+  independent R fixtures, and matched Java/R benchmarks.
 
 ## Numerical contract and remaining work
 

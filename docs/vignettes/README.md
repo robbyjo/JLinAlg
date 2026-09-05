@@ -17,6 +17,7 @@ Run the complete verification suite before adapting an example:
 | --- | --- |
 | [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
+| [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
 | [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |
 | [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, combined random terms, GLMM PQL, pedigree GLMM PQL |
 | [Cox and frailty survival models](cox-survival.md) | right-censoring, delayed entry, strata, Efron/Breslow ties, hazard ratios, Gaussian, GRM, and pedigree frailty |

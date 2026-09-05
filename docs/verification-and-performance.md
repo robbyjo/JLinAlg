@@ -20,6 +20,7 @@ parity runs are documented for CHOLMOD.
 | REML and mixed models | `nlme`, `lme4`, `rrBLUP`, `pedigreemm` | fixed effects, variance components, BLUP/PEV, sparse/dense parity |
 | GEE | `geepack` and `geer` | Gaussian/binomial/Poisson coefficients, robust covariance, working correlation |
 | GAM/GAMM | `mgcv` and `lme4` | fitted values, EDF, likelihood, smooth and random-effect quantities |
+| LOESS | R `stats::loess` direct surface | weighted/robust fitted values, prediction, robustness weights, exact trace |
 | Distributional/vector models | `gamlss` and `VGAM` | parameter predictors, likelihoods, probabilities |
 | Cox and frailty | R `survival` and `coxme` | coefficients, SEs, likelihood, grouped and pedigree frailty |
 | Penalized regression | `glmnet` plus direct normal equations | paths, objectives, deterministic CV, ridge solution |
@@ -52,6 +53,7 @@ each source document.
 | Three 100-lambda penalized paths | R `glmnet` | 0.086000 s | 0.020893 s | 4.12x |
 | 100-gene Gaussian GAM scan | R `mgcv` | 16.620 s | 0.337 s | 49.38x |
 | 100-gene batch GAMM scan | R `mgcv` | 21.940 s | 0.559 s | 39.24x |
+| LOESS, 5,000 rows, direct degree 2 | R `stats::loess` | 0.090000 s | 0.023688 s | 3.80x |
 | 20-gene exchangeable GEE | R `geer` | 562.530 s | 0.169 s | 3332.2x |
 | 20-gene fixed Cox scan | R `coxph` | 0.450 s | 0.052 s | 8.67x |
 | 223,963 random-effects meta-analyses | vectorized base R | 8.470 s | 0.159 s | 53.2x |
@@ -75,6 +77,7 @@ limitations are recorded in:
 - [TOPMed penalized regression](topmed-penalized-performance.md)
 - [TOPMed GAM](topmed-gam-performance.md) and
   [GAMM](topmed-gamm-performance.md)
+- [LOESS direct fitting](loess.md)
 - [TOPMed GEE](topmed-gee-performance.md)
 - [TOPMed Cox](topmed-cox-performance.md)
 - [TOPMed meta-analysis](topmed-meta-analysis-performance.md)

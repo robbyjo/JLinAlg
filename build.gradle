@@ -341,6 +341,18 @@ tasks.register('benchmarkCoxPipeline', JavaExec) {
     }
 }
 
+tasks.register('benchmarkLoess', JavaExec) {
+    group = 'verification'
+    description = 'Runs the deterministic direct-surface LOESS benchmark shared with R.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.LoessBenchmark'
+    jvmArgs '-Xms512m', '-Xmx2g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
 tasks.register('benchmarkSparsePedigreePev', JavaExec) {
     group = 'verification'
     description = 'Profiles batched sparse pedigree PEV and reliability extraction.'
