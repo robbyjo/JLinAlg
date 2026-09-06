@@ -88,10 +88,10 @@ Completion evidence:
   standard errors pass checked-in `glmmTMB` 1.1.14 fixtures;
 - a separately compiled TMB 1.9.25 sparse-GMRF template gates correlated
   pedigree fixed effects, variances, correlation, and marginal likelihood;
-- the reproducible 500-member, 1,500-observation benchmark used 1,000 random
-  coefficients, 4,900 sparse equation/factor nonzeros, converged in 2.576353
-  seconds, and sampled a 313,129,896-byte peak-heap delta on the documented
-  development host.
+- the optimized reproducible 500-member, 1,500-observation benchmark used
+  1,000 random coefficients, 4,900 sparse equation/factor nonzeros, converged
+  in 2.186222 seconds (previously 2.576353), and sampled a 311,095,128-byte
+  peak-heap delta on the documented development host.
 
 Sources: [pedigree and GLMM vignette](docs/vignettes/pedigree-and-glmm.md),
 [`SparseZeroInflatedMixedModel`](src/main/java/org/jlinalg/distributional/SparseZeroInflatedMixedModel.java),

@@ -1,5 +1,11 @@
 # Unreleased
 
+- Reduced sparse ZIP/ZINB fit time by reusing row-likelihood workspaces,
+  precomputing response-only terms, using a likelihood-only Newton line
+  search, and separating count/zero sparse row products. On the official
+  644-row `glmmTMB` Salamanders examples, median JLinAlg fit time fell from
+  0.135 to 0.081 seconds for ZIP and from 2.365 to 1.019 seconds for ZINB;
+  both optimized fits converged to the documented `glmmTMB` solutions.
 - Added a uniform `org.jlinalg.stats.StatisticalTests` facade for the basic
   base R test families. Existing JDistlib tests are delegated; JLinAlg adds
   correlation, Fisher exact, Friedman, Cochran-Mantel-Haenszel, McNemar,

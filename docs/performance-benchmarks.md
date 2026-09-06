@@ -157,9 +157,10 @@ reports equation and factor nonzeros alongside elapsed time:
 .\gradlew.bat benchmarkZeroInflatedMixed
 ```
 
-The 2026-09-05 default run on the development host used 500 pedigree members,
-1,500 observations, and 1,000 random coefficients. It converged in 2.576353
-seconds with 4,900 sparse equation entries, 4,900 factor entries, and a sampled
-313,129,896-byte peak-heap delta. Override `jlinalg.benchmark.members` and
-`jlinalg.benchmark.repeats` to exercise other sizes. The benchmark retains
-coefficient-space `A^-1`; it never builds dense `A`, `G kron A`, or `ZAZ'`.
+The optimized 2026-09-05 default run on the development host used 500 pedigree
+members, 1,500 observations, and 1,000 random coefficients. It converged in
+2.186222 seconds, down from 2.576353 seconds, with 4,900 sparse equation
+entries, 4,900 factor entries, and a sampled 311,095,128-byte peak-heap delta.
+Override `jlinalg.benchmark.members` and `jlinalg.benchmark.repeats` to exercise
+other sizes. The benchmark retains coefficient-space `A^-1`; it never builds
+dense `A`, `G kron A`, or `ZAZ'`.
