@@ -207,20 +207,24 @@ represented as `0.99 * tanh(z)`. The random precision is
 full observed 2-by-2 predictor curvature, including the cross term; positive
 observations have a zero cross term.
 
-BOBYQA remains derivative-free. `fitWithInference` performs a separate
-post-fit numerical Hessian of the marginal Laplace objective, including the
-variance/correlation nuisance parameters, and exposes fixed/dispersion
-covariance and standard errors. `profile` refits the nuisance parameters over a
-caller grid; `parametricBootstrap` records failed replicates as `NaN`. Prepared
-state holds one symbolic analysis and lazily creates one numeric factor per
-calling worker.
+Automatic outer optimization uses bounded BFGS and workload-gated parallel
+numerical gradients for modes with at most 128 random coefficients. Each
+gradient perturbs the complete Laplace objective from the same converged center
+mode, so it includes mode and log-determinant changes. Larger sparse modes use
+BOBYQA; callers may also select BOBYQA explicitly or limit gradient threads in
+`ZeroInflatedMixedOptions`. `fitWithInference` performs a separate post-fit
+numerical Hessian, including the variance/correlation nuisance parameters, and
+exposes fixed/dispersion covariance and standard errors. `profile` refits the
+nuisance parameters over a caller grid; `parametricBootstrap` records failed
+replicates as `NaN`. Prepared state holds one symbolic analysis and lazily
+creates one numeric factor per calling worker.
 
 `ZeroInflatedMixedFormula` compiles count and zero formulas, plus an NB2 size
 formula when needed. Checked-in fixtures compare grouped ZIP/ZINB fits and ZIP
 standard errors with `glmmTMB`; a separately compiled TMB sparse-GMRF template
 checks correlated pedigree fixed effects, variances, correlation, and marginal
 likelihood. The default benchmark fits 1,500 observations and 1,000 random
-coefficients with 4,900 sparse equation/factor entries in 2.576353 seconds on
+coefficients with 4,900 sparse equation/factor entries in 2.161532 seconds on
 the documented development host; use `benchmarkZeroInflatedMixed` to rerun it.
 
 Satterthwaite and Kenward-Roger options describe the final PQL working model,

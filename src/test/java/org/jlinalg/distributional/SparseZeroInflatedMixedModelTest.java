@@ -95,6 +95,27 @@ final class SparseZeroInflatedMixedModelTest {
     }
 
     @Test
+    void selectableOuterOptimizersAgreeOnGroupedZip() {
+        Fixture fixture = fixture(false);
+        ZeroInflatedMixedOptions base = controls();
+        ZeroInflatedMixedResult bfgs = SparseZeroInflatedMixedModel.fitPoisson(
+            fixture.response(), fixture.countFixed(), 2,
+            fixture.intercept(), 1, List.of(fixture.groupTerm()), null, null,
+            withOptimizer(base, ZeroInflatedOuterOptimizer.BOUNDED_BFGS),
+            BackendPolicy.CPU);
+        ZeroInflatedMixedResult bobyqa = SparseZeroInflatedMixedModel.fitPoisson(
+            fixture.response(), fixture.countFixed(), 2,
+            fixture.intercept(), 1, List.of(fixture.groupTerm()), null, null,
+            withOptimizer(base, ZeroInflatedOuterOptimizer.BOBYQA),
+            BackendPolicy.CPU);
+
+        assertTrue(bfgs.converged(), bfgs.convergenceMessage());
+        assertTrue(bobyqa.converged(), bobyqa.convergenceMessage());
+        assertEquals(bobyqa.marginalLogLikelihood(),
+            bfgs.marginalLogLikelihood(), 1e-4);
+    }
+
+    @Test
     void groupedZinbEstimatesFiniteSizeAndUnconditionalPredictions() {
         Fixture fixture = fixture(true);
         ZeroInflatedMixedResult fit =
@@ -281,6 +302,18 @@ final class SparseZeroInflatedMixedModelTest {
         return new ZeroInflatedMixedOptions(
             350, 100, 1e-6, 0.4,
             1e-6, 100.0, 1e-4, 1e4, 20.0, null);
+    }
+
+    private static ZeroInflatedMixedOptions withOptimizer(
+            ZeroInflatedMixedOptions options,
+            ZeroInflatedOuterOptimizer optimizer) {
+        return new ZeroInflatedMixedOptions(
+            options.maximumOuterEvaluations(), options.maximumModeIterations(),
+            options.relativeTolerance(), options.initialTrustRadius(),
+            options.minimumVariance(), options.maximumVariance(),
+            options.minimumSize(), options.maximumSize(),
+            options.maximumAbsoluteCoefficient(), options.initialVariances(),
+            optimizer);
     }
 
     private static double[] derivatives(

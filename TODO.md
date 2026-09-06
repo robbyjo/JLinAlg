@@ -86,11 +86,13 @@ Completion evidence:
 - compiled count/zero/size formulas avoid repeated parsing and design builds;
 - grouped estimates, marginal log likelihoods, variance components, and ZIP
   standard errors pass checked-in `glmmTMB` 1.1.14 fixtures;
+- automatic bounded BFGS uses parallel full-Laplace numerical gradients for
+  small modes while large sparse modes and failed BFGS fits retain BOBYQA;
 - a separately compiled TMB 1.9.25 sparse-GMRF template gates correlated
   pedigree fixed effects, variances, correlation, and marginal likelihood;
 - the optimized reproducible 500-member, 1,500-observation benchmark used
   1,000 random coefficients, 4,900 sparse equation/factor nonzeros, converged
-  in 2.186222 seconds (previously 2.576353), and sampled a 311,095,128-byte
+  in 2.161532 seconds (previously 2.576353), and sampled a 312,168,592-byte
   peak-heap delta on the documented development host.
 
 Sources: [pedigree and GLMM vignette](docs/vignettes/pedigree-and-glmm.md),

@@ -159,8 +159,16 @@ reports equation and factor nonzeros alongside elapsed time:
 
 The optimized 2026-09-05 default run on the development host used 500 pedigree
 members, 1,500 observations, and 1,000 random coefficients. It converged in
-2.186222 seconds, down from 2.576353 seconds, with 4,900 sparse equation
-entries, 4,900 factor entries, and a sampled 311,095,128-byte peak-heap delta.
+2.161532 seconds, down from 2.576353 seconds, with 4,900 sparse equation
+entries, 4,900 factor entries, and a sampled 312,168,592-byte peak-heap delta.
 Override `jlinalg.benchmark.members` and `jlinalg.benchmark.repeats` to exercise
 other sizes. The benchmark retains coefficient-space `A^-1`; it never builds
 dense `A`, `G kron A`, or `ZAZ'`.
+
+On the official 644-row `glmmTMB` Salamanders examples, the same development
+host measured warmed median JLinAlg fits of 0.032545 seconds for ZIP and
+0.211661 seconds for ZINB. Before zero-inflated hot-loop and outer-optimizer
+work these fits took 0.135456 and 2.364569 seconds, respectively. The optimized
+fits converged within `1e-7` log likelihood of `glmmTMB`; the comparison used
+two warmups and seven measured fits with inference excluded from both timed
+optimization paths.

@@ -135,7 +135,7 @@ public final class ZeroInflatedMixedResult {
     public boolean converged() { return converged; }
     public String convergenceMessage() {
         return converged
-            ? "BOBYQA and random-effect mode tolerances reached"
+            ? "outer optimizer and random-effect mode tolerances reached"
             : "outer optimizer or random-effect mode stopped before convergence";
     }
     public int randomCoefficientCount() { return randomCoefficientCount; }

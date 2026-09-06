@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.random.RandomGenerator;
 import java.util.random.RandomGeneratorFactory;
 import jdistlib.accelerator.ComputeBackend;
@@ -183,6 +187,7 @@ public final class SparseZeroInflatedMixedModel {
         private final ConcurrentLinkedQueue<PreparedSparseCholesky> factors =
             new ConcurrentLinkedQueue<>();
         private final ThreadLocal<PreparedSparseCholesky> localFactor;
+        private volatile ExecutorService gradientExecutor;
         private volatile boolean closed;
 
         private Prepared(
@@ -412,16 +417,38 @@ public final class SparseZeroInflatedMixedModel {
                 int interpolationPoints = Math.min(2 * initial.length + 1,
                     (initial.length + 1) * (initial.length + 2) / 2);
                 OptimizationResult optimized;
-                try {
-                    optimized = Bobyqa.bobyqa(initial, lower, upper,
-                        objective::value, interpolationPoints,
-                        options.initialTrustRadius(),
-                        Math.max(1e-7, options.relativeTolerance()),
-                        options.maximumOuterEvaluations(), true);
-                } catch (ArithmeticException | ArrayIndexOutOfBoundsException
-                        exception) {
-                    optimized = coordinateOptimize(initial, lower, upper,
-                        objective, options);
+                int priorEvaluations = 0;
+                boolean outerConverged;
+                boolean derivativeFree = options.outerOptimizer()
+                        == ZeroInflatedOuterOptimizer.BOBYQA
+                    || (options.outerOptimizer()
+                            == ZeroInflatedOuterOptimizer.AUTO
+                        && design.columns() > 128);
+                if (derivativeFree) {
+                    optimized = bobyqa(initial, lower, upper, objective,
+                        interpolationPoints, options);
+                    outerConverged = optimized.numFunctionCalls
+                        < options.maximumOuterEvaluations();
+                } else {
+                    ThreadLocal<Objective> workerObjectives =
+                        ThreadLocal.withInitial(() ->
+                            objective.fork(localFactor.get()));
+                    optimized = boundedBfgs(initial, lower, upper, objective,
+                        options, initial.length >= 8
+                            && options.maximumGradientThreads() > 1
+                                ? gradientExecutor() : null,
+                        workerObjectives);
+                    outerConverged = optimized.numFunctionCalls
+                        < options.maximumOuterEvaluations();
+                    if (options.outerOptimizer()
+                            == ZeroInflatedOuterOptimizer.AUTO
+                            && !outerConverged) {
+                        priorEvaluations = optimized.numFunctionCalls;
+                        optimized = bobyqa(optimized.mX, lower, upper,
+                            objective, interpolationPoints, options);
+                        outerConverged = optimized.numFunctionCalls
+                            < options.maximumOuterEvaluations();
+                    }
                 }
                 double[] parameters = optimized.mX == null
                     ? initial : optimized.mX;
@@ -435,9 +462,8 @@ public final class SparseZeroInflatedMixedModel {
                 return result(fitted, parameters, countColumns, zeroColumns,
                     dispersionColumns, family, structure, design,
                     pattern, factor.factorNonzeroCount(),
-                    optimized.numFunctionCalls,
-                    optimized.numFunctionCalls
-                        < options.maximumOuterEvaluations(), inferenceData,
+                    priorEvaluations + optimized.numFunctionCalls,
+                    outerConverged, inferenceData,
                     options);
         }
 
@@ -448,9 +474,25 @@ public final class SparseZeroInflatedMixedModel {
         /** Number of lazily created worker-local numerical factors. */
         public int numericFactorCount() { return factors.size(); }
 
+        private synchronized ExecutorService gradientExecutor() {
+            if (gradientExecutor == null) {
+                int threads = Math.min(options.maximumGradientThreads(),
+                    Runtime.getRuntime().availableProcessors());
+                gradientExecutor = Executors.newFixedThreadPool(threads,
+                    runnable -> {
+                        Thread thread = new Thread(runnable,
+                            "zero-inflated-gradient");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+            }
+            return gradientExecutor;
+        }
+
         @Override public void close() {
             if (closed) return;
             closed = true;
+            if (gradientExecutor != null) gradientExecutor.shutdownNow();
             for (PreparedSparseCholesky factor : factors) factor.close();
             factors.clear();
             localFactor.remove();
@@ -489,6 +531,266 @@ public final class SparseZeroInflatedMixedModel {
         }
         return new OptimizationResult(point, best, calls,
             calls < options.maximumOuterEvaluations());
+    }
+
+    private static OptimizationResult bobyqa(
+            double[] initial, double[] lower, double[] upper,
+            Objective objective, int interpolationPoints,
+            ZeroInflatedMixedOptions options) {
+        try {
+            return Bobyqa.bobyqa(initial, lower, upper,
+                objective::value, interpolationPoints,
+                options.initialTrustRadius(),
+                Math.max(1e-7, options.relativeTolerance()),
+                options.maximumOuterEvaluations(), true);
+        } catch (ArithmeticException | ArrayIndexOutOfBoundsException
+                exception) {
+            return coordinateOptimize(initial, lower, upper,
+                objective, options);
+        }
+    }
+
+    /** Bounded BFGS using central differences of the full Laplace objective. */
+    private static OptimizationResult boundedBfgs(
+            double[] initial, double[] lower, double[] upper,
+            Objective objective, ZeroInflatedMixedOptions options,
+            ExecutorService gradientExecutor,
+            ThreadLocal<Objective> workerObjectives) {
+        int dimensions = initial.length;
+        double[] point = initial.clone();
+        ObjectivePoint center = objective.point(point, null);
+        double value = center.value();
+        double[] randomMode = center.random();
+        int calls = 1;
+        GradientEvaluation differentiated = numericalGradient(objective,
+            point, value, randomMode, lower, upper,
+            options.maximumOuterEvaluations() - calls, gradientExecutor,
+            workerObjectives);
+        calls += differentiated.calls();
+        if (!differentiated.complete())
+            return exhausted(point, value, options.maximumOuterEvaluations());
+        double[] gradient = differentiated.gradient();
+        double[] inverseHessian = MatrixOps.identity(dimensions);
+        double gradientTolerance = Math.max(1e-5,
+            Math.sqrt(options.relativeTolerance()));
+        boolean converged = projectedGradientMaximum(point, gradient,
+            lower, upper) <= gradientTolerance;
+        while (!converged && calls < options.maximumOuterEvaluations()) {
+            double[] direction = new double[dimensions];
+            for (int row = 0; row < dimensions; row++)
+                for (int column = 0; column < dimensions; column++)
+                    direction[row] -= inverseHessian[row * dimensions + column]
+                        * gradient[column];
+            projectDirection(point, direction, lower, upper);
+            double directionalDerivative = dot(gradient, direction);
+            if (!(directionalDerivative < 0.0)) {
+                for (int index = 0; index < dimensions; index++)
+                    direction[index] = -gradient[index];
+                projectDirection(point, direction, lower, upper);
+                directionalDerivative = dot(gradient, direction);
+                inverseHessian = MatrixOps.identity(dimensions);
+            }
+            double directionMaximum = maximumAbsolute(direction);
+            if (!(directionMaximum > 0.0)) {
+                converged = true;
+                break;
+            }
+            double scale = Math.min(1.0,
+                options.initialTrustRadius() / directionMaximum);
+            double[] candidate = new double[dimensions];
+            double candidateValue = Double.POSITIVE_INFINITY;
+            double[] candidateRandom = randomMode;
+            boolean accepted = false;
+            while (scale >= 1e-10
+                    && calls < options.maximumOuterEvaluations()) {
+                for (int index = 0; index < dimensions; index++)
+                    candidate[index] = Math.max(lower[index],
+                        Math.min(upper[index], point[index]
+                            + scale * direction[index]));
+                ObjectivePoint candidatePoint = objective.point(candidate,
+                    randomMode);
+                candidateValue = candidatePoint.value();
+                candidateRandom = candidatePoint.random();
+                calls++;
+                if (Double.isFinite(candidateValue)
+                        && candidateValue <= value
+                            + 1e-4 * scale * directionalDerivative) {
+                    accepted = true;
+                    break;
+                }
+                scale *= 0.5;
+            }
+            if (!accepted) break;
+            differentiated = numericalGradient(objective, candidate,
+                candidateValue, candidateRandom, lower, upper,
+                options.maximumOuterEvaluations() - calls, gradientExecutor,
+                workerObjectives);
+            calls += differentiated.calls();
+            if (!differentiated.complete()) {
+                point = candidate.clone();
+                value = candidateValue;
+                randomMode = candidateRandom;
+                break;
+            }
+            double[] nextGradient = differentiated.gradient();
+            double[] displacement = new double[dimensions];
+            double[] gradientChange = new double[dimensions];
+            for (int index = 0; index < dimensions; index++) {
+                displacement[index] = candidate[index] - point[index];
+                gradientChange[index] = nextGradient[index] - gradient[index];
+            }
+            double curvature = dot(displacement, gradientChange);
+            double curvatureFloor = 1e-12 * Math.sqrt(
+                dot(displacement, displacement)
+                    * dot(gradientChange, gradientChange));
+            if (curvature > curvatureFloor) {
+                double[] hessianChange = new double[dimensions];
+                for (int row = 0; row < dimensions; row++)
+                    for (int column = 0; column < dimensions; column++)
+                        hessianChange[row] += inverseHessian[
+                            row * dimensions + column]
+                            * gradientChange[column];
+                double changeQuadratic = dot(gradientChange, hessianChange);
+                double coefficient = (curvature + changeQuadratic)
+                    / (curvature * curvature);
+                for (int row = 0; row < dimensions; row++)
+                    for (int column = 0; column < dimensions; column++)
+                        inverseHessian[row * dimensions + column] += coefficient
+                            * displacement[row] * displacement[column]
+                            - (hessianChange[row] * displacement[column]
+                                + displacement[row] * hessianChange[column])
+                                / curvature;
+            } else inverseHessian = MatrixOps.identity(dimensions);
+            double relativeStep = relativeChange(point, candidate);
+            point = candidate.clone();
+            value = candidateValue;
+            randomMode = candidateRandom;
+            gradient = nextGradient;
+            converged = relativeStep <= options.relativeTolerance()
+                || projectedGradientMaximum(point, gradient, lower, upper)
+                    <= gradientTolerance;
+        }
+        return new OptimizationResult(point, value,
+            converged ? calls : options.maximumOuterEvaluations(), true);
+    }
+
+    private static GradientEvaluation numericalGradient(
+            Objective objective, double[] point, double center,
+            double[] centerRandom, double[] lower, double[] upper,
+            int availableCalls, ExecutorService executor,
+            ThreadLocal<Objective> workerObjectives) {
+        if (executor != null && availableCalls >= point.length)
+            return parallelNumericalGradient(point, center, centerRandom,
+                lower, upper, executor, workerObjectives);
+        double[] gradient = new double[point.length];
+        double[] trial = point.clone();
+        int calls = 0;
+        for (int parameter = 0; parameter < point.length; parameter++) {
+            double step = 1e-5 * (1.0 + Math.abs(point[parameter]));
+            double below = Math.max(lower[parameter], point[parameter] - step);
+            double above = Math.min(upper[parameter], point[parameter] + step);
+            if (above == point[parameter] && below == point[parameter]) continue;
+            if (calls + 1 > availableCalls)
+                return new GradientEvaluation(gradient, calls, false);
+            if (above > point[parameter]) {
+                trial[parameter] = above;
+                double upperValue = objective.valueFrom(trial, centerRandom);
+                gradient[parameter] = (upperValue - center)
+                    / (above - point[parameter]);
+            } else {
+                trial[parameter] = below;
+                double lowerValue = objective.valueFrom(trial, centerRandom);
+                gradient[parameter] = (center - lowerValue)
+                    / (point[parameter] - below);
+            }
+            calls++;
+            trial[parameter] = point[parameter];
+        }
+        return new GradientEvaluation(gradient, calls, true);
+    }
+
+    private static GradientEvaluation parallelNumericalGradient(
+            double[] point, double center, double[] centerRandom,
+            double[] lower, double[] upper, ExecutorService executor,
+            ThreadLocal<Objective> workerObjectives) {
+        List<Future<Double>> futures = new ArrayList<>(point.length);
+        for (int parameter = 0; parameter < point.length; parameter++) {
+            final int index = parameter;
+            futures.add(executor.submit(() -> gradientComponent(
+                workerObjectives.get(), point, center, centerRandom,
+                lower, upper, index)));
+        }
+        double[] gradient = new double[point.length];
+        try {
+            for (int parameter = 0; parameter < point.length; parameter++)
+                gradient[parameter] = futures.get(parameter).get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            futures.forEach(value -> value.cancel(true));
+            return new GradientEvaluation(gradient, point.length, false);
+        } catch (ExecutionException exception) {
+            futures.forEach(value -> value.cancel(true));
+            return new GradientEvaluation(gradient, point.length, false);
+        }
+        return new GradientEvaluation(gradient, point.length, true);
+    }
+
+    private static double gradientComponent(
+            Objective objective, double[] point, double center,
+            double[] centerRandom, double[] lower, double[] upper,
+            int parameter) {
+        double[] trial = point.clone();
+        double step = 1e-5 * (1.0 + Math.abs(point[parameter]));
+        double above = Math.min(upper[parameter], point[parameter] + step);
+        if (above > point[parameter]) {
+            trial[parameter] = above;
+            return (objective.valueFrom(trial, centerRandom) - center)
+                / (above - point[parameter]);
+        }
+        double below = Math.max(lower[parameter], point[parameter] - step);
+        if (below < point[parameter]) {
+            trial[parameter] = below;
+            return (center - objective.valueFrom(trial, centerRandom))
+                / (point[parameter] - below);
+        }
+        return 0.0;
+    }
+
+    private static OptimizationResult exhausted(
+            double[] point, double value, int maximumCalls) {
+        return new OptimizationResult(point, value, maximumCalls, true);
+    }
+
+    private static void projectDirection(
+            double[] point, double[] direction,
+            double[] lower, double[] upper) {
+        for (int index = 0; index < point.length; index++) {
+            if ((point[index] <= lower[index] && direction[index] < 0.0)
+                    || (point[index] >= upper[index]
+                        && direction[index] > 0.0))
+                direction[index] = 0.0;
+        }
+    }
+
+    private static double projectedGradientMaximum(
+            double[] point, double[] gradient,
+            double[] lower, double[] upper) {
+        double result = 0.0;
+        for (int index = 0; index < point.length; index++) {
+            double value = gradient[index];
+            if ((point[index] <= lower[index] && value > 0.0)
+                    || (point[index] >= upper[index] && value < 0.0))
+                value = 0.0;
+            result = Math.max(result, Math.abs(value));
+        }
+        return result;
+    }
+
+    private static double dot(double[] first, double[] second) {
+        double result = 0.0;
+        for (int index = 0; index < first.length; index++)
+            result += first[index] * second[index];
+        return result;
     }
 
     private static OptimizationResult optimizeReduced(
@@ -898,6 +1200,39 @@ public final class SparseZeroInflatedMixedModel {
             crossCurvatures = new double[response.length];
         }
 
+        private Objective(Objective source, PreparedSparseCholesky factor) {
+            response = source.response;
+            countFixed = source.countFixed;
+            countColumns = source.countColumns;
+            zeroFixed = source.zeroFixed;
+            zeroColumns = source.zeroColumns;
+            dispersionFixed = source.dispersionFixed;
+            dispersionColumns = source.dispersionColumns;
+            offsets = source.offsets;
+            family = source.family;
+            design = source.design;
+            precision = source.precision;
+            pattern = source.pattern;
+            this.factor = factor;
+            options = source.options;
+            responseLogFactorials = source.responseLogFactorials;
+            means = new double[response.length];
+            zeroProbabilities = new double[response.length];
+            sizes = family == CountFamily.NEGATIVE_BINOMIAL
+                ? new double[response.length] : new double[0];
+            responseMeans = new double[response.length];
+            totalZeroProbabilities = new double[response.length];
+            countScores = new double[response.length];
+            zeroScores = new double[response.length];
+            countCurvatures = new double[response.length];
+            zeroCurvatures = new double[response.length];
+            crossCurvatures = new double[response.length];
+        }
+
+        Objective fork(PreparedSparseCholesky workerFactor) {
+            return new Objective(this, workerFactor);
+        }
+
         double value(double[] parameters) {
             try {
                 Evaluation result = evaluate(parameters);
@@ -911,6 +1246,25 @@ public final class SparseZeroInflatedMixedModel {
         double coldValue(double[] parameters) {
             warmRandom = null;
             return value(parameters);
+        }
+
+        ObjectivePoint point(double[] parameters, double[] initialRandom) {
+            warmRandom = initialRandom == null ? null : initialRandom.clone();
+            try {
+                Evaluation result = evaluate(parameters);
+                double value = -result.laplaceLogLikelihood();
+                return new ObjectivePoint(
+                    Double.isFinite(value) ? value : INVALID_OBJECTIVE,
+                    result.random().clone());
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                return new ObjectivePoint(INVALID_OBJECTIVE,
+                    initialRandom == null ? new double[design.columns()]
+                        : initialRandom.clone());
+            }
+        }
+
+        double valueFrom(double[] parameters, double[] initialRandom) {
+            return point(parameters, initialRandom).value();
         }
 
         Evaluation evaluate(double[] parameters) {
@@ -1892,6 +2246,11 @@ public final class SparseZeroInflatedMixedModel {
             return new InferenceData(List.of(), new double[0]);
         }
     }
+
+    private record GradientEvaluation(
+            double[] gradient, int calls, boolean complete) { }
+
+    private record ObjectivePoint(double value, double[] random) { }
 
     private record TermData(
             int[] rowStarts, int[] columnIndices, double[] values) { }

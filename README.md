@@ -495,10 +495,13 @@ dense reference implementation; adaptive quadrature is not implemented.
 mixed models. Separate fixed designs control the conditional count mean,
 structural-zero probability, and (for NB2) size. Ordinary and pedigree random
 effects may enter either process and are integrated by first-order Laplace
-approximation. BOBYQA optimizes only the low-dimensional fixed, dispersion,
-variance, and guarded-correlation parameters; sparse damped Newton iterations
-find the high-dimensional random-effect mode. The full observed count/zero
-cross-Hessian supplies the Laplace determinant:
+approximation. Automatic outer optimization uses bounded BFGS with a numerical
+gradient of the complete Laplace objective for modes with at most 128 random
+coefficients. Independent gradient components use up to four worker-local
+sparse factors. Larger modes use derivative-free BOBYQA, which is also the
+fallback when BFGS does not converge. Sparse damped Newton iterations find the
+high-dimensional random-effect mode. The full observed count/zero cross-Hessian
+supplies the Laplace determinant:
 
 ```java
 PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
@@ -521,13 +524,18 @@ try (SparseZeroInflatedMixedModel.Prepared model =
 NB2 uses `variance = mu + mu^2 / size`. `conditionalCountMeans()` reports the
 count-process mean, while `fittedMeans()` includes structural-zero probability;
 `fittedZeroProbabilities()` includes both structural and sampling zeros.
-`fitWithInference` computes a post-optimization observed numerical Hessian—this
-is not Fisher information supplied to BOBYQA—and returns nuisance-adjusted
-marginal covariance and standard errors. The prepared object reuses symbolic
-sparse analysis and one numeric factor per worker; it also provides profile
-likelihood and deterministic conditional parametric bootstrap. Checked-in
-fixtures gate grouped models against `glmmTMB` and correlated pedigree models
-against an independent TMB sparse-GMRF template.
+The outer numerical gradient differentiates the full profiled objective,
+including changes in the random-effect mode and Laplace log determinant. Set
+`ZeroInflatedOuterOptimizer.BOBYQA` in `ZeroInflatedMixedOptions` to require a
+fully derivative-free fit, or set `maximumGradientThreads` to one for serial
+BFGS. `fitWithInference` separately computes a post-optimization observed
+numerical Hessian—this is not Fisher information supplied to either optimizer—
+and returns nuisance-adjusted marginal covariance and standard errors. The
+prepared object reuses symbolic sparse analysis and one numeric factor per
+worker; it also provides profile likelihood and deterministic conditional
+parametric bootstrap. Checked-in fixtures gate grouped models against
+`glmmTMB` and correlated pedigree models against an independent TMB sparse-GMRF
+template.
 
 The same PQL estimator is available with a numerator-relationship random
 effect through `PedigreeGlmmPql`:
