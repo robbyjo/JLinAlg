@@ -165,10 +165,18 @@ Override `jlinalg.benchmark.members` and `jlinalg.benchmark.repeats` to exercise
 other sizes. The benchmark retains coefficient-space `A^-1`; it never builds
 dense `A`, `G kron A`, or `ZAZ'`.
 
-On the official 644-row `glmmTMB` Salamanders examples, the same development
-host measured warmed median JLinAlg fits of 0.032545 seconds for ZIP and
+Before outer-point caching, on the official 644-row `glmmTMB` Salamanders
+examples, the same development host measured warmed median JLinAlg fits of
+0.032545 seconds for ZIP and
 0.211661 seconds for ZINB. Before zero-inflated hot-loop and outer-optimizer
 work these fits took 0.135456 and 2.364569 seconds, respectively. The optimized
 fits converged within `1e-7` log likelihood of `glmmTMB`; the comparison used
 two warmups and seven measured fits with inference excluded from both timed
 optimization paths.
+
+The subsequent [outer-point caching benchmark](zero-inflated-cache-performance.md)
+measured full-fit medians of 22.861 ms (ZIP) and 115.625 ms (ZINB), another
+1.41x and 1.83x speedup against freshly measured prior-version baselines.
+Reported estimates and standard errors were identical. The large correlated
+pedigree check showed no speedup. The linked report includes raw timings,
+thread counts, accuracy checks, and reproducible Java/R commands.

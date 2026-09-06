@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 package org.jlinalg.distributional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -131,6 +132,116 @@ final class SparseZeroInflatedMixedModelTest {
         assertEquals(fixture.response().length, fit.sizes().length);
         assertTrue(fit.sizes()[0] > 0.1 && fit.sizes()[0] < 1000.0);
         assertTrue(fit.fittedMeans()[0] < fit.conditionalCountMeans()[0]);
+    }
+
+    @Test
+    void outerCachesRefreshForDispersionOffsetsAndParallelGradients() {
+        Fixture fixture = fixture(true);
+        int rows = fixture.response().length;
+        double[] count = new double[rows * 3];
+        double[] offsets = new double[rows];
+        for (int row = 0; row < rows; row++) {
+            count[3 * row] = 1.0;
+            count[3 * row + 1] = fixture.countFixed()[2 * row + 1];
+            count[3 * row + 2] = Math.sin(row * 0.73);
+            offsets[row] = 0.12 * Math.cos(row * 0.31);
+        }
+        // Eight/nine outer parameters exercise the actual parallel-gradient path.
+        for (boolean zeroRandom : new boolean[] {false, true}) {
+            List<RandomEffectTerm> zeroTerms = zeroRandom
+                ? List.of(fixture.groupTerm()) : List.of();
+            try (SparseZeroInflatedMixedModel.Prepared serial =
+                    SparseZeroInflatedMixedModel.prepareNegativeBinomial(rows,
+                        List.of(fixture.groupTerm()), null, zeroTerms, null,
+                        List.of(), cacheTestControls(1), BackendPolicy.CPU);
+                 SparseZeroInflatedMixedModel.Prepared parallel =
+                    SparseZeroInflatedMixedModel.prepareNegativeBinomial(rows,
+                        List.of(fixture.groupTerm()), null, zeroTerms, null,
+                        List.of(), cacheTestControls(4), BackendPolicy.CPU)) {
+                for (int pass = 0; pass < 2; pass++) {
+                    double[] response = fixture.response().clone();
+                    double[] dispersion = fixture.countFixed().clone();
+                    if (pass == 1) {
+                        // Reuse symbolic factors with different data/design/offsets.
+                        for (int row = 0; row < rows; row++) {
+                            if (row % 7 == 0) response[row] += 1.0;
+                            dispersion[2 * row + 1] = Math.cos(row * 0.17);
+                            offsets[row] += 0.02;
+                        }
+                    }
+                    ZeroInflatedMixedResult expected = serial.fit(response,
+                        count, 3, fixture.countFixed(), 2, dispersion, 2, offsets);
+                    ZeroInflatedMixedResult actual = parallel.fit(response,
+                        count, 3, fixture.countFixed(), 2, dispersion, 2, offsets);
+                    assertTrue(expected.converged(), expected.convergenceMessage());
+                    assertTrue(actual.converged(), actual.convergenceMessage());
+                    assertArrayEquals(expected.outerParameterEstimates(),
+                        actual.outerParameterEstimates(), 1e-8);
+                    assertArrayEquals(expected.fittedMeans(), actual.fittedMeans(), 1e-8);
+                    assertEquals(expected.objectiveEvaluations(), actual.objectiveEvaluations());
+                    assertEquals(expected.marginalLogLikelihood(),
+                        actual.marginalLogLikelihood(), 1e-7);
+                    assertUncachedGroupedLikelihood(actual, response, count,
+                        fixture.countFixed(), dispersion, offsets, zeroRandom);
+                }
+            }
+        }
+    }
+
+    private static ZeroInflatedMixedOptions cacheTestControls(int threads) {
+        return new ZeroInflatedMixedOptions(2000, 100, 1e-6, 0.4,
+            1e-6, 100.0, 1e-4, 1e4, 20.0, null,
+            ZeroInflatedOuterOptimizer.BOUNDED_BFGS, threads);
+    }
+
+    /** Independently reconstruct a block-diagonal Laplace likelihood, uncached. */
+    private static void assertUncachedGroupedLikelihood(
+            ZeroInflatedMixedResult fit, double[] response, double[] count,
+            double[] zero, double[] dispersion, double[] offsets,
+            boolean zeroRandom) {
+        double[] beta = fit.countCoefficients();
+        double[] gamma = fit.zeroCoefficients();
+        double[] delta = fit.dispersionCoefficients();
+        double[] u = fit.randomEffects("group");
+        double[] v = zeroRandom ? fit.randomEffects("zero:group") : new double[u.length];
+        double[] variances = fit.varianceComponents();
+        double[] fittedSizes = fit.sizes();
+        double[] fittedCounts = fit.conditionalCountMeans();
+        double[] fittedZeros = fit.structuralZeroProbabilities();
+        double likelihood = 0.0;
+        for (int group = 0; group < u.length; group++) {
+            double hcc = 1.0 / variances[0];
+            double hzz = zeroRandom ? 1.0 / variances[1] : 1.0;
+            double hcz = 0.0;
+            for (int within = 0; within < 20; within++) {
+                int row = 20 * group + within;
+                double fixedCount = 0.0;
+                for (int column = 0; column < 3; column++)
+                    fixedCount += count[3 * row + column] * beta[column];
+                double eta = offsets[row] + fixedCount + u[group];
+                double zeta = zero[2 * row] * gamma[0]
+                    + zero[2 * row + 1] * gamma[1] + v[group];
+                double size = Math.exp(dispersion[2 * row] * delta[0]
+                    + dispersion[2 * row + 1] * delta[1]);
+                assertEquals(size, fittedSizes[row], 1e-12);
+                assertEquals(Math.exp(eta), fittedCounts[row], 1e-12);
+                assertEquals(1.0 / (1.0 + Math.exp(-zeta)), fittedZeros[row], 1e-12);
+                double[] uncached = SparseZeroInflatedMixedModel.likelihoodDerivatives(
+                    response[row], eta, zeta, size, true);
+                likelihood += uncached[0];
+                hcc += uncached[3];
+                if (zeroRandom) {
+                    hzz += uncached[4];
+                    hcz += uncached[5];
+                }
+            }
+            likelihood -= 0.5 * (u[group] * u[group] / variances[0]
+                + Math.log(variances[0]) + Math.log(hcc * hzz - hcz * hcz));
+            if (zeroRandom)
+                likelihood -= 0.5 * (v[group] * v[group] / variances[1]
+                    + Math.log(variances[1]));
+        }
+        assertEquals(likelihood, fit.marginalLogLikelihood(), 1e-9);
     }
 
     @Test

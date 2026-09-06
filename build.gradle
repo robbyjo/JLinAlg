@@ -365,6 +365,18 @@ tasks.register('benchmarkSparsePedigreePev', JavaExec) {
     }
 }
 
+tasks.register('benchmarkSalamandersZeroInflated', JavaExec) {
+    group = 'verification'
+    description = 'Benchmarks ZIP/ZINB against exported glmmTMB Salamanders matrices.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.SalamandersZeroInflatedBenchmark'
+    jvmArgs '-Xms512m', '-Xmx4g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.salamanders.')
+    }
+}
+
 tasks.register('benchmarkZeroInflatedMixed', JavaExec) {
     group = 'verification'
     description = 'Profiles sparse correlated-pedigree zero-inflated fitting.'

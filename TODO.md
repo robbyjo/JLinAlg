@@ -170,3 +170,14 @@ Confirmed 2026-09-05. Association and Cox scans stream deterministic estimates,
 failures, and accounting rather than retaining large result grids in memory.
 
 Source: [GWAS/TWAS pipeline](docs/gwas-twas-pipeline.md).
+
+### Zero-inflated outer-point cache optimization — completed
+
+Completed 2026-09-05. Worker-local caches remove repeated fixed-predictor,
+NB2 gamma/size, and eligible zero-probability calculations from inner mode
+solves. Full Salamanders fits improved another 1.41x (ZIP) and 1.83x (ZINB),
+with identical reported estimates and standard errors. Added reproducible
+Java/R runners, raw paired timings, independent likelihood reconstruction,
+and parallel/cache-refresh tests. The large pedigree case showed no speedup.
+
+Source: [benchmark and validation report](docs/zero-inflated-cache-performance.md).

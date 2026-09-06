@@ -1,5 +1,13 @@
 # Unreleased
 
+- Further reduced ZIP/ZINB likelihood work with worker-local outer-point
+  caches for fixed predictors, NB2 size/gamma terms, and eligible zero-process
+  probabilities. Fresh paired Salamanders full-fit medians improved from
+  32.290 to 22.861 ms (1.41x) for ZIP and 211.470 to 115.625 ms (1.83x) for
+  ZINB, with identical reported estimates/SEs and unchanged optimizer controls.
+  Added reproducible Java/R benchmarks and cache/parallel correctness tests;
+  the large correlated-pedigree benchmark showed no speedup. See
+  [measurement details](docs/zero-inflated-cache-performance.md).
 - Reduced sparse ZIP/ZINB fit time with reusable likelihood workspaces,
   response-only caches, likelihood-only Newton line searches, split
   count/zero sparse products, and bounded BFGS over workload-gated parallel

@@ -80,12 +80,15 @@ public final class ZeroInflatedMixedBenchmark {
         peak.accumulateAndGet(usedHeap(), Math::max);
         System.out.println("members,observations,random_coefficients,equation_nonzeros,"
             + "factor_nonzeros,seconds,baseline_heap_bytes,peak_heap_bytes,"
-            + "peak_heap_delta_bytes,converged");
+            + "peak_heap_delta_bytes,converged,marginal_log_likelihood,objective_evaluations");
         System.out.printf(java.util.Locale.ROOT,
-            "%d,%d,%d,%d,%d,%.6f,%d,%d,%d,%s%n", members, rows,
+            "%d,%d,%d,%d,%d,%.6f,%d,%d,%d,%s,%.17g,%d%n", members, rows,
             fit.randomCoefficientCount(), fit.sparseEquationNonzeroCount(),
             fit.factorNonzeroCount(), seconds, baseline, peak.get(),
-            peak.get() - baseline, fit.converged());
+            peak.get() - baseline, fit.converged(),
+            fit.marginalLogLikelihood(), fit.objectiveEvaluations());
+        if (!fit.converged() || !Double.isFinite(fit.marginalLogLikelihood()))
+            throw new IllegalStateException(fit.convergenceMessage());
     }
 
     private static List<PedigreeIndividual> pedigree(int members) {

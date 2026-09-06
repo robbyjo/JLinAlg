@@ -1148,6 +1148,15 @@ public final class SparseZeroInflatedMixedModel {
         private final PreparedSparseCholesky factor;
         private final ZeroInflatedMixedOptions options;
         private final double[] responseLogFactorials;
+        // Worker-local, refreshed for every outer point, including finite differences.
+        private final double[] countFixedPredictors;
+        private final double[] zeroFixedPredictors;
+        private final double[] fixedZeroProbabilities;
+        private final double[] fixedLogZeroProbabilities;
+        private final double[] fixedLogCountProbabilities;
+        private final double[] logSizes;
+        private final double[] sizeLogGammas;
+        private final double[] responseSizeLogGammas;
         private final double[] means;
         private final double[] zeroProbabilities;
         private final double[] sizes;
@@ -1188,9 +1197,17 @@ public final class SparseZeroInflatedMixedModel {
                 responseLogFactorials[row] = SpecialFunctions.logGamma(
                     response[row] + 1.0);
             means = new double[response.length];
+            countFixedPredictors = new double[response.length];
+            zeroFixedPredictors = new double[response.length];
+            fixedZeroProbabilities = new double[response.length];
+            fixedLogZeroProbabilities = new double[response.length];
+            fixedLogCountProbabilities = new double[response.length];
             zeroProbabilities = new double[response.length];
             sizes = family == CountFamily.NEGATIVE_BINOMIAL
                 ? new double[response.length] : new double[0];
+            logSizes = new double[sizes.length];
+            sizeLogGammas = new double[sizes.length];
+            responseSizeLogGammas = new double[sizes.length];
             responseMeans = new double[response.length];
             totalZeroProbabilities = new double[response.length];
             countScores = new double[response.length];
@@ -1217,9 +1234,17 @@ public final class SparseZeroInflatedMixedModel {
             options = source.options;
             responseLogFactorials = source.responseLogFactorials;
             means = new double[response.length];
+            countFixedPredictors = new double[response.length];
+            zeroFixedPredictors = new double[response.length];
+            fixedZeroProbabilities = new double[response.length];
+            fixedLogZeroProbabilities = new double[response.length];
+            fixedLogCountProbabilities = new double[response.length];
             zeroProbabilities = new double[response.length];
             sizes = family == CountFamily.NEGATIVE_BINOMIAL
                 ? new double[response.length] : new double[0];
+            logSizes = new double[sizes.length];
+            sizeLogGammas = new double[sizes.length];
+            responseSizeLogGammas = new double[sizes.length];
             responseMeans = new double[response.length];
             totalZeroProbabilities = new double[response.length];
             countScores = new double[response.length];
@@ -1268,6 +1293,7 @@ public final class SparseZeroInflatedMixedModel {
         }
 
         Evaluation evaluate(double[] parameters) {
+            cacheOuterPoint(parameters);
             int varianceStart = countColumns + zeroColumns
                 + (family == CountFamily.NEGATIVE_BINOMIAL
                     ? dispersionColumns : 0);
@@ -1280,7 +1306,7 @@ public final class SparseZeroInflatedMixedModel {
             for (int iteration = 1;
                     iteration <= options.maximumModeIterations(); iteration++) {
                 iterations = iteration;
-                DataState data = data(parameters, random, false);
+                DataState data = data(random, false);
                 double[] gradient = randomGradient(
                     data.countScores(), data.zeroScores(), random,
                     logVariances);
@@ -1312,7 +1338,7 @@ public final class SparseZeroInflatedMixedModel {
                     double[] trial = random.clone();
                     for (int index = 0; index < trial.length; index++)
                         trial[index] += scale * step[index];
-                    double trialJoint = logLikelihood(parameters, trial)
+                    double trialJoint = logLikelihood(trial)
                         - 0.5 * precision.quadratic(trial, logVariances);
                     if (Double.isFinite(trialJoint) && trialJoint >= joint) {
                         candidate = trial;
@@ -1338,7 +1364,7 @@ public final class SparseZeroInflatedMixedModel {
                     break;
                 }
             }
-            DataState fitted = data(parameters, random, true);
+            DataState fitted = data(random, true);
             factor.refactor(pattern.matrix(fitted.countCurvatures(),
                 fitted.zeroCurvatures(), fitted.crossCurvatures(), design,
                 precision, logVariances, 0.0));
@@ -1356,9 +1382,8 @@ public final class SparseZeroInflatedMixedModel {
                 iterations, converged);
         }
 
-        private DataState data(
-                double[] parameters, double[] random,
-                boolean fittedOutputs) {
+        /** Hoist work independent of the random mode out of Newton/line search. */
+        private void cacheOuterPoint(double[] parameters) {
             int zeroStart = countColumns;
             int dispersionStart = zeroStart + zeroColumns;
             int varianceStart = dispersionStart
@@ -1370,29 +1395,63 @@ public final class SparseZeroInflatedMixedModel {
                 throw new IllegalArgumentException(
                     "outer parameter dimensions do not match the model");
             }
+            for (int row = 0; row < response.length; row++) {
+                // Preserve the original summation order (important near flat optima).
+                countFixedPredictors[row] = offsets[row]
+                    + fixedValue(countFixed, row, countColumns, parameters, 0);
+                zeroFixedPredictors[row] = fixedValue(zeroFixed, row,
+                    zeroColumns, parameters, zeroStart);
+                if (fixedZeroRow(row)) {
+                    double probability = logistic(zeroFixedPredictors[row]);
+                    fixedZeroProbabilities[row] = probability;
+                    fixedLogZeroProbabilities[row] = logLogistic(probability);
+                    fixedLogCountProbabilities[row] =
+                        logOneMinusLogistic(probability);
+                }
+                if (sizes.length > 0) {
+                    double size = safeExp(fixedValue(dispersionFixed, row,
+                        dispersionColumns, parameters, dispersionStart));
+                    sizes[row] = size;
+                    logSizes[row] = Math.log(size);
+                    sizeLogGammas[row] = SpecialFunctions.logGamma(size);
+                    responseSizeLogGammas[row] =
+                        SpecialFunctions.logGamma(response[row] + size);
+                }
+            }
+        }
+
+        private boolean fixedZeroRow(int row) {
+            return design.countEnds()[row] == design.rowStarts()[row + 1];
+        }
+
+        private DataState data(double[] random, boolean fittedOutputs) {
             double logLikelihood = 0.0;
             RowLikelihoodWorkspace likelihood = new RowLikelihoodWorkspace();
             for (int row = 0; row < response.length; row++) {
-                double countEta = offsets[row]
-                    + fixedValue(countFixed, row, countColumns, parameters, 0)
+                double countEta = countFixedPredictors[row]
                     + design.rowProduct(row, random, true);
-                double zeroEta = fixedValue(zeroFixed, row, zeroColumns,
-                    parameters, zeroStart)
-                    + design.rowProduct(row, random, false);
                 double mean = safeExp(countEta);
-                double probability = logistic(zeroEta);
-                double size = family == CountFamily.NEGATIVE_BINOMIAL
-                    ? safeExp(fixedValue(dispersionFixed, row,
-                        dispersionColumns, parameters, dispersionStart))
-                    : Double.POSITIVE_INFINITY;
+                boolean fixedZero = fixedZeroRow(row);
+                double probability = fixedZero ? fixedZeroProbabilities[row]
+                    : logistic(zeroFixedPredictors[row]
+                        + design.rowProduct(row, random, false));
+                boolean nb = sizes.length > 0;
+                double size = nb ? sizes[row] : Double.POSITIVE_INFINITY;
                 fillRowLikelihood(response[row], mean, probability, size,
-                    family, responseLogFactorials[row], fittedOutputs,
-                    likelihood);
+                    family, responseLogFactorials[row],
+                    nb ? logSizes[row] : 0.0,
+                    nb ? sizeLogGammas[row] : 0.0,
+                    nb ? responseSizeLogGammas[row] : 0.0,
+                    fixedZero ? fixedLogZeroProbabilities[row]
+                        : response[row] == 0.0 || fittedOutputs
+                            ? logLogistic(probability) : 0.0,
+                    fixedZero ? fixedLogCountProbabilities[row]
+                        : logOneMinusLogistic(probability),
+                    fittedOutputs, likelihood);
                 logLikelihood += likelihood.logLikelihood;
                 if (fittedOutputs) {
                     means[row] = mean;
                     zeroProbabilities[row] = probability;
-                    if (sizes.length > 0) sizes[row] = size;
                     responseMeans[row] = (1.0 - probability) * mean;
                     totalZeroProbabilities[row] =
                         likelihood.totalZeroProbability;
@@ -1409,25 +1468,27 @@ public final class SparseZeroInflatedMixedModel {
         }
 
         /** Likelihood-only pass used by the Newton line search. */
-        private double logLikelihood(double[] parameters, double[] random) {
-            int zeroStart = countColumns;
-            int dispersionStart = zeroStart + zeroColumns;
+        private double logLikelihood(double[] random) {
             double result = 0.0;
             for (int row = 0; row < response.length; row++) {
-                double countEta = offsets[row]
-                    + fixedValue(countFixed, row, countColumns, parameters, 0)
+                double countEta = countFixedPredictors[row]
                     + design.rowProduct(row, random, true);
-                double zeroEta = fixedValue(zeroFixed, row, zeroColumns,
-                    parameters, zeroStart)
-                    + design.rowProduct(row, random, false);
                 double mean = safeExp(countEta);
-                double probability = logistic(zeroEta);
-                double size = family == CountFamily.NEGATIVE_BINOMIAL
-                    ? safeExp(fixedValue(dispersionFixed, row,
-                        dispersionColumns, parameters, dispersionStart))
-                    : Double.POSITIVE_INFINITY;
-                result += rowLogLikelihood(response[row], mean, probability,
-                    size, family, responseLogFactorials[row]);
+                boolean fixedZero = fixedZeroRow(row);
+                double probability = fixedZero ? fixedZeroProbabilities[row]
+                    : logistic(zeroFixedPredictors[row]
+                        + design.rowProduct(row, random, false));
+                boolean nb = sizes.length > 0;
+                double size = nb ? sizes[row] : Double.POSITIVE_INFINITY;
+                result += rowLogLikelihood(response[row], mean,
+                    size, family, responseLogFactorials[row],
+                    nb ? logSizes[row] : 0.0,
+                    nb ? sizeLogGammas[row] : 0.0,
+                    nb ? responseSizeLogGammas[row] : 0.0,
+                    fixedZero ? fixedLogZeroProbabilities[row]
+                        : response[row] == 0.0 ? logLogistic(probability) : 0.0,
+                    fixedZero ? fixedLogCountProbabilities[row]
+                        : logOneMinusLogistic(probability));
             }
             return result;
         }
@@ -1452,8 +1513,14 @@ public final class SparseZeroInflatedMixedModel {
             double response, double mean, double zeroProbability,
             double size, CountFamily family) {
         RowLikelihoodWorkspace result = new RowLikelihoodWorkspace();
+        boolean nb = family == CountFamily.NEGATIVE_BINOMIAL;
         fillRowLikelihood(response, mean, zeroProbability, size, family,
-            SpecialFunctions.logGamma(response + 1.0), true, result);
+            SpecialFunctions.logGamma(response + 1.0),
+            nb ? Math.log(size) : 0.0,
+            nb ? SpecialFunctions.logGamma(size) : 0.0,
+            nb ? SpecialFunctions.logGamma(response + size) : 0.0,
+            logLogistic(zeroProbability), logOneMinusLogistic(zeroProbability),
+            true, result);
         return new RowLikelihood(result.logLikelihood, result.countScore,
             result.zeroScore, result.countCurvature, result.zeroCurvature,
             result.crossCurvature, result.totalZeroProbability);
@@ -1462,6 +1529,8 @@ public final class SparseZeroInflatedMixedModel {
     private static void fillRowLikelihood(
             double response, double mean, double zeroProbability,
             double size, CountFamily family, double responseLogFactorial,
+            double logSize, double sizeLogGamma, double responseSizeLogGamma,
+            double logPi, double logOneMinusPi,
             boolean totalZeroNeeded, RowLikelihoodWorkspace result) {
         double logCount;
         double logCountZero;
@@ -1479,11 +1548,11 @@ public final class SparseZeroInflatedMixedModel {
             positiveCurvature = mean;
         } else {
             double total = size + mean;
-            logCountZero = size * (Math.log(size) - Math.log(total));
-            logCount = SpecialFunctions.logGamma(response + size)
-                - SpecialFunctions.logGamma(size)
+            logCountZero = size * (logSize - Math.log(total));
+            logCount = responseSizeLogGamma
+                - sizeLogGamma
                 - responseLogFactorial
-                + size * (Math.log(size) - Math.log(total))
+                + size * (logSize - Math.log(total))
                 + response * (Math.log(mean) - Math.log(total));
             baseZeroScore = -size * mean / total;
             baseZeroScoreDerivative =
@@ -1492,11 +1561,10 @@ public final class SparseZeroInflatedMixedModel {
             positiveCurvature =
                 size * mean * (size + response) / (total * total);
         }
-        double logOneMinusPi = logOneMinusLogistic(zeroProbability);
         if (response > 0.0) {
             double totalZero = 0.0;
             if (totalZeroNeeded) {
-                double logZeroMass = logAddExp(logLogistic(zeroProbability),
+                double logZeroMass = logAddExp(logPi,
                     logOneMinusPi + logCountZero);
                 totalZero = Math.exp(logZeroMass);
             }
@@ -1505,7 +1573,7 @@ public final class SparseZeroInflatedMixedModel {
                 zeroProbability * (1.0 - zeroProbability), 0.0, totalZero);
             return;
         }
-        double logZeroMass = logAddExp(logLogistic(zeroProbability),
+        double logZeroMass = logAddExp(logPi,
             logOneMinusPi + logCountZero);
         double totalZero = Math.exp(logZeroMass);
         double countPosterior = Math.exp(
@@ -1525,9 +1593,10 @@ public final class SparseZeroInflatedMixedModel {
     }
 
     private static double rowLogLikelihood(
-            double response, double mean, double zeroProbability,
-            double size, CountFamily family, double responseLogFactorial) {
-        double logOneMinusPi = logOneMinusLogistic(zeroProbability);
+            double response, double mean,
+            double size, CountFamily family, double responseLogFactorial,
+            double logSize, double sizeLogGamma, double responseSizeLogGamma,
+            double logPi, double logOneMinusPi) {
         if (response > 0.0) {
             if (family == CountFamily.POISSON) {
                 return logOneMinusPi + response * Math.log(mean) - mean
@@ -1535,14 +1604,14 @@ public final class SparseZeroInflatedMixedModel {
             }
             double total = size + mean;
             return logOneMinusPi
-                + SpecialFunctions.logGamma(response + size)
-                - SpecialFunctions.logGamma(size) - responseLogFactorial
-                + size * (Math.log(size) - Math.log(total))
+                + responseSizeLogGamma
+                - sizeLogGamma - responseLogFactorial
+                + size * (logSize - Math.log(total))
                 + response * (Math.log(mean) - Math.log(total));
         }
         double logCountZero = family == CountFamily.POISSON
-            ? -mean : size * (Math.log(size) - Math.log(size + mean));
-        return logAddExp(logLogistic(zeroProbability),
+            ? -mean : size * (logSize - Math.log(size + mean));
+        return logAddExp(logPi,
             logOneMinusPi + logCountZero);
     }
 
