@@ -10,6 +10,9 @@ inference. Mean and precision can have distinct design matrices.
 This does not claim compatibility with `betareg`'s extended-support,
 bias-corrected, bias-reduced, mixture, or tree models.
 
+Grouped and pedigree random effects are covered separately in the
+[sparse beta mixed-model note](beta-mixed-models.md).
+
 ## Package-example accuracy
 
 The comparison used `betareg` 3.2-6 under R 4.6.1 and the package's own

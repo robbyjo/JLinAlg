@@ -16,6 +16,7 @@ public final class GlmmLaplaceResult {
     private final double[] variances;
     private final AssociationStatistics association;
     private final double[] fixedCovariance;
+    private final Map<String, double[]> componentCoefficients;
     private final Map<String, double[]> componentPredictors;
     private final double[] linearPredictor;
     private final double[] fittedMeans;
@@ -30,6 +31,7 @@ public final class GlmmLaplaceResult {
             double[] variances,
             AssociationStatistics association,
             double[] fixedCovariance,
+            Map<String, double[]> componentCoefficients,
             Map<String, double[]> componentPredictors,
             double[] linearPredictor,
             double[] fittedMeans,
@@ -42,16 +44,22 @@ public final class GlmmLaplaceResult {
         this.variances = variances.clone();
         this.association = association;
         this.fixedCovariance = fixedCovariance.clone();
-        Map<String, double[]> copied = new LinkedHashMap<>();
-        componentPredictors.forEach((name, values) ->
-            copied.put(name, values.clone()));
-        this.componentPredictors = java.util.Collections.unmodifiableMap(copied);
+        this.componentCoefficients = immutableArrayMap(componentCoefficients);
+        this.componentPredictors = immutableArrayMap(componentPredictors);
         this.linearPredictor = linearPredictor.clone();
         this.fittedMeans = fittedMeans.clone();
         this.logLikelihood = logLikelihood;
         this.outerIterations = outerIterations;
         this.modeIterations = modeIterations;
         this.converged = converged;
+    }
+
+    private static Map<String, double[]> immutableArrayMap(
+            Map<String, double[]> source) {
+        Map<String, double[]> copied = new LinkedHashMap<>();
+        source.forEach((name, values) ->
+            copied.put(name, values.clone()));
+        return java.util.Collections.unmodifiableMap(copied);
     }
     public String family() { return family; }
     public List<String> componentNames() { return componentNames; }
@@ -62,6 +70,18 @@ public final class GlmmLaplaceResult {
     public double[] statistics() { return association.statistics(); }
     public double[] pValues() { return association.pValues(); }
     public double[] fixedEffectCovariance() { return fixedCovariance.clone(); }
+    /** Returns conditional random-coefficient modes, including unobserved ancestors. */
+    public double[] componentCoefficients(String name) {
+        double[] values = componentCoefficients.get(name);
+        if (values == null) throw new IllegalArgumentException("unknown component: " + name);
+        return values.clone();
+    }
+    public Map<String, double[]> componentCoefficients() {
+        Map<String, double[]> result = new LinkedHashMap<>();
+        componentCoefficients.forEach((name, values) ->
+            result.put(name, values.clone()));
+        return java.util.Collections.unmodifiableMap(result);
+    }
     public double[] componentPredictor(String name) {
         double[] values = componentPredictors.get(name);
         if (values == null) throw new IllegalArgumentException("unknown component: " + name);

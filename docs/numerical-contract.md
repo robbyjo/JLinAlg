@@ -375,6 +375,13 @@ refactorable sparse Cholesky object per worker. Consequently, worker scheduling
 does not alter fitted estimates. Fixed-effect covariance is the inverse Schur
 complement and inference is asymptotic normal/Wald inference.
 
+`BetaMixedModel` uses this same sparse Laplace system with the classical beta
+mean/precision likelihood. Its mean working response and weight are the exact
+beta score and expected Fisher information. Log precision is optimized beside
+log variance components. The current contract is logit-linked conditional
+mean, constant precision, and mean-side random effects; pedigree terms set
+`Q = A^-1` and therefore imply covariance `variance_a A`.
+
 ## Genomic relationship matrices and cryptic relatedness
 
 For each retained variant `j`, called alternate-allele dosages estimate

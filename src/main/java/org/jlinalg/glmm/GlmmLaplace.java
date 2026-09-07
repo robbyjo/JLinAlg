@@ -244,12 +244,18 @@ public final class GlmmLaplace {
             beta, standardErrors);
         double[] variances = new double[logVariances.length];
         List<String> names = new ArrayList<>(components.size());
+        Map<String, double[]> coefficientsByTerm = new LinkedHashMap<>();
         Map<String, double[]> predictors = new LinkedHashMap<>();
         int coefficientStart = fixedColumns;
         for (int component = 0; component < components.size(); component++) {
             variances[component] = Math.exp(logVariances[component]);
             names.add(components.get(component).name());
             ComponentFactor factor = factors.get(component);
+            double[] componentCoefficients = Arrays.copyOfRange(
+                mode.coefficients(), coefficientStart,
+                coefficientStart + factor.columns());
+            coefficientsByTerm.put(components.get(component).name(),
+                componentCoefficients);
             double[] contribution = new double[mode.linear().length];
             for (int row = 0; row < contribution.length; row++) {
                 for (int column = 0; column < factor.columns(); column++) {
@@ -262,7 +268,8 @@ public final class GlmmLaplace {
             coefficientStart += factor.columns();
         }
         return new GlmmLaplaceResult(family.name(), names, variances,
-            association, fixedCovariance, predictors, mode.linear(), mode.means(),
+            association, fixedCovariance, coefficientsByTerm, predictors,
+            mode.linear(), mode.means(),
             mode.laplaceLogLikelihood(), outerIterations,
             mode.iterations(), converged);
     }

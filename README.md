@@ -234,6 +234,16 @@ with `./gradlew benchmarkBetaRegression`. Full accuracy tables, measured
 Java/R timings, scope, and reproduction commands are in the
 [beta-regression validation note](docs/beta-regression.md).
 
+`BetaMixedModel` extends the same classical beta likelihood with sparse
+mean-side random effects and jointly optimized constant precision. Ordinary
+grouped effects use `RandomEffectTerm`; additive genetic effects use
+`PedigreeRandomEffectTerm` and its sparse `A^-1`, retaining unphenotyped
+ancestors in the returned conditional modes. The implementation maximizes a
+first-order Laplace likelihood rather than PQL. Its checked-in `glmmTMB`
+reference, statistical limits, API examples, and the measured 11.20x grouped
+speedup are documented in the
+[beta mixed-model note](docs/beta-mixed-models.md).
+
 ## Ridge, LASSO, and elastic net
 
 `PenalizedRegression` fits Gaussian penalized models by cyclic coordinate

@@ -18,6 +18,7 @@ import jdistlib.matrix.CsrMatrix;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.glm.GlmFamily;
+import org.jlinalg.glm.LaplaceTunableFamily;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.mixed.RandomEffectTerm;
@@ -163,6 +164,10 @@ public final class SparseGlmmLaplace {
             for (int row = 0; row < rows; row++)
                 family.validateResponse(response[row], weights[row]);
             double[] logVariances = sharedLogVariances.clone();
+            LaplaceTunableFamily tunable = family instanceof LaplaceTunableFamily
+                ? (LaplaceTunableFamily) family : null;
+            double[] familyParameters = tunable == null
+                ? new double[0] : tunable.laplaceParameters();
             PreparedSparseCholesky factor = localFactor.get();
             Mode best = mode(response, fixedEffects, columns, weights, offsets,
                 logVariances, factor, null);
@@ -173,15 +178,29 @@ public final class SparseGlmmLaplace {
                     sweep <= options.maximumOuterIterations(); sweep++) {
                 outerIterations = sweep;
                 boolean improved = false;
-                for (int component = 0;
-                        component < logVariances.length; component++) {
-                    double original = logVariances[component];
+                int coordinates = logVariances.length + familyParameters.length;
+                for (int component = 0; component < coordinates; component++) {
+                    boolean varianceComponent = component < logVariances.length;
+                    int familyComponent = component - logVariances.length;
+                    double original = varianceComponent
+                        ? logVariances[component]
+                        : familyParameters[familyComponent];
                     double selected = original;
                     Mode coordinateBest = best;
                     for (double direction : new double[] {-1.0, 1.0}) {
-                        double trial = clamp(original + direction * step);
+                        double trial = varianceComponent
+                            ? clamp(original + direction * step)
+                            : Math.max(tunable.minimumLaplaceParameter(
+                                    familyComponent),
+                                Math.min(tunable.maximumLaplaceParameter(
+                                    familyComponent),
+                                    original + direction * step));
                         if (trial == original) continue;
-                        logVariances[component] = trial;
+                        if (varianceComponent) logVariances[component] = trial;
+                        else {
+                            familyParameters[familyComponent] = trial;
+                            tunable.setLaplaceParameters(familyParameters);
+                        }
                         Mode candidate = mode(response, fixedEffects, columns,
                             weights, offsets, logVariances, factor, best);
                         if (candidate.laplaceLogLikelihood()
@@ -190,7 +209,11 @@ public final class SparseGlmmLaplace {
                             selected = trial;
                         }
                     }
-                    logVariances[component] = selected;
+                    if (varianceComponent) logVariances[component] = selected;
+                    else {
+                        familyParameters[familyComponent] = selected;
+                        tunable.setLaplaceParameters(familyParameters);
+                    }
                     if (coordinateBest.laplaceLogLikelihood()
                             > best.laplaceLogLikelihood()
                             + options.relativeTolerance()
@@ -312,16 +335,17 @@ public final class SparseGlmmLaplace {
                     + fixedValue(fixed, row, fixedColumns, beta)
                     + design.rowProduct(row, random);
                 linear[row] = eta;
-                double mean = family.inverseLink(eta);
-                means[row] = mean;
-                double derivative = family.meanDerivative(eta);
-                double variance = family.variance(mean);
-                double weight = priorWeights[row] * derivative * derivative
-                    / variance;
+                means[row] = family.inverseLink(eta);
+            }
+            for (int row = 0; row < rows; row++) {
+                double eta = linear[row];
+                double mean = means[row];
+                double weight = family.workingWeight(response[row], eta,
+                    mean, priorWeights[row]);
                 workingWeights[row] = Math.max(
                     MINIMUM_WORKING_WEIGHT, weight);
-                workingResponse[row] = eta - offsets[row]
-                    + (response[row] - mean) / derivative;
+                workingResponse[row] = family.workingResponse(response[row],
+                    eta, mean, priorWeights[row], offsets[row]);
             }
             return workingResponse;
         }
@@ -410,17 +434,20 @@ public final class SparseGlmmLaplace {
                 variances[index] = Math.exp(logVariances[index]);
             List<String> names = new ArrayList<>(terms.size());
             Map<String, double[]> predictors = new LinkedHashMap<>();
+            Map<String, double[]> coefficientsByTerm = new LinkedHashMap<>();
             for (int term = 0; term < terms.size(); term++) {
                 RandomEffectTerm value = terms.get(term);
                 names.add(value.name());
                 double[] coefficients = Arrays.copyOfRange(mode.random(),
                     design.termStarts()[term],
                     design.termStarts()[term] + value.coefficients());
+                coefficientsByTerm.put(value.name(), coefficients);
                 predictors.put(value.name(), multiply(value, coefficients));
             }
             return new GlmmLaplaceResult(family.name(), names, variances,
                 AssociationStatistics.normal(mode.beta(), standardErrors),
-                mode.fixedCovariance(), predictors, mode.linear(), mode.means(),
+                mode.fixedCovariance(), coefficientsByTerm, predictors,
+                mode.linear(), mode.means(),
                 mode.laplaceLogLikelihood(), outerIterations,
                 mode.iterations(), converged);
         }

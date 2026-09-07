@@ -47,6 +47,7 @@ and the CRAN
 | Meta-analysis | base R matrix algebra and `pchisq` | fixed inverse-variance pooling, Cochran Q, generalized DL random effects, and numeric meta-regression |
 | Gaussian GAM | `mgcv::gam` | REML P-spline fitted values, EDF, smoothing parameter, deviance, and likelihood |
 | Binomial Laplace GLMM | `lme4::glmer` | coefficients, random-intercept variance, likelihood, and selected fitted probabilities |
+| Beta Laplace GLMM | `glmmTMB::glmmTMB` | coefficients, beta precision, random-intercept variance, likelihood, and pedigree/grouped identity equivalence |
 | Distributional/vector models | `gamlss::gamlss`, `VGAM::vglm` | Gaussian location/scale coefficients, fitted parameters, and likelihood; multinomial logits, likelihood, and category probabilities |
 | SuSiE colocalization | `coloc::coloc.susie` | bundled D1/D2 and multi-signal D3/D4 examples; H0-H4 and conditional-H4 variant posteriors |
 | SuSiE fine mapping | `susieR::susie`, `susieR::susie_rss` | official `N3finemapping` vignette PIPs, coefficients, residual variance, ELBO and iterations; finite-sample z/LD transformation |

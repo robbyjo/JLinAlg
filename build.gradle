@@ -365,6 +365,18 @@ tasks.register('benchmarkBetaRegression', JavaExec) {
     }
 }
 
+tasks.register('benchmarkBetaMixedModel', JavaExec) {
+    group = 'verification'
+    description = 'Runs grouped and pedigree sparse beta mixed-model benchmarks.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.BetaMixedModelBenchmark'
+    jvmArgs '-Xms512m', '-Xmx2g'
+    systemProperties System.properties.findAll { key, value ->
+        key.toString().startsWith('jlinalg.benchmark.beta.mixed.')
+    }
+}
+
 tasks.register('benchmarkSparsePedigreePev', JavaExec) {
     group = 'verification'
     description = 'Profiles batched sparse pedigree PEV and reliability extraction.'

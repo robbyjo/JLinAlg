@@ -17,4 +17,20 @@ public interface GlmFamily {
     double logLikelihood(
         double response, double mean, double priorWeight, double dispersion);
     boolean fixedDispersion();
+
+    /** Returns the Fisher information for the linear predictor. */
+    default double workingWeight(
+            double response, double linearPredictor, double mean,
+            double priorWeight) {
+        double derivative = meanDerivative(linearPredictor);
+        return priorWeight * derivative * derivative / variance(mean);
+    }
+
+    /** Returns the offset-free Fisher-scoring working response. */
+    default double workingResponse(
+            double response, double linearPredictor, double mean,
+            double priorWeight, double offset) {
+        return linearPredictor - offset
+            + (response - mean) / meanDerivative(linearPredictor);
+    }
 }

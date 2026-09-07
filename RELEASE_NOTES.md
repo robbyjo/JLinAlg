@@ -1,5 +1,14 @@
 # Unreleased
 
+- Added sparse first-order Laplace beta mixed models with analytic beta
+  Fisher-scoring updates, jointly optimized constant precision and variance
+  components, grouped random effects, arbitrary sparse coefficient precision,
+  and a pedigree convenience API consuming sparse `A^-1`. An independent
+  `glmmTMB` 1.1.14 fixture checks fixed effects, precision, variance, likelihood,
+  unrelated-founder equivalence, and retention of unphenotyped ancestors. On
+  the documented 30,000-row/1,000-group workload, the Java median was
+  1,028.105 ms versus 11,520 ms for R (11.20x faster); a 3,000-member pedigree
+  fit took 1,374.480 ms.
 - Added specialized classical beta regression compatible with R `betareg`'s
   mean/precision parameterization, six mean links, three precision links,
   constant and variable precision, expected-information covariance, and Wald
