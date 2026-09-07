@@ -17,6 +17,23 @@ Priority meanings:
 
 No major or medium items are currently in progress.
 
+## Requested future analyses
+
+- **Mediation analysis:** adapt the `mediation` R package approach, with
+  optional sampling or a frequentist alternative.
+- **Non-linear fixed and mixed effects:** support non-linear fixed-effect and
+  mixed-effect analyses, including pedigree structures.
+- **Multivariate regression:** implement Gaussian models first, followed by
+  other response families where appropriate; investigate an `rrr`-based path.
+- **Multinomial regression:** investigate an implementation compatible with
+  the `nnet` R package.
+- **Supersmoother regression:** implement R's `supsmu` approach.
+- **Quantile regression:** support the `quantreg` and `quantreg.nonpar` R
+  package approaches.
+- **Nonparametric regression:** investigate the `np` and `npreg` R package
+  approaches.
+- **Semiparametric regression.**
+
 ## Candidates requiring prioritization
 
 These are real documented boundaries, but the vignettes do not establish that
