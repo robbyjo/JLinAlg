@@ -205,6 +205,35 @@ contains fitted means, linear predictors, coefficient covariance, Wald
 statistics, confidence intervals, deviance and Pearson residuals, dispersion,
 log likelihood/AIC when defined, convergence status, and backend provenance.
 
+## Beta regression
+
+`BetaRegression` is a specialized maximum-likelihood implementation of the
+mean/precision model used by R's `betareg`. The two-argument overload matches
+`betareg(y ~ x)` defaults: a logit-linked mean and identity-linked constant
+precision. Supplying a precision design uses the package's variable-precision
+default, a log link.
+
+```java
+BetaRegressionResult fixed = BetaRegression.fit(proportion, meanDesign);
+BetaRegressionResult varying = BetaRegression.fit(
+    proportion, meanDesign, precisionDesign);
+```
+
+All six `betareg` mean links (`LOGIT`, `PROBIT`, `CLOGLOG`, `CAUCHIT`, `LOG`,
+and `LOGLOG`) and its `IDENTITY`, `LOG`, and `SQRT` precision links are
+available through `BetaRegressionOptions`. Results include both coefficient
+blocks, their joint expected-information covariance, Wald inference, fitted
+means and precisions, log likelihood/AIC, convergence details, and backend
+provenance. Responses must be strictly inside `(0, 1)`; boundary-inflated and
+bias-reduced variants are not implied by this classical ML API.
+
+The checked-in R reference test reproduces the `GasolineYield` and
+`FoodExpenditure` examples from the package, including a variable-precision
+fit. Run the deterministic specialized-versus-generic performance comparison
+with `./gradlew benchmarkBetaRegression`. Full accuracy tables, measured
+Java/R timings, scope, and reproduction commands are in the
+[beta-regression validation note](docs/beta-regression.md).
+
 ## Ridge, LASSO, and elastic net
 
 `PenalizedRegression` fits Gaussian penalized models by cyclic coordinate

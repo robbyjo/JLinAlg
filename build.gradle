@@ -353,6 +353,18 @@ tasks.register('benchmarkLoess', JavaExec) {
     }
 }
 
+tasks.register('benchmarkBetaRegression', JavaExec) {
+    group = 'verification'
+    description = 'Benchmarks specialized beta regression against the generic distributional engine.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.BetaRegressionBenchmark'
+    jvmArgs '-Xms512m', '-Xmx2g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.beta.')
+    }
+}
+
 tasks.register('benchmarkSparsePedigreePev', JavaExec) {
     group = 'verification'
     description = 'Profiles batched sparse pedigree PEV and reliability extraction.'

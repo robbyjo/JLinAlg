@@ -1,5 +1,14 @@
 # Unreleased
 
+- Added specialized classical beta regression compatible with R `betareg`'s
+  mean/precision parameterization, six mean links, three precision links,
+  constant and variable precision, expected-information covariance, and Wald
+  inference. Package-example fixtures cover GasolineYield and FoodExpenditure;
+  a deterministic benchmark compares the fused row-major solver with the
+  generic distributional engine. On the documented 100,000-row workload,
+  JLinAlg matched all coefficients within `1.3e-14` of its generic engine and
+  within `2.6e-13` of R, while running in 143.216 ms versus 2,090 ms for
+  `betareg` 3.2-6 (14.59x faster).
 - Further reduced ZIP/ZINB likelihood work with worker-local outer-point
   caches for fixed predictors, NB2 size/gamma terms, and eligible zero-process
   probabilities. Fresh paired Salamanders full-fit medians improved from
