@@ -39,6 +39,10 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("mr-estimate"))
             return MrEstimatorCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && (arguments[0].equals("beta-regression")
+                || arguments[0].equals("penalized-regression")))
+            return RegressionCli.run(arguments[0], Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         CliOptions options;
         try {
             options = CliOptions.parse(arguments);
@@ -146,6 +150,11 @@ public final class JLinAlgCli {
               java -jar jlinalg-<version>.jar mr-estimate --input FILE
                 [--method ivw-fixed|ivw-random|egger|weighted-median|all]
                 [--output FILE] [--plot FILE]
+              java -jar jlinalg-<version>.jar beta-regression --input FILE
+                --response COLUMN [--mean COLUMNS] [--precision COLUMNS]
+              java -jar jlinalg-<version>.jar penalized-regression --input FILE
+                --response COLUMN --predictors COLUMNS
+                --model ridge|lasso|elastic-net
 
             Core options:
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix

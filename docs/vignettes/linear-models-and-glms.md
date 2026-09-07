@@ -137,6 +137,30 @@ For LASSO/elastic net, `refitActiveSet` performs an optional OLS refit, but its
 p-values are conditional on the selected active set and are not automatically
 selection-valid.
 
+## Command-line regression
+
+The same beta and penalized Gaussian fitters are available from the executable
+JAR. Inputs are numeric CSV/TSV files with a header row. Both commands include
+an intercept by default:
+
+```console
+java -jar jlinalg-<version>.jar beta-regression \
+  --input proportions.tsv --response proportion --mean dose \
+  --precision batch_score --out beta-coefficients.tsv
+
+java -jar jlinalg-<version>.jar penalized-regression \
+  --input continuous.tsv --response y --predictors x1,x2,x3 \
+  --model elastic-net --alpha 0.5 --lambda-grid 1,0.3,0.1,0.03 \
+  --cv-folds 5 --out penalized-coefficients.tsv
+```
+
+Use `--model ridge` or `--model lasso` for the endpoint penalties. Omit
+`--precision` for constant beta-regression precision. The penalized command
+reports the selected lambda, active-count, objective, and convergence flag;
+`--no-intercept` and `--no-standardize` expose the corresponding API controls.
+Cross-validation uses deterministic folds; pass `--seed` to change the fold
+assignment.
+
 ## Formula equivalent
 
 For an R-like user-facing layer, see the [formula vignette](formulas-and-backends.md).

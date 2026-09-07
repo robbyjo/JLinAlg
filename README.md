@@ -244,6 +244,15 @@ reference, statistical limits, API examples, and the measured 11.20x grouped
 speedup are documented in the
 [beta mixed-model note](docs/beta-mixed-models.md).
 
+The beta fitter is also available from the command line for numeric CSV/TSV
+files:
+
+```powershell
+java -jar build/cli/jlinalg-0.2.0.jar beta-regression `
+  --input proportions.tsv --response proportion --mean dose `
+  --precision batch_score --out beta-coefficients.tsv
+```
+
 ## Ridge, LASSO, and elastic net
 
 `PenalizedRegression` fits Gaussian penalized models by cyclic coordinate
@@ -284,6 +293,20 @@ are available from `PenalizedRegressionInference.ridge`. For LASSO and elastic
 net, `refitActiveSet` provides an optional OLS refit and association results
 conditional on the selected active set. Those p-values are not adjusted for
 variable selection and should not be presented as selection-valid inference.
+
+The Gaussian penalized fitter is also available as a file-oriented command:
+
+```powershell
+java -jar build/cli/jlinalg-0.2.0.jar penalized-regression `
+  --input continuous.tsv --response y --predictors x1,x2,x3 `
+  --model elastic-net --alpha 0.5 `
+  --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 `
+  --out penalized-coefficients.tsv
+```
+
+Use `--model ridge` or `--model lasso` for the endpoint penalties. Both
+commands include an intercept by default and emit tidy TSV coefficient rows;
+`--help` lists the complete options.
 
 ## REML
 
