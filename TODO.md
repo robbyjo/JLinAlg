@@ -77,7 +77,9 @@ benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 Completed 2026-09-07. `MediationAnalysis` fits the mediator, outcome, and
 total-effect Gaussian OLS models and reports the `a`, `b`, indirect, direct,
-and total effects. Indirect-effect inference uses the analytic
+and total effects. Sparse REML mediation also supports ordinary random-effect
+terms and additive pedigree precision terms, reusing prepared sparse
+structure across all three fits. Indirect-effect inference uses the analytic
 Sobel/product-of-coefficients delta method with a normal confidence interval;
 no bootstrap, Monte Carlo, or posterior sampling is used. Common complete-row
 selection keeps all three component fits on the same analysis sample.

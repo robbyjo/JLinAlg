@@ -76,3 +76,57 @@ This first implementation is deliberately limited to continuous Gaussian
 responses and linear paths. Binary/count outcomes, nonlinear links, clustered
 or robust covariance, and sampling-based intervals remain separate design
 decisions rather than being silently approximated here.
+
+## Mixed effects and pedigree terms
+
+Use `MediationAnalysis.fitMixed` for ordinary independent random-effect terms.
+The same terms are included in the mediator, outcome, and total-effect fits.
+The sparse REML structure is prepared once and warm-started across the three
+fits:
+
+```java
+RandomEffectTerm subject = RandomEffectTerm.randomIntercept(
+    "subject", subjectIds);
+MediationMixedResult mixed = MediationAnalysis.fitMixed(
+    outcome, treatment, mediator, covariates,
+    List.of(subject), RemlOptions.defaults(), 0.95,
+    BackendPolicy.CPU);
+```
+
+Pedigree effects use the sparse additive relationship precision already used by
+the pedigree mixed-model API. Ordinary random terms can be added alongside the
+pedigree term:
+
+```java
+PedigreeRandomEffectTerm animal = PedigreeRandomEffectTerm.of(
+    "animal", observedIndividualIds, pedigree);
+MediationMixedResult pedigreeFit = MediationAnalysis.fitPedigree(
+    outcome, treatment, mediator, covariates,
+    List.of(animal), List.of(subject), RemlOptions.defaults(), 0.95,
+    BackendPolicy.CPU);
+```
+
+Mixed and pedigree results expose the three underlying
+`SparseLinearMixedModelResult` objects, including variance components,
+convergence status, random effects, and fixed-effect covariance. These fits
+currently require finite complete rows and residual-approximation denominator
+degrees of freedom, matching the sparse mixed-model contract.
+
+## Accuracy and speed comparison
+
+The deterministic comparator is `src/benchmark/r/mediation_benchmark.R` and
+the matching Java task is:
+
+```powershell
+.\gradlew.bat `
+  '-Djlinalg.benchmark.mediation.rows=2000' `
+  '-Djlinalg.benchmark.mediation.groups=100' `
+  benchmarkMediation
+```
+
+The OLS rows compare base R `lm` point estimates with JLinAlg's analytic
+`a`, `b`, indirect, direct, and total effects. The optional `lme4` block
+compares mixed-effect fixed effects. Run the R script with the same row and
+group counts on a host with R and `lme4`; timings are workload- and
+backend-specific, so a speedup claim must use the paired outputs rather than
+the Java compile result alone.

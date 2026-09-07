@@ -7,12 +7,19 @@ package org.jlinalg.mediation;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.mixed.RandomEffectTerm;
 import org.jlinalg.model.MissingDataPolicy;
 import org.jlinalg.ols.Ols;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.ols.RankDeficiencyStrategy;
+import org.jlinalg.pedigree.Pedigree;
+import org.jlinalg.pedigree.PedigreeIndividual;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
+import org.jlinalg.reml.RemlOptions;
 import org.junit.jupiter.api.Test;
 
 class MediationAnalysisTest {
@@ -96,6 +103,61 @@ class MediationAnalysisTest {
             MediationAnalysis.fit(
                 OUTCOME, constantTreatment, MEDIATOR, null, options,
                 BackendPolicy.CPU));
+    }
+
+    @Test
+    void reusesSparseRemlStructureForMixedMediation() {
+        List<String> groups = List.of(
+            "a", "a", "a", "b", "b", "b", "c", "c", "c",
+            "d", "d", "d");
+        RandomEffectTerm randomIntercept = RandomEffectTerm.randomIntercept(
+            "subject", groups);
+        RemlOptions options = RemlOptions.builder()
+            .initialVariances(2.0, 1.0)
+            .maximumIterations(160)
+            .build();
+
+        MediationMixedResult result = MediationAnalysis.fitMixed(
+            OUTCOME, TREATMENT, MEDIATOR, null,
+            List.of(randomIntercept), options, BackendPolicy.CPU);
+
+        assertEquals(12, result.observations());
+        assertTrue(result.converged());
+        assertEquals(result.aPath().estimate(),
+            result.mediatorModel().beta()[1], 0.0);
+        assertEquals(result.bPath().estimate(),
+            result.outcomeModel().beta()[2], 0.0);
+        assertEquals("subject",
+            result.outcomeModel().randomEffects().get(0).termName());
+        assertEquals(2, result.outcomeModel().varianceComponents().length);
+    }
+
+    @Test
+    void includesPedigreePrecisionInAllMediationComponentFits() {
+        Pedigree pedigree = Pedigree.of(List.of(
+            PedigreeIndividual.founder("A"),
+            PedigreeIndividual.founder("B"),
+            new PedigreeIndividual("C", "A", "B"),
+            new PedigreeIndividual("D", "A", "C")));
+        List<String> observed = List.of(
+            "A", "A", "A", "B", "B", "B",
+            "C", "C", "C", "D", "D", "D");
+        PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
+            "animal", observed, pedigree);
+        RemlOptions options = RemlOptions.builder()
+            .initialVariances(2.0, 1.0)
+            .maximumIterations(160)
+            .build();
+
+        MediationMixedResult result = MediationAnalysis.fitPedigree(
+            OUTCOME, TREATMENT, MEDIATOR, null,
+            List.of(additive), List.of(), options, BackendPolicy.CPU);
+
+        assertTrue(result.converged());
+        assertEquals(pedigree.size(), result.outcomeModel()
+            .randomEffects("animal").estimates().length);
+        assertEquals("animal", result.totalModel().componentNames().get(0));
+        assertTrue(result.indirectEffect().standardError() >= 0.0);
     }
 
     private static OlsResultReference independentFits() {

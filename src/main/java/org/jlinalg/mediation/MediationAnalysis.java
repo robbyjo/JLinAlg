@@ -5,12 +5,20 @@
 package org.jlinalg.mediation;
 
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import jdistlib.Normal;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.model.MissingDataPolicy;
+import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparseLinearMixedModel;
+import org.jlinalg.mixed.SparseLinearMixedModelResult;
 import org.jlinalg.ols.Ols;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.ols.OlsResult;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
+import org.jlinalg.pedigree.SparsePedigreeMixedModel;
+import org.jlinalg.reml.RemlOptions;
 
 /**
  * Gaussian linear mediation using ordinary least squares and analytic
@@ -23,6 +31,8 @@ import org.jlinalg.ols.OlsResult;
  * asymptotic standard-normal approximation.</p>
  */
 public final class MediationAnalysis {
+    private static final double DEFAULT_CONFIDENCE_LEVEL = 0.95;
+
     private MediationAnalysis() {
     }
 
@@ -97,6 +107,190 @@ public final class MediationAnalysis {
             data.retainedRows());
     }
 
+    /**
+     * Fits mediation with one or more independent sparse Gaussian random
+     * effects shared by the mediator, outcome, and total-effect models.
+     * Sparse REML structure is prepared once and reused across all three
+     * fits.
+     */
+    public static MediationMixedResult fitMixed(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            List<RandomEffectTerm> randomEffects) {
+        return fitMixed(outcome, treatment, mediator, null, randomEffects,
+            RemlOptions.defaults(), BackendPolicy.PREFERRED);
+    }
+
+    /** Fits sparse REML mediation with optional fixed-effect covariates. */
+    public static MediationMixedResult fitMixed(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            double[][] covariates,
+            List<RandomEffectTerm> randomEffects,
+            RemlOptions options,
+            BackendPolicy backendPolicy) {
+        Objects.requireNonNull(randomEffects, "randomEffects");
+        if (randomEffects.isEmpty()) {
+            throw new IllegalArgumentException(
+                "at least one ordinary random-effect term is required");
+        }
+        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(backendPolicy, "backendPolicy");
+        return fitMixed(outcome, treatment, mediator, covariates,
+            randomEffects, options, DEFAULT_CONFIDENCE_LEVEL, backendPolicy);
+    }
+
+    /** Fits sparse REML mediation with an explicit confidence level. */
+    public static MediationMixedResult fitMixed(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            double[][] covariates,
+            List<RandomEffectTerm> randomEffects,
+            RemlOptions options,
+            double confidenceLevel,
+            BackendPolicy backendPolicy) {
+        Objects.requireNonNull(randomEffects, "randomEffects");
+        if (randomEffects.isEmpty()) {
+            throw new IllegalArgumentException(
+                "at least one ordinary random-effect term is required");
+        }
+        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(backendPolicy, "backendPolicy");
+        validateConfidenceLevel(confidenceLevel);
+        PreparedData data = prepare(
+            outcome, treatment, mediator, covariates,
+            MissingDataPolicy.ERROR);
+        List<RandomEffectTerm> compactTerms = compactTerms(
+            randomEffects, data, "random-effect");
+        try (SparseLinearMixedModel.Prepared prepared =
+                SparseLinearMixedModel.prepare(
+                    data.outcome().length, compactTerms,
+                    options, backendPolicy)) {
+            return fitPreparedMixed(
+                data, prepared, confidenceLevel);
+        }
+    }
+
+    /**
+     * Fits sparse REML mediation with pedigree random effects and optional
+     * independent random effects. The same terms are shared by all three
+     * component models; pedigree precision remains sparse in coefficient
+     * space.
+     */
+    public static MediationMixedResult fitPedigree(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            List<PedigreeRandomEffectTerm> pedigreeEffects) {
+        return fitPedigree(outcome, treatment, mediator, null,
+            pedigreeEffects, List.of(), RemlOptions.defaults(),
+            BackendPolicy.PREFERRED);
+    }
+
+    /** Fits pedigree-aware sparse REML mediation with fixed covariates. */
+    public static MediationMixedResult fitPedigree(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            double[][] covariates,
+            List<PedigreeRandomEffectTerm> pedigreeEffects,
+            List<RandomEffectTerm> ordinaryEffects,
+            RemlOptions options,
+            BackendPolicy backendPolicy) {
+        Objects.requireNonNull(pedigreeEffects, "pedigreeEffects");
+        if (pedigreeEffects.isEmpty()) {
+            throw new IllegalArgumentException(
+                "at least one pedigree random-effect term is required");
+        }
+        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(backendPolicy, "backendPolicy");
+        return fitPedigree(outcome, treatment, mediator, covariates,
+            pedigreeEffects, ordinaryEffects, options,
+            DEFAULT_CONFIDENCE_LEVEL, backendPolicy);
+    }
+
+    /** Fits pedigree-aware sparse REML mediation with an explicit confidence level. */
+    public static MediationMixedResult fitPedigree(
+            double[] outcome,
+            double[] treatment,
+            double[] mediator,
+            double[][] covariates,
+            List<PedigreeRandomEffectTerm> pedigreeEffects,
+            List<RandomEffectTerm> ordinaryEffects,
+            RemlOptions options,
+            double confidenceLevel,
+            BackendPolicy backendPolicy) {
+        Objects.requireNonNull(pedigreeEffects, "pedigreeEffects");
+        if (pedigreeEffects.isEmpty()) {
+            throw new IllegalArgumentException(
+                "at least one pedigree random-effect term is required");
+        }
+        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(backendPolicy, "backendPolicy");
+        validateConfidenceLevel(confidenceLevel);
+        PreparedData data = prepare(
+            outcome, treatment, mediator, covariates,
+            MissingDataPolicy.ERROR);
+        List<PedigreeRandomEffectTerm> compactPedigree = compactPedigreeTerms(
+            pedigreeEffects, data);
+        List<RandomEffectTerm> compactOrdinary = ordinaryEffects == null
+            ? List.of() : compactTerms(ordinaryEffects, data, "random-effect");
+        try (SparseLinearMixedModel.Prepared prepared =
+                SparsePedigreeMixedModel.prepare(
+                    data.outcome().length, compactPedigree, compactOrdinary,
+                    options, backendPolicy)) {
+            return fitPreparedMixed(
+                data, prepared, confidenceLevel);
+        }
+    }
+
+    private static MediationMixedResult fitPreparedMixed(
+            PreparedData data,
+            SparseLinearMixedModel.Prepared prepared,
+            double confidenceLevel) {
+        double[] mediatorDesign = designRowMajor(
+            data.treatment(), data.mediator(), data.covariates(), false);
+        double[] outcomeDesign = designRowMajor(
+            data.treatment(), data.mediator(), data.covariates(), true);
+        double[] totalDesign = designRowMajor(
+            data.treatment(), null, data.covariates(), false);
+        int covariates = data.covariates() == null
+            ? 0 : data.covariates()[0].length;
+        int mediatorColumns = 2 + covariates;
+        int outcomeColumns = mediatorColumns + 1;
+
+        SparseLinearMixedModelResult mediatorModel = prepared.fit(
+            data.mediator(), mediatorDesign, mediatorColumns);
+        prepared.warmStart(mediatorModel.varianceComponents());
+        SparseLinearMixedModelResult outcomeModel = prepared.fit(
+            data.outcome(), outcomeDesign, outcomeColumns);
+        prepared.warmStart(outcomeModel.varianceComponents());
+        SparseLinearMixedModelResult totalModel = prepared.fit(
+            data.outcome(), totalDesign, mediatorColumns);
+
+        MediationEffect aPath = mixedCoefficientEffect(
+            "a", mediatorModel, 1, confidenceLevel);
+        MediationEffect bPath = mixedCoefficientEffect(
+            "b", outcomeModel, 2, confidenceLevel);
+        MediationEffect directEffect = mixedCoefficientEffect(
+            "direct", outcomeModel, 1, confidenceLevel);
+        MediationEffect totalEffect = mixedCoefficientEffect(
+            "total", totalModel, 1, confidenceLevel);
+        MediationEffect indirectEffect = indirectEffect(
+            aPath.estimate(), bPath.estimate(),
+            diagonal(mediatorModel.fixedEffectCovariance(), mediatorColumns, 1),
+            diagonal(outcomeModel.fixedEffectCovariance(), outcomeColumns, 2),
+            confidenceLevel);
+        return new MediationMixedResult(
+            mediatorModel, outcomeModel, totalModel,
+            aPath, bPath, indirectEffect, directEffect, totalEffect,
+            data.outcome().length, data.originalObservations(),
+            data.retainedRows());
+    }
+
     private static MediationEffect coefficientEffect(
             String name, OlsResult fit, int column) {
         return new MediationEffect(
@@ -110,7 +304,7 @@ public final class MediationAnalysis {
             fit.residualDegreesOfFreedom());
     }
 
-    private static MediationEffect indirectEffect(
+    static MediationEffect indirectEffect(
             double a, double b, double varianceA, double varianceB,
             double confidenceLevel) {
         double estimate = a * b;
@@ -136,6 +330,35 @@ public final class MediationAnalysis {
             Double.POSITIVE_INFINITY);
     }
 
+    private static MediationEffect mixedCoefficientEffect(
+            String name, SparseLinearMixedModelResult fit, int column,
+            double confidenceLevel) {
+        double[] degrees = fit.associationStatistics().degreesOfFreedom();
+        double df = degrees[column];
+        double estimate = fit.beta()[column];
+        double standardError = fit.standardErrors()[column];
+        double statistic = fit.tStatistics()[column];
+        double critical = jdistlib.T.quantile(
+            0.5 + confidenceLevel / 2.0, df, true, false);
+        return new MediationEffect(
+            name, estimate, standardError, statistic,
+            fit.pValues()[column],
+            estimate - critical * standardError,
+            estimate + critical * standardError, df);
+    }
+
+    private static double diagonal(double[] covariance, int columns, int index) {
+        return covariance[index * columns + index];
+    }
+
+    private static void validateConfidenceLevel(double confidenceLevel) {
+        if (!(confidenceLevel > 0.0 && confidenceLevel < 1.0)
+                || !Double.isFinite(confidenceLevel)) {
+            throw new IllegalArgumentException(
+                "confidenceLevel must be strictly between zero and one");
+        }
+    }
+
     private static double[][] design(
             double[] treatment,
             double[] mediator,
@@ -156,6 +379,90 @@ public final class MediationAnalysis {
             }
         }
         return design;
+    }
+
+    private static double[] designRowMajor(
+            double[] treatment,
+            double[] mediator,
+            double[][] covariates,
+            boolean includeMediator) {
+        double[][] matrix = design(
+            treatment, mediator, covariates, includeMediator);
+        double[] result = new double[matrix.length * matrix[0].length];
+        for (int row = 0; row < matrix.length; row++) {
+            System.arraycopy(matrix[row], 0, result,
+                row * matrix[row].length, matrix[row].length);
+        }
+        return result;
+    }
+
+    private static List<RandomEffectTerm> compactTerms(
+            List<RandomEffectTerm> terms,
+            PreparedData data,
+            String kind) {
+        List<RandomEffectTerm> result = new ArrayList<>(terms.size());
+        for (RandomEffectTerm term : terms) {
+            if (term == null || term.observations() != data.originalObservations()) {
+                throw new IllegalArgumentException(
+                    kind + " rows must equal mediation observations");
+            }
+            int rows = data.retainedRows().length;
+            int[] retained = data.retainedRows();
+            if (rows == data.originalObservations()) {
+                result.add(term);
+                continue;
+            }
+            if (term.sparse()) {
+                int[] originalStarts = term.rowPointers();
+                int[] originalColumns = term.columnIndices();
+                double[] originalValues = term.sparseValues();
+                int[] starts = new int[rows + 1];
+                List<Integer> columns = new ArrayList<>();
+                List<Double> values = new ArrayList<>();
+                for (int row = 0; row < rows; row++) {
+                    starts[row] = columns.size();
+                    int source = retained[row];
+                    for (int index = originalStarts[source];
+                            index < originalStarts[source + 1]; index++) {
+                        columns.add(originalColumns[index]);
+                        values.add(originalValues[index]);
+                    }
+                }
+                starts[rows] = columns.size();
+                int[] compactColumns = columns.stream().mapToInt(Integer::intValue).toArray();
+                double[] compactValues = values.stream().mapToDouble(Double::doubleValue).toArray();
+                result.add(RandomEffectTerm.ofSparseCsr(
+                    term.name(), rows, term.coefficients(), starts,
+                    compactColumns, compactValues, term.coefficientNames()));
+            } else {
+                double[] original = term.design();
+                double[] compact = new double[rows * term.coefficients()];
+                for (int row = 0; row < rows; row++) {
+                    System.arraycopy(original, retained[row] * term.coefficients(),
+                        compact, row * term.coefficients(), term.coefficients());
+                }
+                result.add(RandomEffectTerm.of(
+                    term.name(), compact, rows, term.coefficients(),
+                    term.coefficientNames()));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<PedigreeRandomEffectTerm> compactPedigreeTerms(
+            List<PedigreeRandomEffectTerm> terms, PreparedData data) {
+        List<PedigreeRandomEffectTerm> result = new ArrayList<>(terms.size());
+        for (PedigreeRandomEffectTerm term : terms) {
+            if (term == null) {
+                throw new IllegalArgumentException(
+                    "pedigree random-effect terms must not be null");
+            }
+            RandomEffectTerm compact = compactTerms(
+                List.of(term.randomEffect()), data, "pedigree random-effect")
+                .get(0);
+            result.add(new PedigreeRandomEffectTerm(compact, term.precision()));
+        }
+        return List.copyOf(result);
     }
 
     private static PreparedData prepare(
