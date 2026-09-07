@@ -17,6 +17,7 @@ Run the complete verification suite before adapting an example:
 | --- | --- |
 | [Basic statistical tests](basic-statistical-tests.md) | uniform base-R-style tests, exact and asymptotic methods, contingency tables, blocked designs, ANOVA power |
 | [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
+| [Linear mediation analysis](mediation.md) | Gaussian mediator/outcome models, direct/indirect/total effects, Sobel delta-method inference, common complete-case handling |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
 | [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
 | [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |

@@ -19,8 +19,6 @@ No major or medium items are currently in progress.
 
 ## Requested future analyses
 
-- **Mediation analysis:** adapt the `mediation` R package approach, with
-  optional sampling or a frequentist alternative.
 - **Non-linear fixed and mixed effects:** support non-linear fixed-effect and
   mixed-effect analyses, including pedigree structures.
 - **Multivariate regression:** implement Gaussian models first, followed by
@@ -74,6 +72,17 @@ sensitivity analyses not proving the exclusion restriction, and the xWAS
 benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 ## Completed work
+
+### Frequentist linear mediation analysis — completed
+
+Completed 2026-09-07. `MediationAnalysis` fits the mediator, outcome, and
+total-effect Gaussian OLS models and reports the `a`, `b`, indirect, direct,
+and total effects. Indirect-effect inference uses the analytic
+Sobel/product-of-coefficients delta method with a normal confidence interval;
+no bootstrap, Monte Carlo, or posterior sampling is used. Common complete-row
+selection keeps all three component fits on the same analysis sample.
+
+Source: [mediation vignette](vignettes/mediation.md).
 
 ### Frequentist zero-inflated mixed and pedigree models — completed
 
