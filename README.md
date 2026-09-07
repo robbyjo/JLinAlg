@@ -124,12 +124,19 @@ service-provider mechanism, and are loaded with `--transform-plugin FILE.jar`.
 
 The [vignette index](docs/vignettes/README.md) provides end-to-end examples for
 every implemented feature group: OLS/GLM and penalized regression, REML/LMM,
-LOESS, GAM/GAMM and distributional/vector additive models, pedigree and GLMM
+multivariate/multinomial, quantile, nonparametric, supersmoother, and
+semiparametric regression, LOESS, GAM/GAMM and distributional/vector additive models, pedigree and GLMM
 PQL/Laplace, formulas/backends, association and GWAS/TWAS, Mendelian
 randomization, meta-analysis/meta-regression, time series, SuSiE, and SEM. Each
 vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
 contract.
+
+The [regression families vignette](docs/vignettes/regression-families.md)
+covers the deterministic multivariate OLS, multinomial logistic, quantile,
+kernel, supersmoother, and partially linear APIs. The JVM benchmark is
+available as `./gradlew benchmarkRegressionFamilies`; direct R timing for
+these new paths is not claimed when `Rscript` is unavailable on the host.
 
 Basic base-R-style hypothesis tests are available through the uniform
 `org.jlinalg.stats.StatisticalTests` facade. It delegates tests already in

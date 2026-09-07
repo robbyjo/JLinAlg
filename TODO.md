@@ -1,6 +1,6 @@
 # Development inventory
 
-Last reviewed: 2026-09-05.
+Last reviewed: 2026-09-07.
 
 This inventory keeps unfinished decisions at the top. Completed work is archived
 at the bottom so it remains searchable without obscuring the active backlog.
@@ -19,16 +19,9 @@ No major or medium items are currently in progress.
 
 ## Requested future analyses
 
-- **Multivariate regression:** implement Gaussian models first, followed by
-  other response families where appropriate; investigate an `rrr`-based path.
-- **Multinomial regression:** investigate an implementation compatible with
-  the `nnet` R package.
-- **Supersmoother regression:** implement R's `supsmu` approach.
-- **Quantile regression:** support the `quantreg` and `quantreg.nonpar` R
-  package approaches.
-- **Nonparametric regression:** investigate the `np` and `npreg` R package
-  approaches.
-- **Semiparametric regression.**
+No requested analysis items remain in this inventory. The six regression
+families requested in the prior review are implemented below with explicit,
+deterministic contracts and corresponding tests and vignettes.
 
 ## Candidates requiring prioritization
 
@@ -70,6 +63,27 @@ sensitivity analyses not proving the exclusion restriction, and the xWAS
 benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 ## Completed work
+
+### Regression families — completed
+
+Completed 2026-09-07. The regression package now provides shared-design
+Gaussian multivariate OLS, baseline-category multinomial logistic regression,
+smoothed pinball-loss quantile regression, Gaussian-kernel nonparametric
+regression, deterministic span-selecting supersmoothing, and a partially
+linear semiparametric model. These paths are in-memory Java APIs and do not
+use bootstrap or Monte Carlo sampling. `RegressionFamiliesBenchmark` reports
+repeatable JVM throughput for all six families.
+
+The R relationship is intentionally documented rather than overstated:
+multivariate OLS is the direct Gaussian reference case, while multinomial,
+supersmoother, quantile, nonparametric, and semiparametric implementations
+are compatible contracts rather than byte-for-byte reimplementations of
+`nnet`, `stats::supsmu`, `quantreg`, `np`/`npreg`, or a single semiparametric
+R package. Direct R timing was not run on this host because `Rscript` is not
+installed; the benchmark output is therefore a Java baseline, not a claimed
+R speedup.
+
+Source: [regression families vignette](docs/vignettes/regression-families.md).
 
 ### Nonlinear fixed and mixed effects — completed
 

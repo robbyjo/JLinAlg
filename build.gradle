@@ -228,7 +228,8 @@ tasks.register('checkWebsite') {
             'vignettes/time-series.html',
             'vignettes/susie.html',
             'vignettes/sem.html',
-            'vignettes/formulas-backends.html'
+            'vignettes/formulas-backends.html',
+            'vignettes/regression-families.html'
         ]
         requiredPages.each { String relative ->
             if (!new File(siteRoot, relative).isFile()) {
@@ -350,6 +351,18 @@ tasks.register('benchmarkLoess', JavaExec) {
     jvmArgs '-Xms512m', '-Xmx2g'
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkRegressionFamilies', JavaExec) {
+    group = 'verification'
+    description = 'Profiles the deterministic multivariate and nonparametric regression families.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.RegressionFamiliesBenchmark'
+    jvmArgs '-Xms512m', '-Xmx2g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.regression.')
     }
 }
 
