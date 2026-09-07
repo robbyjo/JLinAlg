@@ -19,8 +19,6 @@ No major or medium items are currently in progress.
 
 ## Requested future analyses
 
-- **Non-linear fixed and mixed effects:** support non-linear fixed-effect and
-  mixed-effect analyses, including pedigree structures.
 - **Multivariate regression:** implement Gaussian models first, followed by
   other response families where appropriate; investigate an `rrr`-based path.
 - **Multinomial regression:** investigate an implementation compatible with
@@ -72,6 +70,24 @@ sensitivity analyses not proving the exclusion restriction, and the xWAS
 benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 ## Completed work
+
+### Nonlinear fixed and mixed effects — completed
+
+Completed 2026-09-07. `NonlinearFixedModel` fits Gaussian nonlinear means with
+analytic gradients using damped Gauss–Newton iterations. `NonlinearMixedModel`
+linearizes the same mean function while reusing prepared sparse REML equations
+for ordinary random effects, and `fitPedigree` adds sparse numerator-relationship
+precision terms with optional ordinary effects. Results expose nonlinear
+parameters, fitted values, residuals, objective, convergence metadata, and the
+final sparse linearized mixed-model result.
+
+The implemented contract is deliberately explicit: this is an additive
+Gaussian nonlinear mixed-effects path, not a non-Gaussian Laplace/AGQ solver or
+an exact `nlme` likelihood implementation. Analytic gradients are required,
+and callers should validate parameterizations against independent reference
+fixtures.
+
+Source: [nonlinear fixed and mixed-effects vignette](docs/vignettes/nonlinear-models.md).
 
 ### Meta-analysis, sparse correlated mixed models, and MR workflow extensions — completed
 

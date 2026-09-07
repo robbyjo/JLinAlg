@@ -34,6 +34,8 @@ covariance bases continue to receive the same numerical model.
   REML projection rather than refitting a mixed model for every set.
 - Sparse-equation ML/REML for independent grouped terms with reusable
   minimum-degree sparse Cholesky and no observation-scale covariance matrix.
+- Analytic-gradient Gaussian nonlinear fixed and mixed effects, with prepared
+  sparse ordinary and pedigree random-effect linearizations.
 - Sparse pedigree variance estimation using `A^-1` directly.
 - Cholesky-parameterized unstructured correlated random blocks on the dense
   reference likelihood path.
