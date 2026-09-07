@@ -36,6 +36,9 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("mr-xwas"))
             return MrXwasCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mr-estimate"))
+            return MrEstimatorCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         CliOptions options;
         try {
             options = CliOptions.parse(arguments);
@@ -140,6 +143,9 @@ public final class JLinAlgCli {
                 --instrument FILE --ld-threshold 0.001 --output FILE
               java -jar jlinalg-<version>.jar mr-xwas --exposure FILE
                 --outcome FILE --output FILE --p-threshold X
+              java -jar jlinalg-<version>.jar mr-estimate --input FILE
+                [--method ivw-fixed|ivw-random|egger|weighted-median|all]
+                [--output FILE] [--plot FILE]
 
             Core options:
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix

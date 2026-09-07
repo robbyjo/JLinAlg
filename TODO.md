@@ -40,15 +40,15 @@ they are committed work:
 - **SEM:** latent measurement variables, mean/intercept structures, ordinal
   thresholds, robust/clustered corrections, modification indices,
   indirect-effect delta-method inference, and FIML missing-data patterns.
-- **Meta-analysis:** cluster-robust variance, multilevel/correlated effects,
-  publication-bias diagnostics, and effect-size construction.
-- **Mixed models:** sparse correlated-block likelihoods, scalable sparse
-  finite-DF calculations, broader `lme4` formula parity, and profile-likelihood
-  intervals.
+- **Meta-analysis:** extend the new cluster-robust and correlated-effect APIs
+  to full multilevel moderator covariance structures and additional bias
+  corrections.
+- **Mixed models:** extend the new sparse correlated-block path to estimated
+  unstructured covariance parameters and formula-native profile refits.
 - **Time series:** diffuse exact likelihood for integrated models and a sparse
   missing-series path.
-- **MR workflow:** a general estimator CLI, native plot rendering, and
-  conditional/secondary-signal clumping.
+- **MR workflow:** extend the new estimator CLI and native SVG plot path to
+  generalized/overlap-aware estimators and conditional p-value calculation.
 - **GLMM:** exact or adaptive-quadrature alternatives where PQL or first-order
   Laplace is inadequate.
 - **Penalized regression:** selection-aware inference after LASSO/elastic-net
@@ -72,6 +72,32 @@ sensitivity analyses not proving the exclusion restriction, and the xWAS
 benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 ## Completed work
+
+### Meta-analysis, sparse correlated mixed models, and MR workflow extensions — completed
+
+Completed 2026-09-07. Meta-analysis now has first-order effect-size
+construction for mean differences, Hedges g, log odds/risk ratios, and Fisher-z
+correlations; generalized inverse-covariance pooling for correlated study
+effects; cluster-robust meta-regression sandwich inference; and deterministic
+Egger/rank publication-bias diagnostics. Mixed models now expose sparse
+grouped correlated blocks with caller-supplied within-group covariance shapes,
+a sparse Satterthwaite contraction utility, and a generic profile-likelihood
+interval solver. The existing `lme4`-style parser continues to provide
+intercepts, slopes, `||`, nested grouping, and correlated single-bar blocks.
+MR now includes `mr-estimate` for the core independent estimators, dependency-
+free native SVG scatter plots, and an explicit secondary-signal clumper for
+conditional LD selection.
+
+These additions are intentionally bounded: correlated meta-analysis currently
+fits an intercept-only GLS model; sparse correlated mixed blocks estimate one
+scale per supplied covariance shape; the finite-DF utility consumes derivatives
+from a caller's sparse factorization; and conditional MR selection requires an
+LD correlation matrix rather than claiming genotype-level conditional p-values.
+
+Completion evidence: focused JUnit coverage for effect-size construction,
+identity-covariance parity, robust/publication-bias diagnostics, sparse
+correlated fitting, profile crossings, native SVG output, and secondary-signal
+LD selection.
 
 ### Frequentist linear mediation analysis — completed
 

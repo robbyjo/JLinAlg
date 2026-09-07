@@ -119,10 +119,50 @@ excluding the intercept. Heterogeneity R-squared is the nonnegative reduction
 in tau-squared relative to the intercept-only model; it is not ordinary OLS
 variance explained.
 
+## Correlated effects and robust inference
+
+For repeated outcomes, multiple estimates from one study, or a multilevel
+effect structure, provide the study-level sampling covariance explicitly:
+
+```java
+MetaCorrelatedResult correlated = MetaCorrelatedAnalysis.fit(
+    studies, samplingCovariance, MetaAnalysisOptions.randomEffects(),
+    BackendPolicy.PREFERRED);
+```
+
+The GLS path adds a common random-effects variance to the supplied covariance
+and retains the generalized Q diagnostic. For clustered meta-regression, use
+the cluster labels and moderator matrix directly:
+
+```java
+MetaClusterRobustResult robust = MetaClusterRobust.fit(
+    studies, clusterLabels, moderators, List.of("dose"),
+    MetaAnalysisOptions.randomEffects(), BackendPolicy.PREFERRED);
+```
+
+This reports a study-cluster sandwich covariance. It is deliberately explicit:
+it does not treat correlated effects as independent or invent a cluster ID.
+
+## Effect sizes and publication-bias diagnostics
+
+Construct additive-scale inputs before pooling:
+
+```java
+MetaEffectSize logOr = MetaEffectSizes.logOddsRatio(20, 80, 10, 90);
+MetaStudy study = logOr.study("trial-1");
+MetaPublicationBiasResult bias = MetaPublicationBias.diagnose(studies);
+```
+
+The diagnostic result contains the Egger intercept test and a deterministic
+rank-correlation test. They are screening diagnostics, not proof of selective
+publication and not substitutes for a prespecified sensitivity analysis.
+
 ## Current scope
 
-This engine assumes independent study estimates. It does not silently supply
-cluster-robust variance, multilevel/correlated-effect meta-analysis,
-publication-bias diagnostics, or effect-size construction. Those require
-explicit data structures and estimators. See the
-[numerical contract](../numerical-contract.md) for exact formulas.
+The original univariate engine still assumes independent study estimates. The
+new correlated and robust APIs are intentionally bounded: correlated pooling
+is intercept-only, the random-effects extension uses a common variance added
+to the supplied covariance, and publication-bias tests are asymptotic
+diagnostics. Full multilevel moderator covariance structures remain future
+work. See the [numerical contract](../numerical-contract.md) for exact
+formulas.

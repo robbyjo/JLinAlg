@@ -86,9 +86,11 @@ These estimators must not be labeled REML: their likelihood and inference are
 distinct from the current working-Gaussian REML calculation.
 
 Accordingly, JLinAlg does not yet claim full `lme4` likelihood parity. The
-largest remaining parity items are sparse correlated-block likelihoods,
-Laplace/AGQ GLMM estimation, boundary-aware optimizer behavior, and
-profile-likelihood inference. `pedigreemm`'s core Gaussian animal model,
+sparse Gaussian correlated-block likelihood, finite-DF contraction, and
+generic profile interval solver are now available as additive matrix-first
+APIs. The largest remaining parity items are estimated unstructured
+correlation parameters, Laplace/AGQ GLMM estimation, boundary-aware optimizer
+behavior, and formula-native profile refits. `pedigreemm`'s core Gaussian animal model,
 pedigree PQL facade, sparse `A^-1`, multiple pedigree terms, BLUP, and dense
 PEV/reliability paths are present; scalable sparse PEV diagonals and
 formula-native pedigree/new-data mapping remain open.

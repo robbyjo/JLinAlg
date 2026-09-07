@@ -28,4 +28,19 @@ class LdClumpDispatchTest {
             .contains("--ld-threshold"));
         assertEquals("", errorOutput.toString(StandardCharsets.UTF_8));
     }
+
+    @Test
+    void topLevelCliDispatchesMrEstimatorHelp() {
+        ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorOutput = new ByteArrayOutputStream();
+
+        int status = JLinAlgCli.run(new String[] {"mr-estimate", "--help"},
+            new PrintStream(standardOutput, true, StandardCharsets.UTF_8),
+            new PrintStream(errorOutput, true, StandardCharsets.UTF_8));
+
+        assertEquals(0, status);
+        assertTrue(standardOutput.toString(StandardCharsets.UTF_8)
+            .contains("ivw-fixed"));
+        assertEquals("", errorOutput.toString(StandardCharsets.UTF_8));
+    }
 }

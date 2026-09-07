@@ -5,13 +5,11 @@ API. It covers instrument discovery or custom QTL input, ancestry-matched LD
 clumping, harmonization, estimation, diagnostics, plotting, bidirectional MR,
 and molecular-trait studies.
 
-> **Current interface boundary:** `ld-db`, `mr-instruments`, and `clump` are
-> executable CLI commands. Single-analysis MR estimation is currently a Java
-> API; the file-to-file `mr-xwas` command provides bounded high-throughput
-> screening, hit-only diagnostics, and optional all-pairs BH/FDR output. JLinAlg
-> exposes plot-ready result objects but does not currently render plots. The
-> plotting section below gives an explicit export schema and R examples so
-> these boundaries are reproducible rather than hidden.
+> **Current interface boundary:** `ld-db`, `mr-instruments`, `clump`, and
+> `mr-estimate` are executable CLI commands. The estimator CLI covers the
+> independent IVW, Egger, and weighted-median paths; generalized and
+> overlap-aware estimators remain Java APIs. Native plots are dependency-free
+> SVG.
 
 ## Workflow at a glance
 
@@ -197,6 +195,24 @@ One instrument can be analyzed with
 requires three.
 
 ## 7. Diagnostics and sensitivity analyses
+
+## Native estimator and plot
+
+For a harmonized CSV/TSV with columns `variant_id`, `beta_exposure`,
+`se_exposure`, `beta_outcome`, and `se_outcome`:
+
+```console
+java -jar jlinalg-<version>.jar mr-estimate \
+  --input harmonized.tsv --method all \
+  --output mr.estimates.tsv --plot mr.scatter.svg
+```
+
+The SVG contains the aligned instrument points and the selected estimator's
+line. Use `--method ivw-fixed`, `ivw-random`, `egger`, or `weighted-median` for
+a single row. For a study with an LD correlation matrix, the Java
+`SecondarySignalClumper` API selects independent primary and secondary signals
+in p-value order; this is LD-conditioned selection, not genotype-level
+conditional regression.
 
 No single diagnostic proves that all instruments are valid. Interpret the
 following together with biological annotation and study design.

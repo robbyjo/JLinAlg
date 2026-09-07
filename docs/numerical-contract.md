@@ -523,10 +523,13 @@ nonnegative proportional reduction in tau-squared from the intercept-only fit.
 Normal inference is the default. Student-t inference uses `k-p` denominator
 DF. Knapp-Hartung multiplies the coefficient covariance by `Q_E/(k-p)` and
 uses the same t DF; the modified form caps that multiplier below at one.
-Prediction intervals are returned only for random-effects pooling. Correlated
-effects, multilevel meta-analysis, robust/sandwich variance, publication-bias
-diagnostics, and effect-size transformation are outside this first engine and
-must not be inferred from these results.
+Prediction intervals are returned only for random-effects pooling. The
+matrix-first `MetaCorrelatedAnalysis`, `MetaClusterRobust`,
+`MetaPublicationBias`, and `MetaEffectSizes` APIs provide explicit bounded
+extensions for correlated effects, clustered inference, diagnostics, and
+effect-size construction. They do not silently alter the original independent
+study engine: correlated pooling is intercept-only, robust inference requires
+cluster labels, and the diagnostics are asymptotic screening tests.
 
 `PreparedMetaAnalysisBatch` applies the same intercept-only definitions to a
 rectangular row-major batch. Every analysis must contain the same number of at
