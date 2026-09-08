@@ -50,14 +50,39 @@ public class DistributionalAuditTest {
     }
     @Test void betaAndNbLogDensitiesStayAccurateAtExtremePrecisionAndCounts() throws Exception {
         double max=0;
-        for(String line:lines("distributional-audit-densities.tsv").subList(1,49)) {
+        List<String> densityRows=lines("distributional-audit-densities.tsv");
+        for(String line:densityRows.subList(1,densityRows.size())) {
             String[] f=line.split("\t");double y=Double.parseDouble(f[1]),mu=Double.parseDouble(f[2]),p=Double.parseDouble(f[3]);
             DistributionalFamily family=f[0].equals("beta")?new BetaMeanPrecisionFamily():new NegativeBinomialMeanDispersionFamily();
             double actual=family.logLikelihood(y,new double[]{mu,p}),expected=Double.parseDouble(f[4]);
+            // R 4.6.1's small-count branch substitutes -mu for
+            // -size*log1p(mu/size). JDistlib 0.10.2 fixes that approximation.
+            // Keep the historical R fixture, but use the exact finite-product
+            // value here; the independent grid below checks this more tightly.
+            if(f[0].equals("nb") && y==2 && mu==1e5 && p==1e14)
+                expected=-99977.66724625262;
             max=Math.max(max,Math.abs(actual-expected));
             assertEquals(expected,actual,2e-10*Math.max(1,Math.abs(expected)),line);
         }
         System.out.println("distributional extreme-density maximum absolute error="+max);
+    }
+    @Test void negativeBinomialSmallCountsMatchIndependentFiniteProduct() throws Exception {
+        List<String> rows=lines("jdistlib-upgrade-nb.tsv");
+        double maximumScaledError=0;
+        for(String row:rows.subList(1,rows.size())) {
+            String[] f=row.split("\t");
+            double y=Double.parseDouble(f[0]),mu=Double.parseDouble(f[1]),size=Double.parseDouble(f[2]);
+            double expected=Double.parseDouble(f[4]);
+            double actual=new NegativeBinomialMeanDispersionFamily().logLikelihood(y,new double[]{mu,size});
+            double scale=Math.max(1,Math.abs(expected));
+            maximumScaledError=Math.max(maximumScaledError,Math.abs(actual-expected)/scale);
+            // Tight gate for the branch improved in 0.10.2. Outside it, both
+            // dependency versions retain up to 1.51e-9 scaled error on this
+            // grid; record that pre-existing limitation, not false FP64 parity.
+            double tolerance=y < 1e-10*size ? 5e-14 : 2e-9;
+            assertEquals(expected,actual,tolerance*scale,row);
+        }
+        System.out.println("NB finite-product grid maximum scaled error="+maximumScaledError);
     }
     @Test void hurdleInformationHandlesSmallAndLargeMeansWithoutClippingOrOverflow() {
         var family=new HurdlePoissonFamily();

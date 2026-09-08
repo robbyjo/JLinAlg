@@ -4,6 +4,10 @@
 <div class="note"><strong>What “checked” means</strong>Correctness is gated by unit, contract, cross-backend, and independent R/Python fixtures. Performance is exercised by deterministic or real-data benchmarks. A benchmark check does not imply that every API is faster than every alternative.</div>
 <p>The earlier v0.2.0 release baseline discovered 253 tests: 250 passed and three optional native tests skipped. The September 8 statistical audit adds independent R fixtures and adversarial regression tests; see the current report below. Native CHOLMOD is not certified by the portable audit run.</p>
 
+<h2 id="dependency-upgrade">JDistlib 0.10.2 source upgrade</h2>
+<p>The September 8 dependency check passed 607 tests with three optional native skips, all nine audit benchmarks, and artifact assembly. No substantial accuracy regression was found. An extreme negative-binomial difference was an improvement over R's approximation, verified using an independent 45-case finite-product grid. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/jdistlib-0.10.2-validation.md">Read the before/after accuracy and timing report →</a></p>
+<p>Current source builds use checksum-pinned JDistlib 0.10.2. Published v0.3.0 binaries retain 0.10.1; the historical release measurements below are unchanged.</p>
+
 <h2 id="release-audit">v0.3.0 remaining-code audit</h2>
 <p>The final local integrated build discovered 609 tests: 606 passed, none failed, and three optional native CHOLMOD tests skipped. Library, executable, source and Javadoc artifacts build successfully. The site contains 22 guides, with internal-link validation and rendered-browser checks.</p>
 <p>The release audit repairs numerical scale and tail errors, GLM likelihood and working precision, full marginal Laplace optimization, distributional densities, nonlinear stopping, coloc support, and file-pipeline accounting. Separate reviewers reran adversarial counterexamples after the repairs. <a href="https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/release-0.3.0-audit.md">Read the release audit, regression gates, raw measurements, and reproduction commands →</a></p>

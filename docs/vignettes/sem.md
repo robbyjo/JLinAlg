@@ -295,15 +295,10 @@ Regenerate the R fixtures from the repository root:
   src/test/resources/r-reference/generate-sem-joint-reference.R
 ```
 
-With the existing main classes and JDistlib dependency already built, compile
-and run the isolated benchmark without changing Gradle:
+Build and run with the dependency version pinned by Gradle:
 
 ```powershell
-$semSources = @(Get-ChildItem src/main/java/org/jlinalg/sem/*.java, `
-  src/benchmark/java/org/jlinalg/benchmark/SemJointBenchmark.java | ForEach-Object FullName)
-$semDependencies = 'build/classes/java/main;build/dependencies/jdistlib-all-0.10.1.jar'
-javac --release 17 -Xlint:all -Werror -cp $semDependencies -d build/sem-benchmark-refresh $semSources
-java -cp ('build/sem-benchmark-refresh;' + $semDependencies) org.jlinalg.benchmark.SemJointBenchmark
+.\gradlew.bat benchmarkSemJoint
 ```
 
 The joint engine currently uses portable Java CPU matrix kernels. CPU,

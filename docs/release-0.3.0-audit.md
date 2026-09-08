@@ -1,5 +1,8 @@
 # JLinAlg 0.3.0: remaining-code audit and release validation
 
+This is the historical v0.3.0 release audit (JDistlib 0.10.1). For current
+source builds, see the [JDistlib 0.10.2 upgrade validation](jdistlib-0.10.2-validation.md).
+
 This audit follows the [advanced-method audit](advanced-validation.md).
 It targets remaining numerical models, shared inference, data pipelines,
 and release packaging. A code audit and passing fixtures do not prove that

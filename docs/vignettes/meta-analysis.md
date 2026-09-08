@@ -313,17 +313,16 @@ small dense workflow timings are not large-study scaling or isolated kernel
 speed claims. The recorded values and checksums are in
 `src/benchmark/resources/meta/parity-timings-2026-09-08.csv`.
 
-Reproduce from the repository root, after compiling the benchmark source:
+Reproduce from the repository root using the Gradle-pinned dependency:
 
 ```powershell
 & 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/meta/generate-metafor.R
 & 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/benchmark/r/meta_parity_benchmark.R 100
-java -Xms256m -Xmx1g -cp 'build/classes/java/benchmark;build/classes/java/main;build/dependencies/jdistlib-all-0.10.1.jar' org.jlinalg.benchmark.MetaParityBenchmark 100
+.\gradlew.bat benchmarkMetaParity
 ```
 
 The host may require an elevated R invocation to read dependencies in its user
-library. For a shared workspace, compile the meta package and this benchmark
-into `build/meta-classes`, then put that directory first on the classpath.
+library.
 
 ## Current scope
 

@@ -92,14 +92,10 @@ dependencies on this host; no installation is needed):
 & 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/r-reference/generate-distributional-audit-reference.R
 & 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/r-reference/generate-distributional-poisson-extremes.R
 & 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/benchmark/r/distributional_audit_benchmark.R
-$auditSources = @(Get-ChildItem src/main/java/org/jlinalg/distributional/*.java,src/main/java/org/jlinalg/gam/*.java | ForEach-Object FullName)
-javac -cp 'build/classes/java/main;build/dependencies/jdistlib-all-0.10.1.jar' -d build/distributional-audit-classes $auditSources
-javac -cp 'build/distributional-audit-classes;build/classes/java/main;build/dependencies/jdistlib-all-0.10.1.jar' -d build/distributional-audit-classes src/benchmark/java/org/jlinalg/benchmark/DistributionalAuditBenchmark.java
-java -Xmx128m -cp 'build/distributional-audit-classes;build/classes/java/main;build/dependencies/jdistlib-all-0.10.1.jar' org.jlinalg.benchmark.DistributionalAuditBenchmark
+.\gradlew.bat benchmarkDistributionalAudit
 ```
 
-The existing main-class snapshot must contain the coordinated GLMM engine.
-Once all agents' sources are stable, the parent runs:
+The Gradle task builds current sources with the pinned dependency. Full checks:
 
 ```powershell
 .\gradlew.bat test --tests 'org.jlinalg.distributional.*' --tests 'org.jlinalg.gam.*'
