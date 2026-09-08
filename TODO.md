@@ -25,25 +25,21 @@ deterministic contracts and corresponding tests and vignettes.
 
 ## Candidates requiring prioritization
 
-These are real documented boundaries, but the vignettes do not establish that
-they are committed work:
+These are real documented boundaries that remain outside the bounded extension
+contracts below:
 
-- **SEM:** latent measurement variables, mean/intercept structures, ordinal
-  thresholds, robust/clustered corrections, modification indices,
-  indirect-effect delta-method inference, and FIML missing-data patterns.
-- **Meta-analysis:** extend the new cluster-robust and correlated-effect APIs
-  to full multilevel moderator covariance structures and additional bias
-  corrections.
-- **Mixed models:** extend the new sparse correlated-block path to estimated
-  unstructured covariance parameters and formula-native profile refits.
-- **Time series:** diffuse exact likelihood for integrated models and a sparse
-  missing-series path.
-- **MR workflow:** extend the new estimator CLI and native SVG plot path to
-  generalized/overlap-aware estimators and conditional p-value calculation.
-- **GLMM:** exact or adaptive-quadrature alternatives where PQL or first-order
-  Laplace is inadequate.
-- **Penalized regression:** selection-aware inference after LASSO/elastic-net
-  selection.
+- full latent-variable RAM optimization with ordinal DWLS/polychoric
+  likelihoods and multi-group SEM;
+- publication-bias models beyond the deterministic PET/PEESE and labelled
+  median-reflection diagnostic;
+- high-dimensional unstructured sparse covariance optimization beyond the
+  one-block coordinate-refit path;
+- state-space diffuse likelihoods with arbitrary seasonal missingness beyond
+  the exposed differenced and stationary observed-pattern paths;
+- generalized MR estimators requiring additional summary-data fields beyond
+  LD-correlated IVW/Egger and overlap-aware IVW;
+- multi-dimensional adaptive quadrature for GLMMs; and
+- selective-inference polyhedral truncation after the deterministic split.
 
 Sources: [SEM](docs/vignettes/sem.md),
 [meta-analysis](docs/vignettes/meta-analysis.md),
@@ -63,6 +59,29 @@ sensitivity analyses not proving the exclusion restriction, and the xWAS
 benchmark not measuring an end-to-end TwoSampleMR workflow.
 
 ## Completed work
+
+### Advanced analysis extensions — completed
+
+Completed 2026-09-07. The seven previously documented candidate areas now have
+bounded, tested implementations. SEM adds principal-factor latent measurement,
+mean/intercept summaries, marginal ordinal thresholds, Gaussian FIML missing
+patterns, score-based sandwich/cluster corrections, modification-index
+diagnostics, and indirect-effect delta-method inference. Meta-analysis adds
+full-covariance GLS moderator regression plus PET, PEESE, and labelled
+median-reflection trim-and-fill diagnostics. Mixed models add sparse
+unstructured covariance-shape coordinate refits and a formula-native entry
+point. Time series add explicit diffuse-state ARIMA bookkeeping and exact
+stationary observed-pattern handling for missing values. MR adds generalized
+and overlap-aware CLI methods with LD-based conditional inference. GLMM adds a
+fixed 10-node Gaussian-quadrature random-intercept path. Penalized regression
+adds deterministic held-out data-splitting inference after LASSO/elastic-net
+selection.
+
+The remaining boundaries are intentionally listed above: these implementations
+are not claims of full lavaan, metafor, lme4, forecast, TwoSampleMR, AGQ, or
+polyhedral-selective-inference parity.
+
+Source: [advanced extensions vignette](docs/vignettes/advanced-extensions.md).
 
 ### Regression families — completed
 

@@ -14,6 +14,7 @@ import org.jlinalg.mixed.SparseLinearMixedModelResult;
 import org.jlinalg.mixed.CorrelatedLinearMixedModel;
 import org.jlinalg.mixed.CorrelatedLinearMixedModelResult;
 import org.jlinalg.mixed.CorrelatedRandomEffectBlock;
+import org.jlinalg.mixed.SparseUnstructuredCorrelatedModel;
 import org.jlinalg.reml.RemlOptions;
 
 /** A mixed formula compiled once into dense fixed and sparse random designs. */
@@ -77,6 +78,31 @@ public final class CompiledMixedFormula {
         return CorrelatedLinearMixedModel.fit(fixed.responseView(),
             fixed.designView(), fixed.rows(), fixed.columns(), blocks,
             options, backendPolicy);
+    }
+
+    /** Fits one parsed correlated block through the sparse unstructured path. */
+    public SparseUnstructuredCorrelatedModel.Result fitSparseUnstructured(
+            RemlOptions options, BackendPolicy backendPolicy) {
+        if (fixed.weightsView() != null || fixed.offsetView() != null)
+            throw new IllegalArgumentException(
+                "unstructured sparse formulas do not yet accept weights or offsets");
+        if (correlatedRandomEffects.size() != 1 || !randomEffects.isEmpty())
+            throw new IllegalArgumentException(
+                "sparse unstructured formula fitting requires one correlated block");
+        CorrelatedRandomEffectBlock block = correlatedRandomEffects.get(0);
+        List<String> groups = new java.util.ArrayList<>(block.observations());
+        for (int index : block.groupIndices()) groups.add(block.groupNames().get(index));
+        return SparseUnstructuredCorrelatedModel.fit(fixed.responseView(), fixed.designView(),
+            fixed.rows(), fixed.columns(), groups, block.effectNames(),
+            rows(block.effectDesign(), block.observations(), block.effectCount()),
+            options, backendPolicy);
+    }
+
+    private static double[][] rows(double[] values, int observations, int columns) {
+        double[][] result = new double[observations][columns];
+        for (int row = 0; row < observations; row++)
+            System.arraycopy(values, row * columns, result[row], 0, columns);
+        return result;
     }
 
     private static CorrelatedRandomEffectBlock asScalarBlock(

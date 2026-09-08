@@ -229,7 +229,8 @@ tasks.register('checkWebsite') {
             'vignettes/susie.html',
             'vignettes/sem.html',
             'vignettes/formulas-backends.html',
-            'vignettes/regression-families.html'
+            'vignettes/regression-families.html',
+            'vignettes/advanced-extensions.html'
         ]
         requiredPages.each { String relative ->
             if (!new File(siteRoot, relative).isFile()) {

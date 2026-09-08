@@ -315,8 +315,9 @@ estimates for SNP `j`, not an overlap fraction. Check `overlap.converged()`.
 
 ## 10. Plotting
 
-JLinAlg does not yet include a plotting dependency or SVG/PNG MR renderer. The
-result objects expose everything needed for the conventional plots:
+JLinAlg includes a dependency-free native SVG scatter renderer through the
+`mr-estimate --plot FILE` path. The result objects also expose everything
+needed for conventional plots:
 
 | Plot | Source data |
 | --- | --- |

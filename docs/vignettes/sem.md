@@ -147,13 +147,15 @@ TOPMed example.
 
 ## Scope and limitations
 
-The current engine supports continuous observed variables, directed paths,
-free or fixed variances and covariances, equality labels, complete-case
-covariance ML, Wald inference, and conventional global fit indices.
+The core engine supports continuous observed variables, directed paths, free or
+fixed variances and covariances, equality labels, complete-case covariance ML,
+Wald inference, and conventional global fit indices. The extension APIs now
+also provide principal-factor latent measurement, mean/intercept summaries,
+marginal normal ordinal thresholds, Gaussian FIML moment estimation,
+score-based robust/clustered covariance, modification-index diagnostics, and
+indirect-effect delta-method inference.
 
-It does not implement latent measurement variables, intercept/mean structures,
-ordinal thresholds, robust or clustered corrections, modification indices,
-indirect-effect delta-method inference, or FIML missing-data patterns. Binary
-variables are treated as Gaussian continuous observations. Use a package with
-the required likelihood rather than interpreting these unsupported cases as
-silently approximated.
+These extensions are deliberately bounded. They do not claim full latent RAM
+optimization, polychoric/DWLS ordinal likelihoods, or multi-group SEM. See
+the [advanced extensions vignette](advanced-extensions.md) for the exact
+contracts and examples.

@@ -138,6 +138,13 @@ kernel, supersmoother, and partially linear APIs. The JVM benchmark is
 available as `./gradlew benchmarkRegressionFamilies`; direct R timing for
 these new paths is not claimed when `Rscript` is unavailable on the host.
 
+The [advanced extensions vignette](docs/vignettes/advanced-extensions.md)
+covers FIML and latent-measurement SEM utilities, full-covariance
+meta-regression and bias diagnostics, sparse unstructured mixed effects,
+diffuse/missing time-series paths, generalized and overlap-aware MR CLI
+options, quadrature GLMMs, and deterministic selection-aware penalized
+inference.
+
 Basic base-R-style hypothesis tests are available through the uniform
 `org.jlinalg.stats.StatisticalTests` facade. It delegates tests already in
 JDistlib and supplies the missing correlation, contingency-table,

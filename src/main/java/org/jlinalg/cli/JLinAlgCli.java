@@ -148,8 +148,10 @@ public final class JLinAlgCli {
               java -jar jlinalg-<version>.jar mr-xwas --exposure FILE
                 --outcome FILE --output FILE --p-threshold X
               java -jar jlinalg-<version>.jar mr-estimate --input FILE
-                [--method ivw-fixed|ivw-random|egger|weighted-median|all]
-                [--output FILE] [--plot FILE]
+                [--method ivw-fixed|ivw-random|egger|weighted-median|
+                 ivw-generalized-fixed|ivw-generalized-random|egger-generalized|
+                 overlap-aware|conditional|all] [--ld MATRIX]
+                [--sampling-covariance FILE] [--output FILE] [--plot FILE]
               java -jar jlinalg-<version>.jar beta-regression --input FILE
                 --response COLUMN [--mean COLUMNS] [--precision COLUMNS]
               java -jar jlinalg-<version>.jar penalized-regression --input FILE

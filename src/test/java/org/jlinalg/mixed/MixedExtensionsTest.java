@@ -2,14 +2,16 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 package org.jlinalg.mixed;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.reml.RemlOptions;
 import org.junit.jupiter.api.Test;
 
-class MixedExtensionsTest {
+final class MixedExtensionsTest {
     @Test
     void sparseCorrelatedBlockProducesFiniteFit() {
         SparseCorrelatedRandomEffectBlock block = SparseCorrelatedRandomEffectBlock.of(
@@ -32,5 +34,13 @@ class MixedExtensionsTest {
         assertTrue(interval.lowerFound());
         assertTrue(interval.upperFound());
         assertTrue(interval.lower() < 0.0 && interval.upper() > 0.0);
+    }
+
+    @Test
+    void sparseUnstructuredModelEstimatesCovarianceShape() {
+        int rows = 24; double[] y = new double[rows], fixed = new double[rows * 1]; List<String> groups = new ArrayList<>(); double[][] random = new double[rows][2];
+        for (int row = 0; row < rows; row++) { int group = row / 4; double covariate = row % 4; groups.add("g" + group); fixed[row] = 1.0; random[row][0] = 1.0; random[row][1] = covariate; y[row] = 2.0 + 0.2 * covariate + 0.1 * group; }
+        SparseUnstructuredCorrelatedModel.Result result = SparseUnstructuredCorrelatedModel.fit(y, fixed, rows, 1, groups, List.of("(Intercept)", "x"), random, RemlOptions.builder().maximumIterations(8).build(), BackendPolicy.PREFERRED);
+        assertEquals(2, result.covarianceShape().length); assertTrue(Double.isFinite(result.fit().logLikelihood()));
     }
 }
