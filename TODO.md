@@ -1,152 +1,83 @@
 # Development inventory
 
-Last reviewed: 2026-09-07.
+Last reviewed: 2026-09-08.
 
-This inventory keeps unfinished decisions at the top. Completed work is archived
-at the bottom so it remains searchable without obscuring the active backlog.
+The September 8 audit found that several earlier completion claims described
+approximations or scaffolding rather than the requested methods. Those claims
+are superseded by this inventory and the
+[validation report](docs/advanced-validation.md).
 
-Priority meanings:
+## Audited implementation status
 
-- **Major**: removes a material scale limit or adds a cross-cutting analysis
-  path.
-- **Medium**: adds an important inference, workflow, or documentation feature
-  without changing the core architecture.
-- **Candidate**: a documented boundary that still needs a product decision.
+The requested analysis paths and audited repairs are implemented and independently
+rechecked. The final integrated gate passes 459 tests with three optional native
+CHOLMOD skips. The remaining extensions below are explicit limits, not claims
+that the requested methods have full R-package parity.
 
-## Active committed work
+## Remaining extensions and limits
 
-No major or medium items are currently in progress.
+These boundaries are explicit; this release does not claim complete parity
+with every feature of lavaan, metafor, lme4, or the other R packages.
 
-## Requested future analyses
+- SEM: DWLS/WLSMV, mixed/missing ordinal responses, multigroup invariance,
+  ordinal modification indices, and FIML robust scaled fit statistics.
+- Meta-analysis: sparse large-study covariance estimation, variance-component
+  profiles, and additional structured covariance families.
+- Mixed models: joint multi-DF KR tests, nonregular boundary-profile coverage,
+  general correlation profiles in blocks larger than two, original-coordinate
+  full PEV blocks, and joint unstructured-plus-pedigree covariance optimization.
+  Formula-level pedigree mapping and automatic complete-case alignment remain open.
+- Time series: diffuse coefficient covariance, general regression terms, and
+  historical state smoothing.
+- MR: additional generalized estimators requiring richer summary statistics;
+  conditional GWAS calculations currently use the documented Gaussian score model.
+- GLMM: multidimensional/crossed/pedigree adaptive quadrature beyond the new
+  scalar Gaussian random-intercept path.
+- Selective inference: unknown-noise or response-selected penalties, dependent
+  sample splits, and non-Gaussian selection require different inferential methods.
+- Quantile/nonparametric regression: quantile inferential covariance,
+  mixed-type/multidimensional kernels, and automatic inference-valid bandwidth
+  selection remain distinct extensions; exact nonsmoothed quantile fitting is implemented.
 
-No requested analysis items remain in this inventory. The six regression
-families requested in the prior review are implemented below with explicit,
-deterministic contracts and corresponding tests and vignettes.
+## Completed audit repairs — 2026-09-08
 
-## Candidates requiring prioritization
+- Joint latent RAM, structural means/intercepts, ordinal probit pairwise ML,
+  direct constrained FIML, robust/cluster covariance, efficient continuous-model
+  modification indices, and indirect-effect delta inference.
+- Joint ML/REML multilevel random-moderator covariance, correlated CR0/CR1/CR2
+  inference, PET/PEESE, real L0/R0/Q0 trim-and-fill, and stable effect sizes.
+- Sparse multi-block unstructured covariance fits, model-derived finite DF,
+  weights/offsets, and formula-native nuisance-optimized ML profiles.
+- Exact diffuse integrated/seasonal likelihood and state-sized missing-series
+  filtering and forecasting.
+- Generalized/overlap-aware estimator CLI, native SVG fits, explicit conditional
+  instrument p-values, and conditional forward/backward secondary-signal selection.
+- Mode-adaptive, node-refined binomial/Poisson random-intercept quadrature,
+  offsets/trials, zero-variance comparison, and covariance inference.
+- Correct weighted held-out LASSO/elastic-net inference and exact Gaussian
+  fixed-penalty active-set/sign polyhedral inference.
+- Shared-QR multivariate OLS, score-checked multinomial optimization, corrected
+  smoothed quantile gradient and certified nonsmoothed quantile LP, stable
+  Gaussian kernel prediction, R-compatible supersmoother, and smoother-aware
+  Robinson partially linear slope inference.
+- Independent R fixture generators, regression tests, accuracy-gated benchmark
+  runners, paired measured timings, source vignettes, and website documentation.
 
-These are real documented boundaries that remain outside the bounded extension
-contracts below:
+Sources: [advanced extensions](docs/vignettes/advanced-extensions.md),
+[regression families](docs/vignettes/regression-families.md),
+[mixed-model roadmap](docs/lme4-pedigreemm-roadmap.md), and
+[accuracy and performance](docs/advanced-validation.md).
 
-- full latent-variable RAM optimization with ordinal DWLS/polychoric
-  likelihoods and multi-group SEM;
-- publication-bias models beyond the deterministic PET/PEESE and labelled
-  median-reflection diagnostic;
-- high-dimensional unstructured sparse covariance optimization beyond the
-  one-block coordinate-refit path;
-- state-space diffuse likelihoods with arbitrary seasonal missingness beyond
-  the exposed differenced and stationary observed-pattern paths;
-- generalized MR estimators requiring additional summary-data fields beyond
-  LD-correlated IVW/Egger and overlap-aware IVW;
-- multi-dimensional adaptive quadrature for GLMMs; and
-- selective-inference polyhedral truncation after the deterministic split.
+## Earlier completed work
 
-Sources: [SEM](docs/vignettes/sem.md),
-[meta-analysis](docs/vignettes/meta-analysis.md),
-[mixed-model roadmap](docs/lme4-pedigreemm-roadmap.md),
-[time series](docs/vignettes/time-series.md),
-[end-to-end MR](docs/vignettes/mr-end-to-end.md),
-[GLMM/pedigree](docs/vignettes/pedigree-and-glmm.md), and
-[linear/penalized models](docs/vignettes/linear-models-and-glms.md).
+### Nonlinear fixed and mixed effects
 
-## Boundaries that are not automatically TODO items
-
-Some vignette warnings state a statistical contract rather than a missing
-feature. Do not turn these into implementation work without a separate design
-decision. Examples include PQL not being an exact marginal GLMM likelihood,
-ordinary post-selection OLS p-values not being selection-adjusted, MR
-sensitivity analyses not proving the exclusion restriction, and the xWAS
-benchmark not measuring an end-to-end TwoSampleMR workflow.
-
-## Completed work
-
-### Advanced analysis extensions — completed
-
-Completed 2026-09-07. The seven previously documented candidate areas now have
-bounded, tested implementations. SEM adds principal-factor latent measurement,
-mean/intercept summaries, marginal ordinal thresholds, Gaussian FIML missing
-patterns, score-based sandwich/cluster corrections, modification-index
-diagnostics, and indirect-effect delta-method inference. Meta-analysis adds
-full-covariance GLS moderator regression plus PET, PEESE, and labelled
-median-reflection trim-and-fill diagnostics. Mixed models add sparse
-unstructured covariance-shape coordinate refits and a formula-native entry
-point. Time series add explicit diffuse-state ARIMA bookkeeping and exact
-stationary observed-pattern handling for missing values. MR adds generalized
-and overlap-aware CLI methods with LD-based conditional inference. GLMM adds a
-fixed 10-node Gaussian-quadrature random-intercept path. Penalized regression
-adds deterministic held-out data-splitting inference after LASSO/elastic-net
-selection.
-
-The remaining boundaries are intentionally listed above: these implementations
-are not claims of full lavaan, metafor, lme4, forecast, TwoSampleMR, AGQ, or
-polyhedral-selective-inference parity.
-
-Source: [advanced extensions vignette](docs/vignettes/advanced-extensions.md).
-
-### Regression families — completed
-
-Completed 2026-09-07. The regression package now provides shared-design
-Gaussian multivariate OLS, baseline-category multinomial logistic regression,
-smoothed pinball-loss quantile regression, Gaussian-kernel nonparametric
-regression, deterministic span-selecting supersmoothing, and a partially
-linear semiparametric model. These paths are in-memory Java APIs and do not
-use bootstrap or Monte Carlo sampling. `RegressionFamiliesBenchmark` reports
-repeatable JVM throughput for all six families.
-
-The R relationship is intentionally documented rather than overstated:
-multivariate OLS is the direct Gaussian reference case, while multinomial,
-supersmoother, quantile, nonparametric, and semiparametric implementations
-are compatible contracts rather than byte-for-byte reimplementations of
-`nnet`, `stats::supsmu`, `quantreg`, `np`/`npreg`, or a single semiparametric
-R package. Direct R timing was not run on this host because `Rscript` is not
-installed; the benchmark output is therefore a Java baseline, not a claimed
-R speedup.
-
-Source: [regression families vignette](docs/vignettes/regression-families.md).
-
-### Nonlinear fixed and mixed effects — completed
-
-Completed 2026-09-07. `NonlinearFixedModel` fits Gaussian nonlinear means with
-analytic gradients using damped Gauss–Newton iterations. `NonlinearMixedModel`
-linearizes the same mean function while reusing prepared sparse REML equations
-for ordinary random effects, and `fitPedigree` adds sparse numerator-relationship
-precision terms with optional ordinary effects. Results expose nonlinear
-parameters, fitted values, residuals, objective, convergence metadata, and the
-final sparse linearized mixed-model result.
-
-The implemented contract is deliberately explicit: this is an additive
-Gaussian nonlinear mixed-effects path, not a non-Gaussian Laplace/AGQ solver or
-an exact `nlme` likelihood implementation. Analytic gradients are required,
-and callers should validate parameterizations against independent reference
-fixtures.
-
-Source: [nonlinear fixed and mixed-effects vignette](docs/vignettes/nonlinear-models.md).
-
-### Meta-analysis, sparse correlated mixed models, and MR workflow extensions — completed
-
-Completed 2026-09-07. Meta-analysis now has first-order effect-size
-construction for mean differences, Hedges g, log odds/risk ratios, and Fisher-z
-correlations; generalized inverse-covariance pooling for correlated study
-effects; cluster-robust meta-regression sandwich inference; and deterministic
-Egger/rank publication-bias diagnostics. Mixed models now expose sparse
-grouped correlated blocks with caller-supplied within-group covariance shapes,
-a sparse Satterthwaite contraction utility, and a generic profile-likelihood
-interval solver. The existing `lme4`-style parser continues to provide
-intercepts, slopes, `||`, nested grouping, and correlated single-bar blocks.
-MR now includes `mr-estimate` for the core independent estimators, dependency-
-free native SVG scatter plots, and an explicit secondary-signal clumper for
-conditional LD selection.
-
-These additions are intentionally bounded: correlated meta-analysis currently
-fits an intercept-only GLS model; sparse correlated mixed blocks estimate one
-scale per supplied covariance shape; the finite-DF utility consumes derivatives
-from a caller's sparse factorization; and conditional MR selection requires an
-LD correlation matrix rather than claiming genotype-level conditional p-values.
-
-Completion evidence: focused JUnit coverage for effect-size construction,
-identity-covariance parity, robust/publication-bias diagnostics, sparse
-correlated fitting, profile crossings, native SVG output, and secondary-signal
-LD selection.
+`NonlinearFixedModel` uses analytic gradients and damped Gauss–Newton.
+`NonlinearMixedModel` linearizes additive Gaussian nonlinear means while
+reusing sparse REML equations; `fitPedigree` adds numerator-relationship
+precision terms. This is not an exact general `nlme` likelihood or a
+non-Gaussian nonlinear quadrature model.
+See [the vignette](docs/vignettes/nonlinear-models.md).
 
 ### Frequentist linear mediation analysis — completed
 

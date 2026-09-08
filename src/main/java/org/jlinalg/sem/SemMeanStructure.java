@@ -2,10 +2,16 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 package org.jlinalg.sem;
 
-/** Intercept/mean estimates for a SEM data matrix. */
+/** Joint structural intercept fitting and an intercept-only descriptive summary. */
 public final class SemMeanStructure {
     private SemMeanStructure() { }
 
+    /** Joint ML of structural intercepts, paths, loadings and disturbance covariance. */
+    public static SemFitResult fit(double[][] data, SemModel model) {
+        return Sem.fit(data, model.hasMeanStructure() ? model : model.toBuilder().meanStructure().build());
+    }
+
+    /** Intercept-only saturated mean summary; these are structural intercepts only with no paths. */
     public static Result fit(double[][] data) {
         if (data == null || data.length < 2 || data[0] == null) throw new IllegalArgumentException("mean-structure data are invalid");
         int observations = data.length, variables = data[0].length; double[] means = new double[variables];

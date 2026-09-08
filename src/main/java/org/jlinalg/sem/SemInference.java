@@ -8,6 +8,126 @@ import jdistlib.Normal;
 public final class SemInference {
     private SemInference() { }
 
+    /** Product delta inference using every covariance term from the fitted model. */
+    public static IndirectEffect indirect(SemFitResult fit, double confidenceLevel, String... paths) {
+        return indirect(fit, fit.parameterCovariance(), confidenceLevel, paths);
+    }
+    /** Supply a robust covariance here to obtain robust product delta inference. */
+    public static IndirectEffect indirect(SemFitResult fit, double[] covariance,
+            double confidenceLevel, String... paths) {
+        if(paths==null || paths.length<2 || !(confidenceLevel>0 && confidenceLevel<1))
+            throw new IllegalArgumentException("at least two paths and a valid confidence level required");
+        int k=fit.parameters().size();if(covariance.length!=k*k)throw new IllegalArgumentException("invalid parameter covariance");
+        int[] indices=new int[paths.length];double[] values=new double[paths.length];double product=1;
+        for(int i=0;i<paths.length;i++) {
+            indices[i]=fit.parameters().indexOf(fit.parameter(paths[i]));values[i]=fit.parameter(paths[i]).estimate();product*=values[i];
+        }
+        double[] gradient=new double[k];
+        for(int i=0;i<paths.length;i++){double v=1;for(int j=0;j<paths.length;j++)if(i!=j)v*=values[j];gradient[indices[i]]+=v;}
+        double variance=SemOptimizer.dot(gradient,RamFit.mv(covariance,gradient));
+        double se=Math.sqrt(variance),z=product/se,critical=Normal.quantile(.5+confidenceLevel/2,0,1,true,false);
+        return new IndirectEffect(product,se,z,product-critical*se,product+critical*se,2*Normal.cumulative(-Math.abs(z),0,1,true,false));
+    }
+
+    /** Model-derived case-score sandwich; expected bread for complete ML, observed bread for FIML. */
+    public static RobustResult robust(SemFitResult fit) { return robust(fit,null); }
+    /** CR0 cluster sandwich. Cluster IDs follow the informative rows retained by the fit. */
+    public static RobustResult robust(SemFitResult fit,int[] clusters) {
+        RamFit.State s=fit.state();
+        if(s.data()==null)throw new IllegalArgumentException("case data are required for robust inference");
+        int n=s.observations(),k=s.point().length;
+        if(k==0)throw new IllegalArgumentException("robust inference requires free parameters");
+        int[] ids=clusters==null?java.util.stream.IntStream.range(0,n).toArray():clusters.clone();
+        if(ids.length!=n)throw new IllegalArgumentException("cluster IDs must match retained rows");
+        int groups=(int)java.util.Arrays.stream(ids).distinct().count();
+        if(groups<2)throw new IllegalArgumentException("at least two independent clusters required");
+        RamFit.Distribution d=RamFit.distribution(s.model(),s.point());
+        double[] information=s.missing()?RamFit.hessian(x->RamFit.evaluate(s.model(),x,s.patterns(),n),s.point(),n)
+            :RamFit.expectedInformation(d,s.patterns());
+        double[] bread=RamFit.informationInverse(information,k);
+        double[] raw=sandwich(RamFit.scores(d,s.data()),ids,bread);
+        double scaling=s.missing()?Double.NaN:scaling(s,d,ids,bread,fit.degreesOfFreedom());
+        double chi=fit.chiSquare()/scaling;
+        return new RobustResult(RamFit.naturalCovariance(raw,s.model(),s.point()),scaling,chi,
+            fit.degreesOfFreedom(),fit.degreesOfFreedom()>0?jdistlib.ChiSquare.cumulative(chi,fit.degreesOfFreedom(),false,false):Double.NaN,groups);
+    }
+
+    private static double scaling(RamFit.State s,RamFit.Distribution d,int[] ids,double[] bread,int df) {
+        if(df<=0)return Double.NaN;
+        int p=d.mean().length,k=s.point().length,q=p*(p+1)/2+(s.model().hasMeanStructure()?p:0);
+        double[][] dm=new double[q][p],dc=new double[q][p*p];double[][] jacobian=new double[q][k];int h=0;
+        if(s.model().hasMeanStructure())for(int i=0;i<p;i++,h++) {
+            dm[h][i]=1;for(int a=0;a<k;a++)jacobian[h][a]=d.dMean()[a][i];
+        }
+        for(int i=0;i<p;i++)for(int j=0;j<=i;j++,h++) {
+            dc[h][i*p+j]=dc[h][j*p+i]=1;
+            for(int a=0;a<k;a++)jacobian[h][a]=d.dCovariance()[a][i*p+j];
+        }
+        RamFit.Distribution saturated=new RamFit.Distribution(d.mean(),d.covariance(),dm,dc);
+        double[] u=RamFit.informationInverse(RamFit.expectedInformation(saturated,s.patterns()),q);
+        for(int i=0;i<q;i++)for(int j=0;j<q;j++)for(int a=0;a<k;a++)for(int b=0;b<k;b++)
+            u[i*q+j]-=jacobian[i][a]*bread[a*k+b]*jacobian[j][b];
+        double[][] scores=RamFit.scores(saturated,s.data());double[] mean=new double[q];
+        for(double[] row:scores)for(int i=0;i<q;i++)mean[i]+=row[i]/scores.length;
+        for(double[] row:scores)for(int i=0;i<q;i++)row[i]-=mean[i];
+        java.util.Map<Integer,double[]> sums=new java.util.LinkedHashMap<>();
+        for(int r=0;r<scores.length;r++){double[] sum=sums.computeIfAbsent(ids[r],unused->new double[q]);for(int i=0;i<q;i++)sum[i]+=scores[r][i];}
+        double trace=0;for(double[] sum:sums.values())trace+=SemOptimizer.dot(sum,RamFit.mv(u,sum));
+        return trace/df;
+    }
+
+    /** Efficient one-df score tests after projecting out all fitted nuisance parameters. */
+    public static java.util.List<ModificationIndex> modificationIndices(SemFitResult fit) {
+        SemModel model=fit.state().model();java.util.List<Modification> candidates=new java.util.ArrayList<>();
+        // The default scan covers omitted observed disturbance covariances. Directed
+        // paths, fixed paths and latent covariances can be supplied explicitly.
+        for(int i=0;i<model.variables().size();i++)for(int j=0;j<i;j++) {
+            final int a=i,b=j;
+            if(model.elements().stream().noneMatch(e->e.kind()==SemModel.Kind.COVARIANCE &&
+                    ((e.first()==a && e.second()==b)||(e.first()==b && e.second()==a))))
+                candidates.add(Modification.covariance(model.variables().get(j),model.variables().get(i)));
+        }
+        return modificationIndices(fit,candidates.toArray(Modification[]::new));
+    }
+    /** Candidate-specific score tests; fixed factor-scale releases can be unidentified. */
+    public static java.util.List<ModificationIndex> modificationIndices(SemFitResult fit, Modification... candidates) {
+        RamFit.State s=fit.state();java.util.List<ModificationIndex> result=new java.util.ArrayList<>();
+        for(Modification c:candidates) {
+            SemModel.Kind kind=switch(c.kind()) {
+                case "regression" -> SemModel.Kind.REGRESSION;
+                case "covariance" -> SemModel.Kind.COVARIANCE;
+                case "intercept" -> SemModel.Kind.INTERCEPT;
+                default -> throw new IllegalArgumentException("unknown modification kind");
+            };
+            String label="__modification__";while(s.model().freeParameterLabels().contains(label))label+="_";
+            SemModel expanded=s.model().freeElement(kind,c.first(),c.second(),label);
+            double[] x=RamFit.initial(expanded);int k=x.length,j=expanded.freeIndex(label);
+            for(String name:s.model().freeParameterLabels())x[expanded.freeIndex(name)]=s.point()[s.model().freeIndex(name)];
+            double[] grad=RamFit.evaluate(expanded,x,s.patterns(),s.observations()).gradient();
+            double[] info=RamFit.expectedInformation(RamFit.distribution(expanded,x),s.patterns());
+            int[] nuisance=java.util.stream.IntStream.range(0,k).filter(i->i!=j).toArray();
+            double[] nuisanceInverse=RamFit.informationInverse(RamFit.sub(info,nuisance,k),k-1),cross=new double[k-1],score=new double[k-1];
+            for(int a=0;a<k-1;a++){cross[a]=info[nuisance[a]*k+j];score[a]=-s.observations()*grad[nuisance[a]];}
+            double efficientInfo=info[j*k+j]-SemOptimizer.dot(cross,RamFit.mv(nuisanceInverse,cross));
+            double efficientScore=-s.observations()*grad[j]-SemOptimizer.dot(cross,RamFit.mv(nuisanceInverse,score));
+            boolean identified=efficientInfo>1e-10*Math.abs(info[j*k+j]);
+            double mi=identified?efficientScore*efficientScore/efficientInfo:Double.NaN;
+            result.add(new ModificationIndex(c,mi,identified?efficientScore/efficientInfo:Double.NaN,jdistlib.ChiSquare.cumulative(mi,1,false,false)));
+        }
+        return java.util.List.copyOf(result);
+    }
+    public record Modification(String kind,String first,String second) {
+        public static Modification regression(String outcome,String predictor){return new Modification("regression",outcome,predictor);}
+        public static Modification covariance(String first,String second){return new Modification("covariance",first,second);}
+        public static Modification intercept(String variable){return new Modification("intercept",variable,variable);}
+    }
+    public record ModificationIndex(Modification parameter,double chiSquare,double expectedChange,double pValue) { }
+    public record RobustResult(double[] parameterCovariance,double scalingFactor,double chiSquare,
+                               int degreesOfFreedom,double pValue,int clusters) {
+        public RobustResult { parameterCovariance=parameterCovariance.clone(); }
+        public double[] parameterCovariance(){return parameterCovariance.clone();}
+    }
+
     /** Sobel/product-of-coefficients delta-method inference for an indirect effect. */
     public static IndirectEffect indirect(double a, double b, double varianceA,
                                           double varianceB, double covarianceAB,
@@ -16,12 +136,14 @@ public final class SemInference {
         if (!Double.isFinite(a) || !Double.isFinite(b) || !Double.isFinite(covarianceAB)
                 || !(confidenceLevel > 0.0) || !(confidenceLevel < 1.0))
             throw new IllegalArgumentException("indirect-effect inputs are invalid");
+        if(Math.abs(covarianceAB)>Math.sqrt(varianceA)*Math.sqrt(varianceB)*(1+1e-12))
+            throw new IllegalArgumentException("indirect-effect covariance is not positive semidefinite");
         double estimate = a * b;
         double variance = b * b * varianceA + a * a * varianceB
             + 2.0 * a * b * covarianceAB;
         double standardError = Math.sqrt(Math.max(0.0, variance));
         double critical = Normal.quantile(0.5 + confidenceLevel / 2.0, 0.0, 1.0, true, false);
-        double z = standardError == 0.0 ? 0.0 : estimate / standardError;
+        double z = estimate / standardError;
         return new IndirectEffect(estimate, standardError, z,
             estimate - critical * standardError, estimate + critical * standardError,
             2.0 * Normal.cumulative(-Math.abs(z), 0.0, 1.0, true, false));
@@ -43,12 +165,22 @@ public final class SemInference {
             if (scores[row] == null || scores[row].length != dimension)
                 throw new IllegalArgumentException("score rows must match bread");
             double[] sum = grouped.computeIfAbsent(clusters[row], ignored -> new double[dimension]);
-            for (int column = 0; column < dimension; column++) sum[column] += scores[row][column];
+            for (int column = 0; column < dimension; column++) {
+                if(!Double.isFinite(scores[row][column]))throw new IllegalArgumentException("nonfinite case score");
+                sum[column] += scores[row][column];
+            }
         }
-        for (double[] sum : grouped.values()) for (int row = 0; row < dimension; row++)
-            for (int column = 0; column < dimension; column++) meat[row * dimension + column] += sum[row] * sum[column];
-        double[] left = multiply(bread, meat, dimension), result = multiply(left, bread, dimension);
-        symmetrize(result, dimension); return result;
+        if(grouped.size()<2)throw new IllegalArgumentException("at least two independent score groups required");
+        // Form outer products of influence vectors directly. B J B' assembled
+        // through two dense products can acquire negative variances by cancellation.
+        for (double[] sum : grouped.values()) {
+            double[] influence=RamFit.mv(bread,sum);
+            for(int row=0;row<dimension;row++)for(int column=0;column<=row;column++)
+                meat[row*dimension+column]+=influence[row]*influence[column];
+        }
+        for(int row=0;row<dimension;row++)for(int column=0;column<row;column++)
+            meat[column*dimension+row]=meat[row*dimension+column];
+        return meat;
     }
 
     /** One-score-per-parameter modification index approximation. */

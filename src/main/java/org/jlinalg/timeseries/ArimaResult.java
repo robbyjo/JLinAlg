@@ -6,7 +6,7 @@ package org.jlinalg.timeseries;
 
 import java.util.Arrays;
 
-/** Immutable conditional Gaussian ARIMA estimates and diagnostics. */
+/** Immutable Gaussian ARIMA estimates and diagnostics; the fitter selects the likelihood. */
 public final class ArimaResult {
     private final ArimaOrder order;
     private final SeasonalArimaOrder seasonalOrder;
@@ -28,6 +28,7 @@ public final class ArimaResult {
     private final int functionEvaluations;
     private final boolean converged;
     private final String convergenceMessage;
+    private final ArimaStateSpace.ForecastState exactState;
 
     ArimaResult(
             ArimaOrder order,
@@ -50,6 +51,20 @@ public final class ArimaResult {
             int functionEvaluations,
             boolean converged,
             String convergenceMessage) {
+        this(order, seasonalOrder, autoregressive, movingAverage, seasonalAutoregressive,
+            seasonalMovingAverage, location, drift, innovationVariance, innovations,
+            differencedSeries, originalSeries, logLikelihood, aic, aicc, bic,
+            effectiveObservations, functionEvaluations, converged, convergenceMessage, null);
+    }
+
+    ArimaResult(ArimaOrder order, SeasonalArimaOrder seasonalOrder,
+            double[] autoregressive, double[] movingAverage, double[] seasonalAutoregressive,
+            double[] seasonalMovingAverage, double location, boolean drift,
+            double innovationVariance, double[] innovations, double[] differencedSeries,
+            double[] originalSeries, double logLikelihood, double aic, double aicc, double bic,
+            int effectiveObservations, int functionEvaluations, boolean converged,
+            String convergenceMessage, ArimaStateSpace.ForecastState exactState) {
+        this.exactState = exactState;
         this.order = order;
         this.seasonalOrder = seasonalOrder;
         this.autoregressive = autoregressive.clone();
@@ -86,6 +101,9 @@ public final class ArimaResult {
     public double location() { return location; }
     public boolean drift() { return drift; }
     public double innovationVariance() { return innovationVariance; }
+    /** Conditional fits return raw innovations. Exact diffuse fits return
+     * v/sqrt(F) on the original time grid, with NaN for missing/diffuse updates;
+     * F is measured in units of the innovation variance. */
     public double[] innovations() { return innovations.clone(); }
     public double[] differencedSeries() { return differencedSeries.clone(); }
     public double logLikelihood() { return logLikelihood; }
@@ -102,6 +120,7 @@ public final class ArimaResult {
     }
 
     public ArimaForecast forecast(int horizon, double confidenceLevel) {
+        if (exactState != null) return exactState.forecast(horizon, confidenceLevel, innovationVariance);
         return ArimaMath.forecast(this, originalSeries, horizon, confidenceLevel);
     }
 
@@ -118,6 +137,14 @@ public final class ArimaResult {
     }
 
     private double[] usedInnovations() {
+        if (exactState != null) {
+            int start = 0;
+            while (start < innovations.length && Double.isNaN(innovations[start])) start++;
+            for (int i = start; i < innovations.length; i++)
+                if (!Double.isFinite(innovations[i])) throw new IllegalStateException(
+                    "ACF/Ljung-Box require contiguous innovations; missing or diffuse gaps cannot be compacted");
+            return Arrays.copyOfRange(innovations, start, innovations.length);
+        }
         return Arrays.copyOfRange(innovations,
             innovations.length - effectiveObservations, innovations.length);
     }

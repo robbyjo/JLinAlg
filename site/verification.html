@@ -2,7 +2,12 @@
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="index.html">Home</a><span>/</span><span>Verification</span></div><h1>Checked for accuracy. Measured for speed.</h1><p>Every shipped component family has automated correctness coverage and an executable performance route. Comparative claims below are real workload measurements with estimator scope and limitations preserved.</p></div></section>
 <div class="container page-layout"><article class="prose">
 <div class="note"><strong>What “checked” means</strong>Correctness is gated by unit, contract, cross-backend, and independent R/Python fixtures. Performance is exercised by deterministic or real-data benchmarks. A benchmark check does not imply that every API is faster than every alternative.</div>
-<p>The clean v0.2.0 release gate discovered 253 tests: 250 passed, zero failed, and three optional CHOLMOD-native tests were skipped because the native library was not staged in that portable build. The separately documented native profiles cover CHOLMOD on the development host.</p>
+<p>The earlier v0.2.0 release baseline discovered 253 tests: 250 passed and three optional native tests skipped. The September 8 statistical audit adds independent R fixtures and adversarial regression tests; see the current report below. Native CHOLMOD is not certified by the portable audit run.</p>
+
+<h2 id="audit">September 8 statistical audit</h2>
+<p>The repairs add joint latent/ordinal/FIML SEM, hierarchical moderator covariance and CR2, estimated sparse mixed covariance and formula profiles, exact diffuse missing-series filtering, actual conditional MR signals, adaptive scalar GLMM quadrature, and selection-aware regression inference. The audit also corrects quantile gradients, multinomial convergence, supersmoothing, and smoothing-induced covariance.</p>
+<p>Validation includes lavaan, metafor, clubSandwich, lme4, lmerTest, pbkrtest, stats::arima, nnet, quantreg, glmnet, selectiveInference, and independent R matrix/integration references. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/advanced-validation.md">Read the current accuracy, performance, test-gate, and limitation report →</a></p>
+<p>Java is not always faster: R wins on the measured supersmoother, some GLMM fits, and the large sparse Satterthwaite workload. The report separates fixed-likelihood kernels from full fits and distinguishes smoothed from nonsmoothed quantile objectives. <a href="vignettes/advanced-extensions.html">Explore the updated vignettes →</a></p>
 
 <h2 id="accuracy">Accuracy matrix</h2>
 <div class="result-table"><table><thead><tr><th>Component family</th><th>Independent or contract reference</th><th>Quantities checked</th></tr></thead><tbody>

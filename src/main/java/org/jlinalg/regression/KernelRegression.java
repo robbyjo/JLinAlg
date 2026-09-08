@@ -26,14 +26,24 @@ public final class KernelRegression {
         validate(predictor, response, bandwidth);
         if (query == null) throw new IllegalArgumentException("query is required");
         double[] result = new double[query.length];
+        double[] weights = new double[predictor.length];
         for (int point = 0; point < query.length; point++) {
-            double numerator = 0.0, denominator = 0.0;
+            if(!Double.isFinite(query[point]))throw new IllegalArgumentException("queries must be finite");
+            double nearest=Double.POSITIVE_INFINITY;
+            for(double value:predictor)nearest=Math.min(nearest,Math.abs(query[point]-value));
+            double denominator = 0.0;
             for (int row = 0; row < predictor.length; row++) {
-                double distance = (query[point] - predictor[row]) / bandwidth;
-                double weight = Math.exp(-0.5 * distance * distance);
-                numerator += weight * response[row]; denominator += weight;
+                double distance = Math.abs(query[point] - predictor[row]);
+                // Subtract the largest log weight before exponentiation.
+                double exponent=distance==nearest?0:
+                    -.5*((distance-nearest)/bandwidth)*((distance+nearest)/bandwidth);
+                double weight = Math.exp(exponent);
+                weights[row] = weight; denominator += weight;
             }
-            result[point] = numerator / denominator;
+            // Normalize before multiplying responses: an unnormalized sum can
+            // overflow even when the weighted mean is comfortably finite.
+            for(int row=0;row<predictor.length;row++)
+                result[point] += (weights[row]/denominator)*response[row];
         }
         return result;
     }

@@ -5,7 +5,6 @@ package org.jlinalg.regression;
 import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
-import org.jlinalg.internal.LeastSquaresSolver;
 
 /** Gaussian multivariate ordinary least squares with shared predictors. */
 public final class MultivariateRegression {
@@ -21,22 +20,25 @@ public final class MultivariateRegression {
         int columns = predictors[0].length;
         if (outcomes < 1 || columns < 1 || rows <= columns)
             throw new IllegalArgumentException("multivariate regression needs full-rank rows");
+        for(double[] row:response) if(row==null || row.length!=outcomes)
+            throw new IllegalArgumentException("response rows must have equal widths");
         double[] x = flatten(predictors, rows, columns);
         double[] fitted = new double[rows * outcomes];
         double[] coefficients = new double[columns * outcomes];
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             ComputeBackend backend = context.backend();
+            var qr=backend.dgeqp3(x,rows,columns);
+            if(qr.rank()!=columns)throw new IllegalArgumentException("multivariate design is rank deficient");
             for (int outcome = 0; outcome < outcomes; outcome++) {
                 double[] y = column(response, outcome, rows);
-                LeastSquaresSolver.Solution solved = LeastSquaresSolver.solve(
-                    x, y, rows, columns, false, backend);
-                System.arraycopy(solved.coefficients(), 0, coefficients,
+                double[] solved = qr.solveLeastSquares(y);
+                System.arraycopy(solved, 0, coefficients,
                     outcome * columns, columns);
                 for (int row = 0; row < rows; row++) {
                     double value = 0.0;
                     for (int column = 0; column < columns; column++)
                         value += x[row * columns + column]
-                            * solved.coefficients()[column];
+                            * solved[column];
                     fitted[row * outcomes + outcome] = value;
                 }
             }

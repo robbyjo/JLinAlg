@@ -16,13 +16,13 @@ public final class MetaEffectSizes {
                 + standardDeviation2 * standardDeviation2 / sampleSize2));
     }
 
-    /** Hedges g with the small-sample J correction. */
+    /** Hedges g with J approximated by 1-3/(4*df-1) and the delta-method sampling variance. */
     public static MetaEffectSize standardizedMeanDifference(
             double mean1, double mean2, double standardDeviation1,
             double standardDeviation2, int sampleSize1, int sampleSize2) {
         requireSamples(standardDeviation1, sampleSize1);
         requireSamples(standardDeviation2, sampleSize2);
-        int degrees = sampleSize1 + sampleSize2 - 2;
+        double degrees = (double) sampleSize1 + sampleSize2 - 2.0;
         if (degrees < 2) throw new IllegalArgumentException(
             "standardized mean difference needs at least two residual degrees of freedom");
         double pooled = Math.sqrt(((sampleSize1 - 1.0) * standardDeviation1 * standardDeviation1
@@ -30,7 +30,7 @@ public final class MetaEffectSizes {
         double d = (mean1 - mean2) / pooled;
         double j = 1.0 - 3.0 / (4.0 * degrees - 1.0);
         double g = j * d;
-        double variance = (sampleSize1 + sampleSize2) / (double) (sampleSize1 * sampleSize2)
+        double variance = 1.0 / sampleSize1 + 1.0 / sampleSize2
             + d * d / (2.0 * degrees);
         return new MetaEffectSize("hedges-g", g, Math.sqrt(j * j * variance));
     }

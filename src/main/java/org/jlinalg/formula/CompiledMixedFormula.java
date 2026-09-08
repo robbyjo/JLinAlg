@@ -43,59 +43,121 @@ public final class CompiledMixedFormula {
         if (!correlatedRandomEffects.isEmpty())
             throw new IllegalArgumentException(
                 "formula contains correlated random blocks; use fitCorrelated");
-        if (fixed.weightsView() != null || fixed.offsetView() != null) {
-            throw new IllegalArgumentException(
-                "mixed formula weights and offsets require a weighted LMM fit");
-        }
+        if (fixed.weightsView() != null || fixed.offsetView() != null)
+            return LinearMixedModelResult.fromSparse(fitSparse(options, backendPolicy),
+                fixed.responseView(), fixed.designView(), fixed.rows(), fixed.columns(), fixed.offsetView());
         return LinearMixedModel.fit(fixed.responseView(), fixed.designView(),
             fixed.rows(), fixed.columns(), randomEffects, options, backendPolicy);
     }
 
-    /** Fits through sparse mixed-model equations without dense n-by-n covariance. */
+    /**
+     * Fits sparse equations. For correlated terms this exposes latent-coordinate
+     * diagnostics; use fitSparseUnstructured().correlatedFit() for original
+     * random coefficients and complete block covariance estimates.
+     */
     public SparseLinearMixedModelResult fitSparse(
             RemlOptions options, BackendPolicy backendPolicy) {
         if (!correlatedRandomEffects.isEmpty())
-            throw new IllegalArgumentException(
-                "correlated random blocks currently use fitCorrelated");
-        if (fixed.weightsView() != null || fixed.offsetView() != null)
-            throw new IllegalArgumentException(
-                "sparse mixed formulas do not yet accept weights or offsets");
-        return SparseLinearMixedModel.fit(fixed.responseView(),
-            fixed.designView(), fixed.rows(), fixed.columns(), randomEffects,
-            options, backendPolicy);
+            return fitSparseUnstructured(options, backendPolicy).fit();
+        List<RandomEffectTerm> terms = new java.util.ArrayList<>();
+        double[] roots = weightRoots();
+        for (RandomEffectTerm term : randomEffects) {
+            double[] values = term.sparseValues();
+            int[] starts = term.rowPointers();
+            for (int r = 0; r < fixed.rows(); r++)
+                for (int k = starts[r]; k < starts[r + 1]; k++) values[k] *= roots[r];
+            terms.add(RandomEffectTerm.ofSparseCsr(term.name(), term.observations(), term.coefficients(),
+                starts, term.columnIndices(), values, term.coefficientNames()));
+        }
+        return SparseLinearMixedModel.fit(whitenedResponse(), whitenedFixed(), fixed.rows(),
+            fixed.columns(), terms, options, backendPolicy)
+            .withObservationScale(fixed.weightsView(), fixed.offsetView());
     }
 
     /** Fits single-bar correlated blocks with Cholesky covariance parameters. */
     public CorrelatedLinearMixedModelResult fitCorrelated(
             RemlOptions options, BackendPolicy backendPolicy) {
-        if (fixed.weightsView() != null || fixed.offsetView() != null)
-            throw new IllegalArgumentException(
-                "correlated mixed formulas do not yet accept weights or offsets");
-        List<CorrelatedRandomEffectBlock> blocks =
-            new java.util.ArrayList<>(correlatedRandomEffects);
-        for (RandomEffectTerm term : randomEffects)
-            blocks.add(asScalarBlock(term));
-        return CorrelatedLinearMixedModel.fit(fixed.responseView(),
-            fixed.designView(), fixed.rows(), fixed.columns(), blocks,
-            options, backendPolicy);
+        return fitSparseUnstructured(options, backendPolicy).correlatedFit();
     }
 
-    /** Fits one parsed correlated block through the sparse unstructured path. */
+    /** Fits all parsed blocks, estimating one covariance per block, with sparse equations. */
     public SparseUnstructuredCorrelatedModel.Result fitSparseUnstructured(
             RemlOptions options, BackendPolicy backendPolicy) {
-        if (fixed.weightsView() != null || fixed.offsetView() != null)
-            throw new IllegalArgumentException(
-                "unstructured sparse formulas do not yet accept weights or offsets");
-        if (correlatedRandomEffects.size() != 1 || !randomEffects.isEmpty())
-            throw new IllegalArgumentException(
-                "sparse unstructured formula fitting requires one correlated block");
-        CorrelatedRandomEffectBlock block = correlatedRandomEffects.get(0);
-        List<String> groups = new java.util.ArrayList<>(block.observations());
-        for (int index : block.groupIndices()) groups.add(block.groupNames().get(index));
-        return SparseUnstructuredCorrelatedModel.fit(fixed.responseView(), fixed.designView(),
-            fixed.rows(), fixed.columns(), groups, block.effectNames(),
-            rows(block.effectDesign(), block.observations(), block.effectCount()),
-            options, backendPolicy);
+        return SparseUnstructuredCorrelatedModel.fit(whitenedResponse(), whitenedFixed(),
+            fixed.rows(), fixed.columns(), whitenedBlocks(), options, backendPolicy)
+            .withObservationScale(fixed.weightsView(), fixed.offsetView());
+    }
+
+    /** ML profile of a fixed coefficient, refitting all covariance and nuisance fixed parameters. */
+    public org.jlinalg.mixed.ProfileLikelihoodInterval profileFixedEffect(int coefficient,
+            double confidence, double lowerBound, double upperBound,
+            RemlOptions options, BackendPolicy backendPolicy) {
+        return SparseUnstructuredCorrelatedModel.profileFixedEffect(whitenedResponse(), whitenedFixed(),
+            fixed.rows(), fixed.columns(), whitenedBlocks(), coefficient, confidence,
+            lowerBound, upperBound, options, backendPolicy);
+    }
+
+    private List<CorrelatedRandomEffectBlock> whitenedBlocks() {
+        List<CorrelatedRandomEffectBlock> blocks = new java.util.ArrayList<>(correlatedRandomEffects);
+        for (RandomEffectTerm term : randomEffects) blocks.add(asScalarBlock(term));
+        List<CorrelatedRandomEffectBlock> result = new java.util.ArrayList<>();
+        double[] roots = weightRoots();
+        for (CorrelatedRandomEffectBlock block : blocks) {
+            List<String> groups = new java.util.ArrayList<>();
+            for (int index : block.groupIndices()) groups.add(block.groupNames().get(index));
+            double[][] design = rows(block.effectDesign(), fixed.rows(), block.effectCount());
+            for (int r = 0; r < design.length; r++) for (int c = 0; c < design[r].length; c++)
+                design[r][c] *= roots[r];
+            result.add(CorrelatedRandomEffectBlock.of(block.name(), groups, block.effectNames(), design));
+        }
+        return result;
+    }
+
+    public org.jlinalg.mixed.ProfileLikelihoodInterval profileResidualSd(double confidence,
+            double lowerBound, double upperBound, RemlOptions options, BackendPolicy policy) {
+        return SparseUnstructuredCorrelatedModel.profileResidualSd(whitenedResponse(), whitenedFixed(),
+            fixed.rows(), fixed.columns(), whitenedBlocks(), confidence, lowerBound, upperBound, options, policy);
+    }
+
+    public org.jlinalg.mixed.ProfileLikelihoodInterval profileCorrelation(int block, double confidence,
+            RemlOptions options, BackendPolicy policy) {
+        return SparseUnstructuredCorrelatedModel.profileCorrelation(whitenedResponse(), whitenedFixed(),
+            fixed.rows(), fixed.columns(), whitenedBlocks(), block, confidence, options, policy);
+    }
+
+    /** Block order is correlatedRandomEffects followed by scalar randomEffects. */
+    public org.jlinalg.mixed.ProfileLikelihoodInterval profileRandomSd(int block, int effect, double confidence,
+            double lowerBound, double upperBound, RemlOptions options, BackendPolicy policy) {
+        return SparseUnstructuredCorrelatedModel.profileRandomSd(whitenedResponse(), whitenedFixed(),
+            fixed.rows(), fixed.columns(), whitenedBlocks(), block, effect, confidence,
+            lowerBound, upperBound, options, policy);
+    }
+
+    private double[] weightRoots() {
+        double[] roots = new double[fixed.rows()], weights = fixed.weightsView();
+        for (int r = 0; r < roots.length; r++) {
+            double w = weights == null ? 1 : weights[r];
+            if (!(w > 0) || !Double.isFinite(w))
+                throw new IllegalArgumentException("mixed formula weights must be finite and positive");
+            roots[r] = Math.sqrt(w);
+        }
+        return roots;
+    }
+    private double[] adjustedResponse() {
+        double[] response = fixed.responseView().clone(), offset = fixed.offsetView();
+        if (offset != null) for (int r = 0; r < response.length; r++) response[r] -= offset[r];
+        return response;
+    }
+    private double[] whitenedResponse() {
+        double[] response = adjustedResponse(), roots = weightRoots();
+        for (int r = 0; r < response.length; r++) response[r] *= roots[r];
+        return response;
+    }
+    private double[] whitenedFixed() {
+        double[] design = fixed.designView().clone(), roots = weightRoots();
+        for (int r = 0; r < fixed.rows(); r++) for (int c = 0; c < fixed.columns(); c++)
+            design[r * fixed.columns() + c] *= roots[r];
+        return design;
     }
 
     private static double[][] rows(double[] values, int observations, int columns) {

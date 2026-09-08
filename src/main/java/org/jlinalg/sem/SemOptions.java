@@ -4,11 +4,11 @@ package org.jlinalg.sem;
 
 import org.jlinalg.model.MissingDataPolicy;
 
-/** Optimization and complete-case controls for SEM. */
+/** Objective-evaluation budget, per-case score tolerance and complete-case controls. */
 public record SemOptions(int maximumEvaluations, double tolerance,
                          MissingDataPolicy missingDataPolicy) {
     public SemOptions {
-        if (maximumEvaluations < 100 || !(tolerance > 0.0)
+        if (maximumEvaluations < 100 || !(tolerance > 0.0) || !Double.isFinite(tolerance)
                 || missingDataPolicy == null)
             throw new IllegalArgumentException("invalid SEM options");
     }

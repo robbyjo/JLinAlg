@@ -135,15 +135,16 @@ contract.
 The [regression families vignette](docs/vignettes/regression-families.md)
 covers the deterministic multivariate OLS, multinomial logistic, quantile,
 kernel, supersmoother, and partially linear APIs. The JVM benchmark is
-available as `./gradlew benchmarkRegressionFamilies`; direct R timing for
-these new paths is not claimed when `Rscript` is unavailable on the host.
+available as `./gradlew benchmarkRegressionFamilies`. The September 8
+[accuracy and timing report](docs/advanced-validation.md) includes executed
+R comparisons, slower workloads, and explicit estimator differences.
 
 The [advanced extensions vignette](docs/vignettes/advanced-extensions.md)
-covers FIML and latent-measurement SEM utilities, full-covariance
+covers jointly fitted latent/ordinal/FIML SEM, full-covariance
 meta-regression and bias diagnostics, sparse unstructured mixed effects,
 diffuse/missing time-series paths, generalized and overlap-aware MR CLI
-options, quadrature GLMMs, and deterministic selection-aware penalized
-inference.
+options and conditional signal selection, adaptive quadrature GLMMs, and
+held-out or fixed-penalty polyhedral selection-aware inference.
 
 Basic base-R-style hypothesis tests are available through the uniform
 `org.jlinalg.stats.StatisticalTests` facade. It delegates tests already in
@@ -565,7 +566,9 @@ pedigree models. It consumes sparse `RandomEffectTerm` designs and
 owns the selected backend for an association scan and reuses one symbolic and
 numeric sparse Cholesky factor per worker, avoiding both observation-scale
 covariance matrices and repeated backend discovery. `GlmmLaplace` remains the
-dense reference implementation; adaptive quadrature is not implemented.
+dense reference implementation. `GlmmQuadrature` additionally provides
+adaptive, node-refined quadrature for independent scalar Gaussian random
+intercepts in binomial and Poisson models; it is not pedigree or multidimensional AGQ.
 
 `SparseZeroInflatedMixedModel` fits frequentist zero-inflated Poisson and NB2
 mixed models. Separate fixed designs control the conditional count mean,
@@ -1007,14 +1010,17 @@ The [standalone SEM vignette](docs/vignettes/sem.md) covers model
 construction, row and covariance inputs, inference, equality constraints,
 interpretation, and current limitations.
 
-`SemModel` specifies observed-variable directed paths, variances, covariances,
-fixed values, and equality constraints through shared labels. `Sem` fits the
+`SemModel` specifies observed and latent directed paths, structural intercepts,
+variances, covariances, fixed values, and equality constraints through shared labels. `Sem` fits the
 model by Gaussian covariance-structure maximum likelihood and reports parameter
 SE/z/p, implied covariance, likelihood chi-square, CFI, TLI, RMSEA, SRMR,
 AIC, and BIC. Variances use a positive log parameterization. Complete-case
-omission is optional. Latent-variable measurement models, ordinal thresholds,
-robust sandwich corrections, and full-information missing-data likelihood are
-future extensions rather than being silently approximated.
+omission is optional. `SemFiml` directly fits the constrained observed-pattern
+likelihood; `SemOrdinal` jointly fits ordinal thresholds and latent structure
+by probit pairwise likelihood. `SemInference` provides case/cluster sandwiches,
+efficient continuous-model modification indices, and indirect-effect delta
+inference. Ordinal PML is not DWLS/WLSMV; see the vignette for identification,
+missing-ordinal, and robust-fit-statistic limitations.
 
 ## Numerical scope
 

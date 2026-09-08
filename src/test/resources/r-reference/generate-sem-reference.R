@@ -1,6 +1,5 @@
 # Regenerates the observed-variable SEM fixture against lavaan.
-local_library <- normalizePath(".r-reference-lib", winslash = "/", mustWork = TRUE)
-.libPaths(c(local_library, .libPaths()))
+.libPaths(c('build/r-library', .libPaths()))
 suppressPackageStartupMessages(library(lavaan))
 
 set.seed(20260904)

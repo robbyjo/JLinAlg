@@ -13,6 +13,7 @@ public final class MultinomialRegression {
                 || options == null || predictors[0] == null)
             throw new IllegalArgumentException("multinomial inputs are invalid");
         int rows = response.length, columns = predictors[0].length;
+        if(columns < 1) throw new IllegalArgumentException("at least one predictor is required");
         double[] x = new double[rows * columns];
         for (int row = 0; row < rows; row++) {
             if (response[row] < 0 || response[row] >= classCount
@@ -23,31 +24,18 @@ public final class MultinomialRegression {
                 if (!Double.isFinite(x[row * columns + column])) throw new IllegalArgumentException("predictors must be finite");
             }
         }
-        double[] beta = new double[(classCount - 1) * columns];
-        double likelihood = logLikelihood(response, x, beta, rows, columns, classCount);
-        boolean converged = false; int iterations = 0;
-        for (int iteration = 1; iteration <= options.maximumIterations(); iteration++) {
-            iterations = iteration;
-            double[] gradient = gradient(response, x, beta, rows, columns, classCount);
-            double step = options.initialStep(); double[] candidate = beta.clone();
-            double candidateLikelihood = Double.NEGATIVE_INFINITY;
-            for (int attempt = 0; attempt < 40; attempt++) {
-                for (int i = 0; i < beta.length; i++) candidate[i] = beta[i] + step * gradient[i];
-                candidateLikelihood = logLikelihood(response, x, candidate, rows, columns, classCount);
-                if (candidateLikelihood >= likelihood) break;
-                step *= 0.5;
-            }
-            if (candidateLikelihood < likelihood) {
-                candidate = beta.clone();
-                candidateLikelihood = likelihood;
-            }
-            double change = 0.0;
-            for (int i = 0; i < beta.length; i++) change = Math.max(change, Math.abs(candidate[i] - beta[i]) / (1 + Math.abs(beta[i])));
-            beta = candidate; double improvement = candidateLikelihood - likelihood; likelihood = candidateLikelihood;
-            if (change <= options.relativeTolerance() && improvement <= options.relativeTolerance()) { converged = true; break; }
-        }
-        return new MultinomialRegressionResult(beta, probabilities(x, beta, rows, columns, classCount),
-            likelihood, rows, columns, classCount, iterations, converged);
+        double[] scales=RegressionOptimizer.scaleColumns(x,rows,columns);
+        var optimized=RegressionOptimizer.minimize(point -> {
+            double[] gradient=gradient(response,x,point,rows,columns,classCount);
+            for(int j=0;j<gradient.length;j++)gradient[j]/=-rows;
+            return new RegressionOptimizer.Evaluation(-logLikelihood(response,x,point,rows,columns,classCount)/rows,gradient);
+        },(classCount-1)*columns,options.maximumIterations(),options.relativeTolerance(),options.initialStep());
+        double[] beta=optimized.point();
+        double likelihood=logLikelihood(response,x,beta,rows,columns,classCount);
+        double[] probabilities=probabilities(x,beta,rows,columns,classCount);
+        for(int j=0;j<beta.length;j++) beta[j]/=scales[j%columns];
+        return new MultinomialRegressionResult(beta, probabilities,
+            likelihood, rows, columns, classCount, optimized.iterations(), optimized.converged());
     }
 
     public static MultinomialRegressionResult fit(int[] response, double[][] predictors, int classCount) {
@@ -63,8 +51,17 @@ public final class MultinomialRegression {
         return result;
     }
     private static double logLikelihood(int[] y, double[] x, double[] beta, int rows, int columns, int classes) {
-        double[] probabilities = probabilities(x, beta, rows, columns, classes); double result = 0;
-        for (int row = 0; row < rows; row++) result += Math.log(Math.max(1e-300, probabilities[row * classes + y[row]]));
+        double result=0; double[] logits=new double[classes];
+        for(int row=0;row<rows;row++) {
+            double maximum=0;
+            for(int cls=1;cls<classes;cls++) {
+                logits[cls]=0;
+                for(int column=0;column<columns;column++)logits[cls]+=x[row*columns+column]*beta[(cls-1)*columns+column];
+                maximum=Math.max(maximum,logits[cls]);
+            }
+            double sum=0;for(double logit:logits)sum+=Math.exp(logit-maximum);
+            result+=logits[y[row]]-maximum-Math.log(sum);
+        }
         return result;
     }
     private static double[] probabilities(double[] x, double[] beta, int rows, int columns, int classes) {

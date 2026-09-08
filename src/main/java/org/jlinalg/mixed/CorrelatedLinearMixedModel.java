@@ -108,9 +108,19 @@ public final class CorrelatedLinearMixedModel {
             double[] upper, double initialStep, double tolerance,
             int maximumEvaluations) {
         double[] current = initial.clone();
+        int evaluations = 0;
+        try {
+            var fit = jdistlib.math.opt.Bobyqa.bobyqa(current, lower, upper,
+                objective::value, 2 * current.length + 1, initialStep,
+                tolerance, maximumEvaluations, true);
+            current = fit.mX;
+            evaluations = fit.numFunctionCalls;
+        } catch (ArithmeticException | ArrayIndexOutOfBoundsException failure) {
+            // Deterministic bounded pattern fallback below.
+        }
         double currentValue = objective.value(current);
-        int evaluations = 1;
-        double step = initialStep;
+        evaluations++;
+        double step = evaluations > 1 ? Math.min(.01, initialStep) : initialStep;
         while (evaluations < maximumEvaluations && step > tolerance) {
             boolean improved = false;
             for (int parameter = 0; parameter < current.length

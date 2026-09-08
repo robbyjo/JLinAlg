@@ -3,11 +3,24 @@
 package org.jlinalg.regression;
 
 /**
- * Quantile regression using a deterministic, line-searched smoothed pinball loss.
- * This is a stable first implementation and does not use bootstrap sampling.
+ * Deterministic quantile regression: fit uses a line-searched smoothed loss;
+ * fitExact uses the nonsmoothed pinball linear program. Neither uses sampling.
  */
 public final class QuantileRegression {
     private QuantileRegression() { }
+
+    /** Minimizes the nonsmoothed pinball loss by a primal-dual linear program.
+     * Predictors explicitly include an intercept column when one is wanted. */
+    public static QuantileRegressionResult fitExact(double[] response, double[][] predictors,
+                                                    double quantile) {
+        return QuantileLinearProgram.solve(response, predictors, quantile).fit();
+    }
+
+    /** Exact-loss LP with independent iteration and KKT controls; no smoothing parameter. */
+    public static QuantileRegressionResult fitExact(double[] response, double[][] predictors,
+            double quantile, QuantileLinearProgram.Options options) {
+        return QuantileLinearProgram.solve(response, predictors, quantile, options).fit();
+    }
 
     public static QuantileRegressionResult fit(double[] response, double[][] predictors,
                                                double quantile,
@@ -20,30 +33,19 @@ public final class QuantileRegression {
         if (columns < 1 || rows <= columns) throw new IllegalArgumentException("quantile design is invalid");
         double[] x = flatten(predictors, rows, columns);
         for (double value : response) if (!Double.isFinite(value)) throw new IllegalArgumentException("response must be finite");
-        double[] beta = new double[columns];
-        double objective = objective(response, x, beta, rows, columns, quantile, options.smoothing());
-        boolean converged = false; int iterations = 0;
-        for (int iteration = 1; iteration <= options.maximumIterations(); iteration++) {
-            iterations = iteration;
-            double[] gradient = gradient(response, x, beta, rows, columns, quantile, options.smoothing());
-            double step = options.initialStep();
-            double[] candidate = beta.clone();
-            double candidateObjective = Double.POSITIVE_INFINITY;
-            for (int attempt = 0; attempt < 50; attempt++) {
-                for (int column = 0; column < columns; column++) candidate[column] = beta[column] - step * gradient[column] / rows;
-                candidateObjective = objective(response, x, candidate, rows, columns, quantile, options.smoothing());
-                if (candidateObjective <= objective) break;
-                step *= 0.5;
-            }
-            double change = 0.0;
-            for (int column = 0; column < columns; column++) change = Math.max(change,
-                Math.abs(candidate[column] - beta[column]) / (1.0 + Math.abs(beta[column])));
-            beta = candidate; double improvement = objective - candidateObjective; objective = candidateObjective;
-            if (change <= options.relativeTolerance() && Math.abs(improvement) <= options.relativeTolerance()) { converged = true; break; }
-        }
+        double[] scales = RegressionOptimizer.scaleColumns(x, rows, columns);
+        var optimized = RegressionOptimizer.minimize(point -> {
+            double[] gradient = gradient(response,x,point,rows,columns,quantile,options.smoothing());
+            for(int j=0;j<columns;j++) gradient[j]/=rows;
+            return new RegressionOptimizer.Evaluation(
+                objective(response,x,point,rows,columns,quantile,options.smoothing())/rows,gradient);
+        }, columns,options.maximumIterations(),options.relativeTolerance(),options.initialStep());
+        double[] beta = optimized.point();
+        double objective=objective(response,x,beta,rows,columns,quantile,options.smoothing());
         double[] fitted = fitted(x, beta, rows, columns), residuals = new double[rows];
         for (int row = 0; row < rows; row++) residuals[row] = response[row] - fitted[row];
-        return new QuantileRegressionResult(beta, fitted, residuals, objective, quantile, iterations, converged);
+        for(int j=0;j<columns;j++) beta[j]/=scales[j];
+        return new QuantileRegressionResult(beta, fitted, residuals, objective, quantile, optimized.iterations(), optimized.converged());
     }
 
     public static QuantileRegressionResult fit(double[] response, double[][] predictors, double quantile) {
@@ -55,7 +57,7 @@ public final class QuantileRegression {
         double[] result = new double[columns];
         for (int row = 0; row < rows; row++) {
             double residual = y[row] - dot(x, row, beta, columns);
-            double scaled = residual / smoothing;
+            double scaled = -residual / smoothing;
             double probability = scaled >= 0.0
                 ? 1.0 / (1.0 + Math.exp(-scaled))
                 : Math.exp(scaled) / (1.0 + Math.exp(scaled));

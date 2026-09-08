@@ -48,10 +48,18 @@ public final class LinearMixedModelResult {
             double[] fixedEffects,
             int rows,
             int columns) {
+        return fromSparse(sparse, response, fixedEffects, rows, columns, null);
+    }
+
+    /** Restores known offsets to the marginal fitted values as well as conditional predictions. */
+    public static LinearMixedModelResult fromSparse(
+            SparseLinearMixedModelResult sparse, double[] response, double[] fixedEffects,
+            int rows, int columns, double[] offset) {
         Objects.requireNonNull(sparse, "sparse");
         if (response == null || response.length != rows
                 || fixedEffects == null
-                || fixedEffects.length != rows * columns) {
+                || fixedEffects.length != rows * columns
+                || (offset != null && offset.length != rows)) {
             throw new IllegalArgumentException(
                 "response and fixed-effect dimensions are invalid");
         }
@@ -62,6 +70,7 @@ public final class LinearMixedModelResult {
         }
         double[] marginalFitted = new double[rows];
         for (int row = 0; row < rows; row++) {
+            if (offset != null) marginalFitted[row] = offset[row];
             for (int column = 0; column < columns; column++) {
                 marginalFitted[row] += fixedEffects[row * columns + column]
                     * beta[column];

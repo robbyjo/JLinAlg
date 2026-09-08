@@ -1,5 +1,30 @@
 # Unreleased
 
+## Statistical audit repairs — 2026-09-08
+
+- Added joint latent/mean/ordinal SEM and direct constrained FIML with full
+  covariance, robust inference, modification indices, and indirect effects.
+- Added multilevel random-moderator ML/REML covariance and correlated CR2
+  inference; replaced median reflection with L0/R0/Q0 trim-and-fill.
+- Extended sparse unstructured mixed models, finite-DF calculations, formula
+  handling, and nuisance-optimized profile refits.
+- Replaced diffuse bookkeeping and dense missing-series covariance with
+  exact diffuse, state-sized Kalman filtering and filtered-state forecasts.
+- Separated conditional instrument associations from causal MR inference;
+  added conditional signal selection, CLI controls, and corrected SVG fits.
+- Replaced fixed-node GLMM integration with mode-adaptive, node-refined
+  quadrature, boundary checks, trials/offsets, and covariance inference.
+- Fixed quantile gradients, multinomial convergence, kernel underflow, and
+  supersmoother edge behavior; reused multivariate QR, added smoother-aware
+  Robinson covariance, and added a certified nonsmoothed quantile LP.
+- Preserved weights in held-out selection inference and added fixed-penalty
+  Gaussian polyhedral LASSO/elastic-net inference.
+- Added independent R fixtures and paired accuracy/speed measurements, with
+  explicit slower cases and remaining limits. See
+  [the validation report](docs/advanced-validation.md).
+
+## Earlier additions
+
 - Added sparse first-order Laplace beta mixed models with analytic beta
   Fisher-scoring updates, jointly optimized constant precision and variance
   components, grouped random effects, arbitrary sparse coefficient precision,

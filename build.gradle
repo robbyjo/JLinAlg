@@ -379,6 +379,29 @@ tasks.register('benchmarkMediation', JavaExec) {
     }
 }
 
+[
+    benchmarkSemJoint: 'SemJointBenchmark',
+    benchmarkMetaParity: 'MetaParityBenchmark',
+    benchmarkSparseMixedParity: 'SparseMixedParityBenchmark',
+    benchmarkMrConditional: 'MrConditionalBenchmark',
+    benchmarkSelectiveInference: 'SelectiveInferenceBenchmark',
+    benchmarkExactQuantile: 'ExactQuantileBenchmark',
+    benchmarkGlmmQuadrature: 'GlmmQuadratureBenchmark',
+    benchmarkExactTimeSeries: 'ExactTimeSeriesBenchmark'
+].each { taskName, benchmarkClass ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = 'Runs the accuracy-gated ' + benchmarkClass + ' R fixture benchmark.'
+        dependsOn tasks.named('benchmarkClasses')
+        classpath = sourceSets.benchmark.runtimeClasspath
+        mainClass = 'org.jlinalg.benchmark.' + benchmarkClass
+        jvmArgs '-Xms64m', '-Xmx1g'
+        systemProperties System.properties.findAll { key, ignored ->
+            key.toString().startsWith('jlinalg.benchmark.')
+        }
+    }
+}
+
 tasks.register('benchmarkBetaRegression', JavaExec) {
     group = 'verification'
     description = 'Benchmarks specialized beta regression against the generic distributional engine.'

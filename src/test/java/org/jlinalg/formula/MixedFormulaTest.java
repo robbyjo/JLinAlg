@@ -13,6 +13,39 @@ import org.junit.jupiter.api.Test;
 
 class MixedFormulaTest {
     @Test
+    void offsetDoesNotConsumeTheFollowingRandomTermAndZeroInterceptSlopesStayCorrelated() {
+        ModelTable table = ModelTable.builder(4).numeric("y",1,2,3,4).numeric("x",0,1,2,3)
+            .numeric("z",1,3,2,4).numeric("o",.1,.2,.3,.4)
+            .categorical("g","a","a","b","b").build();
+        var fit = MixedFormula.compile("y~x+offset(o)+(0+x+z|g)",table);
+        assertEquals(java.util.List.of("x","z"),fit.correlatedRandomEffects().get(0).effectNames());
+        assertEquals(0,fit.randomEffects().size());
+        assertEquals(.1,fit.fixed().offset()[0]);
+    }
+
+    @Test
+    void weightedOffsetsRestoreBothConditionalAndMarginalPredictions() {
+        int n = 40; double[] y = new double[n], w = new double[n], offset = new double[n];
+        String[] group = new String[n];
+        for (int r = 0; r < n; r++) {
+            group[r] = "g"+(r/4); w[r] = 1+(r%3)*.5; offset[r] = .7*Math.sin(r);
+            y[r] = 3+Math.sin(r/4)*2+.2*Math.cos(r*2.7)+offset[r];
+        }
+        var table = ModelTable.builder(n).numeric("y",y).numeric("w",w).numeric("o",offset)
+            .categorical("g",group).build();
+        var formula = MixedFormula.compile("y~offset(o)+(1|g)",table,
+            new FormulaOptions(ContrastCoding.TREATMENT,"w"));
+        var sparse = formula.fitSparse(RemlOptions.defaults(),BackendPolicy.CPU);
+        var fit = formula.fit(RemlOptions.defaults(),BackendPolicy.CPU);
+        for (int r = 0; r < n; r++) {
+            assertEquals(y[r],sparse.fittedValues()[r]+sparse.residuals()[r],1e-10);
+            assertEquals(y[r]-offset[r]-fit.beta()[0],fit.reml().residuals()[r],1e-10);
+        }
+        var interval = formula.profileFixedEffect(0,.95,-1,7,
+            RemlOptions.builder().maximumIterations(200).build(),BackendPolicy.CPU);
+        assertTrue(interval.lowerFound() && interval.upperFound());
+    }
+    @Test
     void compilesSparseRandomInterceptWithoutRuntimeParsing() {
         ModelTable table = ModelTable.builder(9)
             .numeric("y", 0, 1, 2, 4, 5, 6, 8, 9, 10)

@@ -5,16 +5,16 @@ package org.jlinalg.timeseries;
 import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
 
-/** Exact stationary ARMA likelihood on sparse missing observation patterns. */
+/** Exact stationary ARMA likelihood with state-sized Kalman covariance workspaces. */
 public final class SparseMissingSeries {
     private SparseMissingSeries() { }
 
     public static Result fit(double[] series, ArimaOrder order, boolean includeMean,
                              BackendPolicy backendPolicy) {
         if (series == null || order == null || backendPolicy == null) throw new IllegalArgumentException("missing-series inputs are invalid");
-        int missing = 0; for (double value : series) if (!Double.isFinite(value)) missing++;
+        int missing = 0; for (double value : series) if (Double.isNaN(value)) missing++;
         ExactArmaResult fit = ExactArma.fitPanel(List.of(series), order, includeMean, backendPolicy);
-        return new Result(fit, missing, missing == 0 ? "dense Toeplitz" : "sparse observed-pattern Cholesky");
+        return new Result(fit, missing, "state-space innovations (missing observations marginalized)");
     }
 
     public record Result(ExactArmaResult fit, int missingCount, String likelihoodPath) { }

@@ -1,13 +1,13 @@
 # Regression families
 
-This vignette covers the six analysis families completed in the current TODO
-review. The examples use primitive arrays so the numerical contract is visible
+This vignette covers six regression families and their numerical contracts.
+The examples use primitive arrays so the numerical contract is visible
 without a dataframe dependency.
 
 ## Multivariate Gaussian regression
 
-`MultivariateRegression` fits one OLS system per response using a shared
-predictor matrix and returns row-major coefficients, fitted values, residuals,
+`MultivariateRegression` reuses one pivoted QR factorization across responses
+and returns outcome-major coefficients, row-major fitted values and residuals,
 and the residual covariance matrix:
 
 ```java
@@ -23,7 +23,7 @@ compute backend.
 ## Multinomial logistic regression
 
 `MultinomialRegression` uses class `0` as the baseline and estimates the other
-class logits with a deterministic, monotone line-searched gradient ascent:
+class logits with column-scaled BFGS and a stable log-sum-exp likelihood:
 
 ```java
 MultinomialRegressionResult fit = MultinomialRegression.fit(classes, design, 3);
@@ -36,18 +36,30 @@ and `converged()` for every fit.
 
 ## Quantile regression
 
-`QuantileRegression` minimizes a smoothed pinball loss, which keeps the fit
-deterministic and avoids bootstrap sampling:
+`QuantileRegression.fitExact` minimizes the actual nonsmoothed pinball loss
+using a deterministic primal-dual linear program:
 
 ```java
-QuantileRegressionResult fit = QuantileRegression.fit(y, design, 0.5);
+QuantileRegressionResult fit = QuantileRegression.fitExact(y, design, 0.5);
 double[] median = fit.coefficients();
+QuantileLinearProgram.Result certified = QuantileLinearProgram.solve(y, design, 0.5);
+double gap = certified.certificate().relativeGap();
 ```
 
-The smoothing parameter and line-search controls are exposed through
-`QuantileRegressionOptions`. This is a stable first implementation; it is not
-an exact reproduction of every simplex, Frisch--Newton, or nonparametric path
-in `quantreg` and `quantreg.nonpar`.
+The exact API checks primal/dual feasibility, complementarity, duality gap,
+and original-unit reconstruction. `QuantileLinearProgram.Options` controls
+iterations and tolerance. Full-column-rank designs with n >= p are required;
+an intercept is an explicit design column. Tied/nonunique optima need not match
+one arbitrary R coefficient vector. "Exact" identifies the nonsmoothed
+objective, not exact arithmetic or quantile standard errors. Large offsets may
+make the requested original-unit tolerance unrepresentable; inspect convergence.
+
+The compatibility API `QuantileRegression.fit` still minimizes a smoothed
+pinball loss, with `QuantileRegressionOptions` controlling smoothing and line
+search. Its score-checked convergence and independent smoothed R comparison
+remain separate from the exact LP. Neither API implements every nonparametric
+or inferential feature of `quantreg`/`quantreg.nonpar`.
+See [exact LP accuracy and paired R timing](../../src/benchmark/resources/exact-quantile-benchmark/exact-quantile-results.md).
 
 ## Nonparametric regression and supersmoothing
 
@@ -60,18 +72,22 @@ KernelRegression.Result fit = KernelRegression.fit(x, y);
 double[] prediction = fit.predict(new double[] {-1.0, 0.0, 1.0});
 ```
 
-`SuperSmoother` selects among candidate spans independently at each training
-point with leave-one-out local-linear tricube fits:
+`SuperSmoother` implements Friedman's running-lines algorithm: smooth the
+leave-one-out absolute errors for three spans, smooth the selected spans,
+interpolate their fitted curves, and perform the final short-span smoothing:
 
 ```java
 SuperSmoother.Result fit = SuperSmoother.fit(x, y);
 double[] smooth = fit.fittedValues();
 ```
 
-The span selector is inspired by `stats::supsmu`; it deliberately exposes the
-selected spans because edge behavior and candidate-span choices are part of
-the result. It is not presented as a hidden-compatible clone of R's Fortran
-implementation.
+The algorithm is an attributed port of R's GPL-licensed `ppr.f` supersmoother.
+Periodic fitting requires at least five observations; nonperiodic fitting requires four.
+An overload exposes weights, fixed span (zero means CV), periodic fitting, and
+bass control. Fitted values and selected spans retain input order; predictions
+interpolate the fitted curve, with constant extrapolation at the boundaries.
+Repeated queries are batch/order invariant. Missing and nonfinite input is
+rejected rather than silently omitted; supplied weights must be positive.
 
 ## Semiparametric partially linear regression
 
@@ -96,26 +112,58 @@ about all spline, single-index, varying-coefficient, or generalized additive
 semiparametric models. The returned convergence flag and residuals should be
 recorded with the analysis.
 
-## Accuracy and speed profile
+When an intercept is present, the backfitting smooth is centered to mean zero.
+For identifiable slopes with variation conditional on `z`, use Robinson
+partialling-out with smoother-aware HC3-style slope covariance:
 
-`RegressionFamiliesTest` checks coefficient recovery for multivariate OLS,
-probability normalization for multinomial regression, and finite output for
-the remaining four families. Run:
-
-```powershell
-.\gradlew.bat test --tests org.jlinalg.regression.RegressionFamiliesTest
-.\gradlew.bat benchmarkRegressionFamilies `
-  -Pjlinalg.benchmark.regression.rows=512 `
-  -Pjlinalg.benchmark.regression.measurements=5
+```java
+PartiallyLinearInference.Result inference =
+    PartiallyLinearRegression.fitWithInference(
+        y, linearDesign, z, 0.4, BackendPolicy.CPU);
+double[] slopeSe = inference.slopeStandardErrors();
 ```
 
-The benchmark prints median seconds and rows/second for each Java estimator.
-Direct R timing was not available on the development host because `Rscript`
-was not installed, so this release does not claim an R speedup for these six
-new families. When R is available, compare the Gaussian multivariate case to
-`lm`/`rrr`, multinomial fits to `nnet::multinom`, supersmoothing to
-`stats::supsmu`, quantiles to `quantreg`, and kernel fits to the selected
-`np`/`npreg` contract using identical data, tolerances, and warm-up policy.
+The covariance concerns the reported `slopeIndices`, not the normalization
+intercept. With smoother S, A=I-S, and residualized design Xt=AX, the coefficient
+influence is L=(Xt'Xt)^-1 Xt'A and the residual map is B=A-Xt L. The sandwich
+uses original-observation influence L and residual corrections e[i]/B[i,i];
+it must not treat the smoothed residuals as independent OLS errors. This reduces
+to ordinary HC3 when S=0, but is asymptotic and may be conservative for
+high-leverage smoothing. It does not correct smoothing bias or bandwidth selection.
+
+`homoskedasticSlopeCovariance()` alternatively returns (e'e / tr(BB')) LL'.
+This is unbiased for homoskedastic noise when B annihilates the true mean;
+otherwise smoothing bias remains. `residualNoiseDegreesOfFreedom()` returns
+tr(BB'), not an exact Student-t denominator. A paired-observation noise test
+checks the exact sampling variance and guards against the former factor-of-two
+underestimate caused by ignoring the smoothing covariance.
+
+## Accuracy and speed profile
+
+`RegressionAccuracyTest` preserves the audit counterexamples.
+`RegressionRParityTest` compares saved R fixtures for multivariate OLS,
+`nnet::multinom`, smoothed quantile optimization and `quantreg::rq`, weighted,
+fixed-span and periodic `stats::supsmu`, Gaussian kernel regression, Robinson
+HC3, and `selectiveInference` truncation limits. Regenerate and test with:
+
+```powershell
+& 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/R/regression-accuracy.R
+.\gradlew.bat test --tests 'org.jlinalg.regression.*'
+.\gradlew.bat '-Djlinalg.benchmark.regression.rows=512' `
+  '-Djlinalg.benchmark.regression.warmups=100' `
+  '-Djlinalg.benchmark.regression.measurements=101' benchmarkRegressionFamilies
+& 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' `
+  src/benchmark/resources/r-reference/benchmark-regression-families.R 512 7 100
+```
+
+The benchmark consumes fitted results and rejects unconverged iterative fits.
+R 4.6.1 is installed outside PATH on the validation host; reference scripts use
+the project library at `build/r-library` plus installed user-library dependencies.
+The two programs use identical deterministic inputs and emit comparable
+checksums. Startup and reference-file I/O are excluded. The R quantile benchmark
+separately reports the matching smoothed objective and the nonsmoothed `rq`
+estimator: these must not be conflated. The semiparametric reference is explicit
+R matrix algebra, not a claimed package-wide `npplreg` speed comparison.
 
 ## Boundaries
 

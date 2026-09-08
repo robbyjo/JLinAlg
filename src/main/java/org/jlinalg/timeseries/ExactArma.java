@@ -4,7 +4,6 @@ package org.jlinalg.timeseries;
 
 import java.util.Arrays;
 import java.util.List;
-import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.MatrixTranspose;
 import jdistlib.math.MultivariableFunction;
@@ -52,7 +51,9 @@ public final class ExactArma {
         if (includeMean) {
             double mean = observed.stream().flatMapToDouble(value -> Arrays.stream(value.values()))
                 .average().orElseThrow();
-            double scale = Math.max(1.0, Math.abs(mean));
+            double scale = Math.max(1.0, Math.sqrt(observed.stream()
+                .flatMapToDouble(value -> Arrays.stream(value.values()))
+                .map(value -> (value - mean) * (value - mean)).average().orElse(1)));
             initial[parameters - 1] = mean;
             lower[parameters - 1] = mean - 10.0 * scale;
             upper[parameters - 1] = mean + 10.0 * scale;
@@ -71,11 +72,15 @@ public final class ExactArma {
                     initial, lower, upper, objective, dynamic, 5_000, 1e-8);
             Likelihood likelihood = evaluate(optimized.parameters(), order,
                 seasonal, includeMean, observed, backend);
+            if (!Double.isFinite(likelihood.variance()) || !(likelihood.variance() > 0)
+                    || likelihood.negativeLogLikelihood() >= Double.MAX_VALUE / 16)
+                throw new IllegalArgumentException("no finite exact likelihood: degenerate or numerically invalid innovation variance");
             double[] rawCovariance = inverseHessian(
                 optimized.parameters(), objective, backend);
             double[] coefficientCovariance = deltaCovariance(
                 optimized.parameters(), rawCovariance, order,
                 seasonal, includeMean, backend);
+            if (!optimized.converged()) Arrays.fill(coefficientCovariance, Double.NaN);
             double[] standardErrors = new double[parameters];
             for (int index = 0; index < parameters; index++) {
                 standardErrors[index] = Math.sqrt(Math.max(0.0,
@@ -83,9 +88,7 @@ public final class ExactArma {
             }
             ArimaMath.Coefficients coefficients = ArimaMath.decode(
                 optimized.parameters(), order, seasonal, includeMean, false);
-            double innovationVariance = likelihood.variance()
-                / ArimaMath.marginalVariancePerInnovation(
-                    coefficients.effectiveAr(), coefficients.effectiveMa());
+            double innovationVariance = likelihood.variance();
             int likelihoodParameters = parameters + 1;
             double logLikelihood = -likelihood.negativeLogLikelihood();
             return new ExactArmaResult(order, coefficients.ar(), coefficients.ma(),
@@ -111,8 +114,13 @@ public final class ExactArma {
                 || observed.get(0).values().length != series.get(0).length) {
             return false;
         }
-        ArimaResult conditional = Arima.fit(series.get(0), order,
-            ArimaOptions.builder().includeMean(includeMean).build());
+        ArimaResult conditional;
+        try {
+            conditional = Arima.fit(series.get(0), order,
+                ArimaOptions.builder().includeMean(includeMean).build());
+        } catch (IllegalArgumentException exception) {
+            return false; // A conditional seed is optional; its sample-size rules differ.
+        }
         double[] encoded = ArimaMath.encodeAutoregressive(
             conditional.autoregressive());
         if (encoded == null) return false;
@@ -137,48 +145,24 @@ public final class ExactArma {
         double quadratic = 0.0;
         double logDeterminant = 0.0;
         int observations = 0;
+        ArimaStateSpace model;
+        try {
+            model = new ArimaStateSpace(coefficients.effectiveAr(), coefficients.effectiveMa(), new double[] {1});
+        } catch (IllegalArgumentException exception) {
+            return new Likelihood(Double.MAX_VALUE / 8.0, Double.NaN);
+        }
         for (ObservedSeries value : series) {
-            int size = value.values().length;
-            double[] centered = new double[size];
-            for (int row = 0; row < size; row++) {
-                centered[row] = value.values()[row] - coefficients.location();
-            }
-            if (size == value.originalLength()) {
-                double[] correlation = ArimaMath.autocorrelation(size,
-                    coefficients.effectiveAr(), coefficients.effectiveMa());
-                double[] contribution =
-                    toeplitzLikelihood(centered, correlation);
-                if (contribution == null) {
-                    return new Likelihood(Double.MAX_VALUE / 8.0, Double.NaN);
-                }
-                quadratic += contribution[0];
-                logDeterminant += contribution[1];
-                observations += size;
-                continue;
-            }
-            double[] full = ArimaMath.correlationMatrix(
-                value.originalLength(), coefficients.effectiveAr(),
-                coefficients.effectiveMa());
-            double[] covariance = new double[size * size];
-            for (int row = 0; row < size; row++) {
-                for (int column = 0; column < size; column++) {
-                    covariance[row * size + column] = full[
-                        value.indices()[row] * value.originalLength()
-                            + value.indices()[column]];
-                }
-            }
             try {
-                CholeskyFactor factor = backend.dpotrf(covariance, size);
-                double[] solved = factor.solve(centered);
-                quadratic += backend.ddot(size, centered, 0, 1, solved, 0, 1);
-                logDeterminant += factor.logDeterminant();
-                observations += size;
+                ArimaStateSpace.Evaluation contribution = model.filter(value.original(), coefficients.location(), 0, false);
+                quadratic += contribution.quadratic();
+                logDeterminant += contribution.logDeterminant();
+                observations += contribution.observations();
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 return new Likelihood(Double.MAX_VALUE / 8.0, Double.NaN);
             }
         }
         double variance = quadratic / observations;
-        if (!(variance > 1e-14) || !Double.isFinite(variance)) {
+        if (!(variance > 0) || !Double.isFinite(variance)) {
             return new Likelihood(Double.MAX_VALUE / 8.0, Double.NaN);
         }
         double nll = 0.5 * (observations
@@ -227,28 +211,62 @@ public final class ExactArma {
             throw new IllegalArgumentException("each series must have at least three positions");
         }
         int count = 0;
-        for (double value : series) if (Double.isFinite(value)) count++;
+        for (double value : series) {
+            if (Double.isInfinite(value)) throw new IllegalArgumentException("infinite observation; use NaN for missing");
+            if (!Double.isNaN(value)) count++;
+        }
         if (count < 3) throw new IllegalArgumentException("each series needs three observed values");
         double[] values = new double[count];
-        int[] indices = new int[count];
         int target = 0;
         for (int index = 0; index < series.length; index++) {
             if (Double.isFinite(series[index])) {
-                values[target] = series[index];
-                indices[target++] = index;
+                values[target++] = series[index];
             }
         }
-        return new ObservedSeries(values, indices, series.length);
+        return new ObservedSeries(values, series.clone());
     }
 
     private static double[] inverseHessian(
             double[] point, MultivariableFunction objective, ComputeBackend backend) {
         int size = point.length;
         if (size == 0) return new double[0];
+        double[] hessian = hessian(point, objective, 1e-4);
+        double[] alternate = hessian(point, objective, 2e-4);
+        double[] normalized = new double[size * size];
+        double error = 0;
+        boolean valid = true;
+        for (int i = 0; i < size; i++) valid &= hessian[i * size + i] > 0;
+        if (valid) for (int i = 0; i < size; i++) {
+            double rowError = 0;
+            for (int j = 0; j < size; j++) {
+                double scale = Math.sqrt(hessian[i * size + i]) * Math.sqrt(hessian[j * size + j]);
+                normalized[i * size + j] = hessian[i * size + j] / scale;
+                rowError += Math.abs(hessian[i * size + j] - alternate[i * size + j]) / scale;
+            }
+            error = Math.max(error, rowError);
+        }
+        if (valid && Double.isFinite(error)) {
+            // Require positive information separated from differentiation error.
+            // Subtracting this guard tests identification; never add a ridge to
+            // manufacture finite SEs along an AR/MA cancellation direction.
+            double guard = Math.max(1e-6, 4 * error);
+            for (int i = 0; i < size; i++) normalized[i * size + i] -= guard;
+            try {
+                backend.dpotrf(normalized, size);
+                return backend.dpotrf(hessian, size).solve(MatrixOps.identity(size), size);
+            } catch (IllegalArgumentException | IllegalStateException ignored) { }
+        }
+        double[] result = new double[size * size];
+        Arrays.fill(result, Double.NaN);
+        return result;
+    }
+
+    private static double[] hessian(double[] point, MultivariableFunction objective, double step) {
+        int size = point.length;
         double[] hessian = new double[size * size];
         double center = objective.eval(point);
         for (int first = 0; first < size; first++) {
-            double h1 = 1e-4 * (1.0 + Math.abs(point[first]));
+            double h1 = step * (1.0 + Math.abs(point[first]));
             double[] plus = point.clone();
             double[] minus = point.clone();
             plus[first] += h1;
@@ -256,7 +274,7 @@ public final class ExactArma {
             hessian[first * size + first] =
                 (objective.eval(plus) - 2.0 * center + objective.eval(minus)) / (h1 * h1);
             for (int second = 0; second < first; second++) {
-                double h2 = 1e-4 * (1.0 + Math.abs(point[second]));
+                double h2 = step * (1.0 + Math.abs(point[second]));
                 double[] pp = point.clone(); pp[first] += h1; pp[second] += h2;
                 double[] pm = point.clone(); pm[first] += h1; pm[second] -= h2;
                 double[] mp = point.clone(); mp[first] -= h1; mp[second] += h2;
@@ -267,21 +285,7 @@ public final class ExactArma {
                 hessian[second * size + first] = value;
             }
         }
-        double ridge = 1e-10;
-        for (int attempt = 0; attempt < 12; attempt++) {
-            double[] regularized = hessian.clone();
-            for (int index = 0; index < size; index++)
-                regularized[index * size + index] += ridge;
-            try {
-                return backend.dpotrf(regularized, size)
-                    .solve(MatrixOps.identity(size), size);
-            } catch (IllegalArgumentException | IllegalStateException ignored) {
-                ridge *= 10.0;
-            }
-        }
-        double[] result = new double[size * size];
-        Arrays.fill(result, Double.NaN);
-        return result;
+        return hessian;
     }
 
     private static double[] deltaCovariance(
@@ -323,6 +327,6 @@ public final class ExactArma {
         return result;
     }
 
-    private record ObservedSeries(double[] values, int[] indices, int originalLength) { }
+    private record ObservedSeries(double[] values, double[] original) { }
     private record Likelihood(double negativeLogLikelihood, double variance) { }
 }

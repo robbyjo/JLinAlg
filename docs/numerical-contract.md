@@ -528,8 +528,12 @@ matrix-first `MetaCorrelatedAnalysis`, `MetaClusterRobust`,
 `MetaPublicationBias`, and `MetaEffectSizes` APIs provide explicit bounded
 extensions for correlated effects, clustered inference, diagnostics, and
 effect-size construction. They do not silently alter the original independent
-study engine: correlated pooling is intercept-only, robust inference requires
-cluster labels, and the diagnostics are asymptotic screening tests.
+study engine: scalar correlated pooling is intercept-only, while
+`MetaMultilevelRegression` jointly estimates full ML/REML random-moderator
+covariance blocks. Robust inference requires independent cluster labels;
+CR2 supplies coefficient-specific Satterthwaite DF. PET/PEESE and Egger use
+their documented t references; L0/R0/Q0 trim-and-fill is an iterative
+sensitivity diagnostic, not proof that publication bias is corrected.
 
 `PreparedMetaAnalysisBatch` applies the same intercept-only definitions to a
 rectangular row-major batch. Every analysis must contain the same number of at
@@ -540,6 +544,14 @@ provenance. Parallel workers own disjoint result rows, so changing parallelism
 does not change reduction order within an analysis.
 
 ## Reproducibility
+
+The [advanced statistical contracts](vignettes/advanced-extensions.md) specify
+joint latent/ordinal/FIML SEM, exact diffuse filtering, sparse unstructured
+covariance/profile refits, conditional summary-score MR, adaptive scalar
+GLMM quadrature, and selection-aware/semiparametric inference. They supersede
+earlier limited-extension descriptions. The
+[September 8 validation report](advanced-validation.md) links executable R
+references, adversarial regression checks, measured speed, and remaining limits.
 
 Backend reductions can differ in order and rounding. Tests use the deterministic
 JDistlib CPU backend. Production results record the requested policy, concrete

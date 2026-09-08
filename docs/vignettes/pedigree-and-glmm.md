@@ -166,6 +166,115 @@ Cholesky factor per calling worker. The random-effect Hessian is assembled as
 `A^-1` and grouped `Z` therefore remain sparse; neither `A` nor `ZAZ'` is
 materialized. Close the prepared scan only after all worker tasks finish.
 
+## Adaptive quadrature for independent grouped random intercepts
+
+`GlmmQuadrature` maximizes the marginal likelihood with mode/curvature adaptive
+Gauss–Hermite integration. It accepts the built-in `GlmFamilies.binomial()`
+(logit, Bernoulli or binomial counts) and `GlmFamilies.poisson()` (log, counts),
+both at dispersion one. Other families, including quasi-likelihood and families
+with unknown dispersion, are rejected. Groups must be independent; fitting
+requires at least two groups and a full-rank fixed design.
+
+```java
+GlmmQuadratureOptions controls = GlmmQuadratureOptions.defaults();
+GlmmQuadratureResult fit = GlmmQuadrature.fit(
+    binaryResponse, fixed, groupIds, GlmFamilies.binomial(), controls);
+if (!fit.converged()) throw new IllegalStateException(fit.status());
+double[] beta = fit.beta();
+double[] se = fit.standardErrors();
+double[][] covariance = fit.fixedEffectCovariance();
+double variance = fit.randomVariance();
+```
+
+The full overload accepts trial counts and offsets before `controls`. Binomial
+responses are proportions with integer `response * trials` (allowing two ULPs
+of round-trip floating-point error for supplied trials greater than one); without trials,
+responses must be zero or one. A binomial count row includes its combinatorial
+constant, so collapsing ordered Bernoulli rows changes the reported likelihood
+by the corresponding log binomial coefficient. Poisson trials must be absent
+or all one; exposure belongs in the log offset. General observation weights,
+random slopes, crossed grouping factors, and estimated dispersion are not
+implemented in this API.
+
+For each group, write `u = b / sd` and
+`h(u) = sum(log p(y | X beta + offset + sd*u)) - u*u/2`.
+Safeguarded Newton iterations locate its unique mode `m`; the scale is
+`a = 1 / sqrt(-h''(m))`. The marginal integral is approximated by
+`a / sqrt(pi) * sum(w[k] * exp(h(m + sqrt(2)*a*z[k]) + z[k]*z[k]))`.
+Newton proposals must contract the score bracket, so large Poisson offsets do
+not consume the iteration budget in unit-sized steps. The implementation uses
+stable log probabilities, compensated sums, and log-sum-exp. Large-count masses
+use Stirling-error normalizers and cancellation-safe deviance terms instead of
+subtracting large log factorials. Hermite rules come from a tridiagonal eigensolver
+and are cached.
+
+Defaults start at 9 nodes and refine to at most 257, requiring two successive
+agreements within a per-group allocation of `1e-10` absolute total
+log-likelihood tolerance. `GlmmQuadratureOptions(initialNodes, maximumNodes,
+quadratureTolerance, maximumIterations, gradientTolerance)` controls these
+limits; the maximum supported order is 512. `evaluate(...)` exposes the
+fixed-parameter likelihood, maximum order actually used, estimated error, and
+convergence. A one-node rule reproduces Laplace, but cannot establish integration
+accuracy. Node-refinement error is an estimate, not a rigorous bound. Exhausting
+the budget never counts as quadrature convergence. The zero-variance model is
+evaluated directly without quadrature.
+
+Fitting uses projected BFGS with design- and information-scaled coefficients,
+two interior variance starts, and an explicitly optimized zero-variance candidate.
+The variance coordinate is `t = log1p(variance / v0)`, where `v0` is the reciprocal
+of the largest group's reference information. This resolves concentrated
+optima without imposing a positive variance floor. Interior derivatives
+differentiate the full marginal likelihood numerically. At variance zero,
+the coefficient score and right variance derivative are analytic; the latter
+uses `d log L / d variance = sum(h'' + h'^2) / 2`, with derivatives of each
+group's conditional log likelihood with respect to its random intercept.
+Convergence requires a small
+projected score, small information-based coefficient correction, successful
+integration, and positive definite observed information. Exhausted iterations,
+line searches, separation, and singular information do not automatically become
+successful fits. Multiple starts improve robustness but do not certify a global
+maximum. The iteration limit applies to each optimization start.
+
+At an interior optimum, `parameterCovariance()` transforms the inverse numerical
+Hessian back to the order fixed coefficients, random **variance**. Its fixed-effect block
+accounts for nuisance-variance uncertainty. `waldZ()` and `pValues()` provide
+asymptotic normal fixed-effect tests. At exactly zero variance,
+`varianceBoundary()` is true and `jointInferenceAvailable()` is false: only the
+fixed-effect covariance conditional on variance zero is returned, and the
+variance row/column is `NaN`. No ordinary Wald variance test is supplied at that
+nonregular boundary. Nonconverged estimates have `NaN` covariance.
+
+`fittedMeans()` averages over a **new** group's random-intercept distribution;
+it returns binomial probabilities or Poisson means, rather than conditional
+posterior-mode predictions. Binomial prediction integrals are separately checked
+and return `NaN` if they exhaust their node budget. Poisson means use the exact
+lognormal expectation `exp(eta + variance/2)`.
+
+The checked-in R fixtures cover eight fixed-parameter integrals, including
+10,000 Bernoulli observations, rare/all-zero outcomes, and concentrated Poisson
+counts, plus four 384-observation fits against `lme4::glmer(nAGQ=25)`. They check
+fixed effects, variance, full likelihood, joint covariance, standard errors,
+and new-group means. The audit's 50/50 Bernoulli example now gives
+`-70.94145611404414`, agreeing with R numerical integration. For count data,
+`lme4`'s reported nAGQ>1 likelihood uses a different additive constant; references
+independently integrate the full binomial/Poisson probability mass.
+
+Regenerate with `src/test/resources/r-reference/generate-quadrature-reference.R`.
+The additional `generate-quadrature-stress-reference.R` uses base R to cover
+both review-reported concentrated interior optima, their likelihood and covariance,
+count masses through `1e16`, valid large-denominator proportions, and Poisson
+offsets through 1000. Regression tests also reject genuinely fractional counts.
+Run `org.jlinalg.benchmark.GlmmQuadratureBenchmark` and
+`src/benchmark/r/quadrature_benchmark.R` from the repository root for comparable
+full-fit timings with accuracy gates. The recorded run and limitations are in
+`src/benchmark/resources/quadrature/accuracy-and-timing.md`.
+
+This is a numerical adaptive-quadrature alternative for independent scalar
+random intercepts. It does **not** implement pedigree-correlated or
+multidimensional adaptive quadrature. Pedigree models in this vignette still use
+the separate PQL or sparse Laplace paths described above; their approximation
+limitations are not removed by this addition.
+
 ## Zero-inflated Poisson and negative-binomial mixed models
 
 `SparseZeroInflatedMixedModel` maximizes a frequentist first-order Laplace

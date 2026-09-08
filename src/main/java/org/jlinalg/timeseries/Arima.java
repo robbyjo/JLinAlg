@@ -244,7 +244,7 @@ public final class Arima {
             maximumEvaluations, tolerance, 5);
     }
 
-    private static BoundedOptimizer.Result multiStart(
+    static BoundedOptimizer.Result multiStart(
             double[] initial,
             double[] lower,
             double[] upper,
@@ -257,7 +257,7 @@ public final class Arima {
             return BoundedOptimizer.minimize(initial, lower, upper, objective,
                 maximumEvaluations, tolerance);
         }
-        double[][] starts = new double[startCount][];
+        double[][] starts = new double[Math.min(startCount, Math.max(1, maximumEvaluations / 20))][];
         starts[0] = initial.clone();
         double[] levels = {0.55, -0.55, 0.3, -0.3};
         for (int start = 1; start < starts.length; start++) {
@@ -271,17 +271,15 @@ public final class Arima {
         int perStart = Math.max(20, maximumEvaluations / starts.length);
         BoundedOptimizer.Result best = null;
         int evaluations = 0;
-        boolean converged = false;
         for (double[] start : starts) {
             BoundedOptimizer.Result candidate = BoundedOptimizer.minimize(
                 start, lower, upper, objective, perStart, tolerance);
             evaluations += candidate.evaluations();
-            converged |= candidate.converged();
             if (best == null || candidate.objective() < best.objective()) {
                 best = candidate;
             }
         }
         return new BoundedOptimizer.Result(best.parameters(), best.objective(),
-            evaluations, converged);
+            evaluations, best.converged());
     }
 }

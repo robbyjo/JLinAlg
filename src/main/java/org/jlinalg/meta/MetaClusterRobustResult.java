@@ -13,11 +13,16 @@ public record MetaClusterRobustResult(
         double[] covariance,
         double tauSquared,
         int clusterCount,
-        BackendProvenance backend) {
+        BackendProvenance backend,
+        MetaRobustCorrection correction,
+        double[] confidenceLower, double[] confidenceUpper) {
     public MetaClusterRobustResult {
         coefficientNames = List.copyOf(coefficientNames);
         covariance = covariance.clone();
+        confidenceLower = confidenceLower.clone(); confidenceUpper = confidenceUpper.clone();
     }
     public double[] beta() { return associationStatistics.beta(); }
     @Override public double[] covariance() { return covariance.clone(); }
+    @Override public double[] confidenceLower() { return confidenceLower.clone(); }
+    @Override public double[] confidenceUpper() { return confidenceUpper.clone(); }
 }

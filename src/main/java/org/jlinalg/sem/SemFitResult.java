@@ -23,6 +23,23 @@ public final class SemFitResult {
     private final int evaluations;
     private final boolean converged;
     private final BackendProvenance backend;
+    private double[] impliedMeans;
+    private double[] parameterCovariance;
+    private double scoreNorm;
+    private RamFit.State state;
+
+    void attach(double[] means, double[] covariance, RamFit.State state, double scoreNorm) {
+        this.impliedMeans = means.clone(); this.parameterCovariance = covariance.clone();
+        this.state = state; this.scoreNorm = scoreNorm;
+    }
+    RamFit.State state() { return state; }
+    /** Observed means implied by (I-A)^-1 intercepts. */
+    public double[] impliedMeans() { return impliedMeans.clone(); }
+    /** Full row-major covariance in the order of parameters(), on the reported scale. */
+    public double[] parameterCovariance() { return parameterCovariance.clone(); }
+    public boolean informationAvailable() { return java.util.Arrays.stream(parameterCovariance).allMatch(Double::isFinite); }
+    /** Infinity norm of the per-observation score in optimization coordinates. */
+    public double scoreNorm() { return scoreNorm; }
 
     SemFitResult(List<SemParameterEstimate> parameters, double[] impliedCovariance,
             double logLikelihood, double chiSquare, int degreesOfFreedom,
@@ -54,7 +71,9 @@ public final class SemFitResult {
     public double[] impliedCovariance() { return impliedCovariance.clone(); }
     public double logLikelihood() { return logLikelihood; }
     public double chiSquare() { return chiSquare; }
+    /** Returns -1 when unidentified or numerically unavailable information prevents valid fit tests. */
     public int degreesOfFreedom() { return degreesOfFreedom; }
+    public boolean fitTestsAvailable() { return degreesOfFreedom>=0 && Double.isFinite(chiSquare); }
     public double pValue() { return pValue; }
     public double cfi() { return cfi; }
     public double tli() { return tli; }

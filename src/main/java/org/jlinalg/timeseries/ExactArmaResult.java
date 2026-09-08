@@ -51,6 +51,14 @@ public final class ExactArmaResult {
     /** Order is AR coefficients, MA coefficients, then mean when included. */
     public double[] coefficientCovariance() { return coefficientCovariance.clone(); }
     public double[] standardErrors() { return standardErrors.clone(); }
+    /** False when observed information is singular, numerically unresolved, or
+     * optimization did not converge. Inference does not regularize an
+     * unidentified AR/MA decomposition; unavailable covariance entries are NaN. */
+    public boolean coefficientInferenceAvailable() {
+        if (!converged) return false;
+        for (double value : coefficientCovariance) if (!Double.isFinite(value)) return false;
+        return true;
+    }
     public double logLikelihood() { return logLikelihood; }
     public double aic() { return aic; }
     public double bic() { return bic; }

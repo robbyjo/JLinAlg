@@ -1,0 +1,3 @@
+R version 4.6.1 (2026-06-24 ucrt)
+stats::arima(method="ML", SSinit="Rossignol2011", kappa=1e6)
+Independent seeded Gaussian simulations; forecasts include missing terminal observations.

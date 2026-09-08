@@ -116,4 +116,44 @@ public final class SparseLinearMixedModelResult {
     public int equationNonzeroCount() { return equationNonzeroCount; }
     public int factorNonzeroCount() { return factorNonzeroCount; }
     public BackendProvenance backend() { return backend; }
+
+    SparseLinearMixedModelResult withOptimization(int evaluations, boolean success) {
+        return copy(associationStatistics, fixedEffectCovariance, conditionalFittedValues,
+            conditionalResiduals, logLikelihood, evaluations, success);
+    }
+
+    SparseLinearMixedModelResult withInference(double[] covariance, double[] df,
+            org.jlinalg.inference.DegreesOfFreedomMethod method) {
+        double[] se = new double[df.length];
+        for (int i = 0; i < se.length; i++) se[i] = Math.sqrt(covariance[i * se.length + i]);
+        return copy(AssociationStatistics.studentT(beta(), se, df, method), covariance,
+            conditionalFittedValues, conditionalResiduals, logLikelihood, functionEvaluations, converged);
+    }
+
+    /** Reverses sqrt(weight) whitening and restores the response offset and likelihood Jacobian. */
+    public SparseLinearMixedModelResult withObservationScale(double[] weights, double[] offsets) {
+        int n = conditionalFittedValues.length;
+        if ((weights != null && weights.length != n) || (offsets != null && offsets.length != n))
+            throw new IllegalArgumentException("weights and offsets must match observations");
+        double[] fitted = conditionalFittedValues.clone(), residuals = conditionalResiduals.clone();
+        double likelihood = logLikelihood;
+        for (int i = 0; i < n; i++) {
+            double weight = weights == null ? 1 : weights[i];
+            double offset = offsets == null ? 0 : offsets[i];
+            if (!(weight > 0) || !Double.isFinite(weight) || !Double.isFinite(offset))
+                throw new IllegalArgumentException("weights must be positive and offsets finite");
+            fitted[i] = fitted[i] / Math.sqrt(weight) + offset;
+            residuals[i] /= Math.sqrt(weight);
+            likelihood += .5 * Math.log(weight);
+        }
+        return copy(associationStatistics, fixedEffectCovariance, fitted, residuals,
+            likelihood, functionEvaluations, converged);
+    }
+
+    private SparseLinearMixedModelResult copy(AssociationStatistics association, double[] covariance,
+            double[] fitted, double[] residuals, double likelihood, int evaluations, boolean success) {
+        return new SparseLinearMixedModelResult(componentNames, varianceComponents, association,
+            covariance, randomEffects, fitted, residuals, likelihood, varianceEstimation,
+            evaluations, success, randomCoefficientCount, equationNonzeroCount, factorNonzeroCount, backend);
+    }
 }

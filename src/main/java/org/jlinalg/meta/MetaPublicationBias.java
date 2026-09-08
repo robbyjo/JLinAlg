@@ -6,33 +6,23 @@ import java.util.Arrays;
 import java.util.List;
 import jdistlib.Normal;
 
-/** Deterministic publication-bias diagnostics without resampling. */
+/** Egger's multiplicative-dispersion t test and an approximate Spearman rank diagnostic.
+ * The rank diagnostic is not Begg's Kendall test (metafor ranktest). */
 public final class MetaPublicationBias {
     private MetaPublicationBias() { }
 
     public static MetaPublicationBiasResult diagnose(List<MetaStudy> studies) {
         MetaMath.Data data = MetaMath.data(studies);
         int n = studies.size();
-        double sumX = 0, sumY = 0, sumXX = 0, sumXY = 0;
+        if (n < 3) throw new IllegalArgumentException("Egger inference requires at least three studies");
         double[] effects = data.effects();
         double[] errors = new double[n];
-        for (int i = 0; i < n; i++) {
-            errors[i] = Math.sqrt(data.variances()[i]);
-            double x = 1.0 / errors[i], y = effects[i] / errors[i];
-            sumX += x; sumY += y; sumXX += x * x; sumXY += x * y;
-        }
-        double determinant = n * sumXX - sumX * sumX;
-        if (!(determinant > 0.0)) throw new IllegalArgumentException("Egger regression requires varying standard errors");
-        double intercept = (sumXX * sumY - sumX * sumXY) / determinant;
-        double slope = (n * sumXY - sumX * sumY) / determinant;
-        double rss = 0.0;
-        for (int i = 0; i < n; i++) {
-            double residual = effects[i] / errors[i] - intercept - slope / errors[i];
-            rss += residual * residual;
-        }
-        double interceptSe = Math.sqrt((rss / Math.max(1, n - 2)) * sumXX / determinant);
-        double statistic = intercept / interceptSe;
-        double p = 2.0 * Normal.cumulative(-Math.abs(statistic), 0.0, 1.0, true, false);
+        for (int i = 0; i < n; i++) errors[i] = Math.sqrt(data.variances()[i]);
+        // WLS effect~SE is algebraically the standardized-effect Egger regression,
+        // with columns reversed. Use the shared QR fit instead of difference-of-sums normal equations.
+        MetaBiasCorrections.Result pet = MetaBiasCorrections.pet(studies);
+        double intercept = pet.slope(), interceptSe = pet.standardErrors()[1];
+        double statistic = pet.associationStatistics().statistics()[1], p = pet.pValues()[1];
         double rank = spearman(effects, errors);
         double rankStatistic = rank * Math.sqrt(Math.max(0.0, (n - 2.0) / Math.max(1e-15, 1.0 - rank * rank)));
         double rankP = 2.0 * Normal.cumulative(-Math.abs(rankStatistic), 0.0, 1.0, true, false);

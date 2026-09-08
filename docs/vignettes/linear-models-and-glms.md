@@ -134,8 +134,40 @@ double lambdaOneSe = cv.lambdaOneStandardError();
 
 Use `PenalizedRegressionInference.ridge` for model-based ridge inference.
 For LASSO/elastic net, `refitActiveSet` performs an optional OLS refit, but its
-p-values are conditional on the selected active set and are not automatically
-selection-valid.
+p-values treat the selected active set as fixed and ignore its selection.
+
+### Selection-aware inference
+
+`SelectionAwarePenalizedInference.fit` uses a deterministic held-out split:
+only the first `selectionFraction` of rows select predictors; weighted OLS on
+the remaining rows supplies inference. Full-data weights are split and
+propagated. High-dimensional selection is allowed provided the selected
+inference design has sufficient observations and rank. The rows in the two
+parts must be independent; this is not a solution for clustered/time-dependent
+rows split across the boundary. Do not select lambda using the inference rows.
+
+For same-data Gaussian inference at an externally fixed penalty, use:
+
+```java
+PolyhedralSelectiveInference.Result inference =
+    PolyhedralSelectiveInference.fit(y, predictors,
+        0.12, 1.0,       // fixed lambda and alpha; alpha=1 is LASSO
+        0.5, true,      // independently known noise SD; include intercept
+        0.95, BackendPolicy.CPU);
+```
+
+The method derives the active-sign and inactive KKT inequalities, conditions
+on that polyhedron, and inverts the truncated-normal distribution. It also
+supports elastic net with `0 < alpha < 1`. Coefficient targets are the
+selected-model least-squares projections, not shrunken penalized coefficients.
+Predictors are not standardized; centering for the intercept is deterministic.
+The selected design must have full column rank. Gaussian errors with known
+independent noise SD and a response-independent lambda are essential: plugging
+in a same-data residual SD or a CV-selected lambda does not preserve exactness.
+Intervals are conditional on the selected signs as well as the active set.
+Returned p-values are two-sided, whereas R's `fixedLassoInf` defaults to
+sign-oriented one-sided tests. See Lee et al. (2016),
+[Exact post-selection inference](https://arxiv.org/abs/1311.6238).
 
 ## Command-line regression
 

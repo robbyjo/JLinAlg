@@ -15,7 +15,8 @@ public record MetaCorrelatedResult(
         double generalizedQ,
         double qDegreesOfFreedom,
         double[] normalizedWeights,
-        BackendProvenance backend) {
+        BackendProvenance backend,
+        double confidenceLower, double confidenceUpper) {
     public MetaCorrelatedResult {
         studyNames = List.copyOf(studyNames);
         covariance = covariance.clone();

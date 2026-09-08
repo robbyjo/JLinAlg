@@ -20,6 +20,11 @@ public final class PartiallyLinearRegression {
         int rows = response.length, columns = linearPredictors[0] == null ? 0 : linearPredictors[0].length;
         if (columns < 1 || rows <= columns) throw new IllegalArgumentException("linear design is invalid");
         double[] x = flatten(linearPredictors, rows, columns), beta = new double[columns], smooth = new double[rows];
+        int intercept=-1;
+        for(int column=0;column<columns;column++) {
+            boolean constant=true;for(int row=1;row<rows;row++)constant&=linearPredictors[row][column]==linearPredictors[0][column];
+            if(constant&&linearPredictors[0][column]!=0)intercept=column;
+        }
         double[] fitted = new double[rows]; boolean converged = false; int iterations = 0;
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             ComputeBackend backend = context.backend();
@@ -31,8 +36,14 @@ public final class PartiallyLinearRegression {
                 double[] partial = new double[rows];
                 for (int row = 0; row < rows; row++) { double value = 0.0; for (int column = 0; column < columns; column++) value += x[row * columns + column] * nextBeta[column]; partial[row] = response[row] - value; }
                 double[] nextSmooth = KernelRegression.predict(nonlinearPredictor, partial, nonlinearPredictor, bandwidth);
+                if(intercept>=0) {
+                    double center=0;for(double value:nextSmooth)center+=value/rows;
+                    for(int row=0;row<rows;row++)nextSmooth[row]-=center;
+                    nextBeta[intercept]+=center/linearPredictors[0][intercept];
+                }
                 double change = 0.0;
                 for (int row = 0; row < rows; row++) change = Math.max(change, Math.abs(nextSmooth[row] - smooth[row]));
+                for(int column=0;column<columns;column++)change=Math.max(change,Math.abs(nextBeta[column]-beta[column])/(1+Math.abs(beta[column])));
                 beta = nextBeta; smooth = nextSmooth;
                 if (change <= 1e-8 * (1.0 + maxAbs(smooth))) { converged = true; break; }
             }
@@ -44,6 +55,12 @@ public final class PartiallyLinearRegression {
 
     public static Result fit(double[] response, double[][] linearPredictors, double[] nonlinearPredictor, double bandwidth) {
         return fit(response, linearPredictors, nonlinearPredictor, bandwidth, 100, BackendPolicy.PREFERRED);
+    }
+
+    /** Robinson partialling-out fit with HC3 covariance for identifiable slopes. */
+    public static PartiallyLinearInference.Result fitWithInference(double[] response,double[][] linearPredictors,
+            double[] nonlinearPredictor,double bandwidth,BackendPolicy backendPolicy) {
+        return PartiallyLinearInference.fit(response,linearPredictors,nonlinearPredictor,bandwidth,backendPolicy);
     }
 
     private static double maxAbs(double[] values) { double result = 0.0; for (double value : values) result = Math.max(result, Math.abs(value)); return result; }

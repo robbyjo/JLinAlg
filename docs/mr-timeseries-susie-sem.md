@@ -1,8 +1,9 @@
 # MR, time-series, SuSiE, and SEM scope
 
 > **Performance status:** SEM is directly validated against `lavaan` and
-> benchmarked on a TOPMed cardiometabolic path model. MR remains an initial
-> performance path. SuSiE is directly validated against susieR and benchmarked
+> benchmarked on a TOPMed cardiometabolic path model and joint latent/ordinal/FIML
+> fixtures. MR conditional/generalized/overlap-aware paths now have paired R timings.
+> See the [September 8 audit](advanced-validation.md). SuSiE is validated against susieR and benchmarked
 > on the package's official `N3finemapping` vignette data.
 
 ## Mendelian randomization
@@ -21,14 +22,23 @@ The PRESSO implementation is explicitly analytic and does not claim the
 simulation calibration of the R MR-PRESSO package. Exposure/outcome covariance
 must be supplied by the caller when samples overlap.
 
+`ConditionalAssociation` fits a Gaussian summary-score model with signed,
+allele-aligned LD. Its conditional instrument p-values are not causal MR
+p-values. `SecondarySignalClumper.select` implements conditional forward/backward
+selection; the older `clump` method is explicitly marginal LD pruning. The
+`mr-estimate` CLI and native SVG output expose these separate workflows; see
+[the end-to-end vignette](vignettes/mr-end-to-end.md).
+
 ## Time series
 
 `Arima` remains the fast conditional estimator and supports integration,
-seasonality, forecasting, and ARIMA-error LMMs. `ExactArma` evaluates the full
-stationary Gaussian Toeplitz covariance. Missing values are marginalized by
-subsetting that covariance, and independent panel likelihoods are summed under
-shared coefficients. This is exact for stationary ARMA, but is not an exact
-diffuse Kalman likelihood for integrated models.
+seasonality, forecasting, and ARIMA-error LMMs. `ExactArma` evaluates stationary
+Gaussian likelihood with state-sized missing-observation filtering; independent
+panel likelihoods are summed under shared coefficients. `DiffuseArima` adds
+symbolic exact diffuse recursions for integrated and seasonal models, including
+missing values and filtered-state forecasts. R's finite initialization and
+Java's exact diffuse normalization are distinguished in the
+[time-series vignette](vignettes/time-series.md).
 
 ## SuSiE
 
@@ -44,11 +54,13 @@ estimation.
 
 ## SEM
 
-`SemModel` uses the observed-variable RAM relationship
-`Sigma = (I - A)^-1 S (I - A)^-T`. Free residual variances are optimized on
-the log scale. Shared labels impose equality constraints. Current estimation
-uses complete-case covariance ML; latent measurement variables, mean
-structures, ordinal likelihoods, robust corrections, modification indices,
-and FIML missingness are outside this first engine.
-Optimization uses an analytic RAM likelihood gradient and expected Fisher
-information. See [TOPMed SEM validation and performance](topmed-sem-performance.md).
+`SemModel` uses RAM covariance `Sigma = (I-A)^-1 S (I-A)^-T` and means
+`mu = (I-A)^-1 intercept`, selecting observed margins from the joint latent
+distribution. Log variances and shared-label equality constraints are supported.
+`Sem` jointly fits latent/mean models; `SemFiml` directly maximizes the
+constrained observed-pattern likelihood. `SemOrdinal` jointly fits thresholds
+and RAM parameters with ordinal probit pairwise likelihood. Robust/cluster
+covariance, continuous-model efficient modification indices, and indirect delta
+inference are explicit APIs. Ordinal PML is not DWLS/WLSMV. See the
+[SEM vignette](vignettes/sem.md) for identification and unsupported extensions,
+and [TOPMed performance](topmed-sem-performance.md) for the earlier observed model.

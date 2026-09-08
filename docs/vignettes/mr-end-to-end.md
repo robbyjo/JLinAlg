@@ -207,12 +207,87 @@ java -jar jlinalg-<version>.jar mr-estimate \
   --output mr.estimates.tsv --plot mr.scatter.svg
 ```
 
-The SVG contains the aligned instrument points and the selected estimator's
-line. Use `--method ivw-fixed`, `ivw-random`, `egger`, or `weighted-median` for
-a single row. For a study with an LD correlation matrix, the Java
-`SecondarySignalClumper` API selects independent primary and secondary signals
-in p-value order; this is LD-conditioned selection, not genotype-level
-conditional regression.
+The SVG contains the instrument points and the selected estimator's line.
+Egger plots use the fitted intercept and orient both effects to the
+exposure-increasing allele, exactly as the regression does. Use `--method
+ivw-fixed`, `ivw-random`, `egger`, or `weighted-median` for a single causal
+effect row; its p-value column is `causal_p_value`. With `all`, the plot shows
+the first estimator (fixed IVW).
+`--backend cpu` selects portable CPU matrix algebra for generalized MR and
+avoids probing native devices for these typically small problems; the default
+remains `preferred`.
+
+### Conditional SNP associations and secondary signals
+
+Conditional association inference uses marginal SNP effects and SEs together
+with a signed, allele-aligned LD matrix in the exact input row order. This is
+a separate estimand from the causal MR coefficient. For example:
+
+```console
+java -jar jlinalg-<version>.jar mr-estimate --input harmonized.tsv \
+  --method conditional --ld signed-ld.tsv --condition-on rs123,rs456 \
+  --association exposure --confidence 0.90 --output conditional.tsv
+
+java -jar jlinalg-<version>.jar mr-estimate --input harmonized.tsv \
+  --method conditional --ld signed-ld.tsv --joint --output joint.tsv
+
+java -jar jlinalg-<version>.jar mr-estimate --input harmonized.tsv \
+  --method secondary-signals --ld signed-ld.tsv --p-threshold 5e-8 \
+  --max-signals 10 --output signals.tsv
+```
+
+`conditional` requires an explicit `--condition-on` list or `--joint` (all
+input SNPs). A member of the conditioning set is tested given every other
+member. For example, with `--condition-on rs123,rs456`, the rs123 row is tested
+given rs456; another SNP is tested given both. `--association outcome` selects
+the outcome columns. Single-trait tables with `variant_id`, `beta`, `se` also
+work; outcome columns are unnecessary for exposure selection. LD files are
+square CSV/TSV matrices without headers. Duplicate IDs, nonfinite values,
+asymmetric, singular or numerically near-singular LD are rejected.
+
+The Java API is `new ConditionalAssociationModel(associations, signedLd)`
+followed by `condition(conditioningIndices, confidenceLevel)`, where each
+`ConditionalAssociation` explicitly contains a **marginal** effect and SE.
+It uses the Gaussian summary-score model
+`z ~ N(R theta, R)`, with `z[j] = marginalBeta[j] / marginalSE[j]` and
+`theta[j] = jointBeta[j] / marginalSE[j]`. Given conditioning set C:
+
+```text
+v[j]        = 1 - R[j,C] solve(R[C,C], R[C,j])
+beta[j|C]  = marginalSE[j] * (z[j] - R[j,C] solve(R[C,C], z[C])) / v[j]
+SE[j|C]    = marginalSE[j] / sqrt(v[j])
+Z[j|C]     = beta[j|C] / SE[j|C]
+```
+
+Normal tail probabilities and confidence intervals use these conditional
+statistics. The output column `conditional_instrument_p_value` tests the SNP
+association with the named trait, including when `--association outcome` is
+used; it is never an MR causal-effect p-value. The `conditioned_on` column
+records the exact adjustment set. In particular, a SNP tagging a lead can
+have a highly significant marginal association and a zero conditional effect.
+The method does not copy marginal effects into conditional output.
+
+`SecondarySignalClumper.select(...)` performs forward selection using current
+conditional Z statistics, followed by backward removal of selected SNPs that
+fail the joint p-value threshold. It recomputes every SNP's test after each
+addition or removal and returns the lead-change history, final adjustment
+sets, selected IDs, and convergence status. A formerly strongest proxy can be
+removed when two underlying signals enter. Cycles or the iteration limit
+return `converged=false`; the CLI reports failure rather than presenting that
+selection as complete. Group labels in the Java API cap counts per group;
+all selected variants enter the conditioning model. Analyze separate
+phenotypes in separate calls. The older `SecondarySignalClumper.clump(...)`
+remains marginal-p-value LD pruning and does not perform conditional inference.
+
+This model is exact for Gaussian scores with a known common residual variance
+and marginal SEs proportional to inverse genotype norms. With ordinary GWAS
+Wald estimates it is an approximation: it does not reconstruct differing
+sample overlaps or sample sizes, estimate a changed residual variance, model
+LD-reference uncertainty, or reproduce logistic individual-data regression.
+Normal intervals and p-values are nominal and do not adjust for the adaptive
+selection process. No ridge or pseudoinverse silently changes the estimand.
+Do not automatically pass conditional effects to generalized MR with the
+original LD covariance: joint effects have a different sampling covariance.
 
 No single diagnostic proves that all instruments are valid. Interpret the
 following together with biological annotation and study design.
@@ -312,6 +387,50 @@ OverlapAwareMrResult overlap =
 
 `samplingCovariance[j]` is the covariance of the exposure and outcome effect
 estimates for SNP `j`, not an overlap fraction. Check `overlap.converged()`.
+The overload `ivw(instruments, samplingCovariance, confidenceLevel)` and CLI
+`--confidence` control its normal confidence intervals, including under
+`--method all`. The method solves an iteratively reweighted estimating equation
+using variance `seY^2 + beta^2 * seX^2 - 2 * beta * covariance`; its reported SE
+uses the final coefficient. It is not a maximized errors-in-variables
+likelihood, and it assumes independence between SNPs. The CLI rejects a
+nonconverged fit. Generalized IVW and generalized Egger separately account for
+between-SNP LD; this release does not combine LD and exposure/outcome overlap
+into one estimator.
+
+### R accuracy and timing evidence
+
+The frozen fixture
+`src/test/resources/r-reference/mr-conditional.properties` is generated by
+`generate-mr-conditional-reference.R` in that directory. It uses base R
+matrix solves for the same conditional score model, fixed/multiplicative
+generalized IVW, oriented generalized Egger, and overlap estimating equation,
+all at 90% confidence. An independent individual-design Gaussian regression
+with known residual variance also verifies joint conditional coefficients.
+Tests compare beta, SE, p-value and interval endpoints at absolute tolerance
+`2e-11`, plus identity-LD reduction, lead replacement, vanished tag signals,
+input rejection, CLI confidence propagation and SVG geometry.
+
+On this Windows host (2026-09-08), 20,000 five-SNP fits after 2,000 warmup fits
+in each language gave these elapsed
+times. Each timing consumes the sum of every reported coefficient, SE,
+p-value and interval endpoint; Java first checks that sum against the fixture.
+
+| Operation | Java seconds | R seconds | Consumed checksum |
+| --- | ---: | ---: | ---: |
+| Conditional tests given SNPs 1 and 3 | 0.060334 | 2.080 | -25593.3082721 |
+| Generalized fixed IVW | 0.026450 | 0.700 | 58442.0798885 |
+| Generalized Egger slope and intercept | 0.032336 | 0.850 | 49553.3001437 |
+| Overlap estimating equation | 0.024302 | 0.190 | 59723.9205848 |
+
+These are small-workload measurements, not universal speed ratios. R timings
+have coarse resolution; the R conditional oracle refits each augmented
+regression independently, while Java shares a conditioning factorization.
+Java includes model construction for conditional tests and uses the portable
+CPU backend for generalized MR. JVM/native startup, file I/O, larger LD
+matrices, and signal selection are outside these timings. Run the R generator
+and `org.jlinalg.benchmark.MrConditionalBenchmark` to reproduce them; the Java
+class can be compiled with `javac` against the existing main classes and
+JDistlib jar without changing the Gradle build.
 
 ## 10. Plotting
 
