@@ -172,6 +172,12 @@ public final class FastGlmAssociation {
                     weightedCovariates, observations, covariateCount,
                     projectionCoefficients, count);
                 double[] block = prepared.values();
+                double[] originalNorm = new double[count];
+                for (int row = 0; row < observations; row++)
+                    for (int variable = 0; variable < count; variable++) {
+                        double value = block[row * count + variable];
+                        originalNorm[variable] += value * value;
+                    }
                 for (int index = 0; index < block.length; index++)
                     block[index] -= fixedProjection[index];
                 for (int variable = 0; variable < count; variable++) {
@@ -184,7 +190,7 @@ public final class FastGlmAssociation {
                         score += value * workingResidual[row];
                         information += value * value;
                     }
-                    if (!(information > 1e-14)
+                    if (!(information > 1e-24 * originalNorm[variable])
                             || !Double.isFinite(information)) {
                         fail(destination, names.get(destination),
                             "predictor is constant or collinear with null covariates",
@@ -320,6 +326,10 @@ public final class FastGlmAssociation {
 
     private static void execute(
             int blocks, int parallelism, BlockOperation operation) {
+        if (parallelism == 1 || blocks == 1) {
+            for (int block = 0; block < blocks; block++) operation.run(block);
+            return;
+        }
         ForkJoinPool pool = new ForkJoinPool(Math.min(blocks, parallelism));
         try {
             pool.submit(() -> IntStream.range(0, blocks).parallel()

@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Nonlinear Gaussian fixed and additive mixed models with pedigree precision in JLinAlg."><title>Nonlinear models · JLinAlg 0.3.0</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a></div><h1>Nonlinear means, explicit random effects.</h1><p>Fit an analytic mean function with deterministic Gaussian least squares, then add sparse ordinary or pedigree random effects.</p></div></section>
+<section class="section"><div class="container prose"><h2>Supply a mean and gradient</h2><pre><code>NonlinearMeanFunction exponential = (theta, row) -&gt; {
+    double x = row * 0.25;
+    double mean = theta[0] * Math.exp(theta[1] * x);
+    return new NonlinearMeanFunction.Evaluation(mean,
+        new double[] {Math.exp(theta[1] * x), x * mean});
+};
+NonlinearFitResult fit = NonlinearFixedModel.fit(
+    response, new double[] {1.0, 0.1}, exponential,
+    NonlinearModelOptions.defaults(), BackendPolicy.CPU);</code></pre>
+<p>Check <code>converged()</code> before interpreting <code>beta()</code>, local standard errors, or the residual objective. Nonlinear parameterization and starting values matter; analytic gradients must match the supplied mean.</p>
+<h2>Add a sparse group effect</h2><pre><code>RandomEffectTerm group = RandomEffectTerm.randomIntercept("site", siteIds);
+NonlinearMixedFitResult mixed = NonlinearMixedModel.fit(
+    response, new double[] {1.0, 0.1}, exponential,
+    List.of(group), RemlOptions.defaults(),
+    NonlinearModelOptions.defaults(), BackendPolicy.CPU);</code></pre>
+<h2>Include pedigree structure</h2><pre><code>PedigreeRandomEffectTerm additive = PedigreeRandomEffectTerm.of(
+    "additive", observationIds, pedigree);
+NonlinearMixedFitResult animal = NonlinearMixedModel.fitPedigree(
+    response, new double[] {1.0, 0.1}, exponential,
+    List.of(additive), List.of(), RemlOptions.defaults(),
+    NonlinearModelOptions.defaults(), BackendPolicy.CPU);</code></pre>
+<p>Unphenotyped ancestors remain in the coefficient system. The model is <code>y = f(theta,x) + Zb + e</code>: random effects are additive on the response scale. Inspect <code>linearizedModel()</code> for variance components, conditional modes, and sparse diagnostics.</p>
+<h2>Statistical boundary and audit</h2><p>The mixed path uses local Gaussian linearization and REML updates. It is not a general nonlinear random-parameter model, exact nlme likelihood, or non-Gaussian adaptive quadrature. Version 0.3.0 checks the projected correction and final Jacobian instead of accepting a tiny damped step. Large shared response offsets can quantize a near-optimal fit and prevent a score certificate; that case now reports nonconvergence rather than accepting a response-scale floor. Independent R fixtures and reviewer counterexamples cover these limits.</p>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/nonlinear-models.md">Full source vignette and current validation →</a> · <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">Release audit →</a></p></div></section></main><site-footer root="../"></site-footer></body></html>

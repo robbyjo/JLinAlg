@@ -36,7 +36,7 @@ public final class ColocSusieResult {
         return sharedVariantPosterior.clone();
     }
 
-    /** Returns the H4-conditional variant posterior for one signal pair. */
+    /** Returns the H4-conditional variant posterior, or zeros if H4 has no support. */
     public double[] sharedVariantPosterior(int signalPair) {
         if (signalPair < 0 || signalPair >= signalPairs.size()) {
             throw new IndexOutOfBoundsException("signal pair index is invalid");

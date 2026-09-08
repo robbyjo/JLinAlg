@@ -40,8 +40,13 @@ public final class WeightedGam {
             adjusted[row] -= offsets[row];
             residualCovariance[row * response.length + row] = 1.0 / weights[row];
         }
-        return Gamm.fitGaussian(adjusted, parametricDesign, smoothTerms,
+        GammResult fitted = Gamm.fitGaussian(adjusted, parametricDesign, smoothTerms,
             List.of(), residualCovariance, options, backendPolicy);
+        double[] originalFitted = fitted.fittedValues();
+        for (int row = 0; row < response.length; row++) originalFitted[row] += offsets[row];
+        return new GammResult(fitted.reml(), parametricDesign[0].length,
+            fitted.smoothTerms(), fitted.randomContributions(), originalFitted,
+            fitted.residuals(), fitted.totalEffectiveDegreesOfFreedom());
     }
 
     /** Fits with unit weights, useful for applying only an offset. */

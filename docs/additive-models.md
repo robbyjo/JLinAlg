@@ -30,6 +30,10 @@ double p = fit.parametricPValues()[1];
 `GeneralizedGam.fit` uses penalized quasi-likelihood/IRLS with prior weights and
 offsets for all `GlmFamilies`. `WeightedGam` supplies exact inverse-variance
 weights and offsets for Gaussian REML.
+`WeightedGam` returns fitted values on the original response scale, including
+the supplied offset; its underlying `reml()` fit models `y - offset`.
+These weighted/generalized GAM paths use dense observation covariance and
+are not advertised as sparse, large-n solvers.
 
 For multiple penalties, `QuadraticSmoothTerm` is the common representation.
 `GaussianSmoothSelector` supports fixed smoothing, GCV, UBRE, and AIC. Tensor
@@ -170,3 +174,12 @@ likelihood, and category probabilities with `VGAM` 1.1-14. The corresponding
 generators and versioned properties are under
 `src/test/resources/r-reference`. `generate-additive-optional-references.R`
 also smoke-tests `gamm4` and `gam` when those packages are installed.
+
+The [2026-09 distributional/GAM audit](distributional-gam-audit.md) adds
+extreme beta/NB/Poisson density checks, stable zero-truncated-Poisson
+derivatives, original-scale weighted-offset identities, nonstationary
+tiny-step rejection, and observed NB covariance against `glmmTMB`. NB uses
+a stabilized positive scoring metric during iteration, but reports the
+inverse observed Hessian at the solution, including mean/size cross terms.
+The sparse beta/ZI likelihood fixes and convergence-qualified timings are
+documented there separately from the dense GAM paths.

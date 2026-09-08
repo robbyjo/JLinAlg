@@ -38,15 +38,15 @@ final class ZeroInflatedMixedRReferenceTest {
                 data.design(), 2, null, 0, null);
         }
         assertVector(zip.countCoefficients(), reference,
-            "zip_count_intercept", "zip_count_x", 0.035);
+            "zip_count_intercept", "zip_count_x", 1e-4);
         assertVector(zip.zeroCoefficients(), reference,
-            "zip_zero_intercept", "zip_zero_x", 0.08);
+            "zip_zero_intercept", "zip_zero_x", 1e-4);
         assertEquals(value(reference, "zip_count_sd"),
-            Math.sqrt(zip.varianceComponents()[0]), 0.07);
+            Math.sqrt(zip.varianceComponents()[0]), 1e-4);
         assertEquals(value(reference, "zip_zero_sd"),
-            Math.sqrt(zip.varianceComponents()[1]), 0.12);
+            Math.sqrt(zip.varianceComponents()[1]), 1e-4);
         assertEquals(value(reference, "zip_log_likelihood"),
-            zip.marginalLogLikelihood(), 0.35);
+            zip.marginalLogLikelihood(), 1e-6);
         double[] standardErrors = zip.standardErrors();
         assertEquals(value(reference, "zip_count_intercept_se"),
             standardErrors[0], 0.025);
@@ -63,14 +63,16 @@ final class ZeroInflatedMixedRReferenceTest {
                 List.of(count), null, List.of(), null, List.of(), null,
                 options, BackendPolicy.CPU);
         assertVector(zinb.countCoefficients(), reference,
-            "zinb_count_intercept", "zinb_count_x", 0.05);
+            "zinb_count_intercept", "zinb_count_x", 1e-4);
         assertVector(zinb.zeroCoefficients(), reference,
-            "zinb_zero_intercept", "zinb_zero_x", 0.12);
-        assertEquals(value(reference, "zinb_size"), zinb.sizes()[0], 0.18);
+            "zinb_zero_intercept", "zinb_zero_x", 1e-4);
+        assertEquals(value(reference, "zinb_size"), zinb.sizes()[0], 1e-3);
         assertEquals(value(reference, "zinb_count_sd"),
-            Math.sqrt(zinb.varianceComponents()[0]), 0.10);
+            Math.sqrt(zinb.varianceComponents()[0]), 1e-4);
         assertEquals(value(reference, "zinb_log_likelihood"),
-            zinb.marginalLogLikelihood(), 0.6);
+            zinb.marginalLogLikelihood(), 1e-6);
+        System.out.printf("ZI R zip converged=%s LL=%.12f calls=%d; zinb converged=%s LL=%.12f calls=%d%n",
+            zip.converged(),zip.marginalLogLikelihood(),zip.objectiveEvaluations(),zinb.converged(),zinb.marginalLogLikelihood(),zinb.objectiveEvaluations());
         assertTrue(zip.converged() && zinb.converged());
     }
 

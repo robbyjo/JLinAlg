@@ -134,11 +134,11 @@ public final class VcfVariantSource implements VariantSource {
     private static double dosage(
             Genotype genotype, Allele alternate, int alternateIndex,
             int alternateCount) {
-        if (genotype == null || !genotype.isAvailable()) return Double.NaN;
+        if (genotype == null) return Double.NaN;
         Object raw = genotype.getAnyAttribute("DS");
         Double dosage = dosageAttribute(raw, alternateIndex, alternateCount);
         if (dosage != null) return dosage;
-        if (!genotype.isCalled()) return Double.NaN;
+        if (!genotype.isAvailable() || !genotype.isCalled()) return Double.NaN;
         int count = 0;
         for (Allele allele : genotype.getAlleles()) {
             if (allele.isNoCall()) return Double.NaN;

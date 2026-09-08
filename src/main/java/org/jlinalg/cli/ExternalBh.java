@@ -13,6 +13,8 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,8 +38,19 @@ final class ExternalBh implements AutoCloseable {
     private long rows;
     private long tests;
     private boolean finished;
+    private boolean closed;
+    private boolean headerWritten;
+    private final boolean overwrite;
 
     ExternalBh(Path output, boolean overwrite) throws IOException {
+        this(output, overwrite, (int) Math.max(10_000,
+            Math.min(500_000, Runtime.getRuntime().maxMemory() / 512)));
+    }
+
+    /** Explicit run size for deterministic bounded-memory tests/benchmarks. */
+    ExternalBh(Path output, boolean overwrite, int chunkCapacity) throws IOException {
+        if (chunkCapacity < 1) throw new IllegalArgumentException("BH run size must be positive");
+        this.overwrite = overwrite;
         this.output = output.toAbsolutePath().normalize();
         if (Files.exists(this.output) && !overwrite)
             throw new IOException("output exists; use --overwrite: " + output);
@@ -49,20 +62,24 @@ final class ExternalBh implements AutoCloseable {
                 "partial output exists; use --resume or --overwrite: " + raw);
         work = Files.createTempDirectory(parent, ".jlinalg-bh-");
         qValues = work.resolve("q.bin");
-        rawWriter = Files.newBufferedWriter(raw, StandardCharsets.UTF_8);
+        rawWriter = Files.newBufferedWriter(raw, StandardCharsets.UTF_8,
+            overwrite ? java.nio.file.StandardOpenOption.CREATE
+                : java.nio.file.StandardOpenOption.CREATE_NEW,
+            java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
         initialQ = new DataOutputStream(new BufferedOutputStream(
             Files.newOutputStream(qValues)));
-        long memory = Runtime.getRuntime().maxMemory();
-        chunkCapacity = (int) Math.max(10_000,
-            Math.min(500_000, memory / 512));
+        this.chunkCapacity = chunkCapacity;
     }
 
     void writeHeader(List<String> fields) throws IOException {
-        rawWriter.write(String.join("\t", fields));
+        if (closed || headerWritten) throw new IOException("BH header already written or output closed");
+        rawWriter.write(join(fields));
         rawWriter.newLine();
+        headerWritten = true;
     }
 
     void write(List<String> fields, double pValue) throws IOException {
+        if (closed || !headerWritten) throw new IOException("BH output requires an open header");
         rawWriter.write(join(fields));
         rawWriter.newLine();
         initialQ.writeDouble(Double.NaN);
@@ -78,7 +95,8 @@ final class ExternalBh implements AutoCloseable {
 
     void finish() throws IOException {
         if (finished) return;
-        finished = true;
+        if (closed || !headerWritten) throw new IOException("BH output is closed or lacks a header");
+        closed = true;
         rawWriter.close();
         initialQ.close();
         flushChunk();
@@ -92,11 +110,11 @@ final class ExternalBh implements AutoCloseable {
                     complete, StandardCharsets.UTF_8);
              DataInputStream qInput = new DataInputStream(
                     new BufferedInputStream(Files.newInputStream(qValues)))) {
-            String header = input.readLine();
+            String header = readRecord(input);
             writer.write(header);
             writer.write("\tfdr_bh");
             writer.newLine();
-            for (String line; (line = input.readLine()) != null;) {
+            for (String line; (line = readRecord(input)) != null;) {
                 writer.write(line);
                 writer.write('\t');
                 double q = qInput.readDouble();
@@ -104,18 +122,28 @@ final class ExternalBh implements AutoCloseable {
                 writer.newLine();
             }
         }
-        Files.move(complete, output, StandardCopyOption.REPLACE_EXISTING,
-            StandardCopyOption.ATOMIC_MOVE);
+        // Without overwrite, the move must itself reject a concurrent output;
+        // ATOMIC_MOVE may replace it even without REPLACE_EXISTING.
+        if (!overwrite) Files.move(complete, output);
+        else try {
+            Files.move(complete, output, StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(complete, output, StandardCopyOption.REPLACE_EXISTING);
+        }
         Files.deleteIfExists(raw);
         cleanup();
+        finished = true;
     }
 
     @Override
     public void close() throws IOException {
-        if (!finished) {
-            rawWriter.close();
-            initialQ.close();
-        }
+        try {
+            if (!closed) {
+                closed = true;
+                try { rawWriter.close(); } finally { initialQ.close(); }
+            }
+        } finally { if (!finished) cleanup(); }
     }
 
     private void flushChunk() throws IOException {
@@ -125,7 +153,7 @@ final class ExternalBh implements AutoCloseable {
         Path chunk = work.resolve("chunk-" + chunks.size() + ".bin");
         try (DataOutputStream output = new DataOutputStream(
                 new BufferedOutputStream(Files.newOutputStream(chunk)))) {
-            output.writeInt(buffered.size());
+            output.writeLong(buffered.size());
             for (PValue value : buffered) {
                 output.writeDouble(value.p());
                 output.writeLong(value.row());
@@ -136,18 +164,38 @@ final class ExternalBh implements AutoCloseable {
     }
 
     private void merge(Path sorted) throws IOException {
+        List<Path> runs = new ArrayList<>(chunks);
+        // Limit open files independently of the number of input records.
+        while (runs.size() > 64) {
+            List<Path> next = new ArrayList<>();
+            for (int first = 0; first < runs.size(); first += 64) {
+                Path combined = work.resolve("chunk-" + chunks.size() + ".bin");
+                chunks.add(combined);
+                mergeRuns(runs.subList(first, Math.min(first + 64, runs.size())), combined, true);
+                next.add(combined);
+            }
+            for (Path run : runs) Files.deleteIfExists(run);
+            runs = next;
+        }
+        mergeRuns(runs, sorted, false);
+    }
+
+    private void mergeRuns(List<Path> runs, Path sorted, boolean header) throws IOException {
         PriorityQueue<Cursor> queue = new PriorityQueue<>(
             Comparator.comparingDouble((Cursor value) -> value.current.p())
                 .thenComparingLong(value -> value.current.row()));
         List<Cursor> cursors = new ArrayList<>();
         try {
-            for (Path chunk : chunks) {
+            long count = 0;
+            for (Path chunk : runs) {
                 Cursor cursor = new Cursor(chunk);
                 cursors.add(cursor);
                 if (cursor.current != null) queue.add(cursor);
+                count = Math.addExact(count, cursor.remaining + (cursor.current == null ? 0 : 1));
             }
             try (DataOutputStream output = new DataOutputStream(
                     new BufferedOutputStream(Files.newOutputStream(sorted)))) {
+                if (header) output.writeLong(count);
                 while (!queue.isEmpty()) {
                     Cursor cursor = queue.remove();
                     output.writeDouble(cursor.current.p());
@@ -166,13 +214,19 @@ final class ExternalBh implements AutoCloseable {
         try (RandomAccessFile values = new RandomAccessFile(sorted.toFile(), "r");
              RandomAccessFile q = new RandomAccessFile(qValues.toFile(), "rw")) {
             double running = 1.0;
+            byte[] record = new byte[16];
+            ByteBuffer decoded = ByteBuffer.wrap(record);
+            byte[] encodedQ = new byte[8];
+            ByteBuffer qBuffer = ByteBuffer.wrap(encodedQ);
             for (long rank = tests; rank >= 1; rank--) {
                 values.seek((rank - 1) * 16);
-                double p = values.readDouble();
-                long row = values.readLong();
+                values.readFully(record);
+                double p = decoded.getDouble(0);
+                long row = decoded.getLong(8);
                 running = Math.min(running, p * tests / rank);
                 q.seek(row * 8);
-                q.writeDouble(Math.min(1.0, running));
+                qBuffer.putDouble(0, Math.min(1.0, running));
+                q.write(encodedQ);
             }
         }
     }
@@ -181,7 +235,28 @@ final class ExternalBh implements AutoCloseable {
         for (Path chunk : chunks) Files.deleteIfExists(chunk);
         Files.deleteIfExists(work.resolve("sorted.bin"));
         Files.deleteIfExists(qValues);
+        Files.deleteIfExists(work.resolve("complete.tsv"));
         Files.deleteIfExists(work);
+    }
+
+    /** Reads one quoted TSV record, retaining embedded CR/LF verbatim. */
+    private static String readRecord(BufferedReader input) throws IOException {
+        StringBuilder record = new StringBuilder();
+        boolean quoted = false;
+        for (int value; (value = input.read()) != -1;) {
+            char c = (char) value;
+            if (c == '"') quoted = !quoted; // doubled quotes toggle twice
+            if (!quoted && (c == '\n' || c == '\r')) {
+                if (c == '\r') {
+                    input.mark(1);
+                    if (input.read() != '\n') input.reset();
+                }
+                return record.toString();
+            }
+            record.append(c);
+        }
+        if (quoted) throw new IOException("unterminated quoted BH record");
+        return record.isEmpty() ? null : record.toString();
     }
 
     private static String join(List<String> fields) {
@@ -205,12 +280,12 @@ final class ExternalBh implements AutoCloseable {
 
     private static final class Cursor implements AutoCloseable {
         private final DataInputStream input;
-        private int remaining;
+        private long remaining;
         private PValue current;
         private Cursor(Path path) throws IOException {
             input = new DataInputStream(new BufferedInputStream(
                 Files.newInputStream(path)));
-            remaining = input.readInt();
+            remaining = input.readLong();
             advance();
         }
         private void advance() throws IOException {

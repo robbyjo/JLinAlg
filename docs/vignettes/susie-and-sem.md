@@ -54,11 +54,31 @@ SusieResult summary = Susie.fitSummary(
 ```
 
 Summary mode uses the same finite-sample z transformation as `susieR::susie_rss`.
-It validates a finite symmetric correlation matrix from an ancestry-matched
-reference, but—like susieR's default `check_input = FALSE`—does not run an
-eager cubic positive-semidefinite factorization.
+It requires an integer sample size greater than two, unique variant names,
+and a finite symmetric positive-semidefinite LD correlation matrix from an
+ancestry-matched reference. Singular LD is allowed. External LD is checked
+with scaled pivoted Cholesky: O(P³) worst-case work and O(P²) storage, unlike
+susieR's default `check_input = FALSE`. This extra safety cost is included in
+the new summary-mode benchmark; it does not apply to the individual-level
+cross-product builder, whose matrix is already known to be PSD.
 Use `fitSufficientStatistics` when `X'X`, `X'y`, and `y'y` are available on a
-different scale. Credible-set purity is the minimum absolute within-set LD;
+different scale. That method checks the joint cross-product matrix for PSD,
+so an impossible `X'y` is rejected as well. The summary z transformation uses
+`hypot` to avoid squaring overflow, and tiny nonzero PIPs are retained using
+log-complement accumulation.
+
+The conjugate update also retains representable posterior means for tiny
+positive priors: it forms the posterior variance on the smaller-variance
+scale and evaluates products/quotients with separated binary exponents.
+For scalar `X'X=1e-200`, `X'y=1e-100`, `y'y=1`, `n=2`, and fixed prior
+variance `1e-200`, the posterior mean is `1e-300`, not a zero caused by an
+underflowed shrinkage ratio.
+
+An exhausted iteration budget returns `converged() == false` and retains the
+residual variance used to produce the returned posterior and objective; it
+does not report an extra unperformed variance update. A large objective
+decrease cannot satisfy the convergence test. Check convergence before using
+the credible sets downstream. Credible-set purity is the minimum absolute within-set LD;
 always inspect it alongside coverage and PIP.
 
 On the bundled 574-by-1,001 vignette benchmark, the portable CPU path matches
@@ -66,6 +86,13 @@ fixed-prior susieR PIPs and coefficients within `2e-10` and is 4.83 times faster
 on the documented i9-9900K run. See
 [performance benchmarks](../performance-benchmarks.md) for exact commands and
 environment.
+
+The [boundary audit](../../src/benchmark/resources/genetic-audit/AUDIT.md)
+preserves the existing N3 reference tolerances and adds exact one-effect
+normal-normal posterior comparisons, indefinite/singular LD cases, extreme
+z scores, and iteration-limit consistency. Its base-R one-effect timing is a
+closed-form reference, not a fresh `susieR` package speed comparison; Java
+runs IBSS to convergence and validates the external LD in that workload.
 
 ## Colocalize SuSiE signals
 
@@ -146,9 +173,13 @@ Repeated labels impose equality constraints. Use the builder's fixed
 regression/variance/covariance methods for known parameters. The row-data fit
 uses complete-case covariance ML according to `SemOptions`.
 
-Current SEM scope is observed-variable covariance structure. Latent
-measurement models, mean structures, ordinal thresholds, robust sandwich
-corrections, modification indices, and FIML missingness are not silently
-approximated. See the [scope document](../mr-timeseries-susie-sem.md).
-Numerical agreement and timing commands are in the
-[TOPMed SEM report](../topmed-sem-performance.md).
+This compact example uses observed-variable covariance ML. The separate
+joint APIs also support latent measurement loadings and structural means,
+Gaussian pattern FIML, ordinal probit pairwise likelihood, case/cluster
+sandwich corrections, continuous-model modification indices, and indirect
+delta-method inference. See the [current SEM vignette](sem.md) and
+[advanced-method validation](../advanced-validation.md) for executable examples
+and R comparisons. Ordinal PML is not DWLS/WLSMV; missing/mixed ordinal models,
+multigroup invariance, ordinal modification indices, and robust scaled FIML
+fit statistics remain open. The [TOPMed report](../topmed-sem-performance.md)
+records the historical observed-variable benchmark, not these newer workloads.

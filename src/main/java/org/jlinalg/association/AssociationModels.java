@@ -61,44 +61,54 @@ public final class AssociationModels {
             throw new IllegalArgumentException("family and options are required");
         double[] retainedWeights = weights == null ? null : weights.clone();
         double[] retainedOffset = offset == null ? null : offset.clone();
-        return (response, design, rows, columns, backend) ->
-            Glm.fit(response, design, rows, columns, family,
-                retainedWeights, retainedOffset, options, backend)
-                .associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = Glm.fit(response, design, rows, columns, family,
+                retainedWeights, retainedOffset, options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter reml(
             List<VarianceComponent> components, RemlOptions options) {
         List<VarianceComponent> retained = List.copyOf(components);
-        return (response, design, rows, columns, backend) ->
-            Reml.fit(response, design, rows, columns, retained, options, backend)
-                .associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = Reml.fit(response, design, rows, columns, retained, options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter linearMixedModel(
             List<RandomEffectTerm> randomEffects, RemlOptions options) {
         List<RandomEffectTerm> retained = List.copyOf(randomEffects);
-        return (response, design, rows, columns, backend) ->
-            LinearMixedModel.fit(response, design, rows, columns,
-                retained, options, backend).associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = LinearMixedModel.fit(response, design, rows, columns, retained, options, backend);
+            requireConverged(fit.reml().converged());
+            return fit.associationStatistics();
+        };
     }
 
     /** Sparse-equation exact-refit LMM association adapter. */
     public static AssociationFitter sparseLinearMixedModel(
             List<RandomEffectTerm> randomEffects, RemlOptions options) {
         List<RandomEffectTerm> retained = List.copyOf(randomEffects);
-        return (response, design, rows, columns, backend) ->
-            SparseLinearMixedModel.fit(response, design, rows, columns,
-                retained, options, backend).associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = SparseLinearMixedModel.fit(response, design, rows, columns, retained, options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter correlatedLinearMixedModel(
             List<CorrelatedRandomEffectBlock> randomEffects,
             RemlOptions options) {
         List<CorrelatedRandomEffectBlock> retained = List.copyOf(randomEffects);
-        return (response, design, rows, columns, backend) ->
-            CorrelatedLinearMixedModel.fit(response, design, rows, columns,
-                retained, options, backend).associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = CorrelatedLinearMixedModel.fit(response, design, rows, columns, retained, options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter linearMixedModel(
@@ -110,10 +120,13 @@ public final class AssociationModels {
             throw new IllegalArgumentException(
                 "residual correlation and options are required");
         double[] correlation = residualCorrelation.clone();
-        return (response, design, rows, columns, backend) ->
-            LinearMixedModel.fitWithResidualCorrelation(
+        return (response, design, rows, columns, backend) -> {
+            var fit = LinearMixedModel.fitWithResidualCorrelation(
                 response, design, rows, columns, retained, correlation,
-                options, backend).associationStatistics();
+                options, backend);
+            requireConverged(fit.reml().converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter pedigreeReml(
@@ -121,10 +134,11 @@ public final class AssociationModels {
             Pedigree pedigree,
             RemlOptions options) {
         List<String> ids = List.copyOf(observationIndividualIds);
-        return (response, design, rows, columns, backend) ->
-            PedigreeReml.fit(response, design, rows, columns,
-                ids, pedigree, options, backend)
-                .associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = PedigreeReml.fit(response, design, rows, columns, ids, pedigree, options, backend);
+            requireConverged(fit.reml().converged());
+            return fit.associationStatistics();
+        };
     }
 
     /** Sparse A-inverse pedigree REML association adapter. */
@@ -133,9 +147,11 @@ public final class AssociationModels {
             Pedigree pedigree,
             RemlOptions options) {
         List<String> ids = List.copyOf(observationIndividualIds);
-        return (response, design, rows, columns, backend) ->
-            SparsePedigreeReml.fit(response, design, rows, columns,
-                ids, pedigree, options, backend).associationStatistics();
+        return (response, design, rows, columns, backend) -> {
+            var fit = SparsePedigreeReml.fit(response, design, rows, columns, ids, pedigree, options, backend);
+            requireConverged(fit.mixedModel().converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter glmmPql(
@@ -147,10 +163,13 @@ public final class AssociationModels {
         List<VarianceComponent> retained = List.copyOf(randomComponents);
         double[] retainedWeights = weights == null ? null : weights.clone();
         double[] retainedOffset = offset == null ? null : offset.clone();
-        return (response, design, rows, columns, backend) ->
-            GlmmPql.fit(response, design, rows, columns,
+        return (response, design, rows, columns, backend) -> {
+            var fit = GlmmPql.fit(response, design, rows, columns,
                 family, retained, retainedWeights, retainedOffset,
-                options, backend).associationStatistics();
+                options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
     }
 
     public static AssociationFitter pedigreeGlmmPql(
@@ -163,10 +182,13 @@ public final class AssociationModels {
         List<String> ids = List.copyOf(observationIndividualIds);
         double[] retainedWeights = weights == null ? null : weights.clone();
         double[] retainedOffset = offset == null ? null : offset.clone();
-        return (response, design, rows, columns, backend) ->
-            PedigreeGlmmPql.fit(response, design, rows, columns,
+        return (response, design, rows, columns, backend) -> {
+            var fit = PedigreeGlmmPql.fit(response, design, rows, columns,
                 family, ids, pedigree, retainedWeights, retainedOffset,
-                options, backend).associationStatistics();
+                options, backend);
+            requireConverged(fit.glmm().converged());
+            return fit.associationStatistics();
+        };
     }
 
     /** Ridge association with effective-DF model-based inference. */
@@ -189,10 +211,17 @@ public final class AssociationModels {
         List<RandomEffectTerm> retained = List.copyOf(randomEffects);
         if (errorOrder == null || options == null)
             throw new IllegalArgumentException("order and options are required");
-        return (response, design, rows, columns, backend) ->
-            ArimaErrorLinearMixedModel.fit(response,
+        return (response, design, rows, columns, backend) -> {
+            var fit = ArimaErrorLinearMixedModel.fit(response,
                 matrix(design, rows, columns), retained, errorOrder,
-                options, backend).associationStatistics();
+                options, backend);
+            requireConverged(fit.converged());
+            return fit.associationStatistics();
+        };
+    }
+
+    private static void requireConverged(boolean converged) {
+        if (!converged) throw new IllegalArgumentException("association model did not converge");
     }
 
     private static double[][] matrix(

@@ -1,0 +1,23 @@
+2026-09-08 Windows CPU; Java -Xmx128m. R 4.6.1, glmmTMB 1.1.14.
+Java 3 warmup + 5 measured fits; R mixed 2 warmup + 5 measured fits.
+Fixed beta R timings/coefficients: src/test/resources/r-reference/distributional-audit-beta.properties
+All timed fits converged; mixed likelihood error gate 1e-6, fixed beta 1e-7 plus coefficient gate 1e-5.
+beta n=1500 JavaMedianSeconds=0.004663 RMedianSeconds=0.05 maxCoefficientError=6.06e-10 checksum=7524.683747795800 RChecksumPerFit=1504.9367495578842
+betaMixed n=600 Java warmSeconds=[0.2470988,0.2449607,0.2447620,0.2439307,0.2465148]
+betaMixed R warmSeconds=[0.20,0.21,0.20,0.20,0.20]
+betaMixed JavaMedianSeconds=0.244961 RMedianSeconds=0.20 maxLikelihoodError=9.34e-10 checksum=2178.633911980160 RChecksum=2178.6339014445639
+zip n=450 Java warmSeconds=[0.0847075,0.0824549,0.0814561,0.0829239,0.0821882]
+zip R warmSeconds=[0.16,0.14,0.14,0.14,0.14]
+zip JavaMedianSeconds=0.082455 RMedianSeconds=0.14 maxLikelihoodError=2.05e-12 checksum=-3271.090691206810 RChecksum=-3271.0906798860997
+zinb n=450 Java warmSeconds=[0.0454392,0.0453021,0.0448938,0.0505514,0.0481326]
+zinb R warmSeconds=[0.30,0.19,0.25,0.19,0.18]
+zinb JavaMedianSeconds=0.045439 RMedianSeconds=0.19 maxLikelihoodError=1.01e-9 checksum=-3416.860940647753 RChecksum=-3416.8609583504431
+Checksum = sum over measured fits of logLik + count/mean coefficients + zero coefficients (if any).
+Fixed beta checksum also includes precision coefficients.
+ZI Java ZIP includes numerical covariance; ZINB Java is fit-only whereas R glmmTMB includes sdreport.
+Thus timings are whole-call measurements, not pure optimizer or equal-inference-work speed ratios.
+No timing accepted for the explicitly nonconvergent two-process ZINB cache counterexample.
+Owned isolated suite: 70 tests started,70 successful,0 skipped,0 failed;16.957s.
+NB observed covariance maximum absolute R error=1.7218629300153054e-8.
+Beta/NB 48-density grid maximum absolute R error=2.3283064365386963e-9 (large-magnitude LL).
+Before high-count Poisson fix: mu=y=1e15 hurdle LL=-16, reference=-18.411470281974225, error=2.411470281974225.

@@ -282,14 +282,13 @@ public final class PenalizedRegression {
         double[] squaredNorms = new double[columns];
         for (int column = 0; column < columns; column++) {
             if (options.standardize()) {
-                double sumSquares = 0.0;
+                double norm = 0.0;
                 for (int row = 0; row < rows; row++) {
                     double centered = predictors[row * columns + column]
                         - predictorMeans[column];
-                    sumSquares += weights[row] * centered * centered;
+                    norm = Math.hypot(norm, Math.sqrt(weights[row] / rows) * centered);
                 }
-                double scale = Math.sqrt(sumSquares / rows);
-                scales[column] = scale > 1e-14 ? scale : 1.0;
+                scales[column] = norm > 0.0 ? norm : 1.0;
             }
             int offset = column * rows;
             for (int row = 0; row < rows; row++) {
@@ -512,6 +511,10 @@ public final class PenalizedRegression {
         }
         double objective = weightedRss / (2.0 * data.rows())
             + lambda * (alpha * l1 + 0.5 * (1.0 - alpha) * l2);
+        if (!Double.isFinite(objective)) {
+            throw new IllegalArgumentException(
+                "penalized objective overflowed; rescale the response and penalty");
+        }
         return new PenalizedRegressionResult(
             intercept, coefficients, data.originalResponse(),
             data.originalPredictors(), data.rows(), data.columns(),
@@ -525,14 +528,21 @@ public final class PenalizedRegression {
             double intercept, double[] coefficients) {
         if (data.gramMatrix() != null) {
             double value = data.nullDeviance();
+            double magnitude = Math.abs(value);
             for (int row = 0; row < data.columns(); row++) {
-                value -= 2.0 * beta[row] * data.responseCorrelations()[row];
+                double cross = 2.0 * beta[row] * data.responseCorrelations()[row];
+                value -= cross;
+                magnitude += Math.abs(cross);
                 for (int column = 0; column < data.columns(); column++) {
-                    value += beta[row] * data.gramMatrix()[
+                    double quadratic = beta[row] * data.gramMatrix()[
                         row * data.columns() + column] * beta[column];
+                    value += quadratic;
+                    magnitude += Math.abs(quadratic);
                 }
             }
-            return Math.max(0.0, value * data.rows());
+            // A nearly exact fit cancels large quadratic terms. Reconstruct
+            // residuals then, rather than silently clamping lost RSS to zero.
+            if (value > 1e-8 * magnitude) return value * data.rows();
         }
         double result = 0.0;
         for (int row = 0; row < data.rows(); row++) {
@@ -559,13 +569,18 @@ public final class PenalizedRegression {
             }
             weights = supplied.clone();
         }
-        double sum = 0.0;
+        double maximum = 0.0;
         for (double value : weights) {
             if (!Double.isFinite(value) || !(value > 0.0)) {
                 throw new IllegalArgumentException(
                     "observation weights must be finite and positive");
             }
-            sum += value;
+            maximum = Math.max(maximum, value);
+        }
+        double sum = 0.0;
+        for (int index = 0; index < rows; index++) {
+            weights[index] /= maximum;
+            sum += weights[index];
         }
         double scale = rows / sum;
         for (int index = 0; index < rows; index++) {

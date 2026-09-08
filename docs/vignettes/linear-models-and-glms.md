@@ -37,7 +37,16 @@ OlsResult fit = Ols.fit(y, x, options, BackendPolicy.PREFERRED);
 
 The resulting individual coefficients depend on the identifying convention;
 test scientifically meaningful estimable contrasts rather than treating every
-minimum-norm coefficient as unique.
+minimum-norm coefficient as unique. Non-estimable coordinates have `NaN`
+standard errors/tests/intervals, and `testContrast()` rejects contrasts outside
+the design row space. The minimum-norm covariance remains available for
+estimable combinations. Full-rank QR equilibrates extreme or disparate column
+units, including mixed `[1e-6, 1e6]` units. Deficient fits identify rank in scaled
+coordinates but retain the original-coordinate minimum norm. Their original-unit
+SVD must reproduce the scaled reference's fitted projection and leverage;
+inaccurate or nonconvergent factorizations raise an explicit reparameterization
+error instead of silently dropping an estimable intercept. Very ill-conditioned
+and some wide deficient designs can therefore be rejected rather than fitted.
 
 ## Weights, offsets, and missing rows
 
@@ -79,7 +88,11 @@ System.out.println(logistic.pValues()[1]);
 
 Available factories include Gaussian, binomial, Poisson, Gamma,
 inverse-Gaussian, fixed-size negative-binomial, quasi-binomial, and
-quasi-Poisson families. GLM coefficient tests are asymptotic Wald z tests.
+quasi-Poisson families. Fixed-dispersion GLM coefficient tests use Wald z tests;
+estimated dispersion uses residual Student t inference and F contrasts.
+`associationStatistics()` follows the same distribution as `pValues()`.
+Gaussian identity fitting uses one weighted least-squares solve, including
+weights and offsets, rather than redundant IRLS factorizations.
 
 For grouped binomial data, supply response proportions and trial counts as
 prior weights. For count rates, use log exposure as an offset:
@@ -97,6 +110,48 @@ GlmResult poisson = Glm.fit(counts, countDesign,
 
 Check `converged()`, deviance, Pearson residuals, dispersion, and AIC. AIC is
 not defined for quasi-likelihood families.
+
+Pearson dispersion scales the coefficient covariance, but it is not generally
+the dispersion used for the likelihood. Built-in Gaussian and inverse-Gaussian
+likelihoods use ML dispersion; Gamma numerically profiles its actual density.
+The latter is not the approximate Gamma AIC calculation in R's `stats::glm`.
+Custom families retain their supplied-dispersion likelihood contract. AIC
+counts numerical rank, plus dispersion only when the family estimates it.
+An iteration limit or a small accepted line-search step without stationary
+final scoring equations is not reported as convergence. Binomial means below
+`1e-12` and small positive Gamma/inverse-Gaussian responses are no longer
+flattened by arbitrary response-scale variance floors. Floating-point overflow,
+unrepresentable probabilities, separation, and near-singular models still
+require care; a converged flag is not an identification certificate.
+Binomial score, Fisher information, deviance and density use the predictor's
+small tail directly, even when the reported mean rounds to one. Compatible
+`GlmFamily` predictor-aware defaults let custom families preserve their existing
+contracts. Information is not floored to fabricate finite standard errors:
+unrepresentable working precision is an error. Exactly zero-residual Gaussian
+ML has likelihood supremum `+Infinity` and AIC `-Infinity`.
+
+## Clustered marginal models (GEE)
+
+`Gee.fit()` supports weights, link-scale offsets, cluster IDs and repeated-wave
+indices. Select the working correlation with `GeeOptions`; select model-based,
+cluster-sandwich or a documented finite-cluster correction separately from the
+working correlation. The ordinary sandwich does not imply small-sample exactness.
+Use `BackendPolicy.CPU` for reproducible portable CPU timings; strict native/GPU
+policies retain their existing availability checks. No native CHOLMOD runtime
+certification follows from these portable CPU checks.
+
+Changing the measurement units of a Gamma response must shift the log-link
+intercept, not change slopes, dispersion or sandwich covariance. Regression
+tests now cover this for independence and exchangeable working correlations.
+Gaussian dispersion and naive covariance now scale with the response units,
+including responses around `1e-12`; zero-residual fits report zero dispersion
+and covariance. The score convergence norm is divided by the square root of
+each sensitivity diagonal so tiny physical units do not prevent convergence.
+Serial score accumulation reduces cluster contributions immediately instead of
+retaining every cluster's bread/meat arrays. Parallel and serial results are
+checked independently. The R audit uses an independently constructed exact GLS
+solution and cluster sandwich for fixed correlation; it is not a `geepack`
+benchmark or validation of every estimated-association/bias-adjustment variant.
 
 ## Ridge, LASSO, and elastic net
 
@@ -131,6 +186,23 @@ PenalizedCrossValidationResult cv =
 double lambdaMin = cv.lambdaMinimum();
 double lambdaOneSe = cv.lambdaOneStandardError();
 ```
+
+Observation weights are normalized without summing huge unscaled values.
+Standardization works for tiny nonconstant predictor units; it does not drop a
+column merely because its SD is below `1e-14`. Near-exact fits reconstruct RSS
+from residuals when the covariance-form quadratic loses precision.
+
+CV now requires convergence of every full-data and training-fold fit. Its mean
+risk is the held-out weighted MSE across observations, not an unweighted average
+of unequal folds. The grouped SE is the square root of the fold-weighted mean
+squared deviation divided by `K-1`; folds remain deterministic for a given seed.
+Automatic CV reuses its already fitted full-data path. Tune the iteration budget
+and tolerance if a path is rejected; nonconverged fits are not eligible winners.
+CV preserves raw weights for each training subset. Evaluation weights smaller
+than representable relative mass contribute zero, without triggering a false
+positivity error or contaminating risk with `0/0` from a zero-mass fold.
+Penalty factors in this API multiply the stated L1/L2 terms directly and are
+not silently rescaled to sum to the predictor count as in `glmnet`.
 
 Use `PenalizedRegressionInference.ridge` for model-based ridge inference.
 For LASSO/elastic net, `refitActiveSet` performs an optional OLS refit, but its
@@ -198,3 +270,25 @@ assignment.
 For an R-like user-facing layer, see the [formula vignette](formulas-and-backends.md).
 Formula compilation happens once; numerical fitting still consumes contiguous
 primitive arrays.
+
+## Reproducing the v0.3.0 fitting audit
+
+The independent generator is `src/benchmark/r/fitting_audit_v030.R`; frozen
+fixtures and seed-17 fold assignments are under
+`src/test/resources/fitting-audit-v030`. It uses R 4.6.1 and `glmnet` 5.0, base R
+weighted/offset GLMs, independently profiled Gamma/inverse-Gaussian densities,
+and exact active-sign enumeration for small ridge/elastic-net fits with an
+unpenalized predictor. It installs nothing. On Windows, reading installed R
+user-library dependencies may require an elevated reference process.
+
+`org.jlinalg.benchmark.FittingAuditBenchmark` and that R script construct the same
+3,000-row data. Each timing is a median of seven batches of 20 warmed fits, with
+convergence checks and consumed coefficient checksums. Measured portable-Java
+CPU times were 0.523 ms OLS, 2.103 ms Poisson, 4.577 ms fixed-correlation GEE,
+and 0.204 ms for a three-lambda weighted LASSO path. Corresponding R medians
+were 0.5, 6, 22.5, and 1 ms; R timings have 0.5 ms batch resolution on this host.
+OLS/GLM Java returns full inference while the timed R fits do not materialize
+every summary; Java GEE also computes auxiliary diagnostics. These are narrow
+workload timings, not interchangeable feature-cost or universal speed claims.
+Checksums agree to floating-point rounding. Full evidence, allocation counts
+and limitations are in `src/benchmark/resources/fitting-audit-v030/evidence.md`.

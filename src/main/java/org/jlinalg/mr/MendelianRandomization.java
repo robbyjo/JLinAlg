@@ -74,16 +74,22 @@ public final class MendelianRandomization {
         validateConfidence(confidenceLevel);
         double numerator = 0.0;
         double denominator = 0.0;
+        double minSe = values.stream().mapToDouble(HarmonizedInstrument::outcomeStandardError).min().orElseThrow();
+        double xScale = values.stream().mapToDouble(v -> Math.abs(v.exposureEffect())).max().orElseThrow();
+        double yScale = values.stream().mapToDouble(v -> Math.abs(v.outcomeEffect())).max().orElseThrow();
+        if (yScale == 0) yScale = 1;
         for (HarmonizedInstrument instrument : values) {
-            double weight = 1.0 / square(instrument.outcomeStandardError());
-            numerator += weight * instrument.exposureEffect()
-                * instrument.outcomeEffect();
-            denominator += weight * square(instrument.exposureEffect());
+            double weight = square(minSe / instrument.outcomeStandardError());
+            double x = instrument.exposureEffect() / xScale;
+            numerator += weight * x * (instrument.outcomeEffect() / yScale);
+            denominator += weight * x * x;
         }
         if (!(denominator > 0.0) || !Double.isFinite(denominator)) {
             throw new IllegalArgumentException("IVW information is not finite and positive");
         }
-        double estimate = numerator / denominator;
+        double estimate = multiplyDivide(numerator / denominator, yScale, xScale);
+        if (!Double.isFinite(estimate))
+            throw new IllegalArgumentException("IVW effect exceeds numerical range");
         double q = 0.0;
         for (HarmonizedInstrument instrument : values) {
             double residual = instrument.outcomeEffect()
@@ -93,7 +99,7 @@ public final class MendelianRandomization {
         int degreesOfFreedom = values.size() - 1;
         double dispersion = multiplicativeRandomEffects
             ? Math.max(1.0, q / degreesOfFreedom) : 1.0;
-        double standardError = Math.sqrt(dispersion / denominator);
+        double standardError = multiplyDivide(minSe, Math.sqrt(dispersion / denominator), xScale);
         MrMethod method = multiplicativeRandomEffects
             ? MrMethod.IVW_MULTIPLICATIVE_RANDOM : MrMethod.IVW_FIXED;
         return estimate(method, estimate, standardError, confidenceLevel,
@@ -110,35 +116,46 @@ public final class MendelianRandomization {
         double sumY = 0.0;
         double sumXX = 0.0;
         double sumXY = 0.0;
+        double minSe = values.stream().mapToDouble(HarmonizedInstrument::outcomeStandardError).min().orElseThrow();
+        double anchorX = Math.abs(values.get(0).exposureEffect());
+        double anchorY = Math.copySign(1.0, values.get(0).exposureEffect()) * values.get(0).outcomeEffect();
         for (HarmonizedInstrument instrument : values) {
             double sign = Math.copySign(1.0, instrument.exposureEffect());
-            double x = Math.abs(instrument.exposureEffect());
-            double y = sign * instrument.outcomeEffect();
-            double weight = 1.0 / square(instrument.outcomeStandardError());
+            double x = Math.abs(instrument.exposureEffect()) - anchorX;
+            double y = sign * instrument.outcomeEffect() - anchorY;
+            double weight = square(minSe / instrument.outcomeStandardError());
             sumWeight += weight;
             sumX += weight * x;
             sumY += weight * y;
+        }
+        double meanDeltaX = sumX / sumWeight;
+        double meanDeltaY = sumY / sumWeight;
+        for (HarmonizedInstrument instrument : values) {
+            double x = (Math.abs(instrument.exposureEffect()) - anchorX) - meanDeltaX;
+            double y = (Math.copySign(1.0, instrument.exposureEffect()) * instrument.outcomeEffect() - anchorY) - meanDeltaY;
+            double weight = square(minSe / instrument.outcomeStandardError());
             sumXX += weight * x * x;
             sumXY += weight * x * y;
         }
-        double determinant = sumWeight * sumXX - sumX * sumX;
-        if (!(determinant > 0.0) || !Double.isFinite(determinant)) {
+        if (!(sumXX > 0.0) || !Double.isFinite(sumXX)) {
             throw new IllegalArgumentException(
                 "MR-Egger requires varying exposure associations");
         }
-        double slope = (sumWeight * sumXY - sumX * sumY) / determinant;
-        double intercept = (sumY - slope * sumX) / sumWeight;
+        double slope = sumXY / sumXX;
+        double meanX = anchorX + meanDeltaX;
+        double intercept = (anchorY - slope * anchorX) + (meanDeltaY - slope * meanDeltaX);
         double q = 0.0;
         for (HarmonizedInstrument instrument : values) {
             double sign = Math.copySign(1.0, instrument.exposureEffect());
-            double residual = sign * instrument.outcomeEffect()
-                - intercept - slope * Math.abs(instrument.exposureEffect());
+            double residual = (sign * instrument.outcomeEffect() - anchorY - meanDeltaY)
+                - slope * (Math.abs(instrument.exposureEffect()) - anchorX - meanDeltaX);
             q += square(residual / instrument.outcomeStandardError());
         }
         int degreesOfFreedom = values.size() - 2;
         double dispersion = Math.max(1.0, q / degreesOfFreedom);
-        double slopeStandardError = Math.sqrt(dispersion * sumWeight / determinant);
-        double interceptStandardError = Math.sqrt(dispersion * sumXX / determinant);
+        double slopeStandardError = minSe * Math.sqrt(dispersion / sumXX);
+        double interceptStandardError = minSe * Math.sqrt(dispersion)
+            * Math.hypot(1 / Math.sqrt(sumWeight), meanX / Math.sqrt(sumXX));
         MrEstimate slopeEstimate = estimate(MrMethod.MR_EGGER,
             slope, slopeStandardError, confidenceLevel,
             q, degreesOfFreedom, dispersion, values.size());
@@ -351,6 +368,13 @@ public final class MendelianRandomization {
     static double normalPValue(double statistic) {
         return Math.min(1.0, 2.0 * Normal.cumulative(
             Math.abs(statistic), 0.0, 1.0, false, false));
+    }
+
+    /** Reconstruct scaled regression quantities without an overflowing scale ratio. */
+    private static double multiplyDivide(double first, double second, double divisor) {
+        int a = Math.getExponent(first), b = Math.getExponent(second), c = Math.getExponent(divisor);
+        return Math.scalb((Math.scalb(first, -a) * Math.scalb(second, -b))
+            / Math.scalb(divisor, -c), a + b - c);
     }
 
     private static double square(double value) {

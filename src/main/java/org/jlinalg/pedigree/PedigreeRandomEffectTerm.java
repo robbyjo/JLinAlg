@@ -79,6 +79,7 @@ public record PedigreeRandomEffectTerm(
                 throw new IllegalArgumentException(
                     "inbreeding coefficients must be finite in [0, 1)");
         }
+        validateAncestry(individuals,indexById);
         int rows = observationIndividualIds.size();
         int[] incidenceStarts = new int[rows + 1];
         int[] incidenceColumns = new int[rows];
@@ -161,5 +162,23 @@ public record PedigreeRandomEffectTerm(
             throw new IllegalArgumentException(
                 "parent " + parent + " of " + child + " is absent");
         return index;
+    }
+
+    /** Check the directed ancestry graph without constructing dense A. */
+    private static void validateAncestry(List<PedigreeIndividual> individuals,Map<String,Integer> index) {
+        int[] pending=new int[individuals.size()];
+        List<List<Integer>> children=new ArrayList<>();
+        for(int i=0;i<pending.length;i++)children.add(new ArrayList<>());
+        for(int i=0;i<pending.length;i++) {
+            PedigreeIndividual entry=individuals.get(i);
+            for(String id:new String[]{entry.sireId(),entry.damId()})if(id!=null) {
+                int p=parent(index,entry.id(),id);children.get(p).add(i);pending[i]++;
+            }
+        }
+        java.util.ArrayDeque<Integer> ready=new java.util.ArrayDeque<>();
+        for(int i=0;i<pending.length;i++)if(pending[i]==0)ready.add(i);
+        int visited=0;
+        while(!ready.isEmpty()) {int p=ready.remove();visited++;for(int child:children.get(p))if(--pending[child]==0)ready.add(child);}
+        if(visited!=pending.length)throw new IllegalArgumentException("pedigree contains an ancestry cycle");
     }
 }

@@ -1,0 +1,71 @@
+2026-09-08 final genetic cross-review repairs; source frozen after these gates.
+Three repaired production files: genetics/PlinkBedLdClumper.java,
+susie/Susie.java, mr/MendelianRandomization.java.
+
+Final isolated four-package regression run:
+Test run finished after 14132 ms
+[        64 tests found           ]
+[         0 tests skipped         ]
+[        64 tests started         ]
+[         0 tests aborted         ]
+[        64 tests successful      ]
+[         0 tests failed          ]
+
+Gauss independent fresh-source original probes and RepairGates:
+PASS SuSiE original mean=1.0E-300
+PASS IVW original beta=1.0E200 SE=1.0E200
+PASS original LD case 1 rSquared=0.001481481481481206
+PASS original LD case 2 rSquared=1.0553031581236428E-29
+PASS original LD case 3 rSquared=0.04048732776637871
+PASS public clump returns one retained/one excluded at rSquared threshold .01
+bounded LD EM failure count=0
+(The original probe's label says EM; final production uses stationary roots.)
+
+Independent R polyroot reference, evaluating observed likelihood at all roots/endpoints:
+susie.mean=1.0000000000000000e-300
+susie.variance=9.9999999999999998e-201
+ld.slow.phase=6.9409684161488183e-01
+ld.slow.LL=-7.7340535403085639e+01
+ld.slow.rSquared=4.0487327766378534e-02
+ld.twin.phase=5.3846153846155342e-01
+ld.twin.LL=-4.7788655899601387e+01
+ld.twin.rSquared=1.4814814814826428e-03
+ivw.beta=9.9999999999999997e+199
+ivw.se=9.9999999999999997e+199
+
+Fresh sequential warmed R then Java timing after final SuSiE arithmetic fix:
+R command: Rscript src/test/resources/r-reference/generate-genetic-audit-reference.R
+Java main: org.jlinalg.genetics.GeneticAuditBenchmark (fresh isolated classes)
+Current normal reproduction: gradlew check, then gradlew benchmarkGeneticAudit.
+coloc64_baseR_enumeration median_ms=0.2 checksum=20344.520741896842 calls=1000
+SER32_baseR_closed_form median_ms=0.006 checksum=4207360779.6415386 calls=50000
+winner40_baseR_score median_ms=0.12 checksum=57.43821926937899 calls=5000
+GRM3_baseR_crossprod median_ms=0.0035 checksum=6399999.9999999991 calls=100000
+R version 4.6.1 (2026-06-24 ucrt)
+gate coloc64 max_scaled_absolute_error=5.55111512e-17
+gate ser32 max_scaled_absolute_error=8.88178420e-16
+gate grm max_scaled_absolute_error=0.00000000
+gate winner max_scaled_absolute_error=2.16883456e-12
+accuracy gates passed: coloc64 H0-H4 + H4 SNPs, SER32 alpha/beta/logBF, GRM3, four conditional MLEs
+coloc64_Java median_ms=0.0124365500 checksum=203445.20741898590 calls=10000
+SER32_Java_IBSS_including_PSD_validation median_ms=0.0230737000 checksum=841472155.92742090 calls=10000
+winner40_Java_score median_ms=0.0223698000 checksum=57.438219267060310 calls=5000
+GRM3_Java_builder median_ms=0.000812710000 checksum=6399999.9999999990 calls=100000
+Java 25 availableProcessors=32
+
+R emitted locale startup warnings. The regression run emitted existing native
+backend access warnings; all tests and reference/benchmark exit codes passed.
+No full shared Gradle task was run by this owner during these fixes; parent
+coordinates final integration. No commits or pushes.
+
+Final additive LD timing, sequential base R then Java, five warmed batches:
+R command: Rscript src/test/resources/r-reference/generate-genetic-final-fixes.R
+Java main: org.jlinalg.genetics.GeneticAuditBenchmark (javac -Xlint:all -Werror passed)
+LD41_baseR_polyroot median_ms=0.03 checksum=8.1961185483111691 calls=5000
+gate LD41 relative_error=4.21884749e-15
+LD41_Java_stationary_core_reflection_included median_ms=0.00329300000 checksum=8.1961185483111730 calls=5000
+Java 25 availableProcessors=32
+Both use the original 41-founder table and maximize observed likelihood over
+stationary roots/endpoints. Java includes reflection and genotype counting;
+R starts with the counts. BED I/O excluded; no PLINK timing or general speed claim.
+The four-workload paired measurements above remain their own earlier run.

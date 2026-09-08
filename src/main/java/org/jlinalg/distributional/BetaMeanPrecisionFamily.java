@@ -66,11 +66,7 @@ public final class BetaMeanPrecisionFamily implements DistributionalFamily {
         double precision = parameters[1];
         double alpha = mean * precision;
         double beta = (1.0 - mean) * precision;
-        return SpecialFunctions.logGamma(precision)
-            - SpecialFunctions.logGamma(alpha)
-            - SpecialFunctions.logGamma(beta)
-            + (alpha - 1.0) * Math.log(response)
-            + (beta - 1.0) * Math.log1p(-response);
+        return jdistlib.Beta.density(response, alpha, beta, true);
     }
     @Override public void derivatives(
             double response,

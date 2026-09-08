@@ -168,9 +168,13 @@ public final class BetaRegression {
             current = candidate;
             if (coefficientChange <= options.relativeTolerance()
                     && likelihoodChange <= options.relativeTolerance()) {
-                converged = true;
-                message = "coefficient and likelihood tolerances reached";
-                break;
+                SystemState checked = system(response, meanDesign, meanColumns,
+                    precisionDesign, precisionColumns, current, options);
+                if (stationary(checked, options.relativeTolerance())) {
+                    converged = true;
+                    message = "coefficient, likelihood, and scaled-score tolerances reached";
+                    break;
+                }
             }
         }
 
@@ -272,11 +276,7 @@ public final class BetaRegression {
                 precisionPredictor);
             double alpha = mean * precision;
             double beta = (1.0 - mean) * precision;
-            double contribution = SpecialFunctions.logGamma(precision)
-                - SpecialFunctions.logGamma(alpha)
-                - SpecialFunctions.logGamma(beta)
-                + (alpha - 1.0) * Math.log(response[row])
-                + (beta - 1.0) * Math.log1p(-response[row]);
+            double contribution = jdistlib.Beta.density(response[row], alpha, beta, true);
             if (!Double.isFinite(contribution)) {
                 return new Evaluation(meanPredictors, precisionPredictors,
                     means, precisions, Double.NaN);
@@ -376,6 +376,16 @@ public final class BetaRegression {
             }
         }
         return new SystemState(gradient, information);
+    }
+
+    private static boolean stationary(SystemState state, double tolerance) {
+        int columns = state.gradient().length;
+        for (int c = 0; c < columns; c++) {
+            double diagonal = state.information()[c * columns + c];
+            double score = Math.abs(state.gradient()[c]) / Math.sqrt(diagonal);
+            if (!(score <= Math.sqrt(tolerance))) return false;
+        }
+        return true;
     }
 
     private static double relativeMaximumChange(

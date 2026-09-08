@@ -14,7 +14,9 @@ public record SusieOptions(
     public SusieOptions {
         if (effects < 1 || maximumIterations < 1
                 || !(convergenceTolerance > 0.0)
+                || !Double.isFinite(convergenceTolerance)
                 || !(priorVariance > 0.0)
+                || !Double.isFinite(priorVariance)
                 || !(credibleSetCoverage > 0.0 && credibleSetCoverage < 1.0)
                 || !(minimumCredibleSetPurity >= 0.0 && minimumCredibleSetPurity <= 1.0)) {
             throw new IllegalArgumentException("invalid SuSiE options");

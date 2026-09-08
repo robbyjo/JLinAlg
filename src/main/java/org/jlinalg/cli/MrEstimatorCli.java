@@ -32,6 +32,7 @@ final class MrEstimatorCli {
         try {
             Options options = Options.parse(arguments);
             if (options.help) { output.println(help()); return 0; }
+            PipelinePaths.requireFreshOutputs(options.output, options.plot);
             if (options.method.equals("conditional") || options.method.equals("secondary-signals"))
                 return conditional(options, output);
             if (options.joint || options.conditionOn != null)
@@ -54,7 +55,7 @@ final class MrEstimatorCli {
             }
             StringBuilder result = new StringBuilder("method\testimate\tstandard_error\tcausal_p_value\tci_lower\tci_upper\tinstruments\n");
             for (MrEstimate estimate : estimates) result.append(estimate.method()).append('\t').append(estimate.estimate()).append('\t').append(estimate.standardError()).append('\t').append(estimate.pValue()).append('\t').append(estimate.confidenceLower()).append('\t').append(estimate.confidenceUpper()).append('\t').append(estimate.instrumentCount()).append('\n');
-            if (options.output == null) output.print(result); else Files.writeString(options.output, result.toString());
+            if (options.output == null) output.print(result); else Files.writeString(options.output, result.toString(), java.nio.file.StandardOpenOption.CREATE_NEW);
             if (options.plot != null) {
                 if (plotEgger != null) MrPlot.writeSvg(options.plot, instruments, plotEgger);
                 else MrPlot.writeSvg(options.plot, instruments, estimates.get(0));
@@ -116,7 +117,7 @@ final class MrEstimatorCli {
             .append('\t').append(test.effect()).append('\t').append(test.standardError()).append('\t').append(test.pValue())
             .append('\t').append(test.confidenceLower()).append('\t').append(test.confidenceUpper())
             .append('\t').append(String.join(",", test.conditionedOn())).append('\t').append(selected.contains(test.variantId())).append('\n');
-        if (options.output == null) output.print(result); else Files.writeString(options.output, result.toString());
+        if (options.output == null) output.print(result); else Files.writeString(options.output, result.toString(), java.nio.file.StandardOpenOption.CREATE_NEW);
         return 0;
     }
 

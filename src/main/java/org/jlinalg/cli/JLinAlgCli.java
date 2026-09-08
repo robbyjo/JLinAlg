@@ -82,11 +82,6 @@ public final class JLinAlgCli {
             if (options.minimumHweP > 0)
                 throw new IllegalArgumentException(
                     "--min-hwe-p filtering is not yet available; HWE is reported");
-            if (options.resume && Files.exists(options.output)) {
-                info(log, "resume_result=already-complete");
-                complete(log, "complete");
-                return 0;
-            }
             AnalysisRunner runner = new AnalysisRunner(options, plan, log);
             int result = runner.execute();
             complete(log, "complete");
@@ -177,7 +172,7 @@ public final class JLinAlgCli {
               --backend POLICY              preferred (default), cholmod, gpu,
                                             cuda, opencl, vulkan, onemkl,
                                             openblas, auto, or cpu
-              --resume
+              --resume                    Existing/partial results cannot yet be verified; use a new output
               --checkpoint-every N
               --log FILE
               --no-log

@@ -19,6 +19,12 @@ public record SampleAlignment(
         rightOrder = rightOrder.clone();
         if (sampleIds.size() != leftOrder.length || sampleIds.size() != rightOrder.length)
             throw new IllegalArgumentException("alignment lengths must match");
+        indexes(sampleIds, "aligned");
+        HashSet<Integer> leftSeen = new HashSet<>(), rightSeen = new HashSet<>();
+        for (int index = 0; index < leftOrder.length; index++)
+            if (leftOrder[index] < 0 || rightOrder[index] < 0
+                    || !leftSeen.add(leftOrder[index]) || !rightSeen.add(rightOrder[index]))
+                throw new IllegalArgumentException("alignment indices must be nonnegative and unique");
     }
 
     @Override public int[] leftOrder() { return leftOrder.clone(); }

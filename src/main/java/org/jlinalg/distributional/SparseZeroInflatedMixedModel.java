@@ -333,9 +333,11 @@ public final class SparseZeroInflatedMixedModel {
                     reducedLower, reducedUpper, function, options);
                 double[] full = insert(optimized.mX == null
                     ? reducedStart : optimized.mX, parameterIndex, fixedValue);
-                logLikelihoods[point] = -objective.coldValue(full);
-                converged[point] = optimized.numFunctionCalls
-                    < options.maximumOuterEvaluations();
+                Stationarity checked = checkStationarity(remove(full, parameterIndex),
+                    reducedLower, reducedUpper, function, options.relativeTolerance());
+                double value = objective.coldValue(full);
+                logLikelihoods[point] = value < INVALID_OBJECTIVE ? -value : Double.NaN;
+                converged[point] = checked.converged() && Double.isFinite(logLikelihoods[point]);
             }
             return new ZeroInflatedProfile(
                 fitted.outerParameterNames().get(parameterIndex), grid,
@@ -427,8 +429,10 @@ public final class SparseZeroInflatedMixedModel {
                 if (derivativeFree) {
                     optimized = bobyqa(initial, lower, upper, objective,
                         interpolationPoints, options);
-                    outerConverged = optimized.numFunctionCalls
-                        < options.maximumOuterEvaluations();
+                    Stationarity checked = checkStationarity(optimized.mX, lower, upper,
+                        objective::coldValue, options.relativeTolerance());
+                    optimized.numFunctionCalls += checked.calls();
+                    outerConverged = checked.converged();
                 } else {
                     ThreadLocal<Objective> workerObjectives =
                         ThreadLocal.withInitial(() ->
@@ -438,21 +442,25 @@ public final class SparseZeroInflatedMixedModel {
                             && options.maximumGradientThreads() > 1
                                 ? gradientExecutor() : null,
                         workerObjectives);
-                    outerConverged = optimized.numFunctionCalls
-                        < options.maximumOuterEvaluations();
+                    Stationarity checked = checkStationarity(optimized.mX, lower, upper,
+                        objective::coldValue, options.relativeTolerance());
+                    optimized.numFunctionCalls += checked.calls();
+                    outerConverged = checked.converged();
                     if (options.outerOptimizer()
                             == ZeroInflatedOuterOptimizer.AUTO
                             && !outerConverged) {
                         priorEvaluations = optimized.numFunctionCalls;
                         optimized = bobyqa(optimized.mX, lower, upper,
                             objective, interpolationPoints, options);
-                        outerConverged = optimized.numFunctionCalls
-                            < options.maximumOuterEvaluations();
+                        checked = checkStationarity(optimized.mX, lower, upper,
+                            objective::coldValue, options.relativeTolerance());
+                        optimized.numFunctionCalls += checked.calls();
+                        outerConverged = checked.converged();
                     }
                 }
                 double[] parameters = optimized.mX == null
                     ? initial : optimized.mX;
-                InferenceData inferenceData = inference
+                InferenceData inferenceData = inference && outerConverged
                     ? numericalInference(objective, parameters, lower, upper,
                         countColumns, zeroColumns,
                         family == CountFamily.NEGATIVE_BINOMIAL
@@ -661,17 +669,38 @@ public final class SparseZeroInflatedMixedModel {
                                 + displacement[row] * hessianChange[column])
                                 / curvature;
             } else inverseHessian = MatrixOps.identity(dimensions);
-            double relativeStep = relativeChange(point, candidate);
             point = candidate.clone();
             value = candidateValue;
             randomMode = candidateRandom;
             gradient = nextGradient;
-            converged = relativeStep <= options.relativeTolerance()
-                || projectedGradientMaximum(point, gradient, lower, upper)
+            converged = projectedGradientMaximum(point, gradient, lower, upper)
                     <= gradientTolerance;
         }
-        return new OptimizationResult(point, value,
-            converged ? calls : options.maximumOuterEvaluations(), true);
+        return new OptimizationResult(point, value, calls, true);
+    }
+
+    private record Stationarity(boolean converged, int calls) { }
+
+    /** Optimizer stopping codes/evaluation counts are not first-order KKT checks. */
+    private static Stationarity checkStationarity(double[] point, double[] lower,
+            double[] upper, java.util.function.ToDoubleFunction<double[]> objective, double tolerance) {
+        if (point == null) return new Stationarity(false, 0);
+        double center = objective.applyAsDouble(point); int calls = 1;
+        if (!Double.isFinite(center) || center >= INVALID_OBJECTIVE) return new Stationarity(false, calls);
+        double[] gradient = new double[point.length];
+        for (int i = 0; i < point.length; i++) {
+            double h = 1e-5 * (1 + Math.abs(point[i]));
+            double lo = Math.max(lower[i], point[i] - h), hi = Math.min(upper[i], point[i] + h);
+            double below = center, above = center; double[] trial = point.clone();
+            if (lo < point[i]) {trial[i] = lo; below = objective.applyAsDouble(trial); calls++;}
+            if (hi > point[i]) {trial[i] = hi; above = objective.applyAsDouble(trial); calls++;}
+            if (!Double.isFinite(below) || !Double.isFinite(above)
+                    || below >= INVALID_OBJECTIVE || above >= INVALID_OBJECTIVE)
+                return new Stationarity(false, calls);
+            gradient[i] = hi > lo ? (above - below) / (hi - lo) : 0;
+        }
+        return new Stationarity(projectedGradientMaximum(point, gradient, lower, upper)
+            <= Math.max(1e-5, Math.sqrt(tolerance)), calls);
     }
 
     private static GradientEvaluation numericalGradient(
@@ -679,7 +708,7 @@ public final class SparseZeroInflatedMixedModel {
             double[] centerRandom, double[] lower, double[] upper,
             int availableCalls, ExecutorService executor,
             ThreadLocal<Objective> workerObjectives) {
-        if (executor != null && availableCalls >= point.length)
+        if (executor != null && availableCalls >= 2 * point.length)
             return parallelNumericalGradient(point, center, centerRandom,
                 lower, upper, executor, workerObjectives);
         double[] gradient = new double[point.length];
@@ -690,20 +719,20 @@ public final class SparseZeroInflatedMixedModel {
             double below = Math.max(lower[parameter], point[parameter] - step);
             double above = Math.min(upper[parameter], point[parameter] + step);
             if (above == point[parameter] && below == point[parameter]) continue;
-            if (calls + 1 > availableCalls)
+            int needed = (above > point[parameter] ? 1 : 0) + (below < point[parameter] ? 1 : 0);
+            if (calls + needed > availableCalls)
                 return new GradientEvaluation(gradient, calls, false);
+            double upperValue = center, lowerValue = center;
             if (above > point[parameter]) {
                 trial[parameter] = above;
-                double upperValue = objective.valueFrom(trial, centerRandom);
-                gradient[parameter] = (upperValue - center)
-                    / (above - point[parameter]);
-            } else {
-                trial[parameter] = below;
-                double lowerValue = objective.valueFrom(trial, centerRandom);
-                gradient[parameter] = (center - lowerValue)
-                    / (point[parameter] - below);
+                upperValue = objective.valueFrom(trial, centerRandom);
             }
-            calls++;
+            if (below < point[parameter]) {
+                trial[parameter] = below;
+                lowerValue = objective.valueFrom(trial, centerRandom);
+            }
+            gradient[parameter] = (upperValue - lowerValue) / (above - below);
+            calls += needed;
             trial[parameter] = point[parameter];
         }
         return new GradientEvaluation(gradient, calls, true);
@@ -727,12 +756,14 @@ public final class SparseZeroInflatedMixedModel {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             futures.forEach(value -> value.cancel(true));
-            return new GradientEvaluation(gradient, point.length, false);
+            return new GradientEvaluation(gradient, 2 * point.length, false);
         } catch (ExecutionException exception) {
             futures.forEach(value -> value.cancel(true));
-            return new GradientEvaluation(gradient, point.length, false);
+            return new GradientEvaluation(gradient, 2 * point.length, false);
         }
-        return new GradientEvaluation(gradient, point.length, true);
+        int calls = 0;
+        for (int i = 0; i < point.length; i++) calls += (point[i] < upper[i] ? 1 : 0) + (point[i] > lower[i] ? 1 : 0);
+        return new GradientEvaluation(gradient, calls, true);
     }
 
     private static double gradientComponent(
@@ -742,18 +773,17 @@ public final class SparseZeroInflatedMixedModel {
         double[] trial = point.clone();
         double step = 1e-5 * (1.0 + Math.abs(point[parameter]));
         double above = Math.min(upper[parameter], point[parameter] + step);
+        double below = Math.max(lower[parameter], point[parameter] - step);
+        double upperValue = center, lowerValue = center;
         if (above > point[parameter]) {
             trial[parameter] = above;
-            return (objective.valueFrom(trial, centerRandom) - center)
-                / (above - point[parameter]);
+            upperValue = objective.valueFrom(trial, centerRandom);
         }
-        double below = Math.max(lower[parameter], point[parameter] - step);
         if (below < point[parameter]) {
             trial[parameter] = below;
-            return (center - objective.valueFrom(trial, centerRandom))
-                / (point[parameter] - below);
+            lowerValue = objective.valueFrom(trial, centerRandom);
         }
-        return 0.0;
+        return above > below ? (upperValue - lowerValue) / (above - below) : 0;
     }
 
     private static OptimizationResult exhausted(
@@ -1261,7 +1291,7 @@ public final class SparseZeroInflatedMixedModel {
         double value(double[] parameters) {
             try {
                 Evaluation result = evaluate(parameters);
-                return Double.isFinite(result.laplaceLogLikelihood())
+                return result.converged() && Double.isFinite(result.laplaceLogLikelihood())
                     ? -result.laplaceLogLikelihood() : INVALID_OBJECTIVE;
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 return INVALID_OBJECTIVE;
@@ -1279,7 +1309,7 @@ public final class SparseZeroInflatedMixedModel {
                 Evaluation result = evaluate(parameters);
                 double value = -result.laplaceLogLikelihood();
                 return new ObjectivePoint(
-                    Double.isFinite(value) ? value : INVALID_OBJECTIVE,
+                    result.converged() && Double.isFinite(value) ? value : INVALID_OBJECTIVE,
                     result.random().clone());
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 return new ObjectivePoint(INVALID_OBJECTIVE,
@@ -1340,15 +1370,14 @@ public final class SparseZeroInflatedMixedModel {
                         trial[index] += scale * step[index];
                     double trialJoint = logLikelihood(trial)
                         - 0.5 * precision.quadratic(trial, logVariances);
-                    if (Double.isFinite(trialJoint) && trialJoint >= joint) {
+                    if (Double.isFinite(trialJoint) && trialJoint >= joint - 1e-14 * (1 + Math.abs(joint))) {
                         candidate = trial;
                         break;
                     }
                     scale *= 0.5;
                 }
                 if (candidate == null) {
-                    if (gradientMaximum <= Math.sqrt(
-                            options.relativeTolerance())) {
+                    if (gradientMaximum <= Math.min(1e-7, options.relativeTolerance())) {
                         converged = true;
                         break;
                     }
@@ -1357,9 +1386,12 @@ public final class SparseZeroInflatedMixedModel {
                 }
                 double change = relativeChange(random, candidate);
                 random = candidate;
-                if (change <= options.relativeTolerance()
+                // The determinant is first-order sensitive to mode error. An
+                // outer finite difference therefore needs a substantially
+                // tighter mode solve than its own parameter stopping tolerance.
+                if (change <= Math.min(1e-9, options.relativeTolerance())
                         && gradientMaximum
-                            <= Math.sqrt(options.relativeTolerance())) {
+                            <= Math.min(1e-7, options.relativeTolerance())) {
                     converged = true;
                     break;
                 }
@@ -1540,19 +1572,20 @@ public final class SparseZeroInflatedMixedModel {
         double positiveCurvature;
         if (family == CountFamily.POISSON) {
             logCountZero = -mean;
-            logCount = response * Math.log(mean) - mean
-                - responseLogFactorial;
+            logCount = jdistlib.Poisson.density(response, mean, true);
             baseZeroScore = -mean;
             baseZeroScoreDerivative = -mean;
             positiveScore = response - mean;
             positiveCurvature = mean;
         } else {
             double total = size + mean;
-            logCountZero = size * (logSize - Math.log(total));
-            logCount = responseSizeLogGamma
+            logCountZero = -size * Math.log1p(mean / size);
+            logCount = size > 1e5 || response > 1e5
+                ? jdistlib.NegBinomial.density_mu(response, size, mean, true)
+                : responseSizeLogGamma
                 - sizeLogGamma
                 - responseLogFactorial
-                + size * (logSize - Math.log(total))
+                + logCountZero
                 + response * (Math.log(mean) - Math.log(total));
             baseZeroScore = -size * mean / total;
             baseZeroScoreDerivative =
@@ -1599,18 +1632,19 @@ public final class SparseZeroInflatedMixedModel {
             double logPi, double logOneMinusPi) {
         if (response > 0.0) {
             if (family == CountFamily.POISSON) {
-                return logOneMinusPi + response * Math.log(mean) - mean
-                    - responseLogFactorial;
+                return logOneMinusPi + jdistlib.Poisson.density(response, mean, true);
             }
             double total = size + mean;
+            if (size > 1e5 || response > 1e5)
+                return logOneMinusPi + jdistlib.NegBinomial.density_mu(response, size, mean, true);
             return logOneMinusPi
                 + responseSizeLogGamma
                 - sizeLogGamma - responseLogFactorial
-                + size * (logSize - Math.log(total))
+                - size * Math.log1p(mean / size)
                 + response * (Math.log(mean) - Math.log(total));
         }
         double logCountZero = family == CountFamily.POISSON
-            ? -mean : size * (logSize - Math.log(size + mean));
+            ? -mean : -size * Math.log1p(mean / size);
         return logAddExp(logPi,
             logOneMinusPi + logCountZero);
     }

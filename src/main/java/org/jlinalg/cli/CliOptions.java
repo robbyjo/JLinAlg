@@ -178,6 +178,7 @@ final class CliOptions {
                 || sireId == null || damId == null))
             throw new IllegalArgumentException(
                 "--pedigree requires --pedigree-id, --sire-id, and --dam-id");
+        PipelinePaths.validate(this);
     }
 
     Path logPath() {

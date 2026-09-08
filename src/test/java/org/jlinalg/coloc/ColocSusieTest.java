@@ -118,15 +118,16 @@ class ColocSusieTest {
             1.7791798369307635e-7,
             8.38378518577422e-5
         }, result.signalPairs().get(0).hypothesisPosteriors(), 2e-15);
+        double sharedNormalizer = 3 * Math.exp(3) + 2 * Math.exp(-0.8) + 6;
         assertArrayEquals(new double[] {
-            0.9326984912884172,
-            0.020865185159203038,
-            0.04643632355237998
+            3 * Math.exp(3) / sharedNormalizer,
+            2 * Math.exp(-0.8) / sharedNormalizer,
+            6 / sharedNormalizer
         }, result.sharedVariantPosterior(0), 2e-15);
     }
 
     @Test
-    void impossibleSharedConfigurationFallsBackToNull() {
+    void impossibleSharedConfigurationRetainsNonSharedHypotheses() {
         List<String> variants = List.of("a", "b");
         ColocSusieInput first = new ColocSusieInput(variants,
             new double[][] {{0.0, Double.NEGATIVE_INFINITY}});
@@ -137,8 +138,10 @@ class ColocSusieTest {
 
         ColocSusieResult result = ColocSusie.analyze(first, second, options);
 
-        assertArrayEquals(new double[] {1.0, 0.0, 0.0, 0.0, 0.0},
-            result.signalPairs().get(0).hypothesisPosteriors());
+        double normalizer = 1 + 2e-4 + 1e-8;
+        assertArrayEquals(new double[] {1 / normalizer, 1e-4 / normalizer,
+            1e-4 / normalizer, 1e-8 / normalizer, 0.0},
+            result.signalPairs().get(0).hypothesisPosteriors(), 2e-15);
         assertArrayEquals(new double[] {0.0, 0.0},
             result.sharedVariantPosterior(0));
     }

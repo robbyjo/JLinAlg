@@ -1,0 +1,6 @@
+runtime,rows,span,degree,median_seconds,checksum
+Java_before_end_to_end,5000,0.2,2,0.023333,0.001584182714
+Java_before_prepared,5000,0.2,2,0.022416,0.001584182714
+Java_after_end_to_end,5000,0.2,2,0.021104,0.001584182714
+Java_after_prepared,5000,0.2,2,0.020379,0.001584182714
+R_stats_direct,5000,0.2,2,0.080000,0.001584182714

@@ -60,7 +60,10 @@ final class AnnotationLookup {
     List<String> columns() { return columns; }
     String[] values(String id) {
         String[] result = values.get(id);
-        return result == null ? new String[columns.size()] : result.clone();
+        if (result != null) return result.clone();
+        String[] missing = new String[columns.size()];
+        java.util.Arrays.fill(missing, "");
+        return missing;
     }
     long size() { return values.size(); }
 }

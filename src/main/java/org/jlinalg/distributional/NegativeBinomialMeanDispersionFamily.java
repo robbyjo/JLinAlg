@@ -45,11 +45,7 @@ public final class NegativeBinomialMeanDispersionFamily
     @Override public double logLikelihood(double response, double[] parameters) {
         double mean = parameters[0];
         double size = parameters[1];
-        return SpecialFunctions.logGamma(response + size)
-            - SpecialFunctions.logGamma(size)
-            - SpecialFunctions.logGamma(response + 1.0)
-            + size * (Math.log(size) - Math.log(size + mean))
-            + response * (Math.log(mean) - Math.log(size + mean));
+        return jdistlib.NegBinomial.density_mu(response, size, mean, true);
     }
     @Override public void derivatives(
             double response, double[] parameters,
@@ -58,9 +54,7 @@ public final class NegativeBinomialMeanDispersionFamily
         double size = parameters[1];
         double total = mean + size;
         score[0] = size * (response - mean) / total;
-        score[1] = size * (SpecialFunctions.digamma(response + size)
-            - SpecialFunctions.digamma(size) + Math.log(size) + 1.0
-            - Math.log(total) - (response + size) / total);
+        score[1] = sizeScore(response, mean, size);
         // Mean and size are orthogonal in expectation; an OPG contribution
         // stabilizes the size update when the expected trigamma term is small.
         information[0] = Math.max(MINIMUM, size * mean / total);
@@ -72,6 +66,31 @@ public final class NegativeBinomialMeanDispersionFamily
                 - 1.0 / size + 1.0 / total
                 + (mean - response) / (total * total));
         information[3] = Math.max(1e-6, curvature + 0.05 * score[1] * score[1]);
+    }
+    private static double sizeScore(double y, double mu, double size) {
+        if (Math.max(y, mu) / size < 1e-4) {
+            double first = .5 * (y - (y - mu) * (y - mu));
+            double second = y*(y-1)*(2*y-1)/6 + 2*mu*mu*mu/3 - y*mu*mu;
+            return first / size + second / size / size;
+        }
+        return size * (SpecialFunctions.digamma(y + size) - SpecialFunctions.digamma(size)
+            - Math.log1p(mu / size) + (mu - y) / (size + mu));
+    }
+
+    /** Actual observed information, distinct from the positive scoring metric. */
+    void observedInformation(double y, double[] parameters, double[] information) {
+        double mu = parameters[0], size = parameters[1], total = mu + size;
+        information[0] = (size / total) * (mu / total) * (size + y);
+        information[1] = information[2] = (size / total) * (mu / total) * (mu - y);
+        if (Math.max(y, mu) / size < 1e-4) {
+            double first = .5 * (y - (y - mu) * (y - mu));
+            double second = y*(y-1)*(2*y-1)/6 + 2*mu*mu*mu/3 - y*mu*mu;
+            information[3] = first / size + 2 * second / size / size;
+        } else {
+            information[3] = size * size * (SpecialFunctions.trigamma(size)
+                - SpecialFunctions.trigamma(y + size) - mu / size / total
+                + (mu - y) / total / total) - sizeScore(y, mu, size);
+        }
     }
     private static void check(int parameter) {
         if (parameter < 0 || parameter >= 2) {

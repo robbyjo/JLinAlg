@@ -9,6 +9,7 @@
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Parallel xWAS MR</span></div><h1>Clump once. Scan every phenotype.</h1><p>A command-line workflow for bounded, parallel Mendelian-randomization screens across many molecular exposures and cardiovascular, kidney, lung, or other phenotype families.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<div class="note"><strong>v0.3.0 audit update</strong>External BH supports quoted multiline records and bounded 64-way merges. CLI preflight rejects input/output aliases, protects existing standalone outputs, and refuses unverifiable resume files. Failed or invalid p-values are excluded from the BH family; choose the attempted-hypothesis policy deliberately. <a href="https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/vignettes/xwas-mr-pipeline.md">Updated guide and evidence →</a></div>
 <div class="note"><strong>Designed for two-level scans</strong>Each exposure keeps one already-clumped instrument set. JLinAlg indexes each outcome once, evaluates the full exposure-by-phenotype grid, and reserves expensive sensitivity analyses for threshold-passing pairs.</div>
 
 <h2 id="workflow">The end-to-end workflow</h2>

@@ -290,3 +290,11 @@ objects using the export schema in the
 
 This design avoids redundant clumping and full diagnostics while preserving
 the complete scientific two-level loop.
+
+The shared disk-BH writer now preserves quoted multiline fields and bounds merge
+fan-in to 64 input files. Non-overwriting publication rejects a destination
+created by another process rather than using an atomic move that may replace it.
+Keep each result, failure, FDR, and follow-up output distinct. See the
+[association output contracts](association-gwas-twas.md#audited-edge-cases-and-output-contracts)
+and [audit evidence](../../src/benchmark/resources/pipeline-audit/AUDIT.md) for
+failure accounting, BH denominator semantics, and raw timing measurements.

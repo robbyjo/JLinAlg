@@ -34,6 +34,7 @@ public final class RemlAssociationScanner {
     private final double degreesOfFreedom;
     private final RemlResult nullModel;
     private final BackendPolicy backendPolicy;
+    private final double projectionNorm;
 
     private RemlAssociationScanner(
             double[] projection,
@@ -48,6 +49,14 @@ public final class RemlAssociationScanner {
         this.degreesOfFreedom = degreesOfFreedom;
         this.nullModel = nullModel;
         this.backendPolicy = backendPolicy;
+        double maximum = 0;
+        for (int row = 0; row < observations; row++) {
+            double sum = 0;
+            for (int column = 0; column < observations; column++)
+                sum += Math.abs(projection[row * observations + column]);
+            maximum = Math.max(maximum, sum);
+        }
+        this.projectionNorm = maximum;
     }
 
     /** Fits and factorizes a reusable mixed-model null model. */
@@ -75,6 +84,9 @@ public final class RemlAssociationScanner {
         MatrixOps.validateModelData(response, covariates, rows, columns);
         RemlResult nullModel = Reml.fit(response, covariates, rows, columns,
             components, options, backendPolicy);
+        if (!nullModel.converged())
+            throw new IllegalArgumentException(
+                "REML association null model did not converge");
         double[] variances = nullModel.varianceComponents();
         double[] covariance = new double[rows * rows];
         for (int component = 0; component < components.size(); component++) {
@@ -141,8 +153,9 @@ public final class RemlAssociationScanner {
         if (markerNames.size() != markerCount) {
             throw new IllegalArgumentException("one name is required per marker");
         }
+        double[] markerScales = new double[markerCount];
         double[] prepared = prepareMarkers(
-            markers, markerCount, options.missingPolicy());
+            markers, markerCount, options.missingPolicy(), markerScales);
         double[] beta = new double[markerCount];
         double[] standardErrors = new double[markerCount];
         int batches = (markerCount + options.batchSize() - 1)
@@ -158,18 +171,25 @@ public final class RemlAssociationScanner {
                 for (int marker = 0; marker < count; marker++) {
                     double numerator = 0.0;
                     double information = 0.0;
+                    double originalNorm = 0.0;
                     for (int row = 0; row < observations; row++) {
                         double dosage = block[row * count + marker];
                         numerator += dosage * projectedResponse[row];
                         information += dosage * projected[row * count + marker];
+                        originalNorm += dosage * dosage;
                     }
                     int destination = first + marker;
-                    if (!(information > 1e-14) || !Double.isFinite(information)) {
+                    if (!(information > 1e-12 * projectionNorm * originalNorm)
+                            || !Double.isFinite(information)) {
                         beta[destination] = Double.NaN;
                         standardErrors[destination] = Double.NaN;
                     } else {
-                        beta[destination] = numerator / information;
-                        standardErrors[destination] = Math.sqrt(1.0 / information);
+                        beta[destination] = (numerator / information) / markerScales[destination];
+                        standardErrors[destination] = (1.0 / Math.sqrt(information)) / markerScales[destination];
+                        if (!Double.isFinite(beta[destination]) || !Double.isFinite(standardErrors[destination])
+                                || !(standardErrors[destination] > 0)) {
+                            beta[destination] = standardErrors[destination] = Double.NaN;
+                        }
                     }
                 }
             }
@@ -203,9 +223,15 @@ public final class RemlAssociationScanner {
     public int observations() { return observations; }
     public double associationDegreesOfFreedom() { return degreesOfFreedom; }
     public BackendPolicy backendPolicy() { return backendPolicy; }
+    /** Infinity norm of retained P, for scale-relative projection-error checks. */
+    public double projectionInfinityNorm() { return projectionNorm; }
 
     private static void execute(
             int batches, int parallelism, BatchOperation operation) {
+        if (parallelism == 1 || batches == 1) {
+            for (int batch = 0; batch < batches; batch++) operation.run(batch);
+            return;
+        }
         ForkJoinPool pool = new ForkJoinPool(Math.min(batches, parallelism));
         try {
             pool.submit(() -> IntStream.range(0, batches).parallel()
@@ -224,32 +250,31 @@ public final class RemlAssociationScanner {
     }
 
     private double[] prepareMarkers(
-            double[] markers, int markerCount, GenotypeMissingPolicy policy) {
-        double[] result = markers;
+            double[] markers, int markerCount, GenotypeMissingPolicy policy, double[] scales) {
+        double[] result = new double[markers.length];
         for (int marker = 0; marker < markerCount; marker++) {
             double sum = 0.0;
             int finite = 0;
             for (int row = 0; row < observations; row++) {
                 double value = markers[row * markerCount + marker];
                 if (Double.isFinite(value)) {
-                    sum += value;
+                    scales[marker] = Math.max(scales[marker], Math.abs(value));
                     finite++;
                 } else if (policy == GenotypeMissingPolicy.ERROR) {
                     throw new IllegalArgumentException(
                         "non-finite dosage for marker " + marker + ", row " + row);
                 }
             }
-            if (finite != observations) {
-                if (finite == 0) {
-                    throw new IllegalArgumentException(
-                        "marker has no finite dosages: " + marker);
-                }
-                if (result == markers) result = markers.clone();
-                double mean = sum / finite;
-                for (int row = 0; row < observations; row++) {
-                    int index = row * markerCount + marker;
-                    if (!Double.isFinite(result[index])) result[index] = mean;
-                }
+            if (finite == 0) throw new IllegalArgumentException("marker has no finite dosages: " + marker);
+            if (scales[marker] == 0) scales[marker] = 1;
+            for (int row = 0; row < observations; row++) {
+                double value = markers[row * markerCount + marker];
+                if (Double.isFinite(value)) sum += value / scales[marker];
+            }
+            double mean = sum / finite;
+            for (int row = 0; row < observations; row++) {
+                int index = row * markerCount + marker;
+                result[index] = Double.isFinite(markers[index]) ? markers[index] / scales[marker] : mean;
             }
         }
         return result;

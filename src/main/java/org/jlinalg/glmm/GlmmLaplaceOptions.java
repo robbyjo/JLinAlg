@@ -4,7 +4,11 @@
  */
 package org.jlinalg.glmm;
 
-/** Controls for first-order Laplace marginal-likelihood GLMM fitting. */
+/** Controls for first-order Laplace marginal-likelihood GLMM fitting.
+ * The outer iteration limit applies to each BFGS start; initialLogVarianceStep
+ * sets the initial nuisance-coordinate inverse-Hessian scale. Inner modes use
+ * at least 1e-9 coefficient accuracy; final marginal score tolerance is
+ * max(1e-6, 10*relativeTolerance) in design-scaled coordinates. */
 public record GlmmLaplaceOptions(
         int maximumOuterIterations,
         int maximumModeIterations,

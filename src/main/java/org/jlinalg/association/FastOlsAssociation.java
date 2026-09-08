@@ -148,6 +148,12 @@ public final class FastOlsAssociation {
                     engineOptions.predictorMissingPolicy(), names, failures,
                     engineOptions.failurePolicy());
                 double[] block = prepared.values();
+                double[] originalNorm = new double[count];
+                for (int row = 0; row < rows; row++)
+                    for (int marker = 0; marker < count; marker++) {
+                        double value = block[row * count + marker];
+                        originalNorm[marker] += value * value;
+                    }
                 double[] fixedCross = MatrixOps.transposeMultiply(backend,
                     base.weightedDesign(), rows, covariateCount, block, count);
                 double[] projectionCoefficients = MatrixOps.multiply(backend,
@@ -168,7 +174,10 @@ public final class FastOlsAssociation {
                         numerator += value * base.responseResidual()[row];
                         information += value * value;
                     }
-                    if (!(information > 1e-14) || !Double.isFinite(information)) {
+                    // A relative residual-norm gate preserves changes of units while
+                    // rejecting numerical remnants of a collinear predictor.
+                    if (!(information > 1e-24 * originalNorm[marker])
+                            || !Double.isFinite(information)) {
                         failures.add(new AssociationFailure(destination,
                             names.get(destination), "NonEstimablePredictor",
                             "predictor is constant or collinear with fixed covariates"));
@@ -177,11 +186,26 @@ public final class FastOlsAssociation {
                                 "predictor is not estimable: " + names.get(destination));
                         continue;
                     }
-                    beta[destination] = numerator / information;
-                    double rss = Math.max(0.0, base.residualSumSquares()
-                        - numerator * numerator / information);
-                    standardErrors[destination] = Math.sqrt(
-                        rss / degreesOfFreedom / information);
+                    double scaledBeta = numerator / information;
+                    // Direct residuals avoid catastrophic subtraction for strong signals.
+                    double rss = 0;
+                    for (int row = 0; row < rows; row++) {
+                        double residual = base.responseResidual()[row]
+                            - scaledBeta * block[row * count + marker];
+                        rss += residual * residual;
+                    }
+                    beta[destination] = scaledBeta / prepared.scales()[marker];
+                    standardErrors[destination] = (Math.sqrt(rss / degreesOfFreedom)
+                        / Math.sqrt(information)) / prepared.scales()[marker];
+                    if (!Double.isFinite(beta[destination])
+                            || !Double.isFinite(standardErrors[destination])
+                            || !(standardErrors[destination] > 0)) {
+                        beta[destination] = standardErrors[destination] = Double.NaN;
+                        failures.add(new AssociationFailure(destination, names.get(destination),
+                            "NumericalRange", "predictor estimate or standard error is not representable"));
+                        if (engineOptions.failurePolicy() == AssociationFailurePolicy.FAIL_FAST)
+                            throw new IllegalArgumentException("predictor estimate exceeds numerical range");
+                    }
                 }
             });
             AssociationStatistics statistics = AssociationStatistics.studentT(
@@ -343,6 +367,7 @@ public final class FastOlsAssociation {
             ConcurrentLinkedQueue<AssociationFailure> failures,
             AssociationFailurePolicy failurePolicy) {
         double[] result = new double[rows * count];
+        double[] scales = new double[count];
         boolean[] valid = new boolean[count];
         Arrays.fill(valid, true);
         for (int marker = 0; marker < count; marker++) {
@@ -352,7 +377,10 @@ public final class FastOlsAssociation {
             int firstMissing = -1;
             for (int row = 0; row < rows; row++) {
                 double value = predictors[row * total + source];
-                if (Double.isFinite(value)) { sum += value; finite++; }
+                if (Double.isFinite(value)) {
+                    scales[marker] = Math.max(scales[marker], Math.abs(value));
+                    finite++;
+                }
                 else if (firstMissing < 0) firstMissing = row;
             }
             String message = null;
@@ -368,14 +396,21 @@ public final class FastOlsAssociation {
                     "IllegalArgumentException", message));
                 continue;
             }
+            if (scales[marker] == 0) scales[marker] = 1;
+            // Normalize before imputation, weights, cross-products and projection.
+            // Squaring raw finite predictors can overflow/underflow in valid units.
+            for (int row = 0; row < rows; row++) {
+                double value = predictors[row * total + source];
+                if (Double.isFinite(value)) sum += value / scales[marker];
+            }
             double mean = sum / finite;
             for (int row = 0; row < rows; row++) {
                 double value = predictors[row * total + source];
                 result[row * count + marker] = squareRootWeights[row]
-                    * (Double.isFinite(value) ? value : mean);
+                    * (Double.isFinite(value) ? value / scales[marker] : mean);
             }
         }
-        return new PreparedPredictors(result, valid);
+        return new PreparedPredictors(result, valid, scales);
     }
 
     private static double[] weightDesign(
@@ -417,6 +452,10 @@ public final class FastOlsAssociation {
     }
 
     private static void execute(int chunks, int parallelism, Chunk operation) {
+        if (parallelism == 1 || chunks == 1) {
+            for (int chunk = 0; chunk < chunks; chunk++) operation.run(chunk);
+            return;
+        }
         ForkJoinPool pool = new ForkJoinPool(Math.min(chunks, parallelism));
         try {
             pool.submit(() -> IntStream.range(0, chunks).parallel()
@@ -474,5 +513,5 @@ public final class FastOlsAssociation {
     private record WeightedBase(double[] weightedDesign, double[] informationInverse,
             double[] responseResidual, double[] squareRootWeights,
             double residualSumSquares, int rank) { }
-    private record PreparedPredictors(double[] values, boolean[] valid) { }
+    private record PreparedPredictors(double[] values, boolean[] valid, double[] scales) { }
 }

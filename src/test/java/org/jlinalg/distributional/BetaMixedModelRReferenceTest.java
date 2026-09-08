@@ -33,16 +33,19 @@ final class BetaMixedModelRReferenceTest {
             List.of(RandomEffectTerm.randomIntercept("group", fixture.groups)),
             null, null, controls(), BackendPolicy.CPU);
 
+        System.out.printf("beta mixed LL=%.12f beta=%s precision=%.12f variance=%.12f R_LLError=%.3g%n",
+            fit.marginalLogLikelihood(),java.util.Arrays.toString(fit.meanCoefficients()),fit.precision(),fit.varianceComponents()[0],
+            fit.marginalLogLikelihood()-fixture.reference("log_likelihood"));
         assertTrue(fit.converged(), fit.convergenceMessage());
         assertEquals(fixture.reference("beta_0"),
-            fit.meanCoefficients()[0], 0.003);
+            fit.meanCoefficients()[0], 1e-4);
         assertEquals(fixture.reference("beta_1"),
-            fit.meanCoefficients()[1], 0.006);
-        assertEquals(fixture.reference("precision"), fit.precision(), 0.01);
+            fit.meanCoefficients()[1], 1e-4);
+        assertEquals(fixture.reference("precision"), fit.precision(), 1e-3);
         assertEquals(fixture.reference("variance"),
-            fit.varianceComponents()[0], 0.002);
+            fit.varianceComponents()[0], 1e-4);
         assertEquals(fixture.reference("log_likelihood"),
-            fit.marginalLogLikelihood(), 0.13);
+            fit.marginalLogLikelihood(), 1e-6);
         assertEquals(fixture.groups.stream().distinct().count(),
             fit.randomEffects("group").length);
     }

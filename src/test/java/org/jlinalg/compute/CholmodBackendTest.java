@@ -6,6 +6,7 @@ package org.jlinalg.compute;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import jdistlib.accelerator.MatrixTriangle;
@@ -45,6 +46,13 @@ final class CholmodBackendTest {
             factor.solveInPlace(second, 1);
             assertSolutions(refactored, second,
                 new double[] {2, -1, 4}, 1);
+            assertThrows(IllegalArgumentException.class, () ->
+                factor.refactor(matrix(new double[] {-1, 1, 4, 1, 3})));
+            assertThrows(IllegalStateException.class, factor::logDeterminant);
+            assertThrows(IllegalStateException.class, () ->
+                factor.solveInPlace(new double[] {1, 2, 3}, 1));
+            factor.refactor(refactored);
+            assertEquals(Math.log(52.0), factor.logDeterminant(), 1e-12);
         }
     }
 

@@ -5,7 +5,7 @@ complete feature map and browser-friendly worked vignettes.
 
 JLinAlg implements Java linear and mixed-model algorithms on top of
 [JDistlib 0.10.1](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.1).
-Version 0.2.0 provides ordinary least squares (OLS), generalized
+Version 0.3.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, penalized-quasi-likelihood generalized linear
 mixed models (GLMM PQL), and frequentist ZIP/ZINB sparse Laplace mixed models.
@@ -14,13 +14,18 @@ a first summary-statistics Mendelian-randomization (MR) layer are also included.
 Direct one-dimensional LOESS supplies weighted or robust local-polynomial
 fitting, prediction, leverage, and reusable predictor geometry.
 
-> **v0.2.0 verification status:** Every shipped component family has automated
-> correctness coverage and an executable performance check. Independent
-> Java/R comparisons and real measured results are published with their model
-> and workload limitations. Profile representative data before production use.
+> **v0.3.0 verification status:** The expanded numerical audit adds adversarial
+> regression tests, independent R comparisons, and workload-specific timings.
+> Read the [release audit](docs/release-0.3.0-audit.md) and the
+> [advanced-method validation](docs/advanced-validation.md) for evidence and
+> explicit approximation limits. Profile representative data before production use.
 
 ## Requirements and build
 
+- Prebuilt v0.3.0 artifacts and checksums are on the
+  [GitHub release page](https://github.com/robbyjo/JLinAlg/releases/tag/v0.3.0).
+  Use `jlinalg-0.3.0.jar` for the self-contained CLI; the separate
+  `JLinAlg-0.3.0-library.jar` is the thin library.
 - A JDK 17 or newer.
 - Network access on the first build. The build downloads the pinned
   `jdistlib-all-0.10.1.jar` and verifies its SHA-256 digest before compiling.
@@ -44,19 +49,19 @@ No system Gradle installation is needed.
 Build the self-contained command-line JAR with:
 
 ```powershell
-.\\gradlew.bat executableJar
+.\gradlew.bat executableJar
 ```
 
 The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
 runtime dependencies. A fixed-effect omics scan can then be run as:
 
 ```powershell
-java -jar build/cli/jlinalg-0.2.0.jar \`
-  --omics methylation.tsv \`
-  --pheno phenotype.tsv \`
-  --id IID \`
-  --formula "trait ~ age + sex + <omics>" \`
-  --transform "<omics>=mvalue(epsilon=1e-6)|zscore()" \`
+java -jar build/cli/jlinalg-0.3.0.jar `
+  --omics methylation.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --formula "trait ~ age + sex + <omics>" `
+  --transform "<omics>=mvalue(epsilon=1e-6)|zscore()" `
   --out ewas-results.tsv
 ```
 
@@ -75,7 +80,7 @@ repeated observations, `--individual-id COLUMN` names the phenotype column
 that maps rows to GRM individuals. It defaults to the `--id` column.
 
 ```powershell
-java -jar build/cli/jlinalg-0.2.0.jar `
+java -jar build/cli/jlinalg-0.3.0.jar `
   --pheno phenotype.tsv --id observation_id --individual-id IID `
   --formula "trait ~ age + sex" --grm cohort `
   --out trait-grm.tsv
@@ -255,15 +260,15 @@ grouped effects use `RandomEffectTerm`; additive genetic effects use
 `PedigreeRandomEffectTerm` and its sparse `A^-1`, retaining unphenotyped
 ancestors in the returned conditional modes. The implementation maximizes a
 first-order Laplace likelihood rather than PQL. Its checked-in `glmmTMB`
-reference, statistical limits, API examples, and the measured 11.20x grouped
-speedup are documented in the
+reference, corrected marginal optimization, statistical limits, API examples,
+and current performance measurements are documented in the
 [beta mixed-model note](docs/beta-mixed-models.md).
 
 The beta fitter is also available from the command line for numeric CSV/TSV
 files:
 
 ```powershell
-java -jar build/cli/jlinalg-0.2.0.jar beta-regression `
+java -jar build/cli/jlinalg-0.3.0.jar beta-regression `
   --input proportions.tsv --response proportion --mean dose `
   --precision batch_score --out beta-coefficients.tsv
 ```
@@ -312,7 +317,7 @@ variable selection and should not be presented as selection-valid inference.
 The Gaussian penalized fitter is also available as a file-oriented command:
 
 ```powershell
-java -jar build/cli/jlinalg-0.2.0.jar penalized-regression `
+java -jar build/cli/jlinalg-0.3.0.jar penalized-regression `
   --input continuous.tsv --response y --predictors x1,x2,x3 `
   --model elastic-net --alpha 0.5 `
   --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 `

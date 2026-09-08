@@ -132,14 +132,24 @@ public final class DistributionalModel {
                 current = candidate;
                 if (coefficientChange <= options.relativeTolerance()
                         && objectiveChange <= options.relativeTolerance()) {
-                    converged = true;
-                    message = "coefficient and likelihood tolerances reached";
-                    break;
+                    SystemState checked = system(response, coefficients, current, starts,
+                        designs, penalties, family, totalColumns);
+                    boolean stationary = true;
+                    for (int c = 0; c < totalColumns; c++) {
+                        double score = Math.abs(checked.gradient()[c])
+                            / Math.sqrt(checked.information()[c * totalColumns + c]);
+                        stationary &= score <= Math.sqrt(options.relativeTolerance());
+                    }
+                    if (stationary) {
+                        converged = true;
+                        message = "coefficient, likelihood, and scaled-score tolerances reached";
+                        break;
+                    }
                 }
             }
 
             system = system(response, coefficients, current, starts,
-                designs, penalties, family, totalColumns);
+                designs, penalties, family, totalColumns, true);
             CholeskyFactor factor = backend.dpotrf(
                 system.information(), totalColumns);
             double[] covariance = factor.solve(
@@ -239,6 +249,12 @@ public final class DistributionalModel {
             double[][] penalties,
             DistributionalFamily family,
             int totalColumns) {
+        return system(response, coefficients, state, starts, designs, penalties, family, totalColumns, false);
+    }
+
+    private static SystemState system(double[] response, double[] coefficients,
+            State state, int[] starts, double[][] designs, double[][] penalties,
+            DistributionalFamily family, int totalColumns, boolean inference) {
         int parameters = family.parameterCount();
         double[] gradient = new double[totalColumns];
         double[] information = new double[totalColumns * totalColumns];
@@ -251,6 +267,8 @@ public final class DistributionalModel {
             }
             family.derivatives(response[row], values,
                 score, observationInformation);
+            if (inference && family instanceof NegativeBinomialMeanDispersionFamily nb)
+                nb.observedInformation(response[row], values, observationInformation);
             for (int first = 0; first < parameters; first++) {
                 int firstColumns = starts[first + 1] - starts[first];
                 for (int left = 0; left < firstColumns; left++) {

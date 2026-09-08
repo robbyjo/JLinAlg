@@ -171,6 +171,10 @@ public final class ParallelAssociationEngine {
 
     private static void execute(
             int chunks, int parallelism, ChunkOperation operation) {
+        if (parallelism == 1 || chunks == 1) {
+            for (int chunk = 0; chunk < chunks; chunk++) operation.run(chunk);
+            return;
+        }
         ForkJoinPool pool = new ForkJoinPool(Math.min(parallelism, chunks));
         try {
             pool.submit(() -> IntStream.range(0, chunks).parallel()

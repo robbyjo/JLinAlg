@@ -21,18 +21,23 @@ public record VariantStatistics(
     public static VariantStatistics of(VariantRecord variant) {
         double[] values = variant.dosagesView();
         double sum = 0;
-        double sumSquares = 0;
+        double mean = 0;
+        double centeredSquares = 0;
         int called = 0;
         for (double dosage : values) {
-            if (!Double.isFinite(dosage)) continue;
+            if (Double.isNaN(dosage)) continue;
+            if (!Double.isFinite(dosage))
+                throw new IllegalArgumentException("infinite dosage for variant " + variant.id());
             if (dosage < -1e-10 || dosage > 2 + 1e-10)
                 throw new IllegalArgumentException(
                     "variant '" + variant.id()
                     + "' contains an additive dosage outside [0,2]: " + dosage);
             double bounded = Math.max(0, Math.min(2, dosage));
             sum += bounded;
-            sumSquares += bounded * bounded;
             called++;
+            double delta = bounded - mean;
+            mean += delta / called;
+            centeredSquares += delta * (bounded - mean);
         }
         int missing = values.length - called;
         if (called == 0) {
@@ -43,9 +48,8 @@ public record VariantStatistics(
         double alleleNumber = 2.0 * called;
         double frequency = sum / alleleNumber;
         double maf = Math.min(frequency, 1 - frequency);
-        double mean = sum / called;
         double variance = called > 1
-            ? Math.max(0, (sumSquares - sum * sum / called) / (called - 1))
+            ? Math.max(0, centeredSquares / (called - 1))
             : 0;
         return new VariantStatistics(values.length, called, missing,
             missing / (double) values.length, sum, frequency,

@@ -11,6 +11,7 @@ import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.internal.MatrixOps;
+import org.jlinalg.genetics.GeneticCovarianceValidation;
 
 /** Sum of Single Effects regression using the IBSS algorithm. */
 public final class Susie {
@@ -61,7 +62,7 @@ public final class Susie {
                 scales[column] += centered * centered;
             }
             scales[column] = Math.sqrt(scales[column] / (rows - 1.0));
-            if (!(scales[column] > 0.0)) {
+            if (!(scales[column] > 0.0) || !Double.isFinite(scales[column])) {
                 throw new IllegalArgumentException("constant design column: " + names.get(column));
             }
             for (int row = 0; row < rows; row++) {
@@ -109,10 +110,15 @@ public final class Susie {
             BackendPolicy backendPolicy) {
         if (zScores == null || ldCorrelation == null
                 || ldCorrelation.length != zScores.length
-                || !(sampleSize > 1.0)) {
+                || zScores.length == 0 || !(sampleSize > 2.0)
+                || !Double.isFinite(sampleSize) || sampleSize > Integer.MAX_VALUE
+                || sampleSize != Math.rint(sampleSize)) {
             throw new IllegalArgumentException("summary dimensions or sample size are invalid");
         }
         int columns = zScores.length;
+        for (double[] row : ldCorrelation)
+            if (row == null || row.length != columns)
+                throw new IllegalArgumentException("LD must be square");
         double[] ld = MatrixOps.rowMajor(ldCorrelation, columns);
         validateLd(ld, columns);
         double[] xtx = ld.clone();
@@ -121,9 +127,8 @@ public final class Susie {
         double[] xty = new double[columns];
         for (int column = 0; column < columns; column++) {
             if (!Double.isFinite(zScores[column])) throw new IllegalArgumentException("z scores must be finite");
-            double adjustment = degreesOfFreedom
-                / (zScores[column] * zScores[column] + sampleSize - 2.0);
-            xty[column] = Math.sqrt(degreesOfFreedom * adjustment) * zScores[column];
+            xty[column] = degreesOfFreedom
+                * (zScores[column] / Math.hypot(zScores[column], Math.sqrt(sampleSize - 2.0)));
         }
         List<String> names = names(variableNames, columns);
         try (BackendContext context = BackendContext.select(backendPolicy)) {
@@ -140,11 +145,24 @@ public final class Susie {
             List<String> variableNames, SusieOptions options,
             BackendPolicy backendPolicy) {
         int columns = xty == null ? 0 : xty.length;
-        if (xtx == null || xtx.length != columns * columns
-                || !(yty > 0.0) || observations < 2) {
+        if (columns == 0 || xtx == null || (long) columns * columns != xtx.length
+                || !(yty > 0.0) || !Double.isFinite(yty) || observations < 2) {
             throw new IllegalArgumentException("sufficient statistics are invalid");
         }
         List<String> names = names(variableNames, columns);
+        for (double value : xty)
+            if (!Double.isFinite(value))
+                throw new IllegalArgumentException("X'y must be finite");
+        // These are claimed to be actual cross-products, unlike approximate
+        // external-LD summary inputs: the joint [X y]'[X y] must also be PSD.
+        int jointSize = columns + 1;
+        double[] joint = new double[jointSize * jointSize];
+        for (int row = 0; row < columns; row++) {
+            System.arraycopy(xtx, row * columns, joint, row * jointSize, columns);
+            joint[row * jointSize + columns] = joint[columns * jointSize + row] = xty[row];
+        }
+        joint[joint.length - 1] = yty;
+        GeneticCovarianceValidation.requirePositiveSemidefinite(joint, jointSize);
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             Core core = fitCore(xtx.clone(), xty.clone(), yty, observations,
                 names, options, context.backend());
@@ -157,6 +175,8 @@ public final class Susie {
             double[] xtx, double[] xty, double yty, int observations,
             List<String> names, SusieOptions options, ComputeBackend backend) {
         if (options == null) throw new IllegalArgumentException("options are required");
+        if (!(yty > 0) || !Double.isFinite(yty))
+            throw new IllegalArgumentException("response sum of squares must be finite and positive");
         int variables = xty.length;
         int effects = Math.min(options.effects(), variables);
         double[] alpha = new double[effects * variables];
@@ -187,16 +207,23 @@ public final class Susie {
                 for (int variable = 0; variable < variables; variable++) {
                     double diagonal = xtx[variable * variables + variable];
                     if (!(diagonal > 0.0)) throw new IllegalArgumentException("X'X has nonpositive diagonal");
-                    double bhat = (xty[variable] - fittedCross[variable]) / diagonal;
+                    double residualCross = xty[variable] - fittedCross[variable];
                     double se2 = residualVariance / diagonal;
-                    conditionalVariance[variable] = options.priorVariance() * se2
-                        / (options.priorVariance() + se2);
-                    conditionalMean[variable] = options.priorVariance()
-                        / (options.priorVariance() + se2) * bhat;
-                    logBf[variable] = 0.5 * (Math.log(se2
-                        / (se2 + options.priorVariance()))
-                        + bhat * bhat * options.priorVariance()
-                            / (se2 * (se2 + options.priorVariance())));
+                    double ratio = options.priorVariance() / se2;
+                    double shrink = ratio <= 1 ? ratio / (1 + ratio)
+                        : 1 / (1 + se2 / options.priorVariance());
+                    conditionalVariance[variable] = ratio <= 1
+                        ? options.priorVariance() / (1 + ratio) : se2 * shrink;
+                    conditionalMean[variable] = ratio <= 1
+                        ? multiplyDivide(conditionalVariance[variable], residualCross, residualVariance)
+                        : multiplyDivide(shrink, residualCross, diagonal);
+                    double logPenalty = ratio <= 1 ? Math.log1p(ratio)
+                        : Math.log(options.priorVariance()) + Math.log(diagonal) - Math.log(residualVariance)
+                            + Math.log1p(se2 / options.priorVariance());
+                    logBf[variable] = 0.5 * (-logPenalty
+                        + multiplyDivide(residualCross, conditionalMean[variable], residualVariance));
+                    if (!Double.isFinite(logBf[variable]))
+                        throw new IllegalArgumentException("single-effect posterior exceeds numerical range");
                     maximumLogBf = Math.max(maximumLogBf, logBf[variable]);
                 }
                 double sum = 0.0;
@@ -254,11 +281,14 @@ public final class Susie {
                 * Math.log(2.0 * Math.PI * residualVariance)
                 - 0.5 * expectedResidualSumSquares / residualVariance;
             for (double divergence : kl) objective -= divergence;
-            if (objective - previousObjective < options.convergenceTolerance()) {
+            if (!Double.isFinite(objective) || !Double.isFinite(expectedResidualSumSquares)
+                    || expectedResidualSumSquares < 0)
+                throw new IllegalArgumentException("inconsistent or numerically unrepresentable sufficient statistics");
+            if (Math.abs(objective - previousObjective) < options.convergenceTolerance()) {
                 converged = true;
                 break;
             }
-            if (options.estimateResidualVariance()) {
+            if (options.estimateResidualVariance() && iteration < options.maximumIterations()) {
                 residualVariance = Math.max(1e-8,
                     expectedResidualSumSquares / observations);
             }
@@ -273,11 +303,10 @@ public final class Susie {
             double[] xtx, SusieOptions options, BackendContext context) {
         int variables = names.size();
         double[] pip = new double[variables];
-        Arrays.fill(pip, 1.0);
         for (int variable = 0; variable < variables; variable++) {
             for (int effect = 0; effect < core.effects(); effect++)
-                pip[variable] *= 1.0 - core.alpha()[effect * variables + variable];
-            pip[variable] = 1.0 - pip[variable];
+                pip[variable] += Math.log1p(-core.alpha()[effect * variables + variable]);
+            pip[variable] = -Math.expm1(pip[variable]);
         }
         List<CredibleSet> sets = credibleSets(
             core.alpha(), core.effects(), names, xtx, options);
@@ -296,6 +325,13 @@ public final class Susie {
                 second[secondOffset + index], result);
         }
         return result;
+    }
+
+    /** Preserve representable products when either direct operation would overflow/underflow. */
+    private static double multiplyDivide(double first, double second, double divisor) {
+        int a = Math.getExponent(first), b = Math.getExponent(second), c = Math.getExponent(divisor);
+        return Math.scalb((Math.scalb(first, -a) * Math.scalb(second, -b))
+            / Math.scalb(divisor, -c), a + b - c);
     }
 
     private static void multiply(
@@ -336,8 +372,8 @@ public final class Susie {
             for (int first : selected) {
                 for (int second : selected) {
                     double correlation = xtx[first * variables + second]
-                        / Math.sqrt(xtx[first * variables + first]
-                            * xtx[second * variables + second]);
+                        / Math.sqrt(xtx[first * variables + first])
+                        / Math.sqrt(xtx[second * variables + second]);
                     purity = Math.min(purity, Math.abs(correlation));
                 }
             }
@@ -350,6 +386,7 @@ public final class Susie {
     }
 
     private static void validateLd(double[] ld, int size) {
+        GeneticCovarianceValidation.requirePositiveSemidefinite(ld, size);
         for (int row = 0; row < size; row++) {
             if (Math.abs(ld[row * size + row] - 1.0) > 1e-8)
                 throw new IllegalArgumentException("LD diagonal must equal one");
@@ -367,8 +404,9 @@ public final class Susie {
             for (int index = 0; index < columns; index++) result.add("variable" + (index + 1));
             return result;
         }
-        if (names.size() != columns || names.stream().anyMatch(value -> value == null || value.isBlank()))
-            throw new IllegalArgumentException("one nonblank name is required per variable");
+        if (names.size() != columns || names.stream().anyMatch(value -> value == null || value.isBlank())
+                || new java.util.HashSet<>(names).size() != columns)
+            throw new IllegalArgumentException("one unique nonblank name is required per variable");
         return List.copyOf(names);
     }
 

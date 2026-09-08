@@ -5,14 +5,15 @@ Last reviewed: 2026-09-08.
 The September 8 audit found that several earlier completion claims described
 approximations or scaffolding rather than the requested methods. Those claims
 are superseded by this inventory and the
-[validation report](docs/advanced-validation.md).
+[advanced-method validation report](docs/advanced-validation.md) and the
+[v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md).
 
 ## Audited implementation status
 
-The requested analysis paths and audited repairs are implemented and independently
-rechecked. The final integrated gate passes 459 tests with three optional native
-CHOLMOD skips. The remaining extensions below are explicit limits, not claims
-that the requested methods have full R-package parity.
+The implemented analysis paths and repairs have reference fixtures and independent
+cross-review. Current integrated test counts and paired R timings are recorded in
+the v0.3.0 audit report. The remaining extensions below are explicit limits, not
+claims that the requested methods have full R-package parity.
 
 ## Remaining extensions and limits
 
@@ -33,13 +34,48 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
   conditional GWAS calculations currently use the documented Gaussian score model.
 - GLMM: multidimensional/crossed/pedigree adaptive quadrature beyond the new
   scalar Gaussian random-intercept path.
+- Zero-inflated mixed models: a reproduced competing-mode ZINB refit is not
+  certified. It now reports nonconvergence and unavailable inference instead of
+  false success; see the exact case in the distributional audit. General
+  multi-mode integration and global optimization remain open.
+- Nonlinear models: floating-point quantization under very large response
+  offsets can prevent a score certificate even when fitted SSE is near optimal.
+  Such fits return nonconvergence. Mixed effects are additive Gaussian effects,
+  not a general nonlinear random-parameter likelihood.
+- MR conditional strength: the old conditional-F accessor is deprecated and
+  throws because it only held marginal F values. True conditional strength needs
+  cross-exposure covariance; use the explicitly named marginal accessor meanwhile.
 - Selective inference: unknown-noise or response-selected penalties, dependent
   sample splits, and non-Gaussian selection require different inferential methods.
 - Quantile/nonparametric regression: quantile inferential covariance,
   mixed-type/multidimensional kernels, and automatic inference-valid bandwidth
   selection remain distinct extensions; exact nonsmoothed quantile fitting is implemented.
+- Kernel set tests: ill-conditioned positive-mixture spectra can exceed the
+  bounded gamma-series calculation and now fail explicitly. Analytic SKAT-O
+  remains moment-matched; no exact finite-sample calibration is implied.
+- Numerical identification: extreme original-coordinate deficient SVD fits
+  and inconclusive sparse covariance-rank checks reject rather than returning
+  a numerically unsupported estimator or variance decomposition.
 
-## Completed audit repairs — 2026-09-08
+## Remaining-code audit repairs — v0.3.0
+
+- Unit-stable statistical tests, exact-tail/rank corrections, O(n log n) Kendall
+  counting, contrast covariance validation, and scale-safe LOESS neighborhoods.
+- OLS/GLM/GEE fitting and inference, weighted penalized paths/CV, full marginal
+  Laplace optimization, pedigree ancestry and REML identification checks.
+- Stable distributional densities, observed curvature, weighted GAM offsets,
+  score-qualified convergence, and corrected beta mixed likelihood.
+- Cox risk moments, final nonlinear state, mediation tails, coloc support and
+  weights, SuSiE state consistency, MR stability, and LD likelihood-mode selection.
+- Validated scan inputs, explicit failure accounting, bounded external BH merges,
+  output-path protection, and accurate scaled kernel-test tails.
+- Checked-in R generators, raw warmed benchmarks, four additional website guides,
+  and version-checked tagged release packaging with SHA-256 assets.
+
+See the [release report](docs/release-0.3.0-audit.md) for measured errors, timings,
+independent rechecks, and estimator-specific restrictions.
+
+## Advanced-method audit repairs — 2026-09-08
 
 - Joint latent RAM, structural means/intercepts, ordinal probit pairwise ML,
   direct constrained FIML, robust/cluster covariance, efficient continuous-model

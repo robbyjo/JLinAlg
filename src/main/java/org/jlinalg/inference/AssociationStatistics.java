@@ -89,7 +89,8 @@ public final class AssociationStatistics {
         for (int index = 0; index < beta.length; index++) {
             double estimate = beta[index];
             double standardError = standardErrors[index];
-            if (!Double.isFinite(standardError) || standardError < 0.0) {
+            if (!Double.isFinite(estimate)
+                    || !Double.isFinite(standardError) || standardError < 0.0) {
                 statistics[index] = Double.NaN;
                 pValues[index] = Double.NaN;
                 negativeLog10PValues[index] = Double.NaN;

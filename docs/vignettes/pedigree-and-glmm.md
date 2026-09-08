@@ -20,6 +20,12 @@ The constructor rejects duplicate identifiers, unknown named parents, and
 ancestry cycles. Unknown founder sources are represented with `null`, not a
 string sentinel such as `"0"`.
 
+`PedigreeRandomEffectTerm.ofSparse` and `ofUninbred` also validate the ancestry
+graph without constructing dense `A`; cyclic graphs are invalid even if their
+algebraic precision happens to be positive definite. `ofSparse` requires known
+inbreeding coefficients in the supplied individual order. It does not infer
+them or certify their biological consistency; `ofUninbred` asserts they are zero.
+
 ## Dense animal-model REML
 
 Observation identifiers define the incidence matrix and may repeat. Pedigree
@@ -41,6 +47,16 @@ Map<String, Double> animalModes = fit.ranef();
 The dense reference path returns additive/residual variance, heritability,
 BLUP, PEV, and reliability. Check the underlying REML convergence before using
 the estimates scientifically.
+
+Dense `Reml` rejects indefinite covariance bases (including a known covariance
+that would otherwise mask an invalid component), duplicate component names,
+and nonidentifiable variance directions. REML checks covariance rank on contrasts
+orthogonal to the fixed design, so a single all-observations random intercept
+cannot acquire an arbitrary variance estimate alongside an unrestricted intercept.
+Numerical ridge stabilization is not an identification certificate. Gaussian
+ML and REML remain distinct likelihoods, and `VarianceEstimation` selects which
+one is optimized. The default residual-DF approximation is still only an
+approximation, not an exact finite-sample mixed-model test.
 
 Retain the animal-model structure for simulation and bootstrap:
 
@@ -129,6 +145,17 @@ conditional on the final working Gaussian linearization. It is not a Laplace
 or adaptive-quadrature marginal GLMM likelihood and can be biased for rare
 binary outcomes or small clusters.
 
+The working residual covariance is fixed at `diag(1 / workingWeight)`; it does
+not estimate an extra residual scale for these fixed-dispersion families.
+Consequently `MASS::glmmPQL`, which estimates that scale, is not automatically
+the same estimand. The independent R PQL fixture uses a fixed-scale dense REML
+working model and compares coefficients, random predictors, and variance.
+
+PQL and Laplace use predictor-aware family working responses, precisions and
+likelihood/deviance evaluations. This retains small failure probabilities even
+when a positive-logit fitted mean rounds to one. Working precisions are not
+silently clipped; unrepresentable working models are rejected explicitly.
+
 Use pedigree covariance in the same PQL engine with:
 
 ```java
@@ -162,9 +189,59 @@ try (SparseGlmmLaplace.Prepared scan =
 
 `Prepared` owns one backend for the scan and lazily creates one reusable sparse
 Cholesky factor per calling worker. The random-effect Hessian is assembled as
-`Z'WZ + Q`, and fixed effects are solved through its Schur complement. Pedigree
-`A^-1` and grouped `Z` therefore remain sparse; neither `A` nor `ZAZ'` is
-materialized. Close the prepared scan only after all worker tasks finish.
+`Z'WZ + Q`. Each inner fit holds fixed coefficients constant and finds the random
+modes, with likelihood step-halving. The outer bounded BFGS optimizer varies the
+fixed coefficients, log variances, and supported family parameters jointly in
+the **complete first-order Laplace likelihood**. Its determinant uses observed
+curvature at the final mode, not a stale Fisher-scoring working matrix. Built-in
+binomial/Poisson derivatives are canonical; other families may supply exact
+`LaplaceFamilyDerivatives`, or use numerical differentiation of their working
+score. Those family derivatives must agree with their actual likelihood.
+
+Fixed-effect covariance is the corresponding block of the inverse numerical
+marginal Hessian, accounting for nuisance estimation at interior optima. At a
+configured variance bound it conditions on that bound; this is not a regular
+variance-component Wald test. Exhausted/nonstationary or singular-information
+fits return unavailable fixed-effect covariance. Positive variance bounds are
+numerical constraints; this API does not fit an exact zero-variance model or
+certify a global optimum. Estimated Gaussian residual dispersion belongs in
+the Gaussian mixed-model/REML APIs and is explicitly rejected here.
+
+Pedigree `A^-1` and grouped `Z` remain sparse inside the engine; neither `A` nor
+`ZAZ'` is materialized there. Constructing a `Pedigree` object itself still uses
+dense `A`; use the direct sparse constructor with known inbreeding when avoiding
+that preparation cost matters. Tunable families carry mutable parameters, so
+fits sharing such a family are serialized. Close the prepared scan only after
+all worker tasks finish. `GlmmLaplace` factorizes dense covariance bases once
+and uses this same coefficient-space engine. Dense component coefficients are
+in the retained eigenfactor coordinates, with estimated variance included in
+their prior, not standardized unit-normal coordinates.
+
+Distinct term names do not establish distinct variance components. Preparation
+checks the rank of induced covariance actions `Z Q^-1 Z' r` using the existing
+sparse precision factors, including equivalent column permutations, rescalings,
+and multi-term linear dependencies. It never constructs an observation-scale
+covariance. Small problems use every coordinate vector; larger problems use
+four reproducible continuous probe vectors and a normalized numerical rank
+test. Independent actions certify independent covariance operators; an
+inconclusive or near-dependent probe result is conservatively rejected with
+a reparameterization error. This is a structural numerical check, not a
+guarantee of strong statistical identification in every response sample.
+
+The remaining-code audit found that the old joint-beta conditional solve could
+report convergence away from the marginal optimum. On the rare-binary fixture,
+its LL was `-106.7587015664`; the corrected first-order Laplace LL is
+`-106.4090535610`, matching independently optimized R and tightly converged
+`lme4(nAGQ=1)`. The prior beta mixed-model discrepancy of about `0.122` against
+`glmmTMB` was likewise an implementation defect (conditional-beta optimization
+and Fisher curvature), not intrinsic Laplace approximation error. With exact
+beta observed curvature supplied by the distributional package, the original
+600-row fixture now agrees in LL within `9.4e-10`.
+
+Reproducible same-likelihood accuracy gates and warmed timings are recorded in
+`src/benchmark/resources/remaining-mixed/REPAIR.md`; the raw per-run outputs are
+kept alongside it. These small-fixture comparisons do not establish a general
+speed guarantee or remove first-order Laplace's approximation bias.
 
 ## Adaptive quadrature for independent grouped random intercepts
 

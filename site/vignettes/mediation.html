@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Deterministic Gaussian mediation with Sobel delta inference, mixed effects, and pedigrees."><title>Mediation · JLinAlg 0.3.0</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a></div><h1>Mediation without sampling.</h1><p>Three Gaussian models estimate the treatment-to-mediator, mediator-to-outcome, direct, and total paths.</p></div></section>
+<section class="section"><div class="container prose"><h2>Fit the component models</h2><pre><code>double[] treatment = {-2, -1, 0, 1, 2, 3};
+double[] mediator = {0.2, 1.1, 2.0, 3.2, 3.9, 5.1};
+double[] outcome = {1.1, 1.9, 3.3, 4.8, 6.0, 7.7};
+MediationResult result = MediationAnalysis.fit(outcome, treatment, mediator);
+double indirect = result.indirectEffect().estimate();</code></pre>
+<p>The optional covariate matrix must not contain an intercept: the API supplies one. Defaults reject missing observations. Selecting <code>MissingDataPolicy.OMIT</code> uses a common complete-row sample across mediator, outcome, and total-effect models.</p>
+<h2>Interpret the indirect effect</h2><p>The indirect estimate is a × b. Its first-order Sobel SE is sqrt(b² Var(a) + a² Var(b)), with normal inference and no bootstrap, Monte Carlo, or posterior draws. This omits cross-model covariance under the documented assumptions; it is not a general correlated-error or robust mediation estimator. Gaussian linear modeling alone does not establish causal identification.</p>
+<h2>Mixed effects and pedigrees</h2><pre><code>RandomEffectTerm subject = RandomEffectTerm.randomIntercept("subject", subjectIds);
+MediationMixedResult mixed = MediationAnalysis.fitMixed(
+    outcome, treatment, mediator, covariates, List.of(subject),
+    RemlOptions.defaults(), 0.95, BackendPolicy.CPU);</code></pre>
+<p><code>fitPedigree</code> accepts sparse numerator-relationship precision terms and optional ordinary terms. The same random structure is fitted separately in all three component models. Check each component's convergence and the assumptions behind cross-model independence before inference.</p>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/mediation.md">Complete model, pedigree example, and limitations →</a> · <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">R accuracy and speed audit →</a></p></div></section></main><site-footer root="../"></site-footer></body></html>

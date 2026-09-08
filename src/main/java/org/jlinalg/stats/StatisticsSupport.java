@@ -42,9 +42,17 @@ final class StatisticsSupport {
     }
 
     static double mean(double[] values) {
-        double sum = 0.0;
-        for (double value : values) sum += value;
-        return sum / values.length;
+        double scale = 0.0;
+        for (double value : values) scale = Math.max(scale, Math.abs(value));
+        if (scale == 0.0) return 0.0;
+        double sum = 0.0, correction = 0.0;
+        for (double value : values) {
+            double adjusted = value / scale - correction;
+            double next = sum + adjusted;
+            correction = (next - sum) - adjusted;
+            sum = next;
+        }
+        return (sum / values.length) * scale;
     }
 
     static double variance(double[] values) {
@@ -66,6 +74,15 @@ final class StatisticsSupport {
         return result;
     }
 
+    /** Applies a common finite unit scale in place to private sample copies. */
+    static double rescale(double reference, double[]... samples) {
+        double scale = Math.abs(reference);
+        for (double[] values : samples) for (double value : values) scale = Math.max(scale, Math.abs(value));
+        if (scale == 0.0) return 1.0;
+        for (double[] values : samples) for (int i = 0; i < values.length; i++) values[i] /= scale;
+        return scale;
+    }
+
     static double[] ranks(double[] values) {
         Integer[] order = new Integer[values.length];
         for (int index = 0; index < order.length; index++) order[index] = index;
@@ -75,7 +92,7 @@ final class StatisticsSupport {
         while (start < order.length) {
             int end = start + 1;
             while (end < order.length
-                    && Double.compare(values[order[start]], values[order[end]]) == 0) {
+                    && values[order[start]] == values[order[end]]) {
                 end++;
             }
             double rank = (start + 1.0 + end) / 2.0;
@@ -87,25 +104,80 @@ final class StatisticsSupport {
 
     static Map<Double, Integer> tieCounts(double[] values) {
         Map<Double, Integer> counts = new LinkedHashMap<>();
-        for (double value : values) counts.merge(value, 1, Integer::sum);
+        for (double value : values) counts.merge(value == 0.0 ? 0.0 : value, 1, Integer::sum);
         counts.values().removeIf(count -> count == 1);
         return counts;
     }
 
     static double correlation(double[] first, double[] second) {
-        double firstMean = mean(first);
-        double secondMean = mean(second);
+        double[] xValues = centeredUnitScale(first);
+        double[] yValues = centeredUnitScale(second);
         double cross = 0.0;
         double firstSquare = 0.0;
         double secondSquare = 0.0;
         for (int index = 0; index < first.length; index++) {
-            double x = first[index] - firstMean;
-            double y = second[index] - secondMean;
+            double x = xValues[index];
+            double y = yValues[index];
             cross += x * y;
             firstSquare += x * x;
             secondSquare += y * y;
         }
-        return cross / Math.sqrt(firstSquare * secondSquare);
+        return Math.max(-1.0, Math.min(1.0,
+            (cross / Math.sqrt(firstSquare)) / Math.sqrt(secondSquare)));
+    }
+
+    /** Center before scaling so a large shared offset does not lose the variation. */
+    static double[] centeredUnitScale(double[] values) {
+        double minimum = values[0], maximum = values[0];
+        for (double value : values) {
+            minimum = Math.min(minimum, value);
+            maximum = Math.max(maximum, value);
+        }
+        double range = maximum - minimum;
+        double center = Double.isFinite(range) ? minimum + range / 2.0
+            : minimum / 2.0 + maximum / 2.0;
+        double scale = Math.max(Math.abs(minimum - center), Math.abs(maximum - center));
+        double[] result = new double[values.length];
+        if (scale == 0.0) return result;
+        double sum = 0.0, correction = 0.0;
+        for (int i = 0; i < result.length; i++) {
+            result[i] = (values[i] - center) / scale;
+            double adjusted = result[i] - correction;
+            double next = sum + adjusted;
+            correction = (next - sum) - adjusted;
+            sum = next;
+        }
+        double mean = sum / result.length;
+        for (int i = 0; i < result.length; i++) result[i] -= mean;
+        return result;
+    }
+
+    /** Counts concordant/discordant pairs in O(n log n), delaying updates within x ties. */
+    static long[] kendallPairs(double[] first, double[] second) {
+        Integer[] order = new Integer[first.length];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        Arrays.sort(order, (a, b) -> Double.compare(first[a], first[b]));
+        double[] ranks = ranks(second);
+        long[] tree = new long[2 * first.length + 2];
+        long concordant = 0, discordant = 0, processed = 0;
+        for (int start = 0; start < order.length;) {
+            int end = start + 1;
+            while (end < order.length && first[order[start]] == first[order[end]]) end++;
+            for (int i = start; i < end; i++) {
+                int rank = (int) (2 * ranks[order[i]]);
+                long less = 0, lessOrEqual = 0;
+                for (int j = rank - 1; j > 0; j -= j & -j) less += tree[j];
+                for (int j = rank; j > 0; j -= j & -j) lessOrEqual += tree[j];
+                concordant += less;
+                discordant += processed - lessOrEqual;
+            }
+            for (int i = start; i < end; i++) {
+                for (int j = (int) (2 * ranks[order[i]]); j < tree.length; j += j & -j) tree[j]++;
+            }
+            processed += end - start;
+            start = end;
+        }
+        return new long[]{concordant, discordant};
     }
 
     static double normalPValue(double statistic, Alternative alternative) {

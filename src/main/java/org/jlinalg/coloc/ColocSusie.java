@@ -59,8 +59,6 @@ public final class ColocSusie {
         double[] second = restrict(trait2, match.second(), common);
         double[] overlap1 = posteriorOverlap(trait1, match.first());
         double[] overlap2 = posteriorOverlap(trait2, match.second());
-        double[] logSum1 = rowLogSums(first, trait1.signals(), common);
-        double[] logSum2 = rowLogSums(second, trait2.signals(), common);
         int[] lead1 = rowMaxima(first, trait1.signals(), common);
         int[] lead2 = rowMaxima(second, trait2.signals(), common);
 
@@ -91,19 +89,8 @@ public final class ColocSusie {
                 int firstOffset = signal1 * common;
                 int secondOffset = signal2 * common;
                 int outputOffset = retained * common;
-                double logSum12 = combinedLogSumAndPosterior(
-                    first, firstOffset, second, secondOffset,
-                    posterior, outputOffset, common);
-                if (logSum12 == Double.NEGATIVE_INFINITY) {
-                    hypotheses[0] = 1.0;
-                    java.util.Arrays.fill(hypotheses, 1, hypotheses.length, 0.0);
-                } else if (weights == null) {
-                    unweightedHypotheses(logSum1[signal1],
-                        logSum2[signal2], logSum12, options, hypotheses);
-                } else {
-                    weightedHypotheses(first, firstOffset, second,
-                        secondOffset, weights, options, common, hypotheses);
-                }
+                hypotheses(first, firstOffset, second, secondOffset,
+                    weights, options, common, hypotheses, posterior, outputOffset);
                 pairs.add(new ColocSignalPair(
                     trait1.rawEffectIndices()[signal1],
                     trait2.rawEffectIndices()[signal2], common,
@@ -120,77 +107,56 @@ public final class ColocSusie {
             options, totalPairs - retained);
     }
 
-    private static void unweightedHypotheses(
-            double logSum1, double logSum2, double logSum12,
-            ColocOptions options, double[] output) {
-        output[0] = 0.0;
-        output[1] = Math.log(options.trait1Prior()) + logSum1;
-        output[2] = Math.log(options.trait2Prior()) + logSum2;
-        output[3] = Math.log(options.trait1Prior())
-            + Math.log(options.trait2Prior())
-            + logDifference(logSum1 + logSum2, logSum12);
-        output[4] = Math.log(options.sharedPrior()) + logSum12;
-        normalizeLogs(output);
-    }
-
-    private static void weightedHypotheses(
+    private static void hypotheses(
             double[] first, int firstOffset,
             double[] second, int secondOffset,
             Weights weights, ColocOptions options, int variants,
-            double[] output) {
+            double[] output, double[] posterior, int posteriorOffset) {
         double firstSum = Double.NEGATIVE_INFINITY;
         double secondSum = Double.NEGATIVE_INFINITY;
-        double distinctCorrection = Double.NEGATIVE_INFINITY;
+        double distinctSum = Double.NEGATIVE_INFINITY;
         double sharedSum = Double.NEGATIVE_INFINITY;
+        double logPrior1 = Math.log(options.trait1Prior());
+        double logPrior2 = Math.log(options.trait2Prior());
         double multiplier = Math.log(options.sharedPrior())
             - Math.log(options.trait1Prior())
             - Math.log(options.trait2Prior());
         for (int variant = 0; variant < variants; variant++) {
-            double weighted1 = weights.logTrait1()[variant]
+            double weighted1 = (weights == null ? logPrior1 : weights.logTrait1()[variant])
                 + first[firstOffset + variant];
-            double weighted2 = weights.logTrait2()[variant]
+            double weighted2 = (weights == null ? logPrior2 : weights.logTrait2()[variant])
                 + second[secondOffset + variant];
+            // Enumerate i != j incrementally, without subtracting nearly equal
+            // product and diagonal sums. Each ordered pair enters exactly once.
+            distinctSum = logAdd(distinctSum,
+                logAdd(weighted1 + secondSum, weighted2 + firstSum));
             firstSum = logAdd(firstSum, weighted1);
             secondSum = logAdd(secondSum, weighted2);
             double both = weighted1 + weighted2;
-            distinctCorrection = logAdd(distinctCorrection, both);
             sharedSum = logAdd(sharedSum, multiplier + both);
+            posterior[posteriorOffset + variant] = multiplier + both;
         }
         output[0] = 0.0;
         output[1] = firstSum;
         output[2] = secondSum;
-        output[3] = logDifference(
-            firstSum + secondSum, distinctCorrection);
+        output[3] = distinctSum;
         output[4] = sharedSum;
+        for (double value : output) {
+            if (Double.isNaN(value) || value == Double.POSITIVE_INFINITY)
+                throw new IllegalArgumentException("log Bayes factors exceed numerical range");
+        }
+        double posteriorSum = 0;
+        for (int variant = 0; variant < variants; variant++) {
+            // If H4 has zero support its conditional distribution is undefined;
+            // use the documented zero vector, but retain the other hypotheses.
+            posterior[posteriorOffset + variant] = sharedSum == Double.NEGATIVE_INFINITY
+                ? 0.0 : Math.exp(posterior[posteriorOffset + variant] - sharedSum);
+            posteriorSum += posterior[posteriorOffset + variant];
+        }
+        if (posteriorSum > 0)
+            for (int variant = 0; variant < variants; variant++)
+                posterior[posteriorOffset + variant] /= posteriorSum;
         normalizeLogs(output);
-    }
-
-    private static double combinedLogSumAndPosterior(
-            double[] first, int firstOffset,
-            double[] second, int secondOffset,
-            double[] output, int outputOffset, int variants) {
-        double maximum = Double.NEGATIVE_INFINITY;
-        for (int variant = 0; variant < variants; variant++) {
-            double value = first[firstOffset + variant]
-                + second[secondOffset + variant];
-            output[outputOffset + variant] = value;
-            maximum = Math.max(maximum, value);
-        }
-        if (maximum == Double.NEGATIVE_INFINITY) {
-            java.util.Arrays.fill(output, outputOffset,
-                outputOffset + variants, 0.0);
-            return Double.NEGATIVE_INFINITY;
-        }
-        double sum = 0.0;
-        for (int variant = 0; variant < variants; variant++) {
-            double value = Math.exp(output[outputOffset + variant] - maximum);
-            output[outputOffset + variant] = value;
-            sum += value;
-        }
-        for (int variant = 0; variant < variants; variant++) {
-            output[outputOffset + variant] /= sum;
-        }
-        return maximum + Math.log(sum);
     }
 
     private static double[] posteriorOverlap(
@@ -221,15 +187,6 @@ public final class ColocSusie {
                 result[targetOffset + variant] =
                     source[sourceOffset + indices[variant]];
             }
-        }
-        return result;
-    }
-
-    private static double[] rowLogSums(
-            double[] values, int rows, int columns) {
-        double[] result = new double[rows];
-        for (int row = 0; row < rows; row++) {
-            result[row] = logSum(values, row * columns, columns);
         }
         return result;
     }
@@ -280,21 +237,19 @@ public final class ColocSusie {
         int common = match.names().size();
         double[] log1 = new double[common];
         double[] log2 = new double[common];
-        double sum1 = 0.0;
-        double sum2 = 0.0;
+        double sum1 = Double.NEGATIVE_INFINITY;
+        double sum2 = Double.NEGATIVE_INFINITY;
         for (int variant = 0; variant < common; variant++) {
-            sum1 += supplied1 == null ? 1.0 : supplied1[match.first()[variant]];
-            sum2 += supplied2 == null ? 1.0 : supplied2[match.second()[variant]];
+            log1[variant] = supplied1 == null ? 0.0 : Math.log(supplied1[match.first()[variant]]);
+            log2[variant] = supplied2 == null ? 0.0 : Math.log(supplied2[match.second()[variant]]);
+            sum1 = logAdd(sum1, log1[variant]);
+            sum2 = logAdd(sum2, log2[variant]);
         }
         for (int variant = 0; variant < common; variant++) {
-            double weight1 = supplied1 == null
-                ? 1.0 : supplied1[match.first()[variant]];
-            double weight2 = supplied2 == null
-                ? 1.0 : supplied2[match.second()[variant]];
-            log1[variant] = Math.log(common * options.trait1Prior()
-                * weight1 / sum1);
-            log2[variant] = Math.log(common * options.trait2Prior()
-                * weight2 / sum2);
+            log1[variant] = Math.log(common) + Math.log(options.trait1Prior())
+                + (log1[variant] - sum1);
+            log2[variant] = Math.log(common) + Math.log(options.trait2Prior())
+                + (log2[variant] - sum2);
         }
         return new Weights(log1, log2);
     }
@@ -327,12 +282,6 @@ public final class ColocSusie {
         if (second == Double.NEGATIVE_INFINITY) return first;
         double maximum = Math.max(first, second);
         return maximum + Math.log1p(Math.exp(Math.min(first, second) - maximum));
-    }
-
-    private static double logDifference(double larger, double smaller) {
-        if (smaller == Double.NEGATIVE_INFINITY) return larger;
-        if (smaller >= larger) return Double.NEGATIVE_INFINITY;
-        return larger + Math.log1p(-Math.exp(smaller - larger));
     }
 
     private static void normalizeLogs(double[] values) {

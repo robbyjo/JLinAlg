@@ -41,7 +41,9 @@ public final class SteigerFiltering {
         if (!(sampleSize > 2.0) || !Double.isFinite(sampleSize)) {
             throw new IllegalArgumentException("sample sizes must be finite and exceed two");
         }
-        double f = beta * beta / (standardError * standardError);
-        return f / (f + sampleSize - 2.0);
+        double t = Math.abs(beta) / standardError;
+        if (Double.isInfinite(t)) return 1.0;
+        double r = t / Math.hypot(t, Math.sqrt(sampleSize - 2.0));
+        return r * r;
     }
 }

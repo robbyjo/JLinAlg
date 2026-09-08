@@ -160,3 +160,75 @@ Burden, SKAT, and SKAT-O accept explicit weighted `VariantSet` membership.
 reuses the fitted GRM-adjusted mixed projection for related samples, including
 SKAT-O calibration. The complete file and set-test contract is in the
 [pipeline guide](../gwas-twas-pipeline.md).
+
+## Audited edge cases and output contracts
+
+Predictor tests use scale-relative information checks, so changing a predictor's
+units does not alone make it nonestimable. OLS computes alternative residual sums
+of squares directly: subtracting two nearly equal sums can materially distort SEs
+for strong signals. GLM/P3D estimates retain their documented score/null-model
+estimands; they are not alternative-model refits. P3D rejects a nonconverged REML
+null, and iterative built-in refit adapters propagate nonconvergence through the
+selected failure policy instead of discarding it when extracting statistics.
+
+VCF `DS` is usable even when no `GT` field is present. Alignment indices must be
+nonnegative and unique, and a custom omics transform must preserve sample count.
+Transforms receive a defensive copy. Cohort dosage variance uses centered updates
+instead of cancellation-prone raw moments; NaN denotes missing genotype dosage,
+whereas infinity is an error in variant QC.
+
+Streaming sinks receive exactly one event per source item in source order.
+`testedVariants`/`testedFeatures` count successful estimates, not failed attempts:
+source = tested + excluded + failed (omics has no QC-excluded category). Collinear
+features appear only as failures, not additional successful rows containing NaNs.
+
+The CLI leaves unmatched annotation cells blank. Disk BH preserves quoted tabs,
+quotes, and embedded newlines, uses at most 64 input runs in a merge pass, and
+cleans scratch sort data on close. A `.partial` result remains recoverable after
+an interrupted run; it is not a resumable checkpoint. BH adjusts over finite
+p-values in [0,1]; failed/excluded rows do not enlarge that denominator. Define
+the testing family before analysis rather than interpreting that convention as
+a correction over every attempted/failed hypothesis.
+
+Input/output/log aliases are rejected before the main CLI opens a log. Without
+`--overwrite`, existing result/log/manifest/partial files are rejected. Existing
+results cannot be authenticated by `--resume`, which now reports an error rather
+than declaring any existing file complete. Use a new output path, or deliberately
+rerun with `--overwrite` and without `--resume`. The standalone `mr-estimate`,
+`beta-regression`, and `penalized-regression` commands require fresh output paths
+(they do not expose an overwrite option).
+
+For set tests, small positive weights no longer disappear behind an absolute
+eigenvalue cutoff. Rank-two positive chi-square mixtures use an angular integral
+over the Gaussian radius/angle decomposition. Factoring out the peak exponential
+preserves relative accuracy for extreme tails and nearly rank-one kernels.
+Simulation critical values invert the component tail rather than substituting
+an unrelated moment-matched quantile. Zero padding does not change positive-rank
+quantiles; near survival probability one, inversion evaluates the lower tail
+directly. Higher-rank mixtures use a positive gamma expansion with a PGF-based
+omitted-probability bound of 1e-12 relative to the result. An 8192-term resource
+limit or unresolvable spectrum produces an explicit numerical error, not an
+uncertified Imhof tail or silent moment fallback. This controls series truncation,
+not all floating-point rounding. Analytic SKAT-O remains a moment-matched
+calibration, not a claim of exact finite-sample calibration.
+Underflowed mixture probabilities retain the existing `Double.MIN_VALUE` floor.
+
+Fast OLS and P3D normalize predictors before imputation and cross-products and
+rescale beta/SE afterward. This preserves inference at marker units as small as
+1e-160 or as large as 1e160; it does not promise representable results for every
+finite input. Direct OLS scans record unrepresentable exported estimates as
+failures. P3D reports unavailable estimates as NaN.
+
+The [audit evidence and runnable commands](../../src/benchmark/resources/pipeline-audit/AUDIT.md)
+include R fixtures, edge-case tests, and raw warm timings. On the audited host,
+400-sample/128-marker OLS took 0.751 ms versus R `lm.fit` at 5.20 ms, with maximum
+beta/SE/p discrepancies of 2.5e-16/1.2e-16/1.7e-15. Disk BH took 78.11 ms for
+20,000 output rows. R's in-memory BH took 1 ms,
+but excludes Java's file I/O and is not an equivalent end-to-end speed comparison.
+The rank-two integral took 0.0293 ms in Java and 0.0220 ms in R; accuracy, not a
+speed win, motivates that repair. For rank three, lambda=(1,.5,.25), q=100,
+positive gamma-series evaluation took 0.1147 ms in Java versus 3.20 ms in R;
+both include coefficient generation and assert a relative remainder bound.
+These are warm, workload-specific measurements. Reproduce with the registered
+`benchmarkPipelineOlsAudit`, `benchmarkPipelineBhAudit`, and
+`benchmarkPipelineKernelAudit` Gradle tasks and normal package tests, as linked.

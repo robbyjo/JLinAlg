@@ -38,11 +38,29 @@ Kruskal-Wallis, Mantel-Haenszel, McNemar, Mood, one-way ANOVA, Poisson, ANOVA
 power, proportion, proportion trend, Quade, Shapiro-Wilk, Student t, variance,
 and Wilcoxon signed-rank/rank-sum tests.
 
-Correlation supports Pearson, Kendall, and Spearman methods. Untied Kendall
-tests use the exact permutation distribution when requested. Untied Spearman
-tests use exact enumeration through nine pairs and base R's AS 89 tail
-approximation for larger samples. Tied rank tests use the corresponding
-asymptotic test, and `pValueMethod()` records that choice.
+Correlation supports Pearson, Kendall, and Spearman methods. The default
+Kendall overload uses the exact permutation distribution below 50 untied
+pairs and the normal approximation otherwise. An explicit `exact=true`
+request uses a normalized, tail-symmetric recurrence; calculations exceeding
+50 million recurrence cells fail with an instruction to use `exact=false`.
+No silent approximation is substituted for that explicit request.
+Untied Spearman uses exact enumeration through nine pairs, AS 89 through
+1,289 pairs, and Student t from 1,290 pairs, matching base R's cutoffs.
+Tied rank tests use the corresponding asymptotic test, and `pValueMethod()`
+records that choice. Positive and negative zero count as ties.
+
+Version 0.3.0 centers and rescales Pearson/ANOVA calculations and rescales
+Student/Welch/variance-test inputs to avoid overflow or underflow when units
+change. It preserves small exact Kendall
+upper-tail probabilities, and replaces quadratic Kendall pair counting with
+an O(n log n) tie-aware algorithm. Equal-variance ANOVA permits an individual
+constant group when the pooled within-group variance is positive; Welch's
+test still requires positive variance in every group.
+
+Reproduce the independent base-R accuracy fixtures and paired timing with
+`Rscript src/test/R/core-statistics-audit.R` and
+`./gradlew benchmarkCoreStatisticsAudit`. Details and caveats are in the
+[v0.3.0 audit report](../release-0.3.0-audit.md).
 
 ```java
 StatisticalTestResult fisher = StatisticalTests.fisherExact(new long[][] {

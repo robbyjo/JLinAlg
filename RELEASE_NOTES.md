@@ -1,4 +1,39 @@
-# Unreleased
+# JLinAlg 0.3.0
+
+## Remaining-code accuracy and performance audit
+
+- Corrected shared statistical scaling, exact Kendall tails, rank-test cutoffs,
+  zero-sign ties, unavailable inference, and LOESS weight/leverage normalization.
+- Corrected Gaussian GLM likelihood and finite-DF inference, unit-sensitive rank
+  and penalty handling, GEE variance scaling, and cross-validation accounting.
+- Replaced conditional-beta/Fisher-curvature Laplace fitting with full marginal
+  optimization and observed-mode curvature; corrected beta mixed-model likelihood
+  agreement and rejected unidentifiable REML covariance directions.
+- Repaired Cox risk-set cancellation, nonlinear convergence/final linearization,
+  sparse assembly, and scale-safe mediation delta inference.
+- Repaired colocalization support and weighted evidence, SuSiE variance state,
+  tiny conjugate means, LD/GRM validity checks, MR centering/scaling, and unphased
+  LD global stationary-point selection without multi-start timeouts.
+- Repaired streaming failure/row accounting, annotation keys, dosage validation,
+  bounded multi-pass BH merging, and quadratic-form tail scaling.
+- Added independent R/reference fixtures, paired warm timing reports, new website
+  guides for basic tests, nonlinear models, mediation, and beta regression, and
+  versioned library/source/Javadoc/CLI release assets with SHA-256 checksums.
+
+Compatibility correction: `MultivariableMrResult.conditionalFStatistics()`
+previously returned marginal mean z², not conditional strength. It is deprecated
+and now fails explicitly. Use `marginalFStatistics()` for the actual statistic;
+true multivariable conditional F requires a richer covariance model.
+
+The [release audit](https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/release-0.3.0-audit.md)
+records reproduction commands, measured faster/slower cases, test gates, and
+retained approximation limits. Earlier timing claims from incorrectly optimized
+likelihoods are not performance baselines for the repaired methods.
+
+Release downloads: `jlinalg-0.3.0.jar` is the self-contained executable;
+`JLinAlg-0.3.0-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included. The library classifier prevents a
+case-insensitive filename collision on Windows.
 
 ## Statistical audit repairs — 2026-09-08
 
@@ -21,19 +56,19 @@
   Gaussian polyhedral LASSO/elastic-net inference.
 - Added independent R fixtures and paired accuracy/speed measurements, with
   explicit slower cases and remaining limits. See
-  [the validation report](docs/advanced-validation.md).
+  [the validation report](https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/advanced-validation.md).
 
 ## Earlier additions
 
 - Added sparse first-order Laplace beta mixed models with analytic beta
-  Fisher-scoring updates, jointly optimized constant precision and variance
+  scores and observed curvature, jointly optimized fixed effects, precision and variance
   components, grouped random effects, arbitrary sparse coefficient precision,
   and a pedigree convenience API consuming sparse `A^-1`. An independent
   `glmmTMB` 1.1.14 fixture checks fixed effects, precision, variance, likelihood,
-  unrelated-founder equivalence, and retention of unphenotyped ancestors. On
-  the documented 30,000-row/1,000-group workload, the Java median was
-  1,028.105 ms versus 11,520 ms for R (11.20x faster); a 3,000-member pedigree
-  fit took 1,374.480 ms.
+  unrelated-founder equivalence, and retention of unphenotyped ancestors.
+  Corrected marginal optimization reduces the original grouped log-likelihood
+  error from about 0.122 to below 1e-8; the release audit supersedes prior
+  timings from the incorrect objective.
 - Added specialized classical beta regression compatible with R `betareg`'s
   mean/precision parameterization, six mean links, three precision links,
   constant and variable precision, expected-information covariance, and Wald

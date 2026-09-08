@@ -34,7 +34,7 @@ public final class SetTests {
         double[] residualBurden = nullModel.residualize(
             new double[][] {burden})[0];
         double information = dot(residualBurden, residualBurden);
-        if (!(information > 1e-14))
+        if (!(information > 1e-24 * dot(burden, burden)) || !Double.isFinite(information))
             throw new IllegalArgumentException(
                 "burden is constant or collinear after covariate adjustment");
         double numerator = dot(residualBurden,
@@ -44,9 +44,11 @@ public final class SetTests {
         if (degrees < 1)
             throw new IllegalArgumentException(
                 "burden test requires positive residual degrees of freedom");
-        double residualSumSquares = Math.max(0,
-            nullModel.residualSumSquares()
-            - numerator * numerator / information);
+        double residualSumSquares = 0;
+        for (int sample = 0; sample < residualBurden.length; sample++) {
+            double residual = nullModel.responseResidualView()[sample] - beta * residualBurden[sample];
+            residualSumSquares += residual * residual;
+        }
         double standardError = Math.sqrt(
             residualSumSquares / degrees / information);
         double statistic = beta / standardError;
@@ -73,7 +75,8 @@ public final class SetTests {
         SetTestScoreState state = nullModel.score(new double[][] {burden});
         double score = state.scoresView()[0];
         double information = state.informationView()[0];
-        if (!(information > 1e-14) || !Double.isFinite(information))
+        if (!(information > 1e-12 * dot(burden, burden) * nullModel.projectionNorm())
+                || !Double.isFinite(information))
             throw new IllegalArgumentException(
                 "burden is constant or collinear after mixed-model adjustment");
         double beta = score / information;
@@ -328,7 +331,8 @@ public final class SetTests {
             SetTestScoreState state) {
         double score = Arrays.stream(state.scoresView()).sum();
         double information = Arrays.stream(state.informationView()).sum();
-        if (!(information > 1e-14) || !Double.isFinite(information))
+        double informationScale = Arrays.stream(state.informationView()).map(Math::abs).sum();
+        if (!(information > 1e-12 * informationScale) || !Double.isFinite(information))
             throw new IllegalArgumentException(
                 "burden is constant or collinear after null-model adjustment");
         double beta = score / information;
@@ -397,7 +401,10 @@ public final class SetTests {
             backend.dsyev(symmetricCopy(matrix, dimension), dimension);
         double maximum = Arrays.stream(decomposition.eigenvalues())
             .map(Math::abs).max().orElse(0);
-        double tolerance = 1e-12 * Math.max(1, maximum);
+        double tolerance = 1e-12 * maximum;
+        for (double value : decomposition.eigenvalues())
+            if (!Double.isFinite(value) || value < -tolerance)
+                throw new IllegalArgumentException("set-test information is not positive semidefinite");
         return Arrays.stream(decomposition.eigenvalues())
             .filter(value -> value > tolerance)
             .sorted().toArray();

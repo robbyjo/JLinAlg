@@ -1,0 +1,14 @@
+Final isolated owned-package JUnit run, 2026-09-08
+Classpath: build/remaining-audit-classes;build/remaining-audit-main-snapshot;build/dependencies/jdistlib-all-0.10.1.jar;src/test/resources;src/benchmark/resources;build/mixed-deps/*.jar
+Command: java -Xmx1g -cp <classpath> RunRemainingTests
+Packages: org.jlinalg.survival, org.jlinalg.mediation, org.jlinalg.nonlinear
+Test run finished after 105773 ms
+12 containers found; 12 started; 12 successful; 0 failed
+38 tests found; 38 started; 38 successful; 0 failed; 0 skipped; 0 aborted
+New adversarial/reference audit tests: 18 (Cox 7, nonlinear 8, mediation 3)
+Includes post-cross-review response-shift/response-unit regressions and R extreme normal/t confidence interval references.
+Compilation: javac --release 17 -Xlint:all -Werror, exit 0
+Pedigree ML beta=[1.7552252524169023,0.3387198592519149]
+Pedigree ML variances=[0.3282970168696363,0.022791022441679815]
+Pedigree ML logLikelihood=9.053569784557801; converged=true; nonlinear iterations=7
+NOTE: an earlier overlapping run saw Ols/OlsResult linkage errors while the shared main classes were rebuilt. The final run used an immutable local snapshot and passed without source changes.

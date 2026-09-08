@@ -114,8 +114,9 @@ public final class Reml {
             throw new IllegalArgumentException(
                 "options and context are required");
         }
-        double[] known = new VarianceComponent(
-            "known covariance", rows, knownCovariance).covarianceView().clone();
+        VarianceComponent knownComponent = new VarianceComponent("known covariance", rows, knownCovariance);
+        knownComponent.requirePositiveSemidefinite(context.backend());
+        double[] known = knownComponent.covarianceView().clone();
         return fit(response, fixedEffects, rows, columns, components,
             known, options, context.backend(), context.provenance());
     }
@@ -130,6 +131,8 @@ public final class Reml {
             RemlOptions options,
             ComputeBackend backend,
             BackendProvenance provenance) {
+        for(VarianceComponent component:components)component.requirePositiveSemidefinite(backend);
+        requireIdentifiableBases(components,fixedEffects,rows,columns,options.varianceEstimation()==VarianceEstimation.REML);
         double[] initial = initialVariances(response, components, options);
         double minimumLog = Math.log(options.minimumVariance());
         double maximumLog = Math.log(options.maximumVariance());
@@ -142,6 +145,7 @@ public final class Reml {
         Evaluation current = evaluate(response, fixedEffects, rows, columns,
             components, knownCovariance, logVariances,
             options.varianceEstimation(), backend);
+        requireIdentifiable(current.information(),components.size());
         boolean converged = false;
         String message = "maximum iterations reached";
         int iterations = 0;
@@ -476,6 +480,7 @@ public final class Reml {
             int dimension,
             ComputeBackend backend,
             String calculation) {
+        requireIdentifiable(information,dimension);
         double maximumDiagonal = 0.0;
         for (int index = 0; index < dimension; index++) {
             maximumDiagonal = Math.max(maximumDiagonal,
@@ -556,10 +561,75 @@ public final class Reml {
             throw new IllegalArgumentException(
                 "at least one variance component is required");
         }
+        java.util.HashSet<String> names=new java.util.HashSet<>();
         for (VarianceComponent component : components) {
             if (component == null || component.dimension() != dimension) {
                 throw new IllegalArgumentException(
                     "all variance components must match the response dimension");
+            }
+            if(!names.add(component.name()))throw new IllegalArgumentException("variance component names must be unique");
+        }
+    }
+
+    /** Ridge stabilization must not manufacture variance-component identification. */
+    private static void requireIdentifiableBases(List<VarianceComponent> components,double[] fixed,int rows,int columns,boolean restricted) {
+        double[][] q=new double[restricted?columns:0][rows];
+        for(int j=0;j<q.length;j++) {
+            double scale=0;for(int i=0;i<rows;i++)scale=Math.max(scale,Math.abs(fixed[i*columns+j]));
+            if(scale==0)throw new IllegalArgumentException("fixed design is rank deficient");
+            for(int i=0;i<rows;i++)q[j][i]=fixed[i*columns+j]/scale;
+            for(int pass=0;pass<2;pass++)for(int k=0;k<j;k++) {
+                double dot=0;for(int i=0;i<rows;i++)dot+=q[j][i]*q[k][i];
+                for(int i=0;i<rows;i++)q[j][i]-=dot*q[k][i];
+            }
+            double norm=0;for(double v:q[j])norm=Math.hypot(norm,v);
+            if(norm<1e-10)throw new IllegalArgumentException("fixed design is rank deficient");
+            for(int i=0;i<rows;i++)q[j][i]/=norm;
+        }
+        double[][] bases=new double[components.size()][];
+        for(int k=0;k<bases.length;k++) {
+            double[] b=components.get(k).covarianceView().clone();double originalNorm=0;
+            for(double v:b)originalNorm=Math.hypot(originalNorm,v);
+            if(!(originalNorm>0))throw new IllegalArgumentException("variance components are not identifiable");
+            for(int i=0;i<b.length;i++)b[i]/=originalNorm;
+            // REML identifies covariance only on contrasts orthogonal to X.
+            for(double[] vector:q) {
+                for(int i=0;i<rows;i++) {
+                    double dot=0;for(int j=0;j<rows;j++)dot+=b[i*rows+j]*vector[j];
+                    for(int j=0;j<rows;j++)b[i*rows+j]-=dot*vector[j];
+                }
+            }
+            for(double[] vector:q) {
+                for(int j=0;j<rows;j++) {
+                    double dot=0;for(int i=0;i<rows;i++)dot+=vector[i]*b[i*rows+j];
+                    for(int i=0;i<rows;i++)b[i*rows+j]-=vector[i]*dot;
+                }
+            }
+            double norm=0;for(double v:b)norm=Math.hypot(norm,v);
+            if(norm<1e-10)throw new IllegalArgumentException("variance component is confounded with fixed effects: "+components.get(k).name());
+            for(int i=0;i<b.length;i++)b[i]/=norm;bases[k]=b;
+        }
+        int n=bases.length;double[] gram=new double[n*n];
+        for(int i=0;i<n;i++)for(int j=0;j<=i;j++) {
+            double dot=0;for(int k=0;k<bases[i].length;k++)dot+=bases[i][k]*bases[j][k];
+            gram[i*n+j]=gram[j*n+i]=dot;
+        }
+        requireIdentifiable(gram,n);
+    }
+
+    /** Normalized information rank check; never add a ridge to create rank. */
+    private static void requireIdentifiable(double[] information,int dimension) {
+        double[] factor=new double[dimension*dimension];
+        for(int i=0;i<dimension;i++) {
+            double diagonal=information[i*dimension+i];
+            if(!(diagonal>0)||!Double.isFinite(diagonal))throw new IllegalArgumentException("variance components are not identifiable");
+            for(int j=0;j<=i;j++) {
+                double value=information[i*dimension+j]/Math.sqrt(diagonal)/Math.sqrt(information[j*dimension+j]);
+                for(int k=0;k<j;k++)value-=factor[i*dimension+k]*factor[j*dimension+k];
+                if(i==j) {
+                    if(!(value>1e-9))throw new IllegalArgumentException("variance components are not identifiable");
+                    factor[i*dimension+j]=Math.sqrt(value);
+                }else factor[i*dimension+j]=value/factor[j*dimension+j];
             }
         }
     }

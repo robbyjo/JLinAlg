@@ -9,7 +9,12 @@ import java.util.List;
 import java.util.Map;
 import org.jlinalg.inference.AssociationStatistics;
 
-/** Conditional modes and marginal likelihood from a Laplace GLMM fit. */
+/** Conditional modes and first-order marginal likelihood from a Laplace GLMM fit.
+ * Fixed covariance includes interior variance/family nuisance estimation through
+ * the complete marginal Hessian. At active parameter bounds it is conditional
+ * on those bounds. Failed fits expose NaN fixed covariance and Wald statistics.
+ * Positive variance bounds are numerical constraints, not exact zero-variance
+ * fits. No global-optimization or finite-sample Wald coverage is implied. */
 public final class GlmmLaplaceResult {
     private final String family;
     private final List<String> componentNames;

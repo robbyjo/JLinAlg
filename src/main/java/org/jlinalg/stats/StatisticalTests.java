@@ -137,13 +137,17 @@ public final class StatisticalTests {
             double[] first, double[] second, CorrelationMethod method,
             Alternative alternative) {
         return correlation(first, second, method, alternative,
-            DEFAULT_CONFIDENCE_LEVEL, true, false);
+            DEFAULT_CONFIDENCE_LEVEL,
+            method != CorrelationMethod.KENDALL || (first != null && first.length < 50), false);
     }
 
     /**
      * Pearson, Kendall, or Spearman correlation test.
-     * Rank tests use base R's exact algorithms when requested and there are no
-     * ties; continuity correction applies only to asymptotic rank tests.
+     * Rank tests use exact/AS 89 probabilities when requested and there are no
+     * ties (Spearman switches to Student t at n >= 1290, as in R).
+     * Explicit Kendall enumeration is bounded to 50 million recurrence cells;
+     * requests above that bound fail rather than silently approximate.
+     * Continuity correction applies only to asymptotic rank tests.
      */
     public static StatisticalTestResult correlation(
             double[] first, double[] second, CorrelationMethod method,
@@ -197,17 +201,9 @@ public final class StatisticalTests {
             double[] first, double[] second, Alternative alternative,
             boolean exact, boolean correction) {
         int size = first.length;
-        long concordant = 0L;
-        long discordant = 0L;
-        for (int left = 0; left < size; left++) {
-            for (int right = left + 1; right < size; right++) {
-                int xSign = Double.compare(first[left], first[right]);
-                int ySign = Double.compare(second[left], second[right]);
-                int product = xSign * ySign;
-                if (product > 0) concordant++;
-                if (product < 0) discordant++;
-            }
-        }
+        long[] pairs = StatisticsSupport.kendallPairs(first, second);
+        long concordant = pairs[0];
+        long discordant = pairs[1];
         Map<Double, Integer> xCounts = StatisticsSupport.tieCounts(first);
         Map<Double, Integer> yCounts = StatisticsSupport.tieCounts(second);
         double pairCount = size * (size - 1.0) / 2.0;
@@ -216,7 +212,7 @@ public final class StatisticalTests {
         double denominator = Math.sqrt(
             (pairCount - firstTies) * (pairCount - secondTies));
         double tau = (concordant - discordant) / denominator;
-        boolean ties = hasTies(first) || hasTies(second);
+        boolean ties = !xCounts.isEmpty() || !yCounts.isEmpty();
         if (!Double.isFinite(tau)) {
             return result("Kendall's rank correlation tau", "z", Double.NaN,
                 Map.of(), Double.NaN, Map.of("tau", Double.NaN),
@@ -224,10 +220,11 @@ public final class StatisticalTests {
                 "undefined for a constant sample");
         }
         if (exact && !ties) {
-            int total = size * (size - 1) / 2;
-            int observed = Math.toIntExact(concordant);
+            long total = size * (size - 1L) / 2;
+            long observed = concordant;
             double lower = kendallCumulative(observed, size);
-            double upper = 1.0 - kendallCumulative(observed - 1, size);
+            // Symmetry avoids subtracting a tiny upper tail from one.
+            double upper = kendallCumulative(total - observed, size);
             double pValue = switch (alternative) {
                 case LESS -> lower;
                 case GREATER -> upper;
@@ -271,7 +268,7 @@ public final class StatisticalTests {
         int size = first.length;
         double q = (Math.pow(size, 3.0) - size) * (1.0 - rho) / 6.0;
         boolean ties = hasTies(first) || hasTies(second);
-        if (exact && !ties) {
+        if (exact && !ties && size < 1290) {
             double lower = spearmanTail(q, size, true);
             double upper = spearmanTail(q, size, false);
             double pValue = switch (alternative) {
@@ -618,6 +615,24 @@ public final class StatisticalTests {
     public static StatisticalTestResult oneWayAnova(
             double[][] groups, boolean equalVariances) {
         validateGroups(groups);
+        // The F statistic is invariant to a common location and scale. Work in
+        // bounded coordinates so squares/weights cannot overflow or underflow.
+        double minimum = groups[0][0], maximum = minimum;
+        for (double[] group : groups) for (double value : group) {
+            minimum = Math.min(minimum, value);
+            maximum = Math.max(maximum, value);
+        }
+        double range = maximum - minimum;
+        double center = Double.isFinite(range) ? minimum + range / 2.0
+            : minimum / 2.0 + maximum / 2.0;
+        double scale = Math.max(Math.abs(minimum - center), Math.abs(maximum - center));
+        if (!(scale > 0.0)) throw new IllegalArgumentException("data have no variation");
+        double[][] scaled = new double[groups.length][];
+        for (int g = 0; g < groups.length; g++) {
+            scaled[g] = new double[groups[g].length];
+            for (int i = 0; i < scaled[g].length; i++) scaled[g][i] = (groups[g][i] - center) / scale;
+        }
+        groups = scaled;
         int groupCount = groups.length;
         int totalCount = 0;
         double[] means = new double[groupCount];
@@ -627,7 +642,8 @@ public final class StatisticalTests {
         for (int index = 0; index < groupCount; index++) {
             means[index] = StatisticsSupport.mean(groups[index]);
             variances[index] = StatisticsSupport.variance(groups[index]);
-            if (!(variances[index] > 0.0) || !Double.isFinite(variances[index])) {
+            if ((!equalVariances && !(variances[index] > 0.0))
+                    || !Double.isFinite(variances[index])) {
                 throw new IllegalArgumentException("each group must have positive finite variance");
             }
             weights[index] = groups[index].length / variances[index];
@@ -647,6 +663,7 @@ public final class StatisticalTests {
                 within += (groups[index].length - 1.0) * variances[index];
             }
             denominatorDegrees = totalCount - groupCount;
+            if (!(within > 0.0)) throw new IllegalArgumentException("pooled within-group variance must be positive");
             statistic = (between / (groupCount - 1.0))
                 / (within / denominatorDegrees);
         } else {
@@ -885,6 +902,7 @@ public final class StatisticalTests {
         for (double score : scores) if (!Double.isFinite(score)) {
             throw new IllegalArgumentException("scores must be finite");
         }
+        scores = StatisticsSupport.centeredUnitScale(scores);
         long totalSuccess = 0L;
         long totalTrials = 0L;
         double weightedScore = 0.0;
@@ -976,7 +994,7 @@ public final class StatisticalTests {
             "Royston approximation");
     }
 
-    /** One-sample Student t test, using JDistlib for the statistic and p-value. */
+    /** One-sample Student t test, using JDistlib for tail probabilities. */
     public static StatisticalTestResult studentT(double[] sample, double mean) {
         return studentT(sample, mean, Alternative.TWO_SIDED,
             DEFAULT_CONFIDENCE_LEVEL);
@@ -989,15 +1007,18 @@ public final class StatisticalTests {
         double[] x = StatisticsSupport.sample(sample, 2, "sample");
         if (!Double.isFinite(mean)) throw new IllegalArgumentException("null mean must be finite");
         StatisticsSupport.probability(confidenceLevel, "confidence level");
-        double[] raw = DistributionTest.t_test(x, mean, kind(alternative));
+        Objects.requireNonNull(alternative, "alternative");
+        double scale = StatisticsSupport.rescale(0.0, x);
         double estimate = StatisticsSupport.mean(x);
         double standardError = Math.sqrt(StatisticsSupport.variance(x) / x.length);
+        if (!(standardError > 0.0)) throw new IllegalArgumentException("sample must have positive variance");
         double degrees = x.length - 1.0;
+        double statistic = (estimate - mean / scale) / standardError;
         ConfidenceInterval interval = tInterval(
             estimate, standardError, degrees, alternative, confidenceLevel);
-        return result("One Sample t-test", "t", raw[0], Map.of("df", degrees),
-            raw[1], Map.of("mean", estimate), Map.of("mean", mean),
-            Optional.of(interval), alternative, "Student t");
+        return result("One Sample t-test", "t", statistic, Map.of("df", degrees),
+            tPValue(statistic, degrees, alternative), Map.of("mean", estimate * scale), Map.of("mean", mean),
+            Optional.of(scaleInterval(interval, scale)), alternative, "Student t");
     }
 
     /** Welch or pooled two-sample t test. */
@@ -1011,8 +1032,8 @@ public final class StatisticalTests {
             throw new IllegalArgumentException("null mean difference must be finite");
         }
         StatisticsSupport.probability(confidenceLevel, "confidence level");
-        double[] raw = DistributionTest.t_test(
-            x, y, meanDifference, equalVariances, kind(alternative));
+        Objects.requireNonNull(alternative, "alternative");
+        double scale = StatisticsSupport.rescale(0.0, x, y);
         double firstVariance = StatisticsSupport.variance(x);
         double secondVariance = StatisticsSupport.variance(y);
         double standardError;
@@ -1030,16 +1051,18 @@ public final class StatisticalTests {
                 / (firstTerm * firstTerm / (x.length - 1.0)
                     + secondTerm * secondTerm / (y.length - 1.0));
         }
+        if (!(standardError > 0.0)) throw new IllegalArgumentException("pooled standard error must be positive");
         double estimate = StatisticsSupport.mean(x) - StatisticsSupport.mean(y);
+        double statistic = (estimate - meanDifference / scale) / standardError;
         return result(equalVariances ? "Two Sample t-test" : "Welch Two Sample t-test",
-            "t", raw[0], Map.of("df", degrees), raw[1],
-            Map.of("difference in means", estimate),
+            "t", statistic, Map.of("df", degrees), tPValue(statistic, degrees, alternative),
+            Map.of("difference in means", estimate * scale),
             Map.of("difference in means", meanDifference),
-            Optional.of(tInterval(estimate, standardError, degrees,
-                alternative, confidenceLevel)), alternative, "Student t");
+            Optional.of(scaleInterval(tInterval(estimate, standardError, degrees,
+                alternative, confidenceLevel), scale)), alternative, "Student t");
     }
 
-    /** Paired t test, implemented as JDistlib's one-sample test of differences. */
+    /** Paired t test, implemented as a one-sample test of differences. */
     public static StatisticalTestResult pairedT(
             double[] first, double[] second, double meanDifference,
             Alternative alternative, double confidenceLevel) {
@@ -1048,7 +1071,7 @@ public final class StatisticalTests {
             differences, meanDifference, alternative, confidenceLevel);
         return result("Paired t-test", base.statisticName(), base.statistic(),
             base.parameters(), base.pValue(),
-            Map.of("mean difference", StatisticsSupport.mean(differences)),
+            Map.of("mean difference", base.estimates().get("mean")),
             Map.of("mean difference", meanDifference), base.confidenceInterval(),
             alternative, base.pValueMethod());
     }
@@ -1070,6 +1093,7 @@ public final class StatisticalTests {
             throw new IllegalArgumentException("null variance ratio must be positive");
         }
         StatisticsSupport.probability(confidenceLevel, "confidence level");
+        StatisticsSupport.rescale(0.0, x, y);
         if (!(StatisticsSupport.variance(x) > 0.0)
                 || !(StatisticsSupport.variance(y) > 0.0)) {
             throw new IllegalArgumentException("both samples must have positive variance");
@@ -1185,11 +1209,15 @@ public final class StatisticalTests {
         return 0.5 * Math.log((1.0 + value) / (1.0 - value));
     }
 
+    private static ConfidenceInterval scaleInterval(ConfidenceInterval interval, double scale) {
+        return new ConfidenceInterval(interval.lower() * scale, interval.upper() * scale, interval.level());
+    }
+
     private static boolean hasTies(double[] values) {
         double[] sorted = values.clone();
         Arrays.sort(sorted);
         for (int index = 1; index < sorted.length; index++) {
-            if (Double.compare(sorted[index - 1], sorted[index]) == 0) return true;
+            if (sorted[index - 1] == sorted[index]) return true;
         }
         return false;
     }
@@ -1251,27 +1279,29 @@ public final class StatisticalTests {
         return result;
     }
 
-    private static double kendallCumulative(int concordant, int size) {
-        int maximum = size * (size - 1) / 2;
+    private static double kendallCumulative(long concordant, int size) {
+        long maximum = size * (size - 1L) / 2;
         if (concordant < 0) return 0.0;
         if (concordant >= maximum) return 1.0;
-        double[] counts = {1.0};
+        if (concordant > maximum / 2) return 1.0 - kendallCumulative(maximum - concordant - 1, size);
+        if ((concordant + 1) * (double) size > 50_000_000.0) {
+            throw new IllegalArgumentException("exact Kendall exceeds 50 million recurrence cells; use exact=false");
+        }
+        int limit = Math.toIntExact(concordant);
+        double[] probabilities = {1.0};
         for (int n = 2; n <= size; n++) {
-            double[] next = new double[n * (n - 1) / 2 + 1];
-            for (int prior = 0; prior < counts.length; prior++) {
-                for (int added = 0; added < n; added++) {
-                    next[prior + added] += counts[prior];
-                }
+            double[] next = new double[(int) Math.min(limit, n * (n - 1L) / 2) + 1];
+            double window = 0.0;
+            for (int k = 0; k < next.length; k++) {
+                if (k < probabilities.length) window += probabilities[k];
+                if (k >= n && k - n < probabilities.length) window -= probabilities[k - n];
+                next[k] = Math.max(0.0, window / n);
             }
-            counts = next;
+            probabilities = next;
         }
-        double total = 0.0;
         double cumulative = 0.0;
-        for (int index = 0; index < counts.length; index++) {
-            total += counts[index];
-            if (index <= concordant) cumulative += counts[index];
-        }
-        return cumulative / total;
+        for (double probability : probabilities) cumulative += probability;
+        return Math.min(1.0, cumulative);
     }
 
     private static double spearmanTail(double q, int size, boolean lowerTail) {

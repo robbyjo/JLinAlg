@@ -30,6 +30,22 @@ public final class GaussianBootstrapResult {
             double[][] fixedEffectReplicates,
             double[][] varianceComponentReplicates,
             List<BootstrapFailure> failures) {
+        if (requestedSimulations < 2 || !(confidenceLevel > 0 && confidenceLevel < 1)
+                || observedFixedEffects == null || observedVarianceComponents == null
+                || varianceComponentNames == null || fixedEffectReplicates == null
+                || varianceComponentReplicates == null || failures == null
+                || (long) fixedEffectReplicates.length + failures.size() != requestedSimulations) {
+            throw new IllegalArgumentException("bootstrap accounting or inputs are invalid");
+        }
+        validateReplicates(fixedEffectReplicates, observedFixedEffects.length);
+        validateReplicates(varianceComponentReplicates, observedVarianceComponents.length);
+        java.util.HashSet<Integer> failureIds = new java.util.HashSet<>();
+        for (BootstrapFailure failure : failures) {
+            if (failure == null || failure.simulation() >= requestedSimulations
+                    || !failureIds.add(failure.simulation())) {
+                throw new IllegalArgumentException("bootstrap failure indices must be distinct and in range");
+            }
+        }
         this.requestedSimulations = requestedSimulations;
         this.randomSeed = randomSeed;
         this.confidenceLevel = confidenceLevel;
@@ -89,13 +105,24 @@ public final class GaussianBootstrapResult {
             return new BootstrapParameterSummary(name, estimate,
                 Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
                 values.length);
-        double mean = Arrays.stream(values).average().orElse(Double.NaN);
+        double scale = 0;
+        for (double value : values) scale = Math.max(scale, Math.abs(value));
+        if (scale == 0) scale = 1;
+        double normalizedSum = 0, correction = 0;
+        for (double value : values) {
+            double adjusted = value / scale - correction;
+            double next = normalizedSum + adjusted;
+            correction = (next - normalizedSum) - adjusted;
+            normalizedSum = next;
+        }
+        double normalizedMean = normalizedSum / values.length;
+        double mean = normalizedMean * scale;
         double sumSquares = 0;
         for (double value : values) {
-            double difference = value - mean;
+            double difference = value / scale - normalizedMean;
             sumSquares += difference * difference;
         }
-        double standardError = Math.sqrt(sumSquares / (values.length - 1));
+        double standardError = Math.sqrt(sumSquares / (values.length - 1)) * scale;
         double[] sorted = values.clone();
         Arrays.sort(sorted);
         double alpha = (1 - confidenceLevel) / 2;
@@ -125,5 +152,16 @@ public final class GaussianBootstrapResult {
         for (int index = 0; index < values.length; index++)
             result[index] = values[index].clone();
         return result;
+    }
+
+    private static void validateReplicates(double[][] values, int columns) {
+        for (double[] row : values) {
+            if (row == null || row.length != columns) {
+                throw new IllegalArgumentException("bootstrap replicate dimensions are invalid");
+            }
+            for (double value : row) if (!Double.isFinite(value)) {
+                throw new IllegalArgumentException("successful bootstrap replicates must be finite");
+            }
+        }
     }
 }

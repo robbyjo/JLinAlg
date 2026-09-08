@@ -74,7 +74,8 @@ public final class GlmFamilies {
     }
 
     private static class BinomialLogit implements GlmFamily {
-        private static final double EPSILON = 1e-12;
+        private static final double EPSILON = Double.MIN_NORMAL;
+        private static final double MAXIMUM = Math.nextDown(1.0);
 
         @Override public String name() { return "binomial(logit)"; }
         @Override public void validateResponse(double response, double priorWeight) {
@@ -84,11 +85,11 @@ public final class GlmFamilies {
             }
         }
         @Override public double initialMean(double response) {
-            return clamp((response + 0.5) / 2.0, EPSILON, 1.0 - EPSILON);
+            return clamp((response + 0.5) / 2.0, EPSILON, MAXIMUM);
         }
         @Override public double link(double mean) {
-            double bounded = clamp(mean, EPSILON, 1.0 - EPSILON);
-            return Math.log(bounded / (1.0 - bounded));
+            double bounded = clamp(mean, EPSILON, MAXIMUM);
+            return Math.log(bounded) - Math.log1p(-bounded);
         }
         @Override public double inverseLink(double predictor) {
             double result;
@@ -99,21 +100,51 @@ public final class GlmFamilies {
                 double exponential = Math.exp(predictor);
                 result = exponential / (1.0 + exponential);
             }
-            return clamp(result, EPSILON, 1.0 - EPSILON);
+            return result;
         }
         @Override public double meanDerivative(double predictor) {
-            double mean = inverseLink(predictor);
-            return mean * (1.0 - mean);
+            double tail = Math.exp(-Math.abs(predictor));
+            return tail / ((1.0 + tail) * (1.0 + tail));
+        }
+        @Override public double varianceAtPredictor(double predictor, double mean) {
+            return meanDerivative(predictor);
+        }
+        @Override public double residualAtPredictor(double response, double predictor, double mean) {
+            double tail = Math.exp(-Math.abs(predictor));
+            double small = tail / (1.0 + tail), large = 1.0 / (1.0 + tail);
+            return predictor >= 0.0 ? response * small - (1.0 - response) * large
+                : response * large - (1.0 - response) * small;
+        }
+        @Override public double workingWeight(double response, double predictor, double mean, double weight) {
+            return weight * meanDerivative(predictor);
+        }
+        @Override public double unitDevianceAtPredictor(double response, double predictor, double mean) {
+            double logTail = -Math.log1p(Math.exp(-Math.abs(predictor)));
+            double logP = predictor >= 0.0 ? logTail : predictor + logTail;
+            double logQ = predictor >= 0.0 ? -predictor + logTail : logTail;
+            double first = response == 0.0 ? 0.0 : response * (Math.log(response) - logP);
+            double second = response == 1.0 ? 0.0 : (1.0-response) * (Math.log1p(-response) - logQ);
+            return Math.max(0.0, 2.0 * (first + second));
+        }
+        @Override public double logLikelihoodAtPredictor(double response, double predictor, double mean,
+                double weight, double dispersion) {
+            // Dynamic dispatch retains quasi-binomial's undefined likelihood.
+            double ordinary = logLikelihood(response, mean, weight, dispersion);
+            if (Double.isNaN(ordinary) || predictor < 0.0) return ordinary;
+            return Binomial.density(Math.rint(weight) - Math.rint(response * weight),
+                Math.rint(weight), inverseLink(-predictor), true);
         }
         @Override public double variance(double mean) {
-            return Math.max(EPSILON, mean * (1.0 - mean));
+            return mean * (1.0 - mean);
         }
         @Override public double unitDeviance(double response, double mean) {
-            double bounded = clamp(mean, EPSILON, 1.0 - EPSILON);
+            if (mean == response) return 0.0;
+            if (mean == 0.0 || mean == 1.0) return Double.POSITIVE_INFINITY;
+            double bounded = clamp(mean, EPSILON, MAXIMUM);
             double first = response == 0.0 ? 0.0
                 : response * Math.log(response / bounded);
             double second = response == 1.0 ? 0.0
-                : (1.0 - response) * Math.log((1.0 - response) / (1.0 - bounded));
+                : (1.0 - response) * (Math.log1p(-response) - Math.log1p(-bounded));
             return 2.0 * (first + second);
         }
         @Override public double logLikelihood(
@@ -132,7 +163,7 @@ public final class GlmFamilies {
     }
 
     private static class PoissonLog implements GlmFamily {
-        private static final double MINIMUM_MEAN = 1e-12;
+        private static final double MINIMUM_MEAN = Double.MIN_NORMAL;
         private static final double MAXIMUM_PREDICTOR = 700.0;
 
         @Override public String name() { return "poisson(log)"; }
@@ -196,7 +227,7 @@ public final class GlmFamilies {
     }
 
     private static final class GammaLog implements GlmFamily {
-        private static final double MINIMUM = 1e-12;
+        private static final double MINIMUM = Double.MIN_NORMAL;
         @Override public String name() { return "Gamma(log)"; }
         @Override public void validateResponse(double response, double priorWeight) {
             if (!(response > 0.0)) {
@@ -232,7 +263,7 @@ public final class GlmFamilies {
     }
 
     private static final class InverseGaussianLog implements GlmFamily {
-        private static final double MINIMUM = 1e-12;
+        private static final double MINIMUM = Double.MIN_NORMAL;
         @Override public String name() { return "inverse.gaussian(log)"; }
         @Override public void validateResponse(double response, double priorWeight) {
             if (!(response > 0.0)) {
@@ -271,7 +302,7 @@ public final class GlmFamilies {
     }
 
     private static final class NegativeBinomialLog implements GlmFamily {
-        private static final double MINIMUM = 1e-12;
+        private static final double MINIMUM = Double.MIN_NORMAL;
         private final double size;
 
         NegativeBinomialLog(double size) {
@@ -319,5 +350,52 @@ public final class GlmFamilies {
 
     private static double clamp(double value, double minimum, double maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    // Pearson dispersion is for covariance, not a maximum-likelihood estimate.
+    // Unknown/custom families retain their supplied-dispersion likelihood contract.
+    static double likelihoodDispersion(GlmFamily family, double[] y, double[] mu,
+            double[] weights, double pearson, double deviance) {
+        if (family.fixedDispersion()) return 1.0;
+        if (family instanceof GaussianIdentity || family instanceof InverseGaussianLog) {
+            return Math.max(Double.MIN_NORMAL, deviance / y.length);
+        }
+        if (!(family instanceof GammaLog)) return pearson;
+        double center = Math.log(pearson);
+        double left = center - 4.0;
+        double right = center + 4.0;
+        for (int i = 0; i < 16; i++) {
+            double middle = likelihood(family, y, mu, weights, center);
+            if (likelihood(family, y, mu, weights, left) > middle) {
+                right = center; center = left; left -= 4.0;
+            } else if (likelihood(family, y, mu, weights, right) > middle) {
+                left = center; center = right; right += 4.0;
+            } else break;
+        }
+        double ratio = (Math.sqrt(5.0) - 1.0) / 2.0;
+        double a = right - ratio * (right - left);
+        double b = left + ratio * (right - left);
+        double fa = likelihood(family, y, mu, weights, a);
+        double fb = likelihood(family, y, mu, weights, b);
+        for (int i = 0; i < 90; i++) {
+            if (fa > fb) {
+                right = b; b = a; fb = fa; a = right - ratio * (right - left);
+                fa = likelihood(family, y, mu, weights, a);
+            } else {
+                left = a; a = b; fa = fb; b = left + ratio * (right - left);
+                fb = likelihood(family, y, mu, weights, b);
+            }
+        }
+        return Math.exp((left + right) / 2.0);
+    }
+
+    private static double likelihood(GlmFamily family, double[] y, double[] mu,
+            double[] weights, double logDispersion) {
+        double value = 0.0;
+        double dispersion = Math.exp(logDispersion);
+        for (int row = 0; row < y.length; row++) {
+            value += family.logLikelihood(y[row], mu[row], weights[row], dispersion);
+        }
+        return Double.isFinite(value) ? value : Double.NEGATIVE_INFINITY;
     }
 }

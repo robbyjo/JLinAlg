@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'org.jlinalg'
-version = '0.2.0'
+version = '0.3.0'
 
 def jdistlibVersion = '0.10.1'
 def jdistlibSha256 = 'c1912e1d10928a0df321c33c85d5f97b3921e40e9bbbdcddfc508358dfb2af03'
@@ -216,6 +216,10 @@ tasks.register('checkWebsite') {
             'verification.html',
             'vignettes/index.html',
             'vignettes/linear-models.html',
+            'vignettes/basic-statistical-tests.html',
+            'vignettes/nonlinear-models.html',
+            'vignettes/mediation.html',
+            'vignettes/beta-regression.html',
             'vignettes/penalized-regression.html',
             'vignettes/mixed-models.html',
             'vignettes/survival.html',
@@ -317,6 +321,15 @@ tasks.register('benchmarkAssociation', JavaExec) {
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.')
     }
+}
+
+tasks.register('benchmarkCoreStatisticsAudit', JavaExec) {
+    group = 'verification'
+    description = 'Runs the accuracy-audited Kendall workload paired with base R.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.CoreStatisticsAuditBenchmark'
+    jvmArgs '-Xms64m', '-Xmx512m'
 }
 
 tasks.register('benchmarkXwasMr', JavaExec) {
@@ -627,6 +640,28 @@ tasks.register('benchmarkTopmedMetaAnalysis', JavaExec) {
     args providers.gradleProperty('topmedMetaArgs').map {
         it.split('\\s+') as List<String>
     }.getOrElse([])
+}
+
+// v0.3.0 audit workloads, paired with independent reference regression tests.
+// Run sequentially for meaningful local timings.
+[
+    benchmarkFittingAudit: 'org.jlinalg.benchmark.FittingAuditBenchmark',
+    benchmarkDistributionalAudit: 'org.jlinalg.benchmark.DistributionalAuditBenchmark',
+    benchmarkRemainingMixedAudit: 'org.jlinalg.benchmark.RemainingMixedBenchmark',
+    benchmarkRemainingModelsAudit: 'org.jlinalg.benchmark.RemainingModelsAuditBenchmark',
+    benchmarkGeneticAudit: 'org.jlinalg.genetics.GeneticAuditBenchmark',
+    benchmarkPipelineOlsAudit: 'org.jlinalg.association.PipelineOlsAuditBenchmark',
+    benchmarkPipelineBhAudit: 'org.jlinalg.cli.PipelineBhAuditBenchmark',
+    benchmarkPipelineKernelAudit: 'org.jlinalg.settest.PipelineKernelAuditBenchmark'
+].each { taskName, className ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = 'Runs an independently checked v0.3.0 audit workload.'
+        dependsOn tasks.named('benchmarkClasses')
+        classpath = sourceSets.benchmark.runtimeClasspath
+        mainClass = className
+        jvmArgs '-Xms256m', '-Xmx1g'
+    }
 }
 
 publishing {

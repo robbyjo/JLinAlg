@@ -33,10 +33,32 @@ public final class PenalizedRegressionCrossValidation {
 
         PenalizedRegressionPath fullPath = PenalizedRegression.path(
             response, design, response.length, columns, lambdas, options);
+        return fitPath(response, design, columns, folds, randomSeed, options, fullPath);
+    }
+
+    private static PenalizedCrossValidationResult fitPath(double[] response,
+            double[] design, int columns, int folds, long randomSeed,
+            ElasticNetOptions options, PenalizedRegressionPath fullPath) {
+        requireConvergence(fullPath, "full-data path");
         double[] validatedLambdas = fullPath.lambdas();
         int[] foldByObservation = folds(response.length, folds, randomSeed);
         double[][] foldErrors = new double[folds][validatedLambdas.length];
         double[] originalWeights = options.observationWeights();
+        double[] riskWeights = originalWeights == null ? null : originalWeights.clone();
+        double[] foldWeights = new double[folds];
+        // CV is invariant to a common weight multiplier, including very large
+        // finite weights whose unscaled sum would overflow.
+        if (riskWeights != null) {
+            double maximum = 0.0;
+            for (double weight : riskWeights) maximum = Math.max(maximum, weight);
+            for (int row = 0; row < riskWeights.length; row++) riskWeights[row] /= maximum;
+        }
+        double totalWeight = 0.0;
+        for (int row = 0; row < response.length; row++) {
+            double weight = riskWeights == null ? 1.0 : riskWeights[row];
+            foldWeights[foldByObservation[row]] += weight;
+            totalWeight += weight;
+        }
 
         for (int fold = 0; fold < folds; fold++) {
             int trainingRows = 0;
@@ -67,6 +89,7 @@ public final class PenalizedRegressionCrossValidation {
             PenalizedRegressionPath trainingPath = PenalizedRegression.path(
                 trainingResponse, trainingPredictors,
                 trainingRows, columns, validatedLambdas, trainingOptions);
+            requireConvergence(trainingPath, "training fold " + fold);
 
             for (int lambdaIndex = 0;
                     lambdaIndex < validatedLambdas.length; lambdaIndex++) {
@@ -83,13 +106,15 @@ public final class PenalizedRegressionCrossValidation {
                         prediction += design[row * columns + column]
                             * coefficients[column];
                     }
-                    double weight = originalWeights == null
-                        ? 1.0 : originalWeights[row];
+                    double weight = riskWeights == null
+                        ? 1.0 : riskWeights[row];
                     double error = response[row] - prediction;
                     sumSquared += weight * error * error;
                     sumWeight += weight;
                 }
-                foldErrors[fold][lambdaIndex] = sumSquared / sumWeight;
+                // A fold with only weights below representable relative mass
+                // contributes zero risk. Its training fit is still validated.
+                foldErrors[fold][lambdaIndex] = sumWeight == 0.0 ? 0.0 : sumSquared / sumWeight;
             }
         }
 
@@ -98,17 +123,17 @@ public final class PenalizedRegressionCrossValidation {
         for (int lambdaIndex = 0;
                 lambdaIndex < validatedLambdas.length; lambdaIndex++) {
             for (int fold = 0; fold < folds; fold++) {
-                means[lambdaIndex] += foldErrors[fold][lambdaIndex];
+                means[lambdaIndex] += foldWeights[fold] / totalWeight
+                    * foldErrors[fold][lambdaIndex];
             }
-            means[lambdaIndex] /= folds;
             double sumSquares = 0.0;
             for (int fold = 0; fold < folds; fold++) {
                 double centered = foldErrors[fold][lambdaIndex]
                     - means[lambdaIndex];
-                sumSquares += centered * centered;
+                sumSquares += foldWeights[fold] / totalWeight * centered * centered;
             }
             standardErrors[lambdaIndex] = Math.sqrt(
-                sumSquares / (folds - 1) / folds);
+                sumSquares / (folds - 1));
         }
         int minimum = minimumIndex(means);
         double threshold = means[minimum] + standardErrors[minimum];
@@ -135,8 +160,18 @@ public final class PenalizedRegressionCrossValidation {
             ElasticNetOptions options) {
         PenalizedRegressionPath generated = PenalizedRegression.automaticPath(
             response, predictors, lambdaCount, minimumRatio, options);
-        return fit(response, predictors, generated.lambdas(),
-            folds, randomSeed, options);
+        validateFolds(response.length, folds);
+        return fitPath(response, MatrixOps.rowMajor(predictors, response.length),
+            predictors[0].length, folds, randomSeed, options, generated);
+    }
+
+    private static void requireConvergence(PenalizedRegressionPath path, String context) {
+        for (PenalizedRegressionResult fit : path.fits()) {
+            if (!fit.converged() || !Double.isFinite(fit.objective())) {
+                throw new IllegalArgumentException("CV requires converged finite fits: "
+                    + context + ", lambda=" + fit.lambda());
+            }
+        }
     }
 
     private static ElasticNetOptions copyOptions(

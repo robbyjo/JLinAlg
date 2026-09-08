@@ -35,6 +35,14 @@ mass on the common variant set. `ColocOptions` exposes all four values and
 optional positive variant-specific prior weights. Sensitivity analysis should
 vary plausible priors; a high H4 under only one aggressive prior is fragile.
 
+Each trait's weights are normalized on the common variants. The conditional
+shared-variant posterior includes the **product** of the two normalized prior
+weights, consistently with H4. Multiplying either weight vector by a positive
+constant does not change the result, including very large or small finite
+scalings. Overlap trimming and the reported per-trait lead remain based on the
+input Bayes factors with uniform variant weights; they are not a new weighted
+fine-mapping fit.
+
 Inspect `commonVariants()` and `skippedSignalPairs()`. Heavy trimming usually
 indicates mismatched variant coverage or a signal whose posterior lies outside
 the overlap, not absence of biological sharing.
@@ -61,6 +69,15 @@ The five values are posterior probabilities for each signal pair. The
 variant-level posterior is conditional on H4 and must be interpreted together
 with H4, not as an unconditional causal probability.
 
+When the traits have disjoint finite Bayes-factor support, H4 is zero and the
+conditional shared-variant vector is all zeros (an undefined conditional
+distribution), but H0–H3 are still evaluated. In particular, strong disjoint
+signals favor H3, not H0. Distinct configurations are accumulated directly in
+log space in O(P) time per signal pair; no subtraction of nearly equal shared
+and total evidence is used. This preserves tiny nonzero H3 when a shared SNP
+dominates. Log evidence outside double precision's representable range is
+rejected instead of returning NaN posteriors.
+
 ## xWAS and MR follow-up
 
 For a retained cis-MR/xWAS hit, reconstruct or retain the harmonized regional
@@ -74,3 +91,10 @@ The implementation is regression-tested against `coloc::coloc.susie` 5.2.3
 for single- and multi-signal fixtures. See the
 [verification guide](../performance-benchmarks.md) and the compact
 [SuSiE example](susie-and-sem.md).
+
+The post-`dd45e80` boundary audit adds independent base-R enumeration, weighted
+posterior and scaling checks, disjoint-support tests, and warm checksum-gated
+timings. Reproduce with
+`src/test/resources/r-reference/run-genetic-audit.ps1`; raw evidence and
+workload limitations are in
+[the genetic audit report](../../src/benchmark/resources/genetic-audit/AUDIT.md).

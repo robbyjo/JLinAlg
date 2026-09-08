@@ -1,0 +1,34 @@
+2026-09-08; post-dd45e80 genetic/MR audit; Windows; Java 25; availableProcessors=32
+Capture command: & src/test/resources/r-reference/run-genetic-audit.ps1
+Historical isolated version of that script; it now uses normal Gradle tasks.
+Current reproduction: .\gradlew.bat check; .\gradlew.bat benchmarkGeneticAudit
+Sequential R then Java timings; five warmed batches; median milliseconds/call.
+
+Test run finished after 13995 ms
+[        60 tests found           ]
+[         0 tests skipped         ]
+[        60 tests started         ]
+[         0 tests aborted         ]
+[        60 tests successful      ]
+[         0 tests failed          ]
+
+coloc64_baseR_enumeration median_ms=0.25 checksum=20344.520741896842 calls=1000
+SER32_baseR_closed_form median_ms=0.005 checksum=4207360779.6415386 calls=50000
+winner40_baseR_score median_ms=0.09 checksum=57.43821926937899 calls=5000
+GRM3_baseR_crossprod median_ms=0.003 checksum=6399999.9999999991 calls=100000
+R version 4.6.1 (2026-06-24 ucrt)
+gate coloc64 max_scaled_absolute_error=5.55111512e-17
+gate ser32 max_scaled_absolute_error=1.11022302e-15
+gate grm max_scaled_absolute_error=0.00000000
+gate winner max_scaled_absolute_error=2.16883456e-12
+accuracy gates passed: coloc64 H0-H4 + H4 SNPs, SER32 alpha/beta/logBF, GRM3, four conditional MLEs
+coloc64_Java median_ms=0.0108665500 checksum=203445.20741898590 calls=10000
+SER32_Java_IBSS_including_PSD_validation median_ms=0.0183494000 checksum=841472155.92742090 calls=10000
+winner40_Java_score median_ms=0.0200095000 checksum=57.438219267060310 calls=5000
+GRM3_Java_builder median_ms=0.000607570000 checksum=6399999.9999999990 calls=100000
+Java 25 availableProcessors=32
+
+R emitted locale-setting startup warnings. Tests emitted JDistlib native-access
+warnings and reported CPU/OpenCL/auto backends for the existing backend tests.
+The timed Java workloads explicitly select CPU. No warning was used as a pass
+marker: the script gates every process exit and every numerical comparison.

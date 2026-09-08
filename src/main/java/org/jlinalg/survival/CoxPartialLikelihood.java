@@ -79,7 +79,7 @@ final class CoxPartialLikelihood {
                     boolean death = survival.eventView()[row]
                         && survival.stopView()[row] == time;
                     if (death) {
-                        logLikelihood += eta[row];
+                        logLikelihood += eta[row] - maximumEta;
                         for (int column = 0; column < columns; column++)
                             score[column] += design[row * columns + column];
                     }
@@ -103,7 +103,7 @@ final class CoxPartialLikelihood {
                         throw new IllegalArgumentException(
                             "Cox risk-set denominator is nonpositive");
                     logLikelihood -= multiplier
-                        * (maximumEta + Math.log(denominator));
+                        * Math.log(denominator);
                     double[] mean = new double[columns];
                     for (int column = 0; column < columns; column++) {
                         mean[column] = (risk1[column]
@@ -252,7 +252,7 @@ final class CoxPartialLikelihood {
                     Arrays.fill(death2, 0);
                 }
                 for (int row : eventRows) {
-                    logLikelihood += eta[row];
+                    logLikelihood += eta[row] - maximumEta;
                     for (int column = 0; column < columns; column++)
                         score[column] += design[row * columns + column];
                     double risk = Math.exp(eta[row] - maximumEta);
@@ -268,7 +268,7 @@ final class CoxPartialLikelihood {
                     double multiplier = ties == CoxTies.EFRON ? 1 : deathCount;
                     double denominator = risk0 - fraction * death0;
                     logLikelihood -= multiplier
-                        * (maximumEta + Math.log(denominator));
+                        * Math.log(denominator);
                     for (int column = 0; column < columns; column++) {
                         mean[column] = (risk1[column]
                             - (deathCount > 1
@@ -298,12 +298,9 @@ final class CoxPartialLikelihood {
         double[] score = new double[columns];
         double[] information = new double[columns * columns];
         for (CoxCountingProcessPlan.Stratum stratum : plan.strata()) {
-            double maximumEta = Double.NEGATIVE_INFINITY;
-            for (int row : stratum.rowsByStart())
-                maximumEta = Math.max(maximumEta, eta[row]);
-            double risk0 = 0.0;
-            double[] risk1 = new double[columns];
-            double[] risk2 = new double[columns * columns];
+            CoxRiskMoments moments = new CoxRiskMoments(design, columns, eta);
+            double[] risk1 = moments.first;
+            double[] risk2 = moments.second;
             double[] death1 = new double[columns];
             double[] death2 = new double[columns * columns];
             double[] mean = new double[columns];
@@ -315,25 +312,23 @@ final class CoxPartialLikelihood {
                         && survival.startView()[stratum.rowsByStart()[entering]]
                             < time) {
                     int row = stratum.rowsByStart()[entering++];
-                    double risk = Math.exp(eta[row] - maximumEta);
-                    risk0 += risk;
-                    addLowerMoments(design, row, columns, risk, risk1, risk2);
+                    moments.add(row);
                 }
                 while (leaving < stratum.rowsByStop().length
                         && survival.stopView()[stratum.rowsByStop()[leaving]]
                             < time) {
                     int row = stratum.rowsByStop()[leaving++];
-                    double risk = Math.exp(eta[row] - maximumEta);
-                    risk0 -= risk;
-                    addLowerMoments(design, row, columns, -risk, risk1, risk2);
+                    moments.remove(row);
                 }
+                moments.refresh();
+                double maximumEta = moments.maximum, risk0 = moments.sum;
                 int[] eventRows = stratum.deaths()[group];
                 int deathCount = eventRows.length;
                 double death0 = 0.0;
                 Arrays.fill(death1, 0.0);
                 Arrays.fill(death2, 0.0);
                 for (int row : eventRows) {
-                    logLikelihood += eta[row];
+                    logLikelihood += eta[row] - maximumEta;
                     for (int column = 0; column < columns; column++)
                         score[column] += design[row * columns + column];
                     double risk = Math.exp(eta[row] - maximumEta);
@@ -352,7 +347,7 @@ final class CoxPartialLikelihood {
                         throw new IllegalArgumentException(
                             "Cox risk-set denominator is nonpositive");
                     logLikelihood -= multiplier
-                        * (maximumEta + Math.log(denominator));
+                        * Math.log(denominator);
                     for (int column = 0; column < columns; column++) {
                         mean[column] = (risk1[column]
                             - fraction * death1[column]) / denominator;
@@ -426,10 +421,7 @@ final class CoxPartialLikelihood {
             CoxCountingProcessPlan plan) {
         List<BaselineHazardPoint> result = new ArrayList<>();
         for (CoxCountingProcessPlan.Stratum stratum : plan.strata()) {
-            double maximumEta = Double.NEGATIVE_INFINITY;
-            for (int row : stratum.rowsByStart())
-                maximumEta = Math.max(maximumEta, eta[row]);
-            double risk0 = 0.0;
+            CoxRiskMoments moments = new CoxRiskMoments(new double[0], 0, eta);
             int entering = 0;
             int leaving = 0;
             double cumulative = 0.0;
@@ -439,14 +431,16 @@ final class CoxPartialLikelihood {
                         && survival.startView()[stratum.rowsByStart()[entering]]
                             < time) {
                     int row = stratum.rowsByStart()[entering++];
-                    risk0 += Math.exp(eta[row] - maximumEta);
+                    moments.add(row);
                 }
                 while (leaving < stratum.rowsByStop().length
                         && survival.stopView()[stratum.rowsByStop()[leaving]]
                             < time) {
                     int row = stratum.rowsByStop()[leaving++];
-                    risk0 -= Math.exp(eta[row] - maximumEta);
+                    moments.remove(row);
                 }
+                moments.refresh();
+                double maximumEta = moments.maximum, risk0 = moments.sum;
                 int[] deaths = stratum.deaths()[group];
                 double death0 = 0.0;
                 for (int row : deaths)

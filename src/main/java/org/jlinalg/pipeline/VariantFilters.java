@@ -37,7 +37,7 @@ public final class VariantFilters {
                         < options.minimumImputationQuality()))
             reasons.add(VariantFilterReason.BELOW_IMPUTATION_QUALITY);
         if (options.excludeMonomorphic()
-                && !(statistics.dosageVariance() > 1e-14))
+                && !(statistics.dosageVariance() > 0))
             reasons.add(VariantFilterReason.MONOMORPHIC);
         return new VariantFilterResult(variant, statistics, reasons);
     }

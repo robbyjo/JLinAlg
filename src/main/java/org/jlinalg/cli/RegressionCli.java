@@ -28,11 +28,12 @@ final class RegressionCli {
         try {
             Options options = Options.parse(command, arguments);
             if (options.help) { output.println(help(command)); return 0; }
+            PipelinePaths.requireFreshOutputs(options.output);
             Table table = Table.read(options.input);
             String result = command.equals("beta-regression")
                 ? beta(table, options) : penalized(table, options);
             if (options.output == null) output.print(result);
-            else Files.writeString(options.output, result);
+            else Files.writeString(options.output, result, java.nio.file.StandardOpenOption.CREATE_NEW);
             return 0;
         } catch (IOException | IllegalArgumentException exception) {
             error.println("jlinalg: " + exception.getMessage());

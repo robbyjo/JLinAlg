@@ -22,7 +22,7 @@ public final class MatrixOps {
         if (response == null || response.length != rows) {
             throw new IllegalArgumentException("response length must equal rows");
         }
-        if (design == null || design.length != rows * columns) {
+        if (design == null || design.length != (long) rows * columns) {
             throw new IllegalArgumentException(
                 "design length must equal rows * columns");
         }
@@ -46,6 +46,9 @@ public final class MatrixOps {
             throw new IllegalArgumentException("matrix must have at least one column");
         }
         int columns = matrix[0].length;
+        if ((long) expectedRows * columns > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("matrix exceeds Java array size limit");
+        }
         double[] result = new double[expectedRows * columns];
         for (int row = 0; row < expectedRows; row++) {
             if (matrix[row] == null || matrix[row].length != columns) {

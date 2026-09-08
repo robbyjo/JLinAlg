@@ -228,6 +228,7 @@ final class MrInstrumentCli {
 
     private static void move(Path source, Path destination, boolean overwrite)
             throws IOException {
+        if (!overwrite) { Files.move(source, destination); return; }
         StandardCopyOption[] options = overwrite
             ? new StandardCopyOption[] {StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING}

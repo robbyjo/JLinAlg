@@ -4,7 +4,11 @@
  */
 package org.jlinalg.gee;
 
-/** Final convergence metrics for the mean, association, scale, and score updates. */
+/**
+ * Final convergence metrics for mean, association, scale, and score updates.
+ * The score norm is max(abs(score[j]) / sqrt(sensitivity[j,j])), so changing
+ * coefficient or response units does not change the score convergence test.
+ */
 public record GeeConvergenceDiagnostics(
         int iterations,
         boolean converged,

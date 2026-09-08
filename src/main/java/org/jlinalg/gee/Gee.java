@@ -30,7 +30,7 @@ import org.jlinalg.model.MissingDataPolicy;
 
 /** Cluster-streaming generalized estimating equations. */
 public final class Gee {
-    private static final double MINIMUM_VARIANCE = 1e-12;
+    private static final double MINIMUM_VARIANCE = Double.MIN_NORMAL;
     private static final double MAXIMUM_CORRELATION = 0.98;
     private static final ThreadLocal<ClusterWorkspace> CLUSTER_WORKSPACE =
         ThreadLocal.withInitial(ClusterWorkspace::new);
@@ -187,7 +187,7 @@ public final class Gee {
             double[] candidate = null;
             State candidateState = null;
             double candidateScoreNorm = Double.POSITIVE_INFINITY;
-            double baselineScoreNorm = norm(score);
+            double baselineScoreNorm = standardizedScoreNorm(score, accumulation.bread());
             double multiplier = 1.0;
             for (int attempt = 0; attempt < 24; attempt++) {
                 double[] trial = addScaled(coefficients, step, multiplier);
@@ -202,7 +202,7 @@ public final class Gee {
                     double[] trialScore = estimatingScore(data, family, trial,
                         trialState, scale.observationScale(), associationParameters,
                         options, trialAccumulation, trialInverseBread, backend);
-                    double trialScoreNorm = norm(trialScore);
+                    double trialScoreNorm = standardizedScoreNorm(trialScore, trialAccumulation.bread());
                     if (trialScoreNorm <= baselineScoreNorm
                             + 1e-10 * (1.0 + baselineScoreNorm)) {
                         candidate = trial;
@@ -218,7 +218,10 @@ public final class Gee {
             }
             if (candidate == null) {
                 if (norm(step) <= options.relativeTolerance()
-                        * (1.0 + norm(coefficients))) {
+                        * (1.0 + norm(coefficients))
+                        && baselineScoreNorm <= options.scoreTolerance() * Math.sqrt(data.rows())
+                        && associationChange <= options.associationTolerance()
+                        && scaleChange <= options.scaleTolerance()) {
                     converged = true;
                     message = "estimating-equation step tolerance reached";
                 } else {
@@ -234,7 +237,7 @@ public final class Gee {
                     && associationChange <= options.associationTolerance()
                     && scaleChange <= options.scaleTolerance()
                     && candidateScoreNorm <= options.scoreTolerance()
-                        * (1.0 + norm(coefficients))) {
+                        * Math.sqrt(data.rows())) {
                 converged = true;
                 message = "coefficient, association, scale, and score tolerances reached";
                 break;
@@ -280,6 +283,7 @@ public final class Gee {
             scale.observationScale(), associationParameters, options, backend);
         int p = data.columns();
         double[] naive = inverseSymmetric(finalAccumulation.bread(), p, backend);
+        if (scale.average() == 0.0) Arrays.fill(naive, 0.0);
         double[] robust = sandwich(naive, finalAccumulation.meat(), p);
         double correction = data.clusters() > p
             ? (double) data.clusters() / (data.clusters() - p) : Double.NaN;
@@ -351,9 +355,9 @@ public final class Gee {
             : diagnostics(data, state, scale.observationScale(),
                 associationParameters, options, coefficients, naive,
                 deletion.coefficients(), backend);
-        double finalScoreNorm = norm(estimatingScore(data, family, coefficients,
+        double finalScoreNorm = standardizedScoreNorm(estimatingScore(data, family, coefficients,
             state, scale.observationScale(), associationParameters, options,
-            finalAccumulation, naive, backend));
+            finalAccumulation, naive, backend), finalAccumulation.bread());
         GeeConvergenceDiagnostics convergenceDiagnostics =
             new GeeConvergenceDiagnostics(iterations, converged, message,
                 lastCoefficientChange, lastAssociationChange, lastScaleChange,
@@ -624,20 +628,21 @@ public final class Gee {
             eta[row] += data.offset()[row];
             means[row] = family.inverseLink(eta[row]);
             derivatives[row] = family.meanDerivative(eta[row]);
-            variances[row] = Math.max(MINIMUM_VARIANCE,
-                family.variance(means[row]));
+            // A variance floor in response units changes the estimating
+            // equations when (for example) Gamma measurements are rescaled.
+            variances[row] = family.varianceAtPredictor(eta[row], means[row]);
             if (!Double.isFinite(means[row]) || !Double.isFinite(derivatives[row])
                     || derivatives[row] == 0.0
-                    || !Double.isFinite(variances[row])) {
+                    || !Double.isFinite(variances[row]) || !(variances[row] > 0.0)) {
                 throw new IllegalArgumentException(
                     "family produced invalid GEE mean, derivative, or variance");
             }
-            residuals[row] = data.response()[row] - means[row];
+            residuals[row] = family.residualAtPredictor(data.response()[row], eta[row], means[row]);
             pearson[row] = residuals[row] * Math.sqrt(data.weights()[row]
                 / (variances[row] * Math.max(MINIMUM_VARIANCE,
                     observationScale[row])));
             deviance += data.weights()[row]
-                * family.unitDeviance(data.response()[row], means[row]);
+                * family.unitDevianceAtPredictor(data.response()[row], eta[row], means[row]);
         }
         return new State(eta, means, derivatives, variances,
             residuals, pearson, deviance);
@@ -658,8 +663,15 @@ public final class Gee {
             sum += data.weights()[row] * state.residuals()[row]
                 * state.residuals()[row] / state.variances()[row];
         }
-        double global = Math.max(MINIMUM_VARIANCE,
-            sum / Math.max(1, data.rows() - data.columns()));
+        double global = sum / Math.max(1, data.rows() - data.columns());
+        if (global == 0.0 && data.scaleDesign() == null) {
+            for (double residual : state.residuals()) {
+                if (residual != 0.0) throw new IllegalArgumentException("GEE residual variance underflowed");
+            }
+            // Exact zero residual variance: any common working scale gives
+            // the same mean equations; report the degenerate covariance as 0.
+            return new Scale(0.0, new double[0], constant(data.rows(), 1.0));
+        }
         if (data.scaleDesign() == null) {
             return new Scale(global, new double[0], constant(data.rows(), global));
         }
@@ -984,11 +996,16 @@ public final class Gee {
                 pool.shutdown();
             }
         } else {
-            clusterValues = new ClusterAccumulation[data.clusters()];
             for (int cluster = 0; cluster < data.clusters(); cluster++) {
-                clusterValues[cluster] = accumulateCluster(data, state, phi,
+                ClusterAccumulation value = accumulateCluster(data, state, phi,
                     associationParameters, options, cluster, backend);
+                addInPlace(score, value.score());
+                addInPlace(bread, value.bread());
+                addInPlace(meat, value.meat());
             }
+            symmetrize(bread, p);
+            symmetrize(meat, p);
+            return new Accumulation(bread, meat, score);
         }
         for (ClusterAccumulation value : clusterValues) {
             addInPlace(score, value.score());
@@ -1183,7 +1200,7 @@ public final class Gee {
         double[] standardDeviation = new double[size];
         double[] correlation = new double[size * size];
         for (int row = 0; row < size; row++) {
-            standardDeviation[row] = Math.sqrt(Math.max(MINIMUM_VARIANCE,
+            standardDeviation[row] = Math.sqrt(Math.max(Double.MIN_NORMAL,
                 covariance[row * size + row]));
         }
         for (int row = 0; row < size; row++) {
@@ -1308,7 +1325,7 @@ public final class Gee {
             maximumDiagonal = Math.max(maximumDiagonal,
                 Math.abs(covariance[index * size + index]));
         }
-        double jitter = Math.max(1e-12, maximumDiagonal * 1e-12);
+        double jitter = Math.max(Double.MIN_NORMAL, maximumDiagonal * 1e-12);
         IllegalArgumentException failure = null;
         for (int attempt = 0; attempt < 10; attempt++) {
             try {
@@ -1507,7 +1524,7 @@ public final class Gee {
         double[] standardized = state.pearsonResiduals().clone();
         for (int row = 0; row < data.rows(); row++) {
             double magnitude = Math.sqrt(Math.max(0.0, data.weights()[row]
-                * family.unitDeviance(data.response()[row], state.means()[row])));
+                * family.unitDevianceAtPredictor(data.response()[row], state.linearPredictor()[row], state.means()[row])));
             deviance[row] = Math.copySign(magnitude, response[row]);
             working[row] = response[row] / state.derivatives()[row];
         }
@@ -1704,12 +1721,7 @@ public final class Gee {
                 double residual = response - mean;
                 value = -0.5 * residual * residual;
             } else if (name.contains("binomial")) {
-                double bounded = clamp(mean, 1e-12, 1.0 - 1e-12);
-                value = response == 0.0 ? 0.0
-                    : response * Math.log(bounded / response);
-                value += response == 1.0 ? 0.0
-                    : (1.0 - response) * Math.log(
-                        (1.0 - bounded) / (1.0 - response));
+                value = -0.5 * family.unitDevianceAtPredictor(response, state.linearPredictor()[row], mean);
             } else if (name.contains("poisson")) {
                 value = response == 0.0 ? -mean
                     : response * Math.log(mean / response) - (mean - response);
@@ -1954,6 +1966,15 @@ public final class Gee {
         double sum = 0.0;
         for (double value : values) sum += value * value;
         return Math.sqrt(sum);
+    }
+
+    private static double standardizedScoreNorm(double[] score, double[] bread) {
+        double maximum = 0.0;
+        for (int column = 0; column < score.length; column++) {
+            maximum = Math.max(maximum, Math.abs(score[column])
+                / Math.sqrt(bread[column * score.length + column]));
+        }
+        return maximum;
     }
 
     private static double clamp(double value, double lower, double upper) {

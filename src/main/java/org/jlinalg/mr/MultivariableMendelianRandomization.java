@@ -76,10 +76,10 @@ public final class MultivariableMendelianRandomization {
                         covariance[(first + offset) * columns + second + offset];
                 }
             }
-            double[] conditionalF = conditionalStrength(instruments, exposures);
+            double[] marginalF = marginalStrength(instruments, exposures);
             return new MultivariableMrResult(exposureNames,
                 AssociationStatistics.normal(beta, se), exposureCovariance,
-                conditionalF,
+                marginalF,
                 intercept ? solution.coefficients()[0] : 0.0,
                 intercept ? Math.sqrt(Math.max(0.0, covariance[0])) : Double.NaN,
                 q, df);
@@ -92,6 +92,9 @@ public final class MultivariableMendelianRandomization {
             throw new IllegalArgumentException("instruments and exposure names are required");
         }
         int exposures = names.size();
+        if (names.stream().anyMatch(n -> n == null || n.isBlank())
+                || new HashSet<>(names).size() != exposures)
+            throw new IllegalArgumentException("exposure names must be unique and nonblank");
         HashSet<String> variants = new HashSet<>();
         for (MultivariableInstrument value : instruments) {
             if (value == null || value.variantId() == null || !variants.add(value.variantId())
@@ -99,12 +102,14 @@ public final class MultivariableMendelianRandomization {
                     || value.exposureEffects().length != exposures
                     || value.exposureStandardErrors().length != exposures
                     || !Double.isFinite(value.outcomeEffect())
-                    || !(value.outcomeStandardError() > 0.0)) {
+                    || !(value.outcomeStandardError() > 0.0)
+                    || !Double.isFinite(value.outcomeStandardError())) {
                 throw new IllegalArgumentException("invalid multivariable instrument");
             }
+            double[] effects = value.exposureEffects(), errors = value.exposureStandardErrors();
             for (int index = 0; index < exposures; index++) {
-                if (!Double.isFinite(value.exposureEffects()[index])
-                        || !(value.exposureStandardErrors()[index] > 0.0)) {
+                if (!Double.isFinite(effects[index])
+                        || !(errors[index] > 0.0) || !Double.isFinite(errors[index])) {
                     throw new IllegalArgumentException("invalid exposure association");
                 }
             }
@@ -112,17 +117,15 @@ public final class MultivariableMendelianRandomization {
         return exposures;
     }
 
-    private static double[] conditionalStrength(
+    private static double[] marginalStrength(
             List<MultivariableInstrument> instruments, int exposures) {
         double[] result = new double[exposures];
-        for (int exposure = 0; exposure < exposures; exposure++) {
-            double sum = 0.0;
-            for (MultivariableInstrument value : instruments) {
-                double z = value.exposureEffects()[exposure]
-                    / value.exposureStandardErrors()[exposure];
-                sum += z * z;
+        for (MultivariableInstrument value : instruments) {
+            double[] effects = value.exposureEffects(), errors = value.exposureStandardErrors();
+            for (int exposure = 0; exposure < exposures; exposure++) {
+                double z = effects[exposure] / errors[exposure];
+                result[exposure] += z * z / instruments.size();
             }
-            result[exposure] = sum / instruments.size();
         }
         return result;
     }

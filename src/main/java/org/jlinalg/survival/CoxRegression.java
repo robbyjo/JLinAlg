@@ -104,6 +104,15 @@ public final class CoxRegression {
         int columns = covariates[0].length;
         double[] design = MatrixOps.rowMajor(covariates, rows);
         validateColumns(design, rows, columns);
+        double[] originalDesign=design.clone(), columnScale=new double[columns];
+        for(int j=0;j<columns;j++) {
+            double minimum=Double.POSITIVE_INFINITY,maximum=Double.NEGATIVE_INFINITY;
+            for(int i=0;i<rows;i++){minimum=Math.min(minimum,design[i*columns+j]);maximum=Math.max(maximum,design[i*columns+j]);}
+            double center=.5*minimum+.5*maximum;
+            double scale=Math.max(Math.abs(maximum-center),Math.abs(minimum-center));
+            columnScale[j]=scale;
+            for(int i=0;i<rows;i++)design[i*columns+j]=(design[i*columns+j]-center)/scale;
+        }
         double[] modelOffset = offset == null ? new double[rows]
             : MatrixOps.finiteCopy(offset, "offset");
         if (modelOffset.length != rows)
@@ -168,8 +177,13 @@ public final class CoxRegression {
         double[] covariance = CoxMath.inversePositive(backend,
             evaluation.information(), columns,
             options.informationRidge());
+        for(int j=0;j<columns;j++) {
+            beta[j]/=columnScale[j];
+            if(!Double.isFinite(beta[j]))throw new IllegalArgumentException("Cox coefficient is not representable in original units");
+            for(int k=0;k<columns;k++)covariance[j*columns+k]=(covariance[j*columns+k]/columnScale[j])/columnScale[k];
+        }
         return new CoxResult(beta, covariance,
-            CoxPartialLikelihood.baseline(survival, design, columns,
+            CoxPartialLikelihood.baseline(survival, originalDesign, columns,
                 beta, modelOffset, options.ties(), riskSets,
                 countingRiskSets),
             evaluation.logLikelihood(), options, iterations, converged,

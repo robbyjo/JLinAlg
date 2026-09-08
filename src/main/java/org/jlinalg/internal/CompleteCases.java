@@ -20,7 +20,7 @@ public final class CompleteCases {
             double[] offset,
             MissingDataPolicy policy) {
         if (response == null || design == null || rows < 1 || columns < 1
-                || response.length != rows || design.length != rows * columns) {
+                || response.length != rows || design.length != (long) rows * columns) {
             throw new IllegalArgumentException("model data dimensions are invalid");
         }
         if (weights != null && weights.length != rows) {

@@ -449,7 +449,7 @@ final class MrXwasCli {
             if (overwrite) Files.move(source, destination,
                 StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING);
-            else Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
+            else Files.move(source, destination);
         } catch (AtomicMoveNotSupportedException exception) {
             if (overwrite) Files.move(source, destination,
                 StandardCopyOption.REPLACE_EXISTING);

@@ -150,6 +150,21 @@ The PRESSO-style result is an analytic robust-center/outlier diagnostic rather
 than the simulation calibration of the R MR-PRESSO package. Report which
 variants were removed and show estimates before and after exclusion.
 
+Check `raps.converged()` before interpreting its estimate. This implementation
+uses a Huber adjusted profile score, a nonnegative residual-moment estimate
+of overdispersion, and a beta sandwich conditional on that plug-in dispersion.
+The variance moment is truncated **after** averaging, not per instrument, and
+the sandwich meat uses the same adjusted score as the estimating equation.
+It is not the full jointly calibrated `mr.raps` procedure: the variance moment
+is not outlier-robust and dispersion-estimation uncertainty is not included.
+
+The contamination mixture is a bounded grid sensitivity model with valid
+probabilities 0.05–0.95 and fixed additional invalid-effect variance 0.01 on
+the outcome-effect scale. It is not R ConMix/MRCML. Its log-likelihood is
+evaluated without probability floors; unresolved/boundary curvature throws
+instead of substituting the grid spacing as an SE. Grid resolution and this
+scale-dependent variance remain substantive modeling choices.
+
 ## Multivariable and overlapping-sample MR
 
 ```java
@@ -167,6 +182,44 @@ OverlapAwareMrResult overlapAware =
 overlap percentage. For selection sensitivity, apply
 `WinnerCurseCorrection.correct(effect, se, selectionZ)` to the appropriate
 exposure associations and retain both corrected and original results.
+
+`direct.marginalFStatistics()` reports mean squared marginal exposure z
+scores, not conditional instrument strength. The deprecated
+`conditionalFStatistics()` now throws explicitly: the former values were
+misnamed, and the input API has no specified cross-exposure sampling covariance
+model for conditional F inference. Multivariable Egger uses the supplied
+joint allele orientation; choose and record a common orientation convention
+before calling it. Unlike univariate Egger, it does not automatically choose
+an exposure-increasing reference trait.
+
+Winner's-curse correction solves the exact two-sided truncated-normal
+likelihood score. It rejects observations that fail the stated selection
+event and thresholds above 1e6. Tail probabilities are evaluated in log space
+and inverse Mills ratios by a stable tail continued fraction. For example,
+an observed z=40.01 selected at 40 has corrected standardized effect
+0.1071804266, not the old probability-floor/grid artifact 2.96074. This is an
+effect correction, not an additional conditional SNP-association p-value.
+
+Core IVW scales weights and variables before accumulation and reconstructs
+the estimate and SE with separated binary exponents, so an overflowing
+intermediate scale ratio does not erase an otherwise finite result. Univariate Egger
+uses anchored weighted centering rather than subtracting nearly equal raw
+moments. The regression suite includes an exact slope-2 line near exposure
+offset 1e8 (formerly returned slope 4), IVW/Steiger unit scalings from 1e-200
+to 1e200, allele-orientation tests, and the previously validated conditional,
+generalized, and overlap-aware paths. These numerical fixes do not remove
+the NOME, InSIDE, independence, or selection-model assumptions.
+
+GRMs accept valid zero-variance/mean-imputed sample rows and singular PSD
+matrices; supplied matrices are checked rather than repaired. PLINK clumping's
+unphased haplotype likelihood is maximized over all admissible stationary
+phases and both endpoints. The self-consistency cubic is partitioned at its
+derivative roots, then each monotone interval is bisected; the observed
+genotype likelihood selects the global candidate. There are no EM starts to
+time out or stationary midpoints silently mistaken for maxima. Equivalent
+phase maxima need not identify a unique haplotype phase even when r² is stable.
+
+See [audit commands, reference checks, and raw warm timings](../../src/benchmark/resources/genetic-audit/AUDIT.md).
 
 For estimator assumptions and limitations, see the
 [MR scope document](../mr-timeseries-susie-sem.md) and

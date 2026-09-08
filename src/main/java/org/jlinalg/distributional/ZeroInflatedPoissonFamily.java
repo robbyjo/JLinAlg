@@ -66,8 +66,7 @@ public final class ZeroInflatedPoissonFamily implements DistributionalFamily {
         if (response == 0.0) {
             return Math.log(inflation + (1.0 - inflation) * Math.exp(-mean));
         }
-        return Math.log1p(-inflation) + response * Math.log(mean) - mean
-            - SpecialFunctions.logGamma(response + 1.0);
+        return Math.log1p(-inflation) + jdistlib.Poisson.density(response, mean, true);
     }
     @Override public void derivatives(
             double response,

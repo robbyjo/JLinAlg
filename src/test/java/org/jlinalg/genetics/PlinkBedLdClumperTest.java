@@ -18,6 +18,47 @@ class PlinkBedLdClumperTest {
     @TempDir Path temporaryDirectory;
 
     @Test
+    void slowPhaseCannotAbortValidFortyOneFounderClump() throws Exception {
+        checkPhaseTable(new int[][]{{4,0,2},{3,21,4},{3,3,1}}, .01, "slow");
+    }
+
+    @Test
+    void midpointStationaryPointCannotHideClumpAboveDefaultThreshold() throws Exception {
+        checkPhaseTable(new int[][]{{2,2,1},{1,13,3},{1,3,0}}, .001, "twin");
+    }
+
+    private void checkPhaseTable(int[][] counts, double threshold, String key) throws Exception {
+        int n=java.util.Arrays.stream(counts).flatMapToInt(java.util.Arrays::stream).sum();
+        int[] a=new int[n],b=new int[n];int index=0;
+        for(int i=0;i<3;i++)for(int j=0;j<3;j++)for(int k=0;k<counts[i][j];k++) {a[index]=i;b[index++]=j;}
+        Path prefix=temporaryDirectory.resolve(key);
+        writeReference(prefix,new Variant("1","a",100,a),new Variant("1","b",200,b));
+        var result=PlinkBedLdClumper.clump(prefix,List.of(new LdClumpCandidate("a",1e-9,"g"),
+            new LdClumpCandidate("b",2e-9,"g")),new LdClumpOptions(10000,threshold,1));
+        assertEquals(1,result.retained().size());assertEquals(1,result.exclusions().size());
+        assertEquals("a",result.retained().get(0).variantId());
+        var reference=new java.util.Properties();
+        try(var in=getClass().getResourceAsStream("/r-reference/genetic-final-fixes.properties")) {reference.load(in);}
+        double expected=Double.parseDouble(reference.getProperty("ld."+key+".rSquared"));
+        assertEquals(expected,result.exclusions().get(0).rSquared(),expected*2e-10);
+    }
+
+    @Test
+    void escapesIndependenceStationaryPointInUnphasedLikelihood() throws Exception {
+        int[] a = new int[104], b = new int[104];
+        java.util.Arrays.fill(a, 1); java.util.Arrays.fill(b, 1);
+        a[0]=0; b[0]=0; a[1]=0; b[1]=2; a[2]=2; b[2]=0; a[3]=2; b[3]=2;
+        Path prefix = temporaryDirectory.resolve("symmetric");
+        writeReference(prefix,new Variant("1","a",100,a),new Variant("1","b",200,b));
+        var result=PlinkBedLdClumper.clump(prefix,List.of(new LdClumpCandidate("a",1e-9,"g"),
+            new LdClumpCandidate("b",2e-9,"g")),new LdClumpOptions(10000,.5,1));
+        assertEquals(1,result.retained().size());
+        // With four corner homozygotes and m double heterozygotes, writing
+        // f00=f11=t, f01=f10=.5-t gives r^2=(m-4)/(m+4) at either maximum.
+        assertEquals(96.0/104,result.exclusions().get(0).rSquared(),2e-11);
+    }
+
+    @Test
     void retainsLowestPVariantAndDropsMissingReferenceVariants() throws Exception {
         Path prefix = temporaryDirectory.resolve("reference");
         writeReference(prefix,

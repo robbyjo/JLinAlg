@@ -75,6 +75,9 @@ public final class Loess {
 
         public LoessResult fit(double[] response, double[] weights) {
             validateResponse(response);
+            double responseScale = responseScale(response);
+            double[] normalizedResponse = response.clone();
+            for (int i = 0; i < response.length; i++) normalizedResponse[i] /= responseScale;
             double[] prior = weights(weights);
             double[] robust = new double[x.length];
             Arrays.fill(robust, 1.0);
@@ -82,9 +85,13 @@ public final class Loess {
                 ? Math.max(0, options.robustnessIterations() - 1) : 0;
             Fit fit = null;
             for (int iteration = 0; iteration <= robustUpdates; iteration++) {
-                fit = fitted(response, prior, robust, true);
+                fit = fitted(normalizedResponse, prior, robust, true);
                 if (iteration < robustUpdates)
                     robust = robustness(fit.residuals());
+            }
+            for (int i = 0; i < response.length; i++) {
+                fit.fitted()[i] *= responseScale;
+                fit.residuals()[i] = response[i] - fit.fitted()[i];
             }
             return new LoessResult(this, response, prior, robust,
                 fit.fitted(), fit.residuals(), fit.leverage(),
@@ -97,12 +104,15 @@ public final class Loess {
                 throw new IllegalArgumentException(
                     "LOESS prediction points are required");
             double[] result = new double[queries.length];
+            double responseScale = responseScale(response);
+            double[] normalizedResponse = response.clone();
+            for (int i = 0; i < response.length; i++) normalizedResponse[i] /= responseScale;
             for (int index = 0; index < queries.length; index++) {
                 if (!Double.isFinite(queries[index]))
                     throw new IllegalArgumentException(
                         "LOESS prediction points must be finite");
-                result[index] = local(response, prior, robust,
-                    queries[index], -1).value();
+                result[index] = local(normalizedResponse, prior, robust,
+                    queries[index], -1).value() * responseScale;
             }
             return result;
         }
@@ -129,6 +139,13 @@ public final class Loess {
             double radius = Math.max(
                 Math.abs(sortedX[window.first()] - query),
                 Math.abs(sortedX[window.last() - 1] - query));
+            double coordinateScale = 1.0;
+            if (!Double.isFinite(radius)) {
+                coordinateScale = Math.max(Math.abs(query),
+                    Math.max(Math.abs(sortedX[window.first()]), Math.abs(sortedX[window.last() - 1])));
+                radius = Math.max(Math.abs(sortedX[window.first()] / coordinateScale - query / coordinateScale),
+                    Math.abs(sortedX[window.last() - 1] / coordinateScale - query / coordinateScale));
+            }
             if (!(radius > 0.0)) radius = Math.ulp(Math.abs(query) + 1.0);
             int maximumDegree = options.degree();
             double[] normal = new double[5];
@@ -136,7 +153,8 @@ public final class Loess {
             double targetWeight = 0.0;
             for (int position = window.first(); position < window.last(); position++) {
                 int row = order[position];
-                double scaled = (x[row] - query) / radius;
+                double scaled = coordinateScale == 1.0 ? (x[row] - query) / radius
+                    : (x[row] / coordinateScale - query / coordinateScale) / radius;
                 double distance = Math.abs(scaled);
                 double kernel = distance >= 1.0 ? 0.0
                     : cube(1.0 - cube(distance));
@@ -151,6 +169,14 @@ public final class Loess {
                 }
                 if (row == targetRow) targetWeight = weight;
             }
+            // Normalize each local system; common weight units must not alter
+            // rank detection or overflow the determinant used for leverage.
+            double mass = normal[0];
+            if (mass > 0) {
+                for (int i = 0; i < normal.length; i++) normal[i] /= mass;
+                for (int i = 0; i < rhs.length; i++) rhs[i] /= mass;
+                targetWeight /= mass;
+            }
             for (int degree = maximumDegree; degree >= 0; degree--) {
                 Solve solve = solve(normal, rhs, degree);
                 if (solve != null)
@@ -162,19 +188,21 @@ public final class Loess {
         }
 
         private Window window(double query) {
-            int insertion = Arrays.binarySearch(sortedX, query);
-            if (insertion < 0) insertion = -insertion - 1;
-            else while (insertion > 0 && sortedX[insertion - 1] == query)
-                insertion--;
-            int left = insertion - 1;
-            int right = insertion;
-            for (int selected = 0; selected < neighborhoodSize; selected++) {
-                if (left < 0) right++;
-                else if (right >= sortedX.length) left--;
-                else if (query - sortedX[left] <= sortedX[right] - query) left--;
-                else right++;
+            int lower = 0, upper = sortedX.length - neighborhoodSize;
+            while (lower < upper) {
+                int middle = lower + (upper - lower) / 2;
+                double left = query - sortedX[middle];
+                double right = sortedX[middle + neighborhoodSize] - query;
+                if (!Double.isFinite(left) || !Double.isFinite(right)) {
+                    double scale = Math.max(Math.abs(query), Math.max(Math.abs(sortedX[middle]),
+                        Math.abs(sortedX[middle + neighborhoodSize])));
+                    left = query / scale - sortedX[middle] / scale;
+                    right = sortedX[middle + neighborhoodSize] / scale - query / scale;
+                }
+                if (left > right) lower = middle + 1;
+                else upper = middle;
             }
-            return new Window(left + 1, right);
+            return new Window(lower, lower + neighborhoodSize);
         }
 
         private void validateResponse(double[] response) {
@@ -201,12 +229,19 @@ public final class Loess {
                 if (!(value >= 0.0) || !Double.isFinite(value))
                     throw new IllegalArgumentException(
                         "LOESS weights must be finite and nonnegative");
-                positive += value;
+                positive = Math.max(positive, value);
             }
             if (!(positive > 0.0))
                 throw new IllegalArgumentException(
                     "LOESS requires a positive weight");
+            for (int i = 0; i < result.length; i++) result[i] /= positive;
             return result;
+        }
+
+        private static double responseScale(double[] response) {
+            double scale = 0.0;
+            for (double value : response) scale = Math.max(scale, Math.abs(value));
+            return scale > 0.0 ? scale : 1.0;
         }
     }
 

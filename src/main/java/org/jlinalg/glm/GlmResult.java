@@ -38,6 +38,8 @@ public final class GlmResult {
     private final int[] retainedRows;
     private final int originalObservations;
     private final BackendProvenance backend;
+    private final boolean estimatedDispersion;
+    private final double[] rowSpaceProjection;
 
     GlmResult(
             String family, double[] coefficients, double[] covariance,
@@ -50,8 +52,11 @@ public final class GlmResult {
             int residualDegreesOfFreedom, int iterations,
             boolean converged, String convergenceMessage,
             int[] retainedRows, int originalObservations,
-            BackendProvenance backend) {
+            BackendProvenance backend, boolean estimatedDispersion,
+            double[] rowSpaceProjection) {
         this.family = Objects.requireNonNull(family, "family");
+        this.estimatedDispersion = estimatedDispersion;
+        this.rowSpaceProjection = rowSpaceProjection == null ? null : rowSpaceProjection.clone();
         this.coefficients = coefficients.clone();
         this.covariance = covariance.clone();
         this.standardErrors = standardErrors.clone();
@@ -109,16 +114,25 @@ public final class GlmResult {
     public int omittedObservations() { return originalObservations - observations; }
     public BackendProvenance backend() { return backend; }
 
-    /** Returns coefficient-level asymptotic Wald z inference. */
+    /** Whether inference estimates dispersion and uses residual Student t/F laws. */
+    public boolean estimatedDispersion() { return estimatedDispersion; }
+
+    /** Coefficient-level Student t (estimated dispersion) or normal inference. */
     public AssociationStatistics associationStatistics() {
-        return AssociationStatistics.normal(coefficients, standardErrors);
+        return estimatedDispersion ? AssociationStatistics.studentT(coefficients,
+            standardErrors, residualDegreesOfFreedom,
+            org.jlinalg.inference.DegreesOfFreedomMethod.RESIDUAL)
+            : AssociationStatistics.normal(coefficients, standardErrors);
     }
 
     /** Alias for {@link #coefficients()} for consistent association APIs. */
     public double[] beta() { return coefficients(); }
 
-    /** Tests one or more linear contrasts using an asymptotic Wald chi-square. */
+    /** Tests estimable contrasts with residual F or asymptotic Wald chi-square. */
     public ContrastTestResult testContrast(double[][] contrast) {
-        return LinearHypothesis.chiSquareTest(coefficients, covariance, contrast);
+        org.jlinalg.internal.LeastSquaresSolver.requireEstimable(contrast, rowSpaceProjection, parameters);
+        return estimatedDispersion ? LinearHypothesis.fTest(coefficients, covariance,
+            contrast, residualDegreesOfFreedom)
+            : LinearHypothesis.chiSquareTest(coefficients, covariance, contrast);
     }
 }

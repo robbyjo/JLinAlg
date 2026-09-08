@@ -13,6 +13,7 @@ public final class VarianceComponent {
     private final String name;
     private final int dimension;
     private final double[] covariance;
+    private volatile boolean positiveSemidefiniteChecked;
 
     /** Creates a component from a square row-major covariance basis matrix. */
     public VarianceComponent(String name, int dimension, double[] covariance) {
@@ -128,6 +129,23 @@ public final class VarianceComponent {
 
     double[] covarianceView() {
         return covariance;
+    }
+
+    /** Cached because working-model REML repeatedly reuses immutable bases. */
+    void requirePositiveSemidefinite(jdistlib.accelerator.ComputeBackend backend) {
+        if(positiveSemidefiniteChecked)return;
+        boolean diagonal=true;double scale=0;
+        for(int i=0;i<dimension;i++)for(int j=0;j<dimension;j++) {
+            double value=covariance[i*dimension+j];scale=Math.max(scale,Math.abs(value));
+            if(i!=j&&value!=0)diagonal=false;
+        }
+        double tolerance=1e-10*scale;
+        if(diagonal) {
+            for(int i=0;i<dimension;i++)if(covariance[i*dimension+i]<0)
+                throw new IllegalArgumentException("covariance basis is not positive semidefinite: "+name);
+        }else for(double eigenvalue:backend.dsyev(covariance,dimension).eigenvalues())
+            if(eigenvalue < -tolerance)throw new IllegalArgumentException("covariance basis is not positive semidefinite: "+name);
+        positiveSemidefiniteChecked=true;
     }
 
     private static void validateGroups(List<?> groups) {

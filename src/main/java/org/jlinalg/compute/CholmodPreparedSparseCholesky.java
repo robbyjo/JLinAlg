@@ -16,6 +16,7 @@ final class CholmodPreparedSparseCholesky implements PreparedSparseCholesky {
     private final int[] permutation;
     private final int structuralNonzeros;
     private long handle;
+    private boolean numericallyValid = true;
 
     CholmodPreparedSparseCholesky(
             CsrMatrix matrix, MatrixTriangle triangle, SparseOrdering ordering) {
@@ -49,7 +50,7 @@ final class CholmodPreparedSparseCholesky implements PreparedSparseCholesky {
 
     @Override
     public synchronized double logDeterminant() {
-        requireOpen();
+        requireNumericalFactor();
         return CholmodNative.logDeterminant(handle);
     }
 
@@ -62,15 +63,19 @@ final class CholmodPreparedSparseCholesky implements PreparedSparseCholesky {
                 || !Arrays.equals(columnIndices, matrix.columnIndices()))
             throw new IllegalArgumentException(
                 "CHOLMOD refactor requires the original sparsity pattern");
+        // CHOLMOD can leave a partial factor after a non-SPD refactor.
+        // Do not allow that partial state to escape through a subsequent solve.
+        numericallyValid = false;
         CholmodNative.refactor(handle, matrix.values());
+        numericallyValid = true;
     }
 
     @Override
     public synchronized void solveInPlace(
             double[] rightHandSide, int rightHandSides) {
-        requireOpen();
+        requireNumericalFactor();
         if (rightHandSide == null || rightHandSides < 1
-                || rightHandSide.length != dimension * rightHandSides)
+                || rightHandSide.length != (long) dimension * rightHandSides)
             throw new IllegalArgumentException(
                 "CHOLMOD right-hand side dimensions are invalid");
         CholmodNative.solveInPlace(handle, rightHandSide, rightHandSides);
@@ -86,5 +91,11 @@ final class CholmodPreparedSparseCholesky implements PreparedSparseCholesky {
     private void requireOpen() {
         if (handle == 0L) throw new IllegalStateException(
             "CHOLMOD factor is closed");
+    }
+
+    private void requireNumericalFactor() {
+        requireOpen();
+        if (!numericallyValid) throw new IllegalStateException(
+            "CHOLMOD factor is invalid after failed refactor; refactor a positive definite matrix first");
     }
 }

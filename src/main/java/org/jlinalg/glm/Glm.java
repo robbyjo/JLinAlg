@@ -6,6 +6,7 @@ package org.jlinalg.glm;
 
 import java.util.Arrays;
 import jdistlib.Normal;
+import jdistlib.T;
 import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
@@ -18,9 +19,6 @@ import org.jlinalg.ols.RankDeficiencyStrategy;
 
 /** Generalized linear models fitted by stabilized iteratively reweighted least squares. */
 public final class Glm {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-15;
-    private static final double MAXIMUM_WORKING_WEIGHT = 1e150;
-
     private Glm() { }
 
     /** Fits a GLM with unit prior weights, zero offset, and default controls. */
@@ -93,16 +91,28 @@ public final class Glm {
             BackendProvenance provenance) {
         boolean allowMinimumNorm = options.rankDeficiencyStrategy()
             == RankDeficiencyStrategy.MINIMUM_NORM;
-        double[] coefficients = initialCoefficients(
+        double[] suppliedInitial = options.initialCoefficients();
+        if (suppliedInitial != null && suppliedInitial.length != columns) {
+            throw new IllegalArgumentException("initial coefficient count must equal design columns");
+        }
+        Solution gaussianSolution = null;
+        if (family == GlmFamilies.gaussian()) {
+            double[] target = new double[rows];
+            for (int row = 0; row < rows; row++) target[row] = response[row] - offset[row];
+            WorkingData weighted = weight(design, target, rows, columns, priorWeights);
+            gaussianSolution = LeastSquaresSolver.solve(weighted.design(), weighted.response(),
+                rows, columns, allowMinimumNorm, backend);
+        }
+        double[] coefficients = gaussianSolution != null ? gaussianSolution.coefficients() : initialCoefficients(
             response, design, rows, columns, family,
             priorWeights, offset, options, allowMinimumNorm, backend);
         State state = state(response, design, rows, columns,
             family, priorWeights, offset, coefficients, backend);
-        boolean converged = false;
-        String message = "maximum iterations reached";
-        int iterations = 0;
+        boolean converged = gaussianSolution != null;
+        String message = converged ? "Gaussian identity solved directly by least squares" : "maximum iterations reached";
+        int iterations = converged ? 1 : 0;
 
-        for (int iteration = 1; iteration <= options.maximumIterations(); iteration++) {
+        for (int iteration = 1; gaussianSolution == null && iteration <= options.maximumIterations(); iteration++) {
             iterations = iteration;
             WorkingData working = workingData(
                 response, design, rows, columns, family,
@@ -116,13 +126,18 @@ public final class Glm {
             for (int attempt = 0; attempt < 30; attempt++) {
                 double[] trial = interpolate(
                     coefficients, candidateCoefficients, scale);
-                State trialState = state(response, design, rows, columns,
-                    family, priorWeights, offset, trial, backend);
-                if (trialState.deviance() <= state.deviance()
-                        + 1e-12 * (1.0 + state.deviance())) {
-                    candidateCoefficients = trial;
-                    candidate = trialState;
-                    break;
+                try {
+                    State trialState = state(response, design, rows, columns,
+                        family, priorWeights, offset, trial, backend);
+                    if (Double.isFinite(trialState.deviance())
+                            && trialState.deviance() <= state.deviance()
+                                + 1e-12 * (1.0 + state.deviance())) {
+                        candidateCoefficients = trial;
+                        candidate = trialState;
+                        break;
+                    }
+                } catch (IllegalArgumentException exception) {
+                    // Invalid trial means are a reason to halve, not abort.
                 }
                 scale *= 0.5;
             }
@@ -145,12 +160,29 @@ public final class Glm {
             }
         }
 
-        WorkingData finalWorking = workingData(
+        WorkingData finalWorking = gaussianSolution != null ? null : workingData(
             response, design, rows, columns, family,
             priorWeights, offset, state);
-        Solution finalSolution = LeastSquaresSolver.solve(
+        Solution finalSolution = gaussianSolution != null ? gaussianSolution : LeastSquaresSolver.solve(
             finalWorking.design(), finalWorking.response(), rows, columns,
             allowMinimumNorm, backend);
+        if (converged) {
+            // Check the undamped scoring step in predictor units. A tiny
+            // accepted line-search step alone is not evidence of stationarity.
+            double maximumStep = 0.0;
+            for (int row = 0; row < rows; row++) {
+                double step = 0.0;
+                for (int column = 0; column < columns; column++) {
+                    step += design[row * columns + column]
+                        * (finalSolution.coefficients()[column] - coefficients[column]);
+                }
+                maximumStep = Math.max(maximumStep, Math.abs(step));
+            }
+            if (!(maximumStep <= Math.sqrt(options.relativeTolerance()))) {
+                converged = false;
+                message = "small accepted step but final scoring equations not stationary";
+            }
+        }
         int degreesOfFreedom = rows - finalSolution.rank();
         if (degreesOfFreedom < 1) {
             throw new IllegalArgumentException(
@@ -162,14 +194,14 @@ public final class Glm {
         double[] pearsonResiduals = new double[rows];
         for (int row = 0; row < rows; row++) {
             double mean = state.means()[row];
-            double variance = family.variance(mean);
-            double residual = response[row] - mean;
+            double variance = family.varianceAtPredictor(state.linearPredictor()[row], mean);
+            double residual = family.residualAtPredictor(response[row], state.linearPredictor()[row], mean);
             pearsonResiduals[row] = residual
                 * Math.sqrt(priorWeights[row] / variance);
             pearsonChiSquare += pearsonResiduals[row] * pearsonResiduals[row];
             devianceResiduals[row] = Math.copySign(
                 Math.sqrt(Math.max(0.0, priorWeights[row]
-                    * family.unitDeviance(response[row], mean))), residual);
+                    * family.unitDevianceAtPredictor(response[row], state.linearPredictor()[row], mean))), residual);
         }
 
         boolean estimateDispersion = !family.fixedDispersion()
@@ -188,11 +220,15 @@ public final class Glm {
         double[] confidenceLower = new double[columns];
         double[] confidenceUpper = new double[columns];
         double alpha = 1.0 - options.confidenceLevel();
-        double critical = Normal.quantile(
-            1.0 - alpha / 2.0, 0.0, 1.0, true, false);
+        double critical = estimateDispersion
+            ? T.quantile(1.0 - alpha / 2.0, degreesOfFreedom, true, false)
+            : Normal.quantile(1.0 - alpha / 2.0, 0.0, 1.0, true, false);
         for (int column = 0; column < columns; column++) {
             standardErrors[column] = Math.sqrt(Math.max(0.0,
                 covariance[column * columns + column]));
+            if (!LeastSquaresSolver.estimableCoordinate(finalSolution.rowSpaceProjection(), columns, column)) {
+                standardErrors[column] = Double.NaN;
+            }
             if (standardErrors[column] == 0.0) {
                 statistics[column] = coefficients[column] == 0.0
                     ? Double.NaN
@@ -202,24 +238,30 @@ public final class Glm {
             }
             pValues[column] = Double.isNaN(statistics[column])
                 ? Double.NaN
-                : Math.min(1.0, 2.0 * Normal.cumulative(
-                    Math.abs(statistics[column]), 0.0, 1.0, false, false));
+                : Math.min(1.0, 2.0 * (estimateDispersion
+                    ? T.cumulative(Math.abs(statistics[column]), degreesOfFreedom, false, false)
+                    : Normal.cumulative(Math.abs(statistics[column]), 0.0, 1.0, false, false)));
             double margin = critical * standardErrors[column];
             confidenceLower[column] = coefficients[column] - margin;
             confidenceUpper[column] = coefficients[column] + margin;
         }
 
         double logLikelihood = 0.0;
+        double likelihoodDispersion = GlmFamilies.likelihoodDispersion(
+            family, response, state.means(), priorWeights, dispersion, state.deviance());
         for (int row = 0; row < rows; row++) {
-            double contribution = family.logLikelihood(response[row],
-                state.means()[row], priorWeights[row], dispersion);
+            double contribution = family.logLikelihoodAtPredictor(response[row],
+                state.linearPredictor()[row], state.means()[row], priorWeights[row], likelihoodDispersion);
             if (Double.isNaN(contribution)) {
                 logLikelihood = Double.NaN;
                 break;
             }
             logLikelihood += contribution;
         }
-        int likelihoodParameterCount = columns + (estimateDispersion ? 1 : 0);
+        if (family == GlmFamilies.gaussian() && state.deviance() == 0.0) {
+            logLikelihood = Double.POSITIVE_INFINITY;
+        }
+        int likelihoodParameterCount = finalSolution.rank() + (family.fixedDispersion() ? 0 : 1);
         double aic = Double.isNaN(logLikelihood) ? Double.NaN
             : 2.0 * likelihoodParameterCount - 2.0 * logLikelihood;
 
@@ -232,7 +274,8 @@ public final class Glm {
             state.deviance(), dispersion, logLikelihood, aic,
             rows, columns, finalSolution.rank(), degreesOfFreedom,
             iterations, converged, message,
-            retainedRows, originalRows, provenance);
+            retainedRows, originalRows, provenance, estimateDispersion,
+            finalSolution.rowSpaceProjection());
     }
 
     private static double[] initialCoefficients(
@@ -272,8 +315,14 @@ public final class Glm {
                 throw new IllegalArgumentException(
                     "inverse link produced a non-finite mean");
             }
+            double derivative = family.meanDerivative(predictor[row]);
+            double variance = family.varianceAtPredictor(predictor[row], means[row]);
+            if (!Double.isFinite(derivative) || derivative == 0.0
+                    || !Double.isFinite(variance) || !(variance > 0.0)) {
+                throw new IllegalArgumentException("invalid family derivative or variance at predictor");
+            }
             deviance += priorWeights[row]
-                * family.unitDeviance(response[row], means[row]);
+                * family.unitDevianceAtPredictor(response[row], predictor[row], means[row]);
         }
         return new State(predictor, means, deviance);
     }
@@ -286,17 +335,19 @@ public final class Glm {
         double[] weights = new double[rows];
         for (int row = 0; row < rows; row++) {
             double derivative = family.meanDerivative(state.linearPredictor()[row]);
-            double variance = family.variance(state.means()[row]);
+            double variance = family.varianceAtPredictor(state.linearPredictor()[row], state.means()[row]);
             if (!Double.isFinite(derivative) || derivative == 0.0
                     || !Double.isFinite(variance) || variance <= 0.0) {
                 throw new IllegalArgumentException(
                     "family produced invalid IRLS derivative or variance");
             }
-            weights[row] = clamp(priorWeights[row] * derivative * derivative / variance,
-                MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
-            targets[row] = state.linearPredictor()[row]
-                + (response[row] - state.means()[row]) / derivative
-                - offset[row];
+            weights[row] = family.workingWeight(response[row], state.linearPredictor()[row],
+                state.means()[row], priorWeights[row]);
+            if (!(weights[row] > 0.0) || !Double.isFinite(weights[row])) {
+                throw new IllegalArgumentException("IRLS information is outside representable positive range");
+            }
+            targets[row] = family.workingResponse(response[row], state.linearPredictor()[row],
+                state.means()[row], priorWeights[row], offset[row]);
         }
         return weight(design, targets, rows, columns, weights);
     }
@@ -372,10 +423,6 @@ public final class Glm {
                     / (1.0 + Math.abs(current[index])));
         }
         return maximum;
-    }
-
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private record State(

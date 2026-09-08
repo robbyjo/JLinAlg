@@ -30,6 +30,7 @@ public final class OlsResult {
     private final double residualVariance;
     private final double logLikelihood;
     private final boolean minimumNorm;
+    private final double[] rowSpaceProjection;
     private final double singularValueTolerance;
     private final int[] retainedRows;
     private final int originalObservations;
@@ -54,6 +55,7 @@ public final class OlsResult {
             double logLikelihood,
             boolean minimumNorm,
             double singularValueTolerance,
+            double[] rowSpaceProjection,
             int[] retainedRows,
             int originalObservations,
             BackendProvenance backend) {
@@ -74,6 +76,7 @@ public final class OlsResult {
         this.residualVariance = residualVariance;
         this.logLikelihood = logLikelihood;
         this.minimumNorm = minimumNorm;
+        this.rowSpaceProjection = rowSpaceProjection == null ? null : rowSpaceProjection.clone();
         this.singularValueTolerance = singularValueTolerance;
         this.retainedRows = retainedRows.clone();
         this.originalObservations = originalObservations;
@@ -98,6 +101,7 @@ public final class OlsResult {
     public double logLikelihood() { return logLikelihood; }
     public boolean rankDeficient() { return rank < parameters; }
     public boolean minimumNorm() { return minimumNorm; }
+    /** Original-unit SVD cutoff diagnostic; equilibrated rank may retain smaller directions. */
     public double singularValueTolerance() { return singularValueTolerance; }
     /** Original zero-based row indices used in the fit. */
     public int[] retainedRows() { return retainedRows.clone(); }
@@ -117,6 +121,8 @@ public final class OlsResult {
 
     /** Tests one or more estimable linear contrasts using the residual F law. */
     public ContrastTestResult testContrast(double[][] contrast) {
+        org.jlinalg.internal.LeastSquaresSolver.requireEstimable(
+            contrast, rowSpaceProjection, parameters);
         return LinearHypothesis.fTest(coefficients, covariance,
             contrast, residualDegreesOfFreedom);
     }

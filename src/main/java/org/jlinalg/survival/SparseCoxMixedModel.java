@@ -436,6 +436,14 @@ public final class SparseCoxMixedModel {
                 eta[row] += sparseCoefficients[observationCoefficient[row]];
             }
             double maximumEta = Arrays.stream(eta).max().orElse(0.0);
+            if (!Double.isFinite(maximumEta)) throw new IllegalArgumentException("nonfinite Cox predictor");
+            double minimumEta=Arrays.stream(eta).min().orElse(0.0);
+            // The prefix identities square globally scaled risks. Beyond this
+            // range use local risk-set probabilities instead of overflowing the
+            // reciprocals or underflowing their products.
+            if(maximumEta-minimumEta>300)
+                return evaluateWideRange(dense,denseColumns,fixedColumns,denseCoefficients,
+                    sparseCoefficients,eta,logVariances);
             double[] risk = new double[rows];
             double risk0 = 0.0;
             double[] risk1 = new double[denseColumns];
@@ -443,9 +451,6 @@ public final class SparseCoxMixedModel {
             for (int row = 0; row < rows; row++) {
                 double weight = Math.exp(eta[row] - maximumEta);
                 risk[row] = weight;
-                risk0 += weight;
-                addDenseMoments(dense, row, denseColumns, weight,
-                    risk1, risk2);
             }
             int events = survivalPlan.eventRows().length;
             double[] prefixA = new double[events];
@@ -455,21 +460,20 @@ public final class SparseCoxMixedModel {
             double[] denseInformation =
                 new double[denseColumns * denseColumns];
             double partial = 0.0;
-            int removal = 0;
-            double cumulativeA = 0.0;
-            double cumulativeB = 0.0;
-            double[] cumulativeC = new double[denseColumns];
+            int removal = survivalPlan.removalRows().length-1;
             double[] mean = new double[denseColumns];
-            for (int event = 0; event < events; event++) {
+            // Add risks in reverse time. Subtracting departed large risks from
+            // a global sum destroyed the later small risk sets (even at eta=40).
+            for (int event = events-1; event >= 0; event--) {
                 int eventRow = survivalPlan.eventRows()[event];
                 double time = survival.stopView()[eventRow];
-                while (removal < survivalPlan.removalRows().length
+                while (removal >= 0
                         && survival.stopView()[survivalPlan.removalRows()[removal]]
-                            < time) {
-                    int row = survivalPlan.removalRows()[removal++];
+                            >= time) {
+                    int row = survivalPlan.removalRows()[removal--];
                     double weight = risk[row];
-                    risk0 -= weight;
-                    subtractDenseMoments(dense, row, denseColumns, weight,
+                    risk0 += weight;
+                    addDenseMoments(dense, row, denseColumns, weight,
                         risk1, risk2);
                 }
                 partial += eta[eventRow] - maximumEta - Math.log(risk0);
@@ -484,14 +488,16 @@ public final class SparseCoxMixedModel {
                         denseInformation[left * denseColumns + right] +=
                             risk2[left * denseColumns + right] / risk0
                             - mean[left] * mean[right];
-                cumulativeA += 1.0 / risk0;
-                cumulativeB += 1.0 / (risk0 * risk0);
-                prefixA[event] = cumulativeA;
-                prefixB[event] = cumulativeB;
+                prefixA[event] = 1.0 / risk0;
+                prefixB[event] = 1.0 / (risk0 * risk0);
                 for (int column = 0; column < denseColumns; column++) {
-                    cumulativeC[column] += risk1[column] / (risk0 * risk0);
-                    prefixC[event * denseColumns + column] = cumulativeC[column];
+                    prefixC[event * denseColumns + column] = risk1[column] / (risk0 * risk0);
                 }
+            }
+            for(int event=1;event<events;event++) {
+                prefixA[event]+=prefixA[event-1]; prefixB[event]+=prefixB[event-1];
+                for(int column=0;column<denseColumns;column++)
+                    prefixC[event*denseColumns+column]+=prefixC[(event-1)*denseColumns+column];
             }
             symmetrizeLower(denseInformation, denseColumns);
             double[] sparseScore = new double[sparseColumns];
@@ -516,19 +522,57 @@ public final class SparseCoxMixedModel {
             for (int coefficient = 0; coefficient < sparseColumns;
                     coefficient++) {
                 double laterWeight = 0.0;
-                for (int row : coefficientRows[coefficient])
-                    laterWeight += risk[row];
                 double squaredRiskContribution = 0.0;
-                for (int row : coefficientRows[coefficient]) {
+                int[] coefficientGroup=coefficientRows[coefficient];
+                for (int index=coefficientGroup.length-1;index>=0;index--) {
+                    int row=coefficientGroup[index];
                     int last = survivalPlan.lastEvent()[row];
                     double weight = risk[row];
-                    laterWeight -= weight;
                     squaredRiskContribution += weight
                         * (weight + 2.0 * laterWeight) * prefixB[last];
+                    laterWeight += weight;
                 }
                 sparseInformation[pattern.diagonalPositions()[coefficient]] -=
                     squaredRiskContribution;
             }
+            return penalize(partial,eta,denseScore,sparseScore,denseInformation,cross,
+                sparseInformation,denseCoefficients,sparseCoefficients,denseColumns,fixedColumns,logVariances);
+        }
+
+        /** Rare extreme-predictor fallback; O(n*events*p), no dense n-by-n matrix. */
+        private Evaluation evaluateWideRange(double[] dense,int p,int fixedColumns,
+                double[] denseCoefficients,double[] sparseCoefficients,double[] eta,double[] logs) {
+            double partial=0;
+            double[] ds=new double[p], ss=new double[sparseColumns], di=new double[p*p];
+            double[] cross=new double[sparseColumns*p], si=new double[pattern.nonzeros()];
+            for(int eventRow:survivalPlan.eventRows()) {
+                double time=survival.stopView()[eventRow], maximum=Double.NEGATIVE_INFINITY;
+                for(int row=0;row<rows;row++)if(survival.stopView()[row]>=time)maximum=Math.max(maximum,eta[row]);
+                double sum=0;double[] first=new double[p],second=new double[p*p],group=new double[sparseColumns];
+                for(int row=0;row<rows;row++)if(survival.stopView()[row]>=time) {
+                    double weight=Math.exp(eta[row]-maximum);sum+=weight;
+                    addDenseMoments(dense,row,p,weight,first,second);
+                }
+                partial+=(eta[eventRow]-maximum)-Math.log(sum);
+                for(int j=0;j<p;j++) {
+                    first[j]/=sum; ds[j]+=dense[eventRow*p+j]-first[j];
+                    for(int k=0;k<=j;k++)di[j*p+k]+=second[j*p+k]/sum-first[j]*(first[k]);
+                }
+                ss[observationCoefficient[eventRow]]++;
+                for(int row=0;row<rows;row++)if(survival.stopView()[row]>=time) {
+                    double probability=Math.exp(eta[row]-maximum)/sum;
+                    int g=observationCoefficient[row];group[g]+=probability;ss[g]-=probability;
+                    for(int j=0;j<p;j++)cross[g*p+j]+=probability*(dense[row*p+j]-first[j]);
+                }
+                for(int g=0;g<sparseColumns;g++)si[pattern.diagonalPositions()[g]]+=group[g]*(1-group[g]);
+            }
+            symmetrizeLower(di,p);
+            return penalize(partial,eta,ds,ss,di,cross,si,denseCoefficients,sparseCoefficients,p,fixedColumns,logs);
+        }
+
+        private Evaluation penalize(double partial,double[] eta,double[] denseScore,double[] sparseScore,
+                double[] denseInformation,double[] cross,double[] sparseInformation,
+                double[] denseCoefficients,double[] sparseCoefficients,int denseColumns,int fixedColumns,double[] logVariances) {
             double sparseVariance = Math.exp(logVariances[0]);
             double[] precisionProduct = multiply(precision, sparseCoefficients);
             double penalty = 0.0;

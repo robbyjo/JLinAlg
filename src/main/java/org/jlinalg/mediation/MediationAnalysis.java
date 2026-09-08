@@ -307,9 +307,16 @@ public final class MediationAnalysis {
     static MediationEffect indirectEffect(
             double a, double b, double varianceA, double varianceB,
             double confidenceLevel) {
+        validateConfidenceLevel(confidenceLevel);
+        if(!Double.isFinite(a)||!Double.isFinite(b)||!Double.isFinite(varianceA)
+                ||!Double.isFinite(varianceB)||varianceA<0||varianceB<0)
+            throw new IllegalArgumentException("finite path estimates and nonnegative finite variances required");
         double estimate = a * b;
-        double variance = b * b * varianceA + a * a * varianceB;
-        double standardError = Math.sqrt(Math.max(0.0, variance));
+        // Squaring a path before multiplying its reciprocal-scale variance can
+        // overflow/underflow although the actual delta-method SE is finite.
+        double standardError = Math.hypot(b * Math.sqrt(varianceA), a * Math.sqrt(varianceB));
+        if(!Double.isFinite(estimate)||!Double.isFinite(standardError))
+            throw new IllegalArgumentException("indirect effect or uncertainty is not representable");
         double statistic;
         double pValue;
         if (standardError == 0.0) {
@@ -322,7 +329,7 @@ public final class MediationAnalysis {
                 Math.abs(statistic), 0.0, 1.0, false, false));
         }
         double critical = Normal.quantile(
-            0.5 + confidenceLevel / 2.0, 0.0, 1.0, true, false);
+            (1.0 - confidenceLevel) / 2.0, 0.0, 1.0, false, false);
         return new MediationEffect(
             "indirect", estimate, standardError, statistic, pValue,
             estimate - critical * standardError,
@@ -339,7 +346,7 @@ public final class MediationAnalysis {
         double standardError = fit.standardErrors()[column];
         double statistic = fit.tStatistics()[column];
         double critical = jdistlib.T.quantile(
-            0.5 + confidenceLevel / 2.0, df, true, false);
+            (1.0 - confidenceLevel) / 2.0, df, false, false);
         return new MediationEffect(
             name, estimate, standardError, statistic,
             fit.pValues()[column],

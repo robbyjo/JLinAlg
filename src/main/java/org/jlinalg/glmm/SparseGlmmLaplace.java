@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import jdistlib.accelerator.CholeskyFactor;
 import jdistlib.accelerator.ComputeBackend;
 import jdistlib.accelerator.MatrixTriangle;
 import jdistlib.accelerator.PreparedSparseCholesky;
@@ -29,7 +28,6 @@ import org.jlinalg.mixed.SparsePrecisionMatrix;
  * precision matrices. Observation-scale covariance matrices are never formed.
  */
 public final class SparseGlmmLaplace {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-12;
 
     private SparseGlmmLaplace() { }
 
@@ -156,84 +154,81 @@ public final class SparseGlmmLaplace {
         public GlmmLaplaceResult fit(
                 double[] response, double[] fixedEffects, int columns,
                 double[] priorWeights, double[] offset) {
-            if (closed) throw new IllegalStateException(
-                "prepared sparse GLMM is closed");
-            MatrixOps.validateModelData(response, fixedEffects, rows, columns);
-            double[] weights = weights(priorWeights, rows);
-            double[] offsets = offsets(offset, rows);
-            for (int row = 0; row < rows; row++)
-                family.validateResponse(response[row], weights[row]);
-            double[] logVariances = sharedLogVariances.clone();
-            LaplaceTunableFamily tunable = family instanceof LaplaceTunableFamily
-                ? (LaplaceTunableFamily) family : null;
-            double[] familyParameters = tunable == null
-                ? new double[0] : tunable.laplaceParameters();
-            PreparedSparseCholesky factor = localFactor.get();
-            Mode best = mode(response, fixedEffects, columns, weights, offsets,
-                logVariances, factor, null);
-            int outerIterations = 0;
-            double step = options.initialLogVarianceStep();
-            boolean outerConverged = false;
-            for (int sweep = 1;
-                    sweep <= options.maximumOuterIterations(); sweep++) {
-                outerIterations = sweep;
-                boolean improved = false;
-                int coordinates = logVariances.length + familyParameters.length;
-                for (int component = 0; component < coordinates; component++) {
-                    boolean varianceComponent = component < logVariances.length;
-                    int familyComponent = component - logVariances.length;
-                    double original = varianceComponent
-                        ? logVariances[component]
-                        : familyParameters[familyComponent];
-                    double selected = original;
-                    Mode coordinateBest = best;
-                    for (double direction : new double[] {-1.0, 1.0}) {
-                        double trial = varianceComponent
-                            ? clamp(original + direction * step)
-                            : Math.max(tunable.minimumLaplaceParameter(
-                                    familyComponent),
-                                Math.min(tunable.maximumLaplaceParameter(
-                                    familyComponent),
-                                    original + direction * step));
-                        if (trial == original) continue;
-                        if (varianceComponent) logVariances[component] = trial;
-                        else {
-                            familyParameters[familyComponent] = trial;
-                            tunable.setLaplaceParameters(familyParameters);
-                        }
-                        Mode candidate = mode(response, fixedEffects, columns,
-                            weights, offsets, logVariances, factor, best);
-                        if (candidate.laplaceLogLikelihood()
-                                > coordinateBest.laplaceLogLikelihood()) {
-                            coordinateBest = candidate;
-                            selected = trial;
-                        }
-                    }
-                    if (varianceComponent) logVariances[component] = selected;
-                    else {
-                        familyParameters[familyComponent] = selected;
-                        tunable.setLaplaceParameters(familyParameters);
-                    }
-                    if (coordinateBest.laplaceLogLikelihood()
-                            > best.laplaceLogLikelihood()
-                            + options.relativeTolerance()
-                            * (1.0 + Math.abs(
-                                best.laplaceLogLikelihood()))) {
-                        best = coordinateBest;
-                        improved = true;
-                    }
-                }
-                if (!improved) step *= 0.5;
-                if (step <= options.relativeTolerance() * 10.0) {
-                    outerConverged = true;
-                    break;
-                }
+            // Tunable families hold mutable likelihood parameters. A prepared
+            // instance may otherwise fit responses concurrently using local factors.
+            if (family instanceof LaplaceTunableFamily) {
+                synchronized (family) { return fitMarginal(response,fixedEffects,columns,priorWeights,offset); }
             }
-            best = mode(response, fixedEffects, columns, weights, offsets,
-                logVariances, factor, best);
-            return result(best, columns, logVariances, outerIterations,
-                outerConverged && best.converged());
+            return fitMarginal(response,fixedEffects,columns,priorWeights,offset);
         }
+
+        private GlmmLaplaceResult fitMarginal(double[] response, double[] fixedEffects, int columns,
+                double[] priorWeights, double[] offset) {
+            if(closed)throw new IllegalStateException("prepared sparse GLMM is closed");
+            MatrixOps.validateModelData(response,fixedEffects,rows,columns);
+            double[] weights=weights(priorWeights,rows),offsets=offsets(offset,rows);
+            for(int row=0;row<rows;row++)family.validateResponse(response[row],weights[row]);
+            double[] scales=new double[columns],fixed=fixedEffects.clone();
+            for(int j=0;j<columns;j++) {
+                for(int i=0;i<rows;i++)scales[j]=Math.max(scales[j],Math.abs(fixed[i*columns+j]));
+                if(scales[j]==0)throw new IllegalArgumentException("fixed design has a zero column");
+                for(int i=0;i<rows;i++)fixed[i*columns+j]/=scales[j];
+            }
+            var tunable=family instanceof LaplaceTunableFamily value ? value : null;
+            double[] familyStart=tunable==null?new double[0]:tunable.laplaceParameters();
+            int varianceCount=terms.size(),dimension=columns+varianceCount+familyStart.length;
+            double[] initial=new double[dimension],lower=new double[dimension],upper=new double[dimension];
+            Arrays.fill(lower,Double.NEGATIVE_INFINITY);Arrays.fill(upper,Double.POSITIVE_INFINITY);
+            double[] betaStart=new double[columns];initializeIntercept(response,fixed,columns,offsets,betaStart);
+            System.arraycopy(betaStart,0,initial,0,columns);
+            for(int i=0;i<varianceCount;i++) {
+                initial[columns+i]=clamp(sharedLogVariances[i]);
+                lower[columns+i]=Math.log(options.minimumVariance());upper[columns+i]=Math.log(options.maximumVariance());
+            }
+            for(int i=0;i<familyStart.length;i++) {
+                initial[columns+varianceCount+i]=familyStart[i];
+                lower[columns+varianceCount+i]=tunable.minimumLaplaceParameter(i);
+                upper[columns+varianceCount+i]=tunable.maximumLaplaceParameter(i);
+            }
+            PreparedSparseCholesky factor=localFactor.get();
+            LaplaceOptimization.Objective objective=point->{
+                if(tunable!=null)tunable.setLaplaceParameters(Arrays.copyOfRange(point,columns+varianceCount,dimension));
+                double[] beta=Arrays.copyOf(point,columns),logV=Arrays.copyOfRange(point,columns,columns+varianceCount);
+                try {
+                    Mode fitted=conditionalMode(response,fixed,columns,weights,offsets,logV,factor,beta);
+                    return fitted.converged() ? -fitted.laplaceLogLikelihood() : Double.POSITIVE_INFINITY;
+                }catch(IllegalArgumentException | IllegalStateException invalid){return Double.POSITIVE_INFINITY;}
+            };
+            var optimum=LaplaceOptimization.fit(objective,initial,lower,upper,
+                options.maximumOuterIterations(),Math.max(1e-6,10*options.relativeTolerance()),columns,options.initialLogVarianceStep());
+            // An extremely small supplied variance can flatten a log-variance
+            // score far from the optimum. Compare a finite-scale restart.
+            boolean smallStart=false;
+            for(int i=0;i<varianceCount;i++)smallStart|=initial[columns+i]<-10;
+            if(smallStart) {
+                double[] restart=optimum.point().clone();
+                for(int i=0;i<varianceCount;i++)restart[columns+i]=Math.max(lower[columns+i],Math.min(upper[columns+i],0));
+                var alternative=LaplaceOptimization.fit(objective,restart,lower,upper,
+                    options.maximumOuterIterations(),Math.max(1e-6,10*options.relativeTolerance()),columns,options.initialLogVarianceStep());
+                if(alternative.value()<optimum.value())optimum=alternative;
+            }
+            double[] point=optimum.point(),covariance=LaplaceOptimization.fixedCovariance(objective,point,lower,upper,columns);
+            if(tunable!=null)tunable.setLaplaceParameters(Arrays.copyOfRange(point,columns+varianceCount,dimension));
+            double[] logV=Arrays.copyOfRange(point,columns,columns+varianceCount);
+            Mode fitted=conditionalMode(response,fixed,columns,weights,offsets,logV,factor,Arrays.copyOf(point,columns));
+            double[] beta=fitted.beta().clone();
+            for(int i=0;i<columns;i++) {
+                beta[i]/=scales[i];
+                for(int j=0;j<columns;j++)covariance[i*columns+j]=
+                    unscaleCovariance(covariance[i*columns+j],scales[i],scales[j]);
+            }
+            boolean converged=optimum.converged()&&fitted.converged();
+            for(double value:covariance)converged&=Double.isFinite(value);
+            if(!converged)Arrays.fill(covariance,Double.NaN);
+            return result(new Mode(beta,fitted.random(),covariance,fitted.linear(),fitted.means(),
+                fitted.laplaceLogLikelihood(),fitted.iterations(),fitted.converged()),columns,logV,optimum.iterations(),converged);
+        }
+
 
         /** Sets deterministic variance starts shared by subsequent workers. */
         public void warmStart(double... varianceComponents) {
@@ -259,70 +254,72 @@ public final class SparseGlmmLaplace {
                 Math.min(Math.log(options.maximumVariance()), value));
         }
 
-        private Mode mode(
-                double[] response, double[] fixed, int fixedColumns,
-                double[] priorWeights, double[] offsets,
-                double[] logVariances, PreparedSparseCholesky factor,
-                Mode start) {
-            int randomColumns = design.columns();
-            double[] beta = start == null
-                ? new double[fixedColumns] : start.beta().clone();
-            double[] random = start == null
-                ? new double[randomColumns] : start.random().clone();
-            if (start == null)
-                initializeIntercept(response, fixed, fixedColumns,
-                    offsets, beta);
-            double[] means = new double[rows];
-            double[] linear = new double[rows];
-            double[] workingWeights = new double[rows];
-            boolean converged = false;
-            int iterations = 0;
-            Schur solved = null;
-            for (int iteration = 1;
-                    iteration <= options.maximumModeIterations(); iteration++) {
-                iterations = iteration;
-                double[] workingResponse = working(
-                    response, fixed, fixedColumns, beta, random,
-                    priorWeights, offsets, means, linear, workingWeights);
-                solved = solveWorking(fixed, fixedColumns, workingResponse,
-                    workingWeights, logVariances, factor, false);
-                double change = Math.max(relativeChange(beta, solved.beta()),
-                    relativeChange(random, solved.random()));
-                beta = solved.beta();
-                random = solved.random();
-                if (change <= options.relativeTolerance()) {
-                    converged = true;
-                    break;
+        /** Random modes at FIXED beta; beta is optimized in the marginal objective. */
+        private Mode conditionalMode(double[] response,double[] fixed,int fixedColumns,
+                double[] priorWeights,double[] offsets,double[] logVariances,
+                PreparedSparseCholesky factor,double[] beta) {
+            double[] random=new double[design.columns()],means=new double[rows],linear=new double[rows];
+            double[] weights=new double[rows];boolean converged=false;int iteration=0;
+            double previous=penalized(response,fixed,fixedColumns,beta,random,priorWeights,offsets,logVariances);
+            for(;iteration<options.maximumModeIterations();iteration++) {
+                double[] z=working(response,fixed,fixedColumns,beta,random,priorWeights,offsets,means,linear,weights);
+                factor.refactor(pattern.matrix(weights,design,precisionData,logVariances));
+                double[] right=new double[random.length];
+                for(int row=0;row<rows;row++) {
+                    double value=weights[row]*(z[row]-fixedValue(fixed,row,fixedColumns,beta));
+                    for(int j=design.rowStarts()[row];j<design.rowStarts()[row+1];j++)right[design.columnIndices()[j]]+=design.values()[j]*value;
                 }
+                factor.solveInPlace(right,1);
+                double change=relativeChange(random,right);
+                if(change<=Math.min(options.relativeTolerance(),1e-9)) {random=right;converged=true;break;}
+                boolean accepted=false;double[] candidate=new double[random.length];
+                for(double alpha=1;alpha>=1e-10;alpha*=.5) {
+                    for(int i=0;i<random.length;i++)candidate[i]=random[i]+alpha*(right[i]-random[i]);
+                    double value=penalized(response,fixed,fixedColumns,beta,candidate,priorWeights,offsets,logVariances);
+                    if(Double.isFinite(value)&&value>=previous-1e-12*(1+Math.abs(previous))) {
+                        previous=value;random=candidate.clone();accepted=true;break;
+                    }
+                }
+                if(!accepted)break;
             }
-            double[] workingResponse = working(response, fixed, fixedColumns,
-                beta, random, priorWeights, offsets, means, linear,
-                workingWeights);
-            solved = solveWorking(fixed, fixedColumns, workingResponse,
-                workingWeights, logVariances, factor, true);
-            beta = solved.beta();
-            random = solved.random();
-            double conditional = 0.0;
-            for (int row = 0; row < rows; row++) {
-                double eta = offsets[row]
-                    + fixedValue(fixed, row, fixedColumns, beta)
-                    + design.rowProduct(row, random);
-                linear[row] = eta;
-                means[row] = family.inverseLink(eta);
-                conditional += family.logLikelihood(response[row], means[row],
-                    priorWeights[row], 1.0);
+            double conditional=penalized(response,fixed,fixedColumns,beta,random,priorWeights,offsets,logVariances);
+            for(int row=0;row<rows;row++) {
+                double eta=offsets[row]+fixedValue(fixed,row,fixedColumns,beta)+design.rowProduct(row,random);
+                linear[row]=eta;means[row]=family.inverseLink(eta);
+                weights[row]=observedWeight(response[row],eta,means[row],priorWeights[row]);
+                if(!Double.isFinite(weights[row]))throw new IllegalArgumentException("nonfinite observed family curvature");
             }
-            if (!Double.isFinite(conditional))
-                throw new IllegalArgumentException(
-                    "Laplace fitting requires a finite family likelihood");
-            conditional -= 0.5 * precisionData.quadratic(
-                random, logVariances);
-            double laplace = conditional
-                + 0.5 * precisionData.logDeterminant(logVariances)
-                - 0.5 * factor.logDeterminant();
-            return new Mode(beta, random, solved.fixedCovariance(),
-                linear, means, laplace, iterations, converged);
+            // The Laplace determinant is the observed random Hessian at the
+            // accepted mode, not an earlier Fisher-scoring working matrix.
+            factor.refactor(pattern.matrix(weights,design,precisionData,logVariances));
+            double likelihood=conditional+.5*precisionData.logDeterminant(logVariances)-.5*factor.logDeterminant();
+            return new Mode(beta,random,null,linear,means,likelihood,iteration+1,converged&&Double.isFinite(likelihood));
         }
+
+        private double observedWeight(double response,double eta,double mean,double weight) {
+            if(family instanceof LaplaceFamilyDerivatives exact)
+                return exact.linearPredictorInformation(response,eta,weight);
+            if(family==org.jlinalg.glm.GlmFamilies.binomial()||family==org.jlinalg.glm.GlmFamilies.poisson())
+                return family.workingWeight(response,eta,mean,weight);
+            double h=1e-5*Math.max(1,Math.abs(eta));
+            return -(familyScore(response,eta+h,weight)-familyScore(response,eta-h,weight))/(2*h);
+        }
+        private double familyScore(double response,double eta,double weight) {
+            if(family instanceof LaplaceFamilyDerivatives exact)return exact.linearPredictorScore(response,eta,weight);
+            double mean=family.inverseLink(eta);
+            return family.workingWeight(response,eta,mean,weight)
+                *(family.workingResponse(response,eta,mean,weight,0)-eta);
+        }
+        private double penalized(double[] response,double[] fixed,int fixedColumns,double[] beta,
+                double[] random,double[] weights,double[] offsets,double[] logVariances) {
+            double value=-.5*precisionData.quadratic(random,logVariances);
+            for(int row=0;row<rows;row++) {
+                double eta=offsets[row]+fixedValue(fixed,row,fixedColumns,beta)+design.rowProduct(row,random);
+                value+=family.logLikelihoodAtPredictor(response[row],eta,family.inverseLink(eta),weights[row],1);
+            }
+            return value;
+        }
+
 
         private double[] working(
                 double[] response, double[] fixed, int fixedColumns,
@@ -342,85 +339,17 @@ public final class SparseGlmmLaplace {
                 double mean = means[row];
                 double weight = family.workingWeight(response[row], eta,
                     mean, priorWeights[row]);
-                workingWeights[row] = Math.max(
-                    MINIMUM_WORKING_WEIGHT, weight);
+                if (!(weight > 0.0) || !Double.isFinite(weight))
+                    throw new IllegalArgumentException("family produced unrepresentable Laplace working precision");
+                workingWeights[row] = weight;
                 workingResponse[row] = family.workingResponse(response[row],
                     eta, mean, priorWeights[row], offsets[row]);
+                if (!Double.isFinite(workingResponse[row]))
+                    throw new IllegalArgumentException("family produced nonfinite Laplace working response");
             }
             return workingResponse;
         }
 
-        private Schur solveWorking(
-                double[] fixed, int fixedColumns, double[] workingResponse,
-                double[] workingWeights, double[] logVariances,
-                PreparedSparseCholesky factor, boolean covariance) {
-            factor.refactor(pattern.matrix(workingWeights, design,
-                precisionData, logVariances));
-            int randomColumns = design.columns();
-            double[] fixedInformation = new double[fixedColumns * fixedColumns];
-            double[] cross = new double[fixedColumns * randomColumns];
-            double[] fixedRight = new double[fixedColumns];
-            double[] randomRight = new double[randomColumns];
-            for (int row = 0; row < rows; row++) {
-                double weight = workingWeights[row];
-                double z = workingResponse[row];
-                for (int left = 0; left < fixedColumns; left++) {
-                    double xleft = fixed[row * fixedColumns + left];
-                    fixedRight[left] += weight * xleft * z;
-                    for (int right = 0; right <= left; right++)
-                        fixedInformation[left * fixedColumns + right] +=
-                            weight * xleft
-                            * fixed[row * fixedColumns + right];
-                    for (int index = design.rowStarts()[row];
-                            index < design.rowStarts()[row + 1]; index++)
-                        cross[left * randomColumns
-                            + design.columnIndices()[index]] += weight * xleft
-                            * design.values()[index];
-                }
-                for (int index = design.rowStarts()[row];
-                        index < design.rowStarts()[row + 1]; index++)
-                    randomRight[design.columnIndices()[index]] += weight
-                        * design.values()[index] * z;
-            }
-            symmetrizeLower(fixedInformation, fixedColumns);
-            double[] randomSolves = new double[
-                randomColumns * (fixedColumns + 1)];
-            for (int row = 0; row < randomColumns; row++) {
-                randomSolves[row * (fixedColumns + 1)] = randomRight[row];
-                for (int column = 0; column < fixedColumns; column++)
-                    randomSolves[row * (fixedColumns + 1) + column + 1] =
-                        cross[column * randomColumns + row];
-            }
-            factor.solveInPlace(randomSolves, fixedColumns + 1);
-            double[] schur = fixedInformation.clone();
-            double[] schurRight = fixedRight.clone();
-            for (int left = 0; left < fixedColumns; left++)
-                for (int randomColumn = 0;
-                        randomColumn < randomColumns; randomColumn++) {
-                    double value = cross[left * randomColumns + randomColumn];
-                    schurRight[left] -= value
-                        * randomSolves[randomColumn * (fixedColumns + 1)];
-                    for (int right = 0; right < fixedColumns; right++)
-                        schur[left * fixedColumns + right] -= value
-                            * randomSolves[randomColumn * (fixedColumns + 1)
-                                + right + 1];
-                }
-            symmetrize(schur, fixedColumns);
-            CholeskyFactor fixedFactor = backend.dpotrf(schur, fixedColumns);
-            double[] beta = fixedFactor.solve(schurRight);
-            double[] random = new double[randomColumns];
-            for (int row = 0; row < randomColumns; row++) {
-                double value = randomSolves[row * (fixedColumns + 1)];
-                for (int column = 0; column < fixedColumns; column++)
-                    value -= randomSolves[row * (fixedColumns + 1)
-                        + column + 1] * beta[column];
-                random[row] = value;
-            }
-            double[] fixedCovariance = covariance
-                ? fixedFactor.solve(MatrixOps.identity(fixedColumns),
-                    fixedColumns) : null;
-            return new Schur(beta, random, fixedCovariance);
-        }
 
         private GlmmLaplaceResult result(
                 Mode mode, int fixedColumns, double[] logVariances,
@@ -529,6 +458,7 @@ public final class SparseGlmmLaplace {
         List<Double> values = new ArrayList<>();
         List<Integer> termIndices = new ArrayList<>();
         double[] logDeterminants = new double[terms.size()];
+        CovarianceIdentification identification = new CovarianceIdentification(design.rows(), terms.size());
         for (int term = 0; term < terms.size(); term++) {
             SparsePrecisionMatrix precision = precisions.get(term);
             int[] starts = precision.rowStarts();
@@ -559,9 +489,11 @@ public final class SparseGlmmLaplace {
             lowerRows[precision.dimension()] = lowerPosition + 1;
             CsrMatrix lower = new CsrMatrix(precision.dimension(),
                 precision.dimension(), lowerValues, lowerColumns, lowerRows);
-            logDeterminants[term] = backend.dcsrpotrf(lower,
+            var factor = backend.dcsrpotrf(lower,
                 MatrixTriangle.LOWER,
-                SparseOrdering.MINIMUM_DEGREE).logDeterminant();
+                SparseOrdering.MINIMUM_DEGREE);
+            logDeterminants[term] = factor.logDeterminant();
+            identification.add(terms.get(term), factor::solve);
         }
         return new PrecisionData(toIntArray(rows), toIntArray(columns),
             toDoubleArray(values), toIntArray(termIndices), logDeterminants,
@@ -604,6 +536,12 @@ public final class SparseGlmmLaplace {
         return new CombinedDesign(rows, columns, rowStarts,
             Arrays.copyOf(columnIndices, position),
             Arrays.copyOf(values, position), termStarts);
+    }
+
+    static double unscaleCovariance(double value, double first, double second) {
+        if (value == 0.0 || !Double.isFinite(value)) return value;
+        int a=Math.getExponent(value),b=Math.getExponent(first),c=Math.getExponent(second);
+        return Math.scalb(Math.scalb(value,-a)/Math.scalb(first,-b)/Math.scalb(second,-c),a-b-c);
     }
 
     private static TermData termData(RandomEffectTerm term) {
@@ -680,6 +618,8 @@ public final class SparseGlmmLaplace {
                 || options == null || policy == null)
             throw new IllegalArgumentException(
                 "rows, family, random effects, controls, and backend are required");
+        if(!family.fixedDispersion())throw new IllegalArgumentException(
+            "Laplace requires a fixed-dispersion or internally parameterized likelihood; use Gaussian REML for estimated residual dispersion");
         java.util.HashSet<String> names = new java.util.HashSet<>();
         for (RandomEffectTerm term : terms)
             if (term == null || term.observations() != rows
@@ -741,23 +681,6 @@ public final class SparseGlmmLaplace {
             maximum = Math.max(maximum, Math.abs(next[index] - previous[index])
                 / (1.0 + Math.abs(previous[index])));
         return maximum;
-    }
-
-    private static void symmetrizeLower(double[] matrix, int dimension) {
-        for (int row = 0; row < dimension; row++)
-            for (int column = 0; column < row; column++)
-                matrix[column * dimension + row] =
-                    matrix[row * dimension + column];
-    }
-
-    private static void symmetrize(double[] matrix, int dimension) {
-        for (int row = 0; row < dimension; row++)
-            for (int column = 0; column < row; column++) {
-                double value = 0.5 * (matrix[row * dimension + column]
-                    + matrix[column * dimension + row]);
-                matrix[row * dimension + column] = value;
-                matrix[column * dimension + row] = value;
-            }
     }
 
     private static int[] toIntArray(List<Integer> values) {
@@ -853,9 +776,6 @@ public final class SparseGlmmLaplace {
             return result;
         }
     }
-
-    private record Schur(
-            double[] beta, double[] random, double[] fixedCovariance) { }
 
     private record Mode(
             double[] beta, double[] random, double[] fixedCovariance,

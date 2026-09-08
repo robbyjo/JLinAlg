@@ -6,6 +6,7 @@ import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.glm.LaplaceTunableFamily;
 import org.jlinalg.glmm.GlmmLaplaceResult;
+import org.jlinalg.glmm.LaplaceFamilyDerivatives;
 import org.jlinalg.glmm.SparseGlmmLaplace;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.mixed.RandomEffectTerm;
@@ -78,7 +79,7 @@ public final class BetaMixedModel {
     }
 
     private static final class LaplaceBetaFamily
-            implements LaplaceTunableFamily {
+            implements LaplaceTunableFamily, LaplaceFamilyDerivatives {
         private static final double MINIMUM_MEAN = 1e-14;
         private final double minimumLogPrecision;
         private final double maximumLogPrecision;
@@ -156,6 +157,21 @@ public final class BetaMixedModel {
             return priorWeight * information;
         }
 
+        @Override public double linearPredictorScore(double response, double predictor, double priorWeight) {
+            double mean = inverseLink(predictor), phi = precision();
+            double transformedResidual = Math.log(response) - Math.log1p(-response)
+                - SpecialFunctions.digamma(mean * phi) + SpecialFunctions.digamma((1 - mean) * phi);
+            return priorWeight * phi * mean * (1 - mean) * transformedResidual;
+        }
+
+        @Override public double linearPredictorInformation(double response, double predictor, double priorWeight) {
+            double mean = inverseLink(predictor);
+            // The second derivative of the logit mean contributes a score term.
+            // Unlike Fisher information this observed curvature can be negative.
+            return workingWeight(response, predictor, mean, priorWeight)
+                - (1 - 2 * mean) * linearPredictorScore(response, predictor, priorWeight);
+        }
+
         @Override public double workingResponse(double response,
                 double predictor, double mean, double priorWeight,
                 double offset) {
@@ -177,11 +193,7 @@ public final class BetaMixedModel {
                 double response, double mean, double phi) {
             double alpha = mean * phi;
             double beta = (1.0 - mean) * phi;
-            return SpecialFunctions.logGamma(phi)
-                - SpecialFunctions.logGamma(alpha)
-                - SpecialFunctions.logGamma(beta)
-                + (alpha - 1.0) * Math.log(response)
-                + (beta - 1.0) * Math.log1p(-response);
+            return jdistlib.Beta.density(response, alpha, beta, true);
         }
     }
 }

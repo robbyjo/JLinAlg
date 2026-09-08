@@ -35,8 +35,6 @@ import java.util.Set;
 public final class PlinkBedLdClumper {
     private static final byte[] BED_HEADER = {
         (byte) 0x6c, (byte) 0x1b, (byte) 0x01};
-    private static final int EM_ITERATIONS = 1_000;
-    private static final double EM_TOLERANCE = 1e-12;
 
     private PlinkBedLdClumper() { }
 
@@ -191,38 +189,100 @@ public final class PlinkBedLdClumper {
         if (!(alleleA > 0.0 && alleleA < 1.0
                 && alleleB > 0.0 && alleleB < 1.0)) return Double.NaN;
 
-        double[] frequency = {
-            (1.0 - alleleA) * (1.0 - alleleB),
-            (1.0 - alleleA) * alleleB,
-            alleleA * (1.0 - alleleB),
-            alleleA * alleleB};
         double[] fixed = fixedHaplotypeCounts(counts);
         double doubleHeterozygotes = counts[1][1];
-        for (int iteration = 0; iteration < EM_ITERATIONS; iteration++) {
-            double coupling = frequency[0] * frequency[3];
-            double repulsion = frequency[1] * frequency[2];
-            double probability = coupling + repulsion == 0.0
-                ? 0.5 : coupling / (coupling + repulsion);
-            double[] next = fixed.clone();
-            next[0] += doubleHeterozygotes * probability;
-            next[3] += doubleHeterozygotes * probability;
-            next[1] += doubleHeterozygotes * (1.0 - probability);
-            next[2] += doubleHeterozygotes * (1.0 - probability);
-            for (int haplotype = 0; haplotype < next.length; haplotype++)
-                next[haplotype] /= 2.0 * observations;
-            double difference = 0.0;
-            for (int haplotype = 0; haplotype < next.length; haplotype++)
-                difference = Math.max(difference,
-                    Math.abs(next[haplotype] - frequency[haplotype]));
-            frequency = next;
-            if (difference < EM_TOLERANCE) break;
+        double[] frequency = null;
+        double bestLikelihood = Double.NEGATIVE_INFINITY;
+        // Every interior stationary point satisfies the EM self-consistency
+        // cubic, but need not maximize the likelihood. Evaluate all its roots
+        // and both endpoints; no iterative phase start can abort the clump.
+        for (double phase : stationaryPhases(fixed, doubleHeterozygotes, observations)) {
+            double[] candidate = phaseFrequencies(fixed, doubleHeterozygotes, phase, observations);
+            double likelihood = haplotypeLogLikelihood(counts, candidate);
+            if (likelihood > bestLikelihood) {
+                bestLikelihood = likelihood;
+                frequency = candidate;
+            }
         }
+        if (frequency == null)
+            throw new IllegalStateException("unphased LD likelihood is not finite");
         double pA = frequency[2] + frequency[3];
         double pB = frequency[1] + frequency[3];
         double denominator = pA * (1.0 - pA) * pB * (1.0 - pB);
         if (!(denominator > 0.0)) return Double.NaN;
         double disequilibrium = frequency[3] - pA * pB;
         return Math.min(1.0, disequilibrium * disequilibrium / denominator);
+    }
+
+    private static double[] stationaryPhases(double[] fixed, double heterozygotes, long observations) {
+        if (heterozygotes == 0) return new double[] {0};
+        double scale = 2.0 * observations;
+        double h = heterozygotes / scale;
+        double a = fixed[0] / scale, b = fixed[1] / scale;
+        double c = fixed[2] / scale, d = fixed[3] / scale;
+        // A(t)=(a+h*t)(d+h*t), B(t)=(b+h-h*t)(c+h-h*t).
+        // F(t)=t*(A+B)-A. In the positive interior, likelihood derivative
+        // has sign -F(t), times a strictly positive factor. Thus its only
+        // stationary points are roots of this cubic (including multiplicities).
+        double c0 = -a * d;
+        double c1 = a * d + (b + h) * (c + h) - h * (a + d);
+        double c2 = h * (a + d - b - c - 3 * h);
+        double c3 = 2 * h * h;
+        List<Double> partitions = new ArrayList<>(List.of(0.0, 1.0));
+        // Roots of F' partition [0,1] into monotone intervals, so bisection
+        // on each sign-changing interval isolates every simple root.
+        double discriminant = Math.fma(c2, c2, -3 * c3 * c1);
+        if (discriminant >= 0) {
+            double root = Math.sqrt(discriminant);
+            double q = -c2 - Math.copySign(root, c2);
+            double first = q / (3 * c3);
+            double second = q == 0 ? -c2 / (3 * c3) : c1 / q;
+            if (first > 0 && first < 1) partitions.add(first);
+            if (second > 0 && second < 1) partitions.add(second);
+        }
+        partitions.sort(Double::compare);
+        // Including the derivative roots themselves handles repeated cubic
+        // roots without a fragile near-zero test; extra feasible candidates
+        // cannot exceed the true global maximum.
+        List<Double> candidates = new ArrayList<>(partitions);
+        for (int interval = 1; interval < partitions.size(); interval++) {
+            double lo = partitions.get(interval - 1), hi = partitions.get(interval);
+            double flo = phasePolynomial(lo, c0, c1, c2, c3);
+            double fhi = phasePolynomial(hi, c0, c1, c2, c3);
+            if (flo == 0 || fhi == 0 || Math.copySign(1, flo) == Math.copySign(1, fhi)) continue;
+            for (int iteration = 0; iteration < 80; iteration++) {
+                double mid = lo + (hi - lo) / 2;
+                if (mid == lo || mid == hi) break;
+                double value = phasePolynomial(mid, c0, c1, c2, c3);
+                if (value == 0) { lo = mid; hi = mid; break; }
+                if (Math.copySign(1, value) == Math.copySign(1, flo)) { lo = mid; flo = value; }
+                else hi = mid;
+            }
+            candidates.add(lo + (hi - lo) / 2);
+        }
+        return candidates.stream().mapToDouble(Double::doubleValue).toArray();
+    }
+
+    private static double phasePolynomial(double t, double c0, double c1, double c2, double c3) {
+        return Math.fma(t, Math.fma(t, Math.fma(t, c3, c2), c1), c0);
+    }
+
+    private static double[] phaseFrequencies(double[] fixed, double heterozygotes,
+            double phase, long observations) {
+        return new double[] {(fixed[0] + heterozygotes * phase) / (2.0 * observations),
+            (fixed[1] + heterozygotes * (1 - phase)) / (2.0 * observations),
+            (fixed[2] + heterozygotes * (1 - phase)) / (2.0 * observations),
+            (fixed[3] + heterozygotes * phase) / (2.0 * observations)};
+    }
+
+    private static double haplotypeLogLikelihood(long[][] counts, double[] f) {
+        double[][] probability = {{f[0]*f[0],2*f[0]*f[1],f[1]*f[1]},
+            {2*f[0]*f[2],2*(f[0]*f[3]+f[1]*f[2]),2*f[1]*f[3]},
+            {f[2]*f[2],2*f[2]*f[3],f[3]*f[3]}};
+        double value = 0;
+        for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++)
+            if (counts[i][j] > 0) value += counts[i][j] * Math.log(probability[i][j]);
+        return value;
     }
 
     private static double[] fixedHaplotypeCounts(long[][] counts) {

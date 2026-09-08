@@ -179,24 +179,37 @@ public final class StreamingAssociationPipeline {
                     (block = reader.read(options.variantBlockSize())) != null;) {
                 sourceVariants += block.variants().size();
                 List<VariantFilterResult> included = new ArrayList<>();
+                List<VariantFilterResult> filteredBlock = new ArrayList<>();
                 for (VariantRecord variant : block.variants()) {
                     VariantFilterResult result = VariantFilters.evaluate(
                         variant, options.variantFilter());
+                    filteredBlock.add(result);
                     if (result.included()) included.add(result);
-                    else {
-                        sink.acceptExcluded(result);
-                        excludedCount++;
-                    }
                 }
-                if (included.isEmpty()) continue;
-                double[][] matrix = transpose(included, analysisSampleIds.size());
                 List<String> names = included.stream()
                     .map(result -> result.variant().id()).toList();
-                BlockResult blockResult = scanner.scan(matrix, names);
-                for (int index = 0; index < included.size(); index++) {
-                    int estimateIndex = index;
-                    VariantFilterResult filtered = included.get(index);
-                    AssociationEstimate estimate = blockResult.estimate(index);
+                BlockResult blockResult = included.isEmpty() ? new BlockResult(List.of(), List.of())
+                    : scanner.scan(transpose(included, analysisSampleIds.size()), names);
+                AssociationFailure[] failures = new AssociationFailure[included.size()];
+                for (AssociationFailure failure : blockResult.failures()) failures[failure.index()] = failure;
+                int index = 0;
+                for (VariantFilterResult filtered : filteredBlock) {
+                    if (!filtered.included()) {
+                        sink.acceptExcluded(filtered);
+                        excludedCount++;
+                        continue;
+                    }
+                    AssociationFailure failure = failures[index];
+                    AssociationEstimate estimate = blockResult.estimate(index++);
+                    if (failure != null || !Double.isFinite(estimate.beta())
+                            || !Double.isFinite(estimate.standardError())
+                            || !Double.isFinite(estimate.pValue())) {
+                        sink.acceptFailure(new AssociationPipelineFailure(filtered.variant().id(),
+                            failure == null ? "NonEstimablePredictor" : failure.exceptionType(),
+                            failure == null ? "variant is not estimable after adjustment" : failure.message()));
+                        failureCount++;
+                        continue;
+                    }
                     AssociationPipelineEstimate output =
                         new AssociationPipelineEstimate(
                         filtered.variant(), filtered.statistics(),
@@ -206,21 +219,6 @@ public final class StreamingAssociationPipeline {
                         estimate.negativeLog10PValue());
                     sink.acceptEstimate(output);
                     tested++;
-                    if (!Double.isFinite(estimate.beta())
-                            && blockResult.failures().stream()
-                                .noneMatch(value ->
-                                    value.index() == estimateIndex)) {
-                        sink.acceptFailure(new AssociationPipelineFailure(
-                            filtered.variant().id(), "NonEstimablePredictor",
-                            "variant is constant or collinear after adjustment"));
-                        failureCount++;
-                    }
-                }
-                for (AssociationFailure failure : blockResult.failures()) {
-                    sink.acceptFailure(new AssociationPipelineFailure(
-                        included.get(failure.index()).variant().id(),
-                        failure.exceptionType(), failure.message()));
-                    failureCount++;
                 }
             }
         }

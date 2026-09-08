@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="JLinAlg v0.2.0 is a verified high-performance Java library for linear, mixed, Cox, GWAS, MR, fine-mapping, meta-analysis, time-series, and SEM analyses.">
+  <meta name="description" content="JLinAlg v0.3.0 is a verified high-performance Java library for linear, mixed, Cox, GWAS, MR, fine-mapping, meta-analysis, time-series, and SEM analyses.">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8f5"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1410">
-  <title>JLinAlg v0.2.0 · Statistical genetics in Java</title>
+  <title>JLinAlg v0.3.0 · Statistical genetics in Java</title>
   <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
 </head>
 <body>
@@ -13,11 +13,11 @@
     <section class="hero">
       <div class="container hero-grid">
         <div class="reveal">
-          <span class="eyebrow">JLinAlg v0.2.0 · Statistical modeling on JDistlib</span>
+          <span class="eyebrow">JLinAlg v0.3.0 · Statistical modeling on JDistlib</span>
           <h1>Models that scale with your <span>science.</span></h1>
           <p class="hero-copy">A Java-first toolkit for linear, mixed, and survival models, genetic association, causal inference, fine mapping, meta-analysis, time series, and structural models—with accelerated routing across performance-tuned paths.</p>
           <div class="hero-actions"><a class="button" href="vignettes/index.html">Explore worked examples →</a><a class="button secondary" href="https://github.com/robbyjo/JLinAlg">View source</a></div>
-          <div class="hero-notes"><span>v0.2.0</span><span>Java 17+</span><span>FP64 throughout</span><span>GPL-2.0-or-later</span></div>
+          <div class="hero-notes"><span>v0.3.0</span><span>Java 17+</span><span>FP64 throughout</span><span>GPL-2.0-or-later</span></div>
         </div>
         <div class="model-stack reveal" aria-label="Illustration of a model moving from design matrix to fit results">
           <article class="stack-card"><div class="stack-label"><span>Design matrix · X</span><span class="stack-status"></span></div><div class="matrix"><i class="hot"></i><i></i><i></i><i class="warm"></i><i></i><i></i><i></i><i></i><i></i><i class="hot"></i><i></i><i class="warm"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="hot"></i><i></i><i></i><i></i><i></i><i class="warm"></i><i></i><i></i><i></i></div></article>
@@ -27,9 +27,9 @@
       </div>
     </section>
 
-    <section class="stats-strip" aria-label="Project summary"><div class="container stats-grid"><div class="stat"><strong>16 model families</strong><span>One coherent Java API</span></div><div class="stat"><strong>3 acceleration tiers</strong><span>GPU · oneMKL · OpenBLAS</span></div><div class="stat"><strong>253 automated tests</strong><span>250 passed · 3 optional native skips</span></div><div class="stat"><strong>18 vignettes</strong><span>Inputs through interpretation</span></div></div></section>
+    <section class="stats-strip" aria-label="Project summary"><div class="container stats-grid"><div class="stat"><strong>16 model families</strong><span>One coherent Java API</span></div><div class="stat"><strong>3 acceleration tiers</strong><span>GPU · oneMKL · OpenBLAS</span></div><div class="stat"><strong>609 automated tests</strong><span>606 passed · 3 optional native skips</span></div><div class="stat"><strong>22 vignettes</strong><span>Inputs through interpretation</span></div></div></section>
 
-    <section class="section" aria-labelledby="release-status"><div class="container"><div class="note reveal" style="margin:0"><strong id="release-status">v0.2.0 verification status</strong>Every shipped component family has automated accuracy coverage and an executable speed check. Real Java/R results are published with estimator and workload limitations.</div></div></section>
+    <section class="section" aria-labelledby="release-status"><div class="container"><div class="note reveal" style="margin:0"><strong id="release-status">v0.3.0 verification status</strong>Independent R fixtures and adversarial cross-review cover the numerical repairs. Read the <a href="verification.html#release-audit">release audit</a> for measured accuracy, speed, and explicit remaining limits.</div></div></section>
 
     <section class="section" id="features">
       <div class="container">
@@ -50,7 +50,7 @@
           <a class="feature-card reveal" data-category="causal" href="vignettes/meta-analysis.html"><span class="feature-icon">Σ</span><h3>Meta-analysis</h3><p>Fixed/random pooling, REML/DL/Paule–Mandel heterogeneity, Knapp–Hartung, and meta-regression.</p><span class="feature-link">Pool study effects →</span></a>
           <a class="feature-card reveal" data-category="structure" href="vignettes/time-series.html"><span class="feature-icon">t</span><h3>Time series</h3><p>AR through seasonal ARIMA, exact stationary ARMA, automatic selection, forecasts, and ARIMA-error LMMs.</p><span class="feature-link">Model a series →</span></a>
           <a class="feature-card reveal" data-category="causal" href="vignettes/susie.html"><span class="feature-icon">PIP</span><h3>SuSiE and colocalization</h3><p>Individual data, summary z/LD, credible sets, and coloc-compatible multi-signal H0–H4 inference. Validated against susieR and coloc.</p><span class="feature-link">Fine-map and colocalize →</span></a>
-          <a class="feature-card reveal" data-category="structure" href="vignettes/sem.html"><span class="feature-icon">A,S</span><h3>Structural equation models</h3><p>Observed-variable RAM path models with analytic gradients, expected-information inference, lavaan parity, and an 8.58x measured speedup.</p><span class="feature-link">Specify a path model →</span></a>
+          <a class="feature-card reveal" data-category="structure" href="vignettes/sem.html"><span class="feature-icon">A,S</span><h3>Structural equation models</h3><p>Observed and latent RAM models, means, ordinal pairwise likelihood, FIML, robust inference, and independent lavaan comparisons.</p><span class="feature-link">Specify a path model →</span></a>
           <a class="feature-card reveal" data-category="core" href="vignettes/formulas-backends.html"><span class="feature-icon">f()</span><h3>Formulas & backends</h3><p>Compile treatment/sum contrasts and mixed syntax once, then route FP64 work across the best available device.</p><span class="feature-link">Prepare the runtime →</span></a>
         </div>
       </div>

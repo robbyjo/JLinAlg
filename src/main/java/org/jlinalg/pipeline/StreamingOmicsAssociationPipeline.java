@@ -189,26 +189,25 @@ public final class StreamingOmicsAssociationPipeline {
                 double[][] matrix = new double[analysisSampleIds.size()]
                     [block.rows().size()];
                 for (int feature = 0; feature < block.rows().size(); feature++) {
-                    double[] values = transform.apply(
-                        block.rows().get(feature).valuesView());
+                    double[] values = transformed(block.rows().get(feature),
+                        transform, analysisSampleIds.size());
                     prepareMissing(values, missingPolicy,
                         block.rows().get(feature).id());
                     for (int sample = 0; sample < values.length; sample++)
                         matrix[sample][feature] = values[sample];
                 }
                 AssociationBatchResult result = scanner.scan(matrix, names);
+                AssociationFailure[] failedRows = failureRows(result);
                 for (int index = 0; index < result.size(); index++) {
                     AssociationEstimate estimate = result.estimate(index);
+                    AssociationPipelineFailure failure = failure(estimate, failedRows[index]);
+                    if (failure != null) { failures.add(failure); continue; }
                     estimates.add(new OmicsAssociationEstimate(estimate.name(),
                         estimate.beta(), estimate.standardError(),
                         estimate.statistic(), estimate.degreesOfFreedom(),
                         estimate.pValue(), estimate.log10PValue(),
                         estimate.negativeLog10PValue()));
                 }
-                for (AssociationFailure failure : result.failures())
-                    failures.add(new AssociationPipelineFailure(
-                        names.get(failure.index()), failure.exceptionType(),
-                        failure.message()));
             }
         }
         return new OmicsAssociationResult(
@@ -233,16 +232,23 @@ public final class StreamingOmicsAssociationPipeline {
                 double[][] matrix = new double[analysisSampleIds.size()]
                     [block.rows().size()];
                 for (int feature = 0; feature < block.rows().size(); feature++) {
-                    double[] values = transform.apply(
-                        block.rows().get(feature).valuesView());
+                    double[] values = transformed(block.rows().get(feature),
+                        transform, analysisSampleIds.size());
                     prepareMissing(values, missingPolicy,
                         block.rows().get(feature).id());
                     for (int sample = 0; sample < values.length; sample++)
                         matrix[sample][feature] = values[sample];
                 }
                 AssociationBatchResult result = scanner.scan(matrix, names);
+                AssociationFailure[] failedRows = failureRows(result);
                 for (int index = 0; index < result.size(); index++) {
                     AssociationEstimate estimate = result.estimate(index);
+                    AssociationPipelineFailure failure = failure(estimate, failedRows[index]);
+                    if (failure != null) {
+                        sink.acceptFailure(failure);
+                        failed++;
+                        continue;
+                    }
                     sink.acceptEstimate(new OmicsAssociationEstimate(
                         estimate.name(), estimate.beta(),
                         estimate.standardError(), estimate.statistic(),
@@ -250,12 +256,6 @@ public final class StreamingOmicsAssociationPipeline {
                         estimate.log10PValue(),
                         estimate.negativeLog10PValue()));
                     tested++;
-                }
-                for (AssociationFailure failure : result.failures()) {
-                    sink.acceptFailure(new AssociationPipelineFailure(
-                        names.get(failure.index()), failure.exceptionType(),
-                        failure.message()));
-                    failed++;
                 }
             }
         }
@@ -281,6 +281,31 @@ public final class StreamingOmicsAssociationPipeline {
         double mean = sum / finite;
         for (int index = 0; index < values.length; index++)
             if (!Double.isFinite(values[index])) values[index] = mean;
+    }
+
+    private static double[] transformed(NumericRow row, OmicsTransform transform, int samples) {
+        if (row.valuesView().length != samples)
+            throw new IllegalArgumentException("feature length does not match aligned samples: " + row.id());
+        double[] result = transform.apply(row.values());
+        if (result == null || result.length != samples)
+            throw new IllegalArgumentException("transform must preserve sample count: " + row.id());
+        return result;
+    }
+
+    private static AssociationFailure[] failureRows(AssociationBatchResult result) {
+        AssociationFailure[] failures = new AssociationFailure[result.size()];
+        for (AssociationFailure failure : result.failures()) failures[failure.index()] = failure;
+        return failures;
+    }
+
+    private static AssociationPipelineFailure failure(AssociationEstimate estimate, AssociationFailure failure) {
+        if (failure != null) return new AssociationPipelineFailure(estimate.name(),
+            failure.exceptionType(), failure.message());
+        if (!Double.isFinite(estimate.beta()) || !Double.isFinite(estimate.standardError())
+                || !Double.isFinite(estimate.pValue()))
+            return new AssociationPipelineFailure(estimate.name(), "NonEstimablePredictor",
+                "feature is not estimable after adjustment");
+        return null;
     }
 
     private static void validate(

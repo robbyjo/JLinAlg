@@ -162,6 +162,9 @@ public final class Ols {
         for (int column = 0; column < columns; column++) {
             standardErrors[column] = Math.sqrt(Math.max(
                 0.0, covariance[column * columns + column]));
+            if (!LeastSquaresSolver.estimableCoordinate(solution.rowSpaceProjection(), columns, column)) {
+                standardErrors[column] = Double.NaN;
+            }
             double estimate = solution.coefficients()[column];
             double standardError = standardErrors[column];
             if (standardError == 0.0) {
@@ -191,7 +194,7 @@ public final class Ols {
             confidenceLower, confidenceUpper,
             rows, columns, solution.rank(), degreesOfFreedom,
             rss, residualVariance, logLikelihood,
-            solution.minimumNorm(), solution.tolerance(),
+            solution.minimumNorm(), solution.tolerance(), solution.rowSpaceProjection(),
             retainedRows, originalRows, provenance);
     }
 

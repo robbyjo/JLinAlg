@@ -23,6 +23,7 @@ public final class RemlSetTestNullModel implements GaussianSetTestNullModel {
     }
 
     @Override public int observations() { return scanner.observations(); }
+    double projectionNorm() { return scanner.projectionInfinityNorm(); }
     @Override public double degreesOfFreedom() {
         return scanner.associationDegreesOfFreedom();
     }

@@ -9,7 +9,12 @@ public final class RobustMendelianRandomization {
     private static final double HUBER = 1.345;
     private RobustMendelianRandomization() { }
 
-    /** Fits a Huber robust adjusted-profile-score estimator. */
+    /**
+     * Fits a Huber adjusted-profile-score estimator with a nonnegative moment
+     * estimate of overdispersion. This plug-in approximation is not the full
+     * jointly calibrated R mr.raps estimator: its beta sandwich treats the
+     * fitted overdispersion as fixed and the variance moment is not robust.
+     */
     public static MrRapsResult raps(List<HarmonizedInstrument> instruments) {
         List<HarmonizedInstrument> values = MendelianRandomization.validated(instruments, 3);
         double beta = MendelianRandomization.ivw(values, false, 0.95).estimate();
@@ -41,34 +46,32 @@ public final class RobustMendelianRandomization {
             - score(values, beta - h, tau2)) / (2.0 * h);
         double meat = 0.0;
         for (HarmonizedInstrument value : values) {
-            double variance = value.outcomeStandardError() * value.outcomeStandardError()
-                + beta * beta * value.exposureStandardError() * value.exposureStandardError()
-                + tau2;
-            double residual = value.outcomeEffect() - beta * value.exposureEffect();
-            double psi = huber(residual / Math.sqrt(variance));
-            double contribution = value.exposureEffect() * psi / Math.sqrt(variance);
+            double contribution = scoreContribution(value, beta, tau2);
             meat += contribution * contribution;
         }
         double standardError = Math.sqrt(meat / (derivative * derivative));
         MrEstimate estimate = MendelianRandomization.estimate(MrMethod.MR_RAPS,
             beta, standardError, 0.95, Double.NaN, 0, 1.0, values.size());
-        return new MrRapsResult(estimate, tau2, iteration, converged);
+        return new MrRapsResult(estimate, tau2, Math.min(iteration, 100), converged);
     }
 
     private static double score(
             List<HarmonizedInstrument> values, double beta, double tau2) {
         double result = 0.0;
         for (HarmonizedInstrument value : values) {
-            double seX2 = value.exposureStandardError() * value.exposureStandardError();
-            double variance = value.outcomeStandardError() * value.outcomeStandardError()
-                + beta * beta * seX2 + tau2;
-            double residual = value.outcomeEffect() - beta * value.exposureEffect();
-            double standardized = residual / Math.sqrt(variance);
-            result += huber(standardized)
-                * (value.exposureEffect() / Math.sqrt(variance)
-                    + beta * seX2 * residual / (variance * Math.sqrt(variance)));
+            result += scoreContribution(value, beta, tau2);
         }
         return result;
+    }
+
+    private static double scoreContribution(HarmonizedInstrument value, double beta, double tau2) {
+        double seX2 = value.exposureStandardError() * value.exposureStandardError();
+        double variance = value.outcomeStandardError() * value.outcomeStandardError()
+            + beta * beta * seX2 + tau2;
+        double residual = value.outcomeEffect() - beta * value.exposureEffect();
+        double root = Math.sqrt(variance);
+        return huber(residual / root)
+            * (value.exposureEffect() / root + beta * seX2 * residual / (variance * root));
     }
 
     private static double overdispersion(
@@ -78,9 +81,9 @@ public final class RobustMendelianRandomization {
             double residual = value.outcomeEffect() - beta * value.exposureEffect();
             double known = value.outcomeStandardError() * value.outcomeStandardError()
                 + beta * beta * value.exposureStandardError() * value.exposureStandardError();
-            excess += Math.max(0.0, residual * residual - known);
+            excess += residual * residual - known;
         }
-        return excess / values.size();
+        return Math.max(0.0, excess / values.size());
     }
 
     private static double huber(double value) {

@@ -216,3 +216,32 @@ to an independent `statsmodels` Cox implementation. Mixed and pedigree tests
 exercise positive variance profiles, hazard-ratio inference, named modes, a
 non-identity parent-offspring relationship, repeated sparse incidence, and
 dense/sparse conditional-mode parity.
+
+## Numerical audit and R evidence
+
+Fixed Cox fitting centers/scales predictor columns internally and returns
+coefficients, covariance, and baseline hazards in the original parameterization.
+This prevents a small-unit predictor from falsely satisfying an unscaled score
+tolerance. Log likelihood contributions cancel the risk-set maximum before
+summation, preserving invariance to a common large offset.
+
+Start–stop risk moments use an active-set scale and rebuild after
+cancellation-prone removals. This recovers small risks after high-offset rows
+leave, without an observation-scale dense covariance allocation. Rebuilding
+cost depends on active-set churn and can be quadratic in adversarial cases.
+Sparse right-censored fitting uses reverse-time risk addition instead of
+subtracting departed risks. For predictor ranges exceeding 300, a locally
+scaled probability fallback avoids overflow in squared-prefix identities.
+That rare fallback is O(observations times events times dense columns), not
+the usual linear sweep; it does not construct an n-by-n matrix.
+
+The audit adds `survival::coxph` references for tied, stratified delayed-entry
+data under both Efron and Breslow ties, finite-difference score/information
+checks, interval-splitting invariance, predictor-unit stress tests, and sparse
+frailty checks with irrelevant high-offset early-censored rows. Gamma frailty
+modes and the complete Laplace normalization are checked against an independent
+R penalized likelihood including the log-frailty Jacobian. These tests do not
+remove the sparse diagonal-information approximation described above.
+
+Warm timings, checksums, reference fixtures, and reproduction commands are in
+the [audit evidence](../../src/benchmark/resources/remaining-model-audit-benchmark/audit-results.md).

@@ -15,15 +15,16 @@ Run the complete verification suite before adapting an example:
 
 | Vignette | Features covered |
 | --- | --- |
-| [Basic statistical tests](basic-statistical-tests.md) | uniform base-R-style tests, exact and asymptotic methods, contingency tables, blocked designs, ANOVA power |
+| [Basic statistical tests](basic-statistical-tests.md) | unit-safe correlation/mean/variance inference, exact/asymptotic rank tests, tables, blocked designs, and ANOVA power |
+| [Nonlinear models](nonlinear-models.md) | analytic Gaussian fixed means, additive mixed effects, sparse pedigree structures |
+| [Mediation](mediation.md) | deterministic Gaussian path analysis, Sobel inference, ordinary and pedigree mixed effects |
+| [Beta regression](../beta-regression.md) | classical mean/precision beta ML, CLI, link options, and independent R validation |
 | [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
 | [Regression families](regression-families.md) | multivariate OLS, multinomial logistic, supersmoother, quantile, kernel nonparametric, and partially linear semiparametric regression |
 | [Advanced extensions](advanced-extensions.md) | SEM extensions, full-covariance meta-regression, sparse unstructured mixed effects, diffuse/missing time series, generalized MR, quadrature GLMM, and selection-aware penalized inference |
-| [Linear mediation analysis](mediation.md) | Gaussian mediator/outcome models, direct/indirect/total effects, Sobel delta-method inference, common complete-case handling |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
 | [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
 | [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |
-| [Nonlinear fixed and mixed effects](nonlinear-models.md) | analytic-gradient Gauss–Newton fixed effects, sparse ordinary random effects, and sparse pedigree nonlinear mixed effects |
 | [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, GLMM PQL/Laplace, frequentist ZIP/ZINB mixed models |
 | [Cox and frailty survival models](cox-survival.md) | right-censoring, delayed entry, strata, Efron/Breslow ties, hazard ratios, Gaussian, GRM, and pedigree frailty |
 | [Formulas and compute backends](formulas-and-backends.md) | model tables, contrasts, offsets, mixed formulas, nested/correlated terms, GPU/oneMKL/OpenBLAS policy |
@@ -36,7 +37,7 @@ Run the complete verification suite before adapting an example:
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
 | [Multi-signal colocalization](colocalization.md) | alignment, priors, posterior-overlap trimming, H0-H4, shared-variant posterior, diagnostics, and MR/xWAS follow-up |
-| [Structural equation modeling](sem.md) | observed-variable RAM paths, covariance/row fitting, inference, lavaan validation, benchmark, and limitations |
+| [Structural equation modeling](sem.md) | joint observed/latent RAM, means, ordinal PML, pattern FIML, robust inference, lavaan validation, and limitations |
 
 ## Common result pattern
 

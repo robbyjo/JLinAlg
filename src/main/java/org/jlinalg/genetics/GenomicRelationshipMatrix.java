@@ -55,6 +55,8 @@ public final class GenomicRelationshipMatrix {
         this.relationship = MatrixOps.finiteCopy(
             relationship, "genomic relationship matrix");
         validateRelationship(this.relationship, samples);
+        if (variantsUsed == 0)
+            GeneticCovarianceValidation.requirePositiveSemidefinite(this.relationship, samples);
         this.variantsConsidered = variantsConsidered;
         this.variantsUsed = variantsUsed;
         this.computationBackend = computationBackend;
@@ -264,9 +266,9 @@ public final class GenomicRelationshipMatrix {
             maximum = Math.max(maximum, Math.abs(value));
         double tolerance = 1e-10 * Math.max(1, maximum);
         for (int row = 0; row < dimension; row++) {
-            if (!(matrix[row * dimension + row] > 0))
+            if (matrix[row * dimension + row] < 0)
                 throw new IllegalArgumentException(
-                    "GRM diagonal entries must be positive");
+                    "GRM diagonal entries must be nonnegative");
             for (int column = 0; column < row; column++)
                 if (Math.abs(matrix[row * dimension + column]
                         - matrix[column * dimension + row]) > tolerance)

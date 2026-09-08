@@ -25,8 +25,6 @@ import org.jlinalg.reml.VarianceComponent;
  * quasi-likelihood with REML working-model updates.
  */
 public final class GlmmPql {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-12;
-    private static final double MAXIMUM_WORKING_WEIGHT = 1e150;
 
     private GlmmPql() { }
 
@@ -95,7 +93,7 @@ public final class GlmmPql {
         double[] randomPredictor = new double[rows];
         double[] fittedMeans = initial.fittedMeans();
         double conditionalDeviance = deviance(
-            response, fittedMeans, weights, family);
+            response, linearPredictor, fittedMeans, weights, family);
         boolean converged = false;
         String message = "maximum PQL iterations reached";
         int iterations = 0;
@@ -150,7 +148,7 @@ public final class GlmmPql {
                 fittedMeans = candidateMeans;
                 previousVariances = variances;
                 conditionalDeviance = deviance(
-                    response, fittedMeans, weights, family);
+                    response, linearPredictor, fittedMeans, weights, family);
 
                 if (predictorChange <= options.relativeTolerance()
                         && varianceChange <= options.relativeTolerance()
@@ -193,18 +191,12 @@ public final class GlmmPql {
         double[] covariance = new double[rows * rows];
         for (int row = 0; row < rows; row++) {
             double mean = family.inverseLink(predictor[row]);
-            double derivative = family.meanDerivative(predictor[row]);
-            double variance = family.variance(mean);
-            if (!Double.isFinite(derivative) || derivative == 0.0
-                    || !Double.isFinite(variance) || variance <= 0.0) {
-                throw new IllegalArgumentException(
-                    "family produced invalid PQL derivative or variance");
-            }
-            double weight = clamp(priorWeights[row]
-                * derivative * derivative / variance,
-                MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
-            workingResponse[row] = predictor[row]
-                + (response[row] - mean) / derivative - offset[row];
+            double weight = family.workingWeight(response[row], predictor[row], mean, priorWeights[row]);
+            workingResponse[row] = family.workingResponse(response[row], predictor[row],
+                mean, priorWeights[row], offset[row]);
+            if (!(weight > 0.0) || !Double.isFinite(weight)
+                    || !Double.isFinite(1.0 / weight) || !Double.isFinite(workingResponse[row]))
+                throw new IllegalArgumentException("family produced unrepresentable PQL working model");
             covariance[row * rows + row] = 1.0 / weight;
         }
         return new WorkingModel(workingResponse, covariance);
@@ -241,12 +233,12 @@ public final class GlmmPql {
     }
 
     private static double deviance(
-            double[] response, double[] means,
+            double[] response, double[] predictor, double[] means,
             double[] weights, GlmFamily family) {
         double result = 0.0;
         for (int row = 0; row < response.length; row++) {
             result += weights[row]
-                * family.unitDeviance(response[row], means[row]);
+                * family.unitDevianceAtPredictor(response[row], predictor[row], means[row]);
         }
         return result;
     }
@@ -303,10 +295,6 @@ public final class GlmmPql {
             throw new IllegalArgumentException("offset length must equal rows");
         }
         return MatrixOps.finiteCopy(offset, "offset");
-    }
-
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private record WorkingModel(

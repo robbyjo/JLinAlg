@@ -109,10 +109,25 @@ MediationMixedResult pedigreeFit = MediationAnalysis.fitPedigree(
 Mixed and pedigree results expose the three underlying
 `SparseLinearMixedModelResult` objects, including variance components,
 convergence status, random effects, and fixed-effect covariance. These fits
-currently require finite complete rows and residual-approximation denominator
-degrees of freedom, matching the sparse mixed-model contract.
+require finite complete rows. Component path tests retain the selected mixed
+model's denominator degrees of freedom and covariance; the indirect-effect
+test remains an asymptotic normal Sobel test, not a Satterthwaite/Kenward–Roger
+test of the product.
+
+The Sobel calculation assumes zero cross-model covariance between the estimated
+`a` and `b` paths. Separate mediator/outcome fits do not estimate correlated
+cross-equation random effects or random-slope products. Consequently this API
+is not a general multilevel causal mediation estimator. Causal interpretation
+requires the relevant treatment/mediator confounding assumptions. In a mixed
+fit, different fitted covariance weights also mean `total = direct + indirect`
+need not hold, unlike ordinary same-sample OLS with these linear paths.
 
 ## Accuracy and speed comparison
+
+Confidence intervals evaluate the small upper-tail probability directly,
+including confidence levels immediately below one; forming `(1 + level) / 2`
+can round to one and incorrectly produce infinite normal or mixed-path t
+intervals. Independent R `qnorm`/`qt` references cover this boundary.
 
 The deterministic comparator is `src/benchmark/r/mediation_benchmark.R` and
 the matching Java task is:
@@ -130,3 +145,16 @@ compares mixed-effect fixed effects. Run the R script with the same row and
 group counts on a host with R and `lme4`; timings are workload- and
 backend-specific, so a speedup claim must use the paired outputs rather than
 the Java compile result alone.
+
+The September 2026 audit freezes base-R and `lme4` references for all five path
+effects and the Sobel SE. Maximum effect/SE differences are `1e-15` for OLS
+and `2.3e-9` for the mixed fixture. A reciprocal-unit stress test also prevents
+overflow caused by squaring a large path before multiplying a small variance:
+the implementation now combines standard-error contributions with `hypot`.
+Undefined zero/zero tests remain NaN; invalid variances and unrepresentable
+effects are rejected explicitly.
+
+See the [audit evidence](../../src/benchmark/resources/remaining-model-audit-benchmark/audit-results.md)
+for the exact reference generator, reproducible isolated checks, and measured
+warm timings. Those fixtures use first-order Sobel inference, not bootstrap
+or posterior simulation from an R mediation package.

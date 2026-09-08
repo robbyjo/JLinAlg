@@ -59,8 +59,7 @@ public final class HurdlePoissonFamily implements DistributionalFamily {
         double mean = parameters[0];
         double zero = parameters[1];
         if (response == 0.0) return Math.log(zero);
-        return Math.log1p(-zero) + response * Math.log(mean) - mean
-            - SpecialFunctions.logGamma(response + 1.0)
+        return Math.log1p(-zero) + jdistlib.Poisson.density(response, mean, true)
             - Math.log(-Math.expm1(-mean));
     }
     @Override public void derivatives(
@@ -72,17 +71,30 @@ public final class HurdlePoissonFamily implements DistributionalFamily {
             score[0] = 0.0;
             score[1] = 1.0 - zero;
         } else {
-            score[0] = response - mean - mean / Math.expm1(mean);
+            score[0] = mean < 1e-3
+                ? (response - 1) - mean * (.5 + mean * (1.0/12 - mean * mean / 720))
+                : response - truncatedMean(mean);
             score[1] = -zero;
         }
         Arrays.fill(information, 0.0);
         information[3] = Math.max(EPSILON, zero * (1.0 - zero));
-        double exponentialMinusOne = Math.expm1(mean);
-        double derivative = (exponentialMinusOne
-            - mean * Math.exp(mean))
-            / (exponentialMinusOne * exponentialMinusOne);
-        information[0] = Math.max(EPSILON,
-            (1.0 - zero) * (mean + mean * derivative));
+        double variance;
+        if (mean < 1e-3) {
+            double squared = mean * mean;
+            variance = mean / 2 + squared / 6 - squared * squared / 180
+                + squared * squared * squared / 5040;
+        } else {
+            double denominator = -Math.expm1(-mean);
+            variance = mean / denominator * (1 - mean * Math.exp(-mean) / denominator);
+        }
+        information[0] = (1.0 - zero) * variance;
+    }
+    private static double truncatedMean(double mean) {
+        if (mean < 1e-3) {
+            double squared = mean * mean;
+            return 1 + mean / 2 + squared / 12 - squared * squared / 720;
+        }
+        return mean / -Math.expm1(-mean);
     }
     private static double clamp(double value) {
         return Math.max(EPSILON, Math.min(1.0 - EPSILON, value));
