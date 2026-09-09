@@ -33,6 +33,14 @@ The already-published v0.3.0 binaries retain JDistlib 0.10.1.
 - A JDK 17 or newer.
 - Network access on the first build. The build downloads the pinned
   `jdistlib-all-0.10.2.jar` and verifies its SHA-256 digest before compiling.
+- Optional NVIDIA CUDA support requires a CUDA-capable NVIDIA GPU, a compatible
+  NVIDIA driver, and the **CUDA Toolkit v12.6 runtime libraries**. Install them
+  using the [NVIDIA CUDA Toolkit 12.6 installer](https://developer.nvidia.com/cuda-12-6-0-download-archive)
+  for your operating system. On Windows, ensure the toolkit's `bin` directory
+  (normally `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin`)
+  is on `PATH`, then restart your terminal before running Java. These NVIDIA
+  runtime libraries are installed separately from the JAR. Use `--backend cuda`
+  to explicitly select CUDA in the CLI; CUDA is not required for CPU use.
 
 On Windows:
 
