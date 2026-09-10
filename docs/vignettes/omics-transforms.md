@@ -11,7 +11,7 @@ java -jar build/cli/jlinalg-0.3.0.jar `
   --pheno phenotype.tsv `
   --id IID `
   --formula "trait ~ age + sex + <omics>" `
-  --transform "<omics>=mvalue(epsilon=1e-6)|zscore()" `
+  --transform "<omics> = mvalue(epsilon=1e-6) | zscore()" `
   --out ewas-results.tsv
 ```
 
@@ -32,11 +32,13 @@ Use the literal target `<omics>`, an equals sign, and one or more stages
 separated by `|`:
 
 ```text
---transform "<omics>=stage(parameters)|next_stage()"
+--transform "<omics> = stage(parameters) | next_stage()"
 ```
 
 Quote the complete specification so that the shell does not interpret `<`,
-`>`, or `|`. Stages run from left to right. The transform is applied
+`>`, or `|`. Whitespace around the target-assignment `=` and stage separator
+`|` is optional; the examples include it to make those boundaries clear.
+Stages run from left to right. The transform is applied
 independently to every feature row after sample IDs have been aligned to the
 phenotype file; it never pools values across features. Repeating
 `--transform` appends more stages in command-line order, although one quoted
@@ -67,7 +69,7 @@ expression syntax such as `expr(...)` is deliberately not enabled.
 Clamp outliers relative to a robust row center and scale, then standardize:
 
 ```text
---transform "<omics>=winsor_mad(k=4)|zscore()"
+--transform "<omics> = winsor_mad(k=4) | zscore()"
 ```
 
 This matches R's `mad(..., constant = 1/qnorm(0.75), na.rm = TRUE)`
@@ -80,7 +82,7 @@ Convert beta values to M values, then standardize the tested effect to one
 post-transform standard deviation:
 
 ```text
---transform "<omics>=mvalue(epsilon=1e-6)|zscore()"
+--transform "<omics> = mvalue(epsilon=1e-6) | zscore()"
 ```
 
 M values are often preferable for modeling methylation intensity, while the
@@ -92,7 +94,7 @@ standard deviation of the transformed feature.
 Compress a long right tail and standardize:
 
 ```text
---transform "<omics>=log1p()|zscore()"
+--transform "<omics> = log1p() | zscore()"
 ```
 
 Use `log(offset=...)` instead when the required pseudocount is not one. For
@@ -104,7 +106,7 @@ example, values whose minimum is `-0.25` can use
 Limit extreme observations before converting ranks to normal scores:
 
 ```text
---transform "<omics>=winsor(p=0.01)|int(method=blom)"
+--transform "<omics> = winsor(p=0.01) | int(method=blom)"
 ```
 
 Rank inverse-normalization changes the estimand to the rank-normalized scale.
@@ -116,7 +118,7 @@ Applying `zscore()` after `int()` is generally redundant.
 Use separate tails when the scientific preprocessing rule is asymmetric:
 
 ```text
---transform "<omics>=winsor(lower=0.005,upper=0.975)|zscore()"
+--transform "<omics> = winsor(lower=0.005,upper=0.975) | zscore()"
 ```
 
 ## Missing values and failures
@@ -179,7 +181,7 @@ example.ScaleTransformProvider
 Then load and use it like a built-in stage:
 
 ```text
---transform-plugin transforms.jar --transform "<omics>=scale(factor=2)|zscore()"
+--transform-plugin transforms.jar --transform "<omics> = scale(factor=2) | zscore()"
 ```
 
 Providers must return a row with the same sample count. Plugin JARs execute
