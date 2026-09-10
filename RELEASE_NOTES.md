@@ -1,3 +1,42 @@
+# JLinAlg 0.3.3
+
+## Complete-case sample handling
+
+- Phenotype rows with missing values in any model column are omitted by
+  default, and the corresponding samples are removed from streamed omics
+  inputs before fitting.
+- Console, log, and manifest output distinguish aligned samples from the final
+  analysis sample count and report how many incomplete phenotype rows were
+  omitted.
+
+## Exact streamed mixed-model scans
+
+- Numeric Gaussian omics scans now refit variance components by REML for every
+  feature through the `lmer`-like pathway instead of using P3D or EMMAX.
+- Non-Gaussian numeric omics scans now refit a first-order Laplace GLMM for
+  every feature through the `glmer`-like pathway instead of PQL.
+- Pedigree-enabled scans use direct sparse Henderson relationship precision
+  with ancestry-graph inbreeding, matching the intended `pedigreemm` model
+  structure without materializing a dense relationship matrix.
+- The selected mixed-fit strategy is recorded in the console preflight, run
+  log, and manifest. Genotype LMM scans retain their documented null-model
+  P3D pathway.
+
+## Delimited output and compact schemas
+
+- A `.csv` output path now produces correctly quoted comma-separated output;
+  `.tsv` and other existing outputs remain tab-separated.
+- Generic numeric omics results omit genotype-only allele, frequency, call,
+  imputation, Hardy-Weinberg, and filter columns.
+- Per-row error fields are consolidated as `failure_reason`. Invariant
+  `omics_type`, `statistic_type`, `df_method`, `partial_r2_method`, and
+  `output_format` metadata now live in the run log and manifest instead of
+  being repeated in every result row.
+
+Release downloads: `jlinalg-0.3.3.jar` is the self-contained executable;
+`JLinAlg-0.3.3-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included.
+
 # JLinAlg 0.3.2
 
 ## Automatic phenotype/omics sample alignment

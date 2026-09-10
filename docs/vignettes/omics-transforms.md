@@ -6,7 +6,7 @@ methylation, protein, or other numeric molecular features before an OLS or GLM
 association scan.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.2.jar `
+java -jar build/cli/jlinalg-0.3.3.jar `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
   --id IID `
