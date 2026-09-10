@@ -19,6 +19,7 @@ cg000002    0.44  0.51  0.49  0.55</code></pre>
 <tr><td><code>identity()</code></td><td>Copy without changing values.</td><td><code>identity</code> is also accepted.</td></tr>
 <tr><td><code>winsor(p=0.01)</code></td><td>Clamp to symmetric empirical quantiles.</td><td><code>p</code> means lower <code>p</code> and upper <code>1-p</code>; linear-interpolation quantiles.</td></tr>
 <tr><td><code>winsor(lower=0.01,upper=0.99)</code></td><td>Clamp to separate lower and upper quantiles.</td><td>Defaults are 0 and 1; require <code>0 &lt;= lower &lt;= upper &lt;= 1</code>.</td></tr>
+<tr><td><code>winsor_mad(k=4)</code></td><td>Clamp to <code>median +/- k * MAD</code>, where <code>MAD = median(abs(x-median)) / qnorm(0.75)</code>.</td><td><code>k</code> defaults to 4 and must be finite and nonnegative. Missing values do not enter either median; zero MAD leaves the row unchanged. Bare <code>winsor_mad</code> is accepted.</td></tr>
 <tr><td><code>log1p()</code></td><td>Compute <code>ln(1+x)</code>.</td><td>Finite values must be greater than -1; <code>log1p</code> is accepted.</td></tr>
 <tr><td><code>log(offset=1)</code></td><td>Compute <code>ln(x+offset)</code>.</td><td>Offset must be finite and shifted finite values must be positive.</td></tr>
 <tr><td><code>zscore()</code></td><td>Center and divide by the row's sample SD.</td><td>Requires two varying finite values; <code>zscore</code> and <code>zscore(ddof=1)</code> are aliases.</td></tr>
@@ -27,6 +28,7 @@ cg000002    0.44  0.51  0.49  0.55</code></pre>
 </tbody></table></div>
 <p>Names are case-insensitive. Use the parameter names shown. Custom expression syntax such as <code>expr(...)</code> is deliberately not enabled.</p>
 <h2 id="recipes">Match the pipeline to the data</h2>
+<h3>Robust median/MAD clipping</h3><pre><code>--transform "&lt;omics&gt;=winsor_mad(k=4)|zscore()"</code></pre><p>Clamp outliers relative to a robust row center and scale, then standardize. This matches R's <code>mad(..., constant = 1/qnorm(0.75), na.rm = TRUE)</code> scaling. A zero raw MAD leaves the row unchanged.</p>
 <h3>Methylation beta values</h3><pre><code>--transform "&lt;omics&gt;=mvalue(epsilon=1e-6)|zscore()"</code></pre><p>Convert beta values to M values, then report effects per one standard deviation of the transformed feature.</p>
 <h3>Nonnegative expression measurements</h3><pre><code>--transform "&lt;omics&gt;=log1p()|zscore()"</code></pre><p>Compress a long right tail and standardize. Use <code>log(offset=...)</code> when the required pseudocount is not one.</p>
 <h3>Protein abundance with outliers</h3><pre><code>--transform "&lt;omics&gt;=winsor(p=0.01)|int(method=blom)"</code></pre><p>Limit extreme observations, then use normal scores. Rank inverse-normalization changes the estimand; choose it as an analysis decision. Adding <code>zscore()</code> after <code>int()</code> is generally redundant.</p>
