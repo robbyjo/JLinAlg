@@ -20,6 +20,7 @@ import org.jlinalg.formula.CompiledFormula;
 import org.jlinalg.formula.CompiledMixedFormula;
 import org.jlinalg.formula.Formula;
 import org.jlinalg.formula.MixedFormula;
+import org.jlinalg.formula.MixedFormulaOptions;
 import org.jlinalg.glm.GlmFamilies;
 import org.jlinalg.glm.GlmFamily;
 import org.jlinalg.glm.GlmOptions;
@@ -34,6 +35,7 @@ import org.jlinalg.gwas.RemlAssociationScanner;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.model.MissingDataPolicy;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.ols.OlsResult;
 import org.jlinalg.pipeline.AssociationPipelineOptions;
@@ -117,8 +119,11 @@ final class AnalysisRunner {
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(sourceIds,
             plan.response(), binomial, options.caseValue, options.controlValue);
+        int idAlignedSamples = prepared.ids().size();
+        prepared = completeCases(
+            phenotype, prepared, plan.response(), binomial);
         reportSampleAlignment(sourceIds.size(), phenotype.originalIds().size(),
-            prepared.ids().size());
+            idAlignedSamples, prepared.ids().size());
         logBinary(prepared);
         GrmContext grm = grm(phenotype, prepared);
         String model = resolveModel();
@@ -295,6 +300,10 @@ final class AnalysisRunner {
         PhenotypeData.Prepared prepared = phenotype.prepare(null,
             preparedResponse, options.family.equals("binomial") || plan.isCox(),
             options.caseValue, options.controlValue);
+        int phenotypeSamples = prepared.ids().size();
+        prepared = completeCases(phenotype, prepared, preparedResponse,
+            options.family.equals("binomial") || plan.isCox());
+        reportPhenotypeSamples(phenotypeSamples, prepared.ids().size());
         GrmContext grm = grm(phenotype, prepared);
         info("resolved_model=" + model);
         long tests = switch (model) {
@@ -609,19 +618,98 @@ final class AnalysisRunner {
     }
 
     private void reportSampleAlignment(
-            int omicsSamples, int phenotypeSamples, int alignedSamples)
+            int omicsSamples, int phenotypeSamples, int alignedSamples,
+            int analysisSamples)
             throws IOException {
         int omicsOnly = omicsSamples - alignedSamples;
         int phenotypeOnly = phenotypeSamples - alignedSamples;
+        int phenotypeMissing = alignedSamples - analysisSamples;
         info("omics_samples=" + omicsSamples);
         info("phenotype_samples=" + phenotypeSamples);
         info("aligned_samples=" + alignedSamples);
         info("omics_only_samples=" + omicsOnly);
         info("phenotype_only_samples=" + phenotypeOnly);
+        info("phenotype_missing_samples_omitted=" + phenotypeMissing);
+        info("analysis_samples=" + analysisSamples);
         output.println("Aligned samples: " + alignedSamples
             + " (omics=" + omicsSamples + ", phenotype=" + phenotypeSamples
             + ", omics-only=" + omicsOnly
             + ", phenotype-only=" + phenotypeOnly + ")");
+        output.println("Analysis samples: " + analysisSamples
+            + " (phenotype-missing omitted=" + phenotypeMissing + ")");
+    }
+
+    private void reportPhenotypeSamples(
+            int phenotypeSamples, int analysisSamples) throws IOException {
+        int phenotypeMissing = phenotypeSamples - analysisSamples;
+        info("phenotype_samples=" + phenotypeSamples);
+        info("phenotype_missing_samples_omitted=" + phenotypeMissing);
+        info("analysis_samples=" + analysisSamples);
+        output.println("Analysis samples: " + analysisSamples
+            + " (phenotype=" + phenotypeSamples
+            + ", phenotype-missing omitted=" + phenotypeMissing + ")");
+    }
+
+    private PhenotypeData.Prepared completeCases(
+            PhenotypeData phenotype, PhenotypeData.Prepared prepared,
+            String response, boolean encodeBinomial) {
+        int[] retained = completeCaseRows(prepared.modelTable());
+        if (retained.length == prepared.ids().size()) return prepared;
+        List<String> ids = new ArrayList<>(retained.length);
+        for (int row : retained) ids.add(prepared.ids().get(row));
+        return phenotype.prepare(ids, response, encodeBinomial,
+            options.caseValue, options.controlValue);
+    }
+
+    private int[] completeCaseRows(org.jlinalg.formula.ModelTable table) {
+        if (plan.isCox()) {
+            String rhs = plan.withoutOmics().substring(
+                plan.withoutOmics().indexOf('~') + 1);
+            FormulaPlan.Survival survival = plan.survival();
+            int[] retained = Formula.compile(
+                survival.stop() + "~0+" + rhs, table,
+                MissingDataPolicy.OMIT).retainedRows();
+            retained = intersectRows(retained, Formula.compile(
+                survival.event() + "~1", table,
+                MissingDataPolicy.OMIT).retainedRows());
+            if (survival.start() != null) {
+                retained = intersectRows(retained, Formula.compile(
+                    survival.start() + "~1", table,
+                    MissingDataPolicy.OMIT).retainedRows());
+            }
+            return retained;
+        }
+        if (plan.hasRandomEffects()) {
+            return MixedFormula.compile(plan.withoutOmics(), table,
+                MixedFormulaOptions.builder()
+                    .missingDataPolicy(MissingDataPolicy.OMIT)
+                    .build()).retainedRows();
+        }
+        return Formula.compile(plan.withoutOmics(), table,
+            MissingDataPolicy.OMIT).retainedRows();
+    }
+
+    private static int[] intersectRows(int[] left, int[] right) {
+        int[] result = new int[Math.min(left.length, right.length)];
+        int leftIndex = 0;
+        int rightIndex = 0;
+        int count = 0;
+        while (leftIndex < left.length && rightIndex < right.length) {
+            if (left[leftIndex] == right[rightIndex]) {
+                result[count++] = left[leftIndex];
+                leftIndex++;
+                rightIndex++;
+            } else if (left[leftIndex] < right[rightIndex]) {
+                leftIndex++;
+            } else {
+                rightIndex++;
+            }
+        }
+        if (count == 0) {
+            throw new IllegalArgumentException(
+                "no complete observations remain");
+        }
+        return Arrays.copyOf(result, count);
     }
 
     private void manifest(

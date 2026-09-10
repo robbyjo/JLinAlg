@@ -23,11 +23,14 @@ public final class CompiledFormula {
     private final List<String> coefficientNames;
     private final double[] weights;
     private final double[] offset;
+    private final int[] retainedRows;
+    private final int originalRows;
 
     CompiledFormula(
             double[] response, double[] design, int rows, int columns,
             List<String> coefficientNames,
-            double[] weights, double[] offset) {
+            double[] weights, double[] offset,
+            int[] retainedRows, int originalRows) {
         this.response = response;
         this.design = design;
         this.rows = rows;
@@ -35,6 +38,8 @@ public final class CompiledFormula {
         this.coefficientNames = List.copyOf(coefficientNames);
         this.weights = weights;
         this.offset = offset;
+        this.retainedRows = retainedRows.clone();
+        this.originalRows = originalRows;
     }
 
     public int rows() { return rows; }
@@ -44,6 +49,10 @@ public final class CompiledFormula {
     public double[] design() { return design.clone(); }
     public double[] weights() { return weights == null ? null : weights.clone(); }
     public double[] offset() { return offset == null ? null : offset.clone(); }
+    /** Original table rows retained by complete-case formula compilation. */
+    public int[] retainedRows() { return retainedRows.clone(); }
+    public int originalRows() { return originalRows; }
+    public int omittedRows() { return originalRows - retainedRows.length; }
 
     double[] responseView() { return response; }
     double[] designView() { return design; }

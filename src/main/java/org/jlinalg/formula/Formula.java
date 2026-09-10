@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.jlinalg.model.MissingDataPolicy;
 
 /** Compiler for an intentionally small, fast subset of R fixed-effect formulas. */
 public final class Formula {
@@ -15,7 +16,8 @@ public final class Formula {
 
     /** Compiles treatment-coded fixed effects, interactions, and offsets. */
     public static CompiledFormula compile(String formula, ModelTable table) {
-        return compile(formula, table, FormulaOptions.defaults());
+        return compile(formula, table, FormulaOptions.defaults(),
+            MissingDataPolicy.ERROR);
     }
 
     /**
@@ -24,13 +26,32 @@ public final class Formula {
      */
     public static CompiledFormula compile(
             String formula, ModelTable table, FormulaOptions options) {
-        if (formula == null || table == null || options == null) {
+        return compile(formula, table, options, MissingDataPolicy.ERROR);
+    }
+
+    /** Compiles after applying the requested missing-data policy jointly. */
+    public static CompiledFormula compile(
+            String formula, ModelTable table, MissingDataPolicy missingDataPolicy) {
+        return compile(formula, table, FormulaOptions.defaults(),
+            missingDataPolicy);
+    }
+
+    /** Compiles fixed effects after one joint complete-case row selection. */
+    public static CompiledFormula compile(
+            String formula, ModelTable table, FormulaOptions options,
+            MissingDataPolicy missingDataPolicy) {
+        if (formula == null || table == null || options == null
+                || missingDataPolicy == null) {
             throw new IllegalArgumentException("formula, table, and options are required");
         }
         String[] sides = formula.replaceAll("\\s+", "").split("~", -1);
         if (sides.length != 2 || sides[0].isEmpty() || sides[1].isEmpty()) {
             throw new IllegalArgumentException("formula must have the form response ~ terms");
         }
+        int originalRows = table.rows();
+        int[] retainedRows = table.completeRows(
+            requiredColumns(sides, options), missingDataPolicy);
+        table = table.retainRows(retainedRows);
         double[] response = table.numeric(sides[0]).clone();
         boolean intercept = true;
         String offsetName = null;
@@ -94,7 +115,35 @@ public final class Formula {
         double[] offset = offsetName == null ? null
             : table.numeric(offsetName).clone();
         return new CompiledFormula(response, design, table.rows(), columns,
-            names, weights, offset);
+            names, weights, offset, retainedRows, originalRows);
+    }
+
+    private static Set<String> requiredColumns(
+            String[] sides, FormulaOptions options) {
+        Set<String> columns = new LinkedHashSet<>();
+        columns.add(sides[0]);
+        String rightHandSide = sides[1].replace("-1", "+-1");
+        for (String token : rightHandSide.split("\\+")) {
+            if (token.isEmpty() || token.equals("0")
+                    || token.equals("1") || token.equals("-1")) {
+                continue;
+            }
+            if (token.startsWith("offset(") && token.endsWith(")")) {
+                columns.add(token.substring(7, token.length() - 1));
+                continue;
+            }
+            for (String factor : token.split("[*:]", -1)) {
+                if (factor.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "empty formula interaction variable");
+                }
+                columns.add(factor);
+            }
+        }
+        if (options.weightColumn() != null) {
+            columns.add(options.weightColumn());
+        }
+        return columns;
     }
 
     private static Encoded encode(

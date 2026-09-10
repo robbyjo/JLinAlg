@@ -144,7 +144,7 @@ class JLinAlgCliTest {
         Path output = temporaryDirectory.resolve("aligned.tsv");
         Files.writeString(phenotype,
             "IID,trait,age\n"
-            + "S3,3.2,40\nS1,1.0,20\nS4,3.8,50\n"
+            + "S3,3.2,40\nS1,1.0,20\nS4,,50\n"
             + "S2,2.0,30\nS7,7.0,80\nS5,5.1,60\n");
         Files.writeString(omics,
             "gene,S1,S2,S3,S4,S5,S6\n"
@@ -165,12 +165,16 @@ class JLinAlgCliTest {
         assertTrue(bytes.toString().contains(
             "Aligned samples: 5 (omics=6, phenotype=6, omics-only=1, "
                 + "phenotype-only=1)"));
+        assertTrue(bytes.toString().contains(
+            "Analysis samples: 4 (phenotype-missing omitted=1)"));
         String log = Files.readString(Path.of(output + ".log"));
         assertTrue(log.contains("omics_samples=6"));
         assertTrue(log.contains("phenotype_samples=6"));
         assertTrue(log.contains("aligned_samples=5"));
         assertTrue(log.contains("omics_only_samples=1"));
         assertTrue(log.contains("phenotype_only_samples=1"));
+        assertTrue(log.contains("phenotype_missing_samples_omitted=1"));
+        assertTrue(log.contains("analysis_samples=4"));
     }
 
     @Test

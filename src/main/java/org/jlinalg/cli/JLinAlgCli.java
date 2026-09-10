@@ -192,6 +192,7 @@ public final class JLinAlgCli {
               --omics-type auto|gwas|ewas|expression|proteomics|generic
               --annot FILE --annot-id COLUMN --annot-cols c1,c2,...
               --case-value VALUE --control-value VALUE
+              Phenotype rows missing any model variable are omitted.
 
             LD reference databases:
               ld-db list                  Show freely available choices
