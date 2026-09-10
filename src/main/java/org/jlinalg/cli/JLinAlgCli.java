@@ -76,9 +76,6 @@ public final class JLinAlgCli {
             if (!plan.hasOmics() && options.omics != null)
                 throw new IllegalArgumentException(
                     "--omics requires a <omics> formula term");
-            if (options.pedigree != null)
-                throw new IllegalArgumentException(
-                    "pedigree CLI execution is not yet available in this build");
             if (options.minimumHweP > 0)
                 throw new IllegalArgumentException(
                     "--min-hwe-p filtering is not yet available; HWE is reported");
@@ -163,7 +160,18 @@ public final class JLinAlgCli {
               --model auto|ols|lmm|glm|glmm|cox
               --family gaussian|binomial|poisson|gamma
               --grm FILE|PREFIX           Labeled dense matrix or GCTA prefix
-              --individual-id COLUMN      Phenotype-to-GRM ID (defaults to --id)
+              --individual-id COLUMN      Phenotype-to-GRM/pedigree ID
+                                           (defaults to --id)
+              --pedigree FILE             Pedigree table for a matching
+                                           (1|individual-id) formula term
+              --pedigree-id COLUMN        Pedigree individual ID column
+              --sire-id COLUMN            Pedigree sire/parent-1 ID column
+              --dam-id COLUMN             Pedigree dam/parent-2 ID column
+              --pedigree-family-id COLUMN Optional family qualifier column
+              --variance-components auto|refit|null-model
+                                           auto uses per-feature refits for
+                                           numeric mixed scans and a null model
+                                           only for genotype LMM scans
               --ties efron|breslow         Cox tied-event method
               --df auto|satterth|kr
               --out FILE                   Log defaults to FILE.log

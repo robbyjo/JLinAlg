@@ -10,9 +10,11 @@ import java.util.List;
 import org.jlinalg.association.AssociationBatchResult;
 import org.jlinalg.association.AssociationEngineOptions;
 import org.jlinalg.association.AssociationEstimate;
+import org.jlinalg.association.AssociationFitter;
 import org.jlinalg.association.AssociationFailure;
 import org.jlinalg.association.FastGlmAssociation;
 import org.jlinalg.association.FastOlsAssociation;
+import org.jlinalg.association.ParallelAssociationEngine;
 import org.jlinalg.glm.GlmFamily;
 import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.ols.OlsOptions;
@@ -137,6 +139,38 @@ public final class StreamingOmicsAssociationPipeline {
         return scanTo(source, analysisSampleIds, featureBlockSize,
             transform, missingPolicy,
             (matrix, names) -> prepared.scan(matrix, names, engineOptions),
+            sink);
+    }
+
+    /**
+     * Streams predictor-oriented results while refitting the supplied model for
+     * every feature. This is the exact-fit path for LMM and Laplace GLMM scans;
+     * unlike score/P3D scans, nuisance and variance parameters are reoptimized
+     * after each transformed feature is appended to the fixed design.
+     */
+    public static OmicsAssociationSummary scanPredictorsRefitTo(
+            NumericMatrixSource source,
+            List<String> analysisSampleIds,
+            double[] response,
+            double[][] covariates,
+            OmicsTransform transform,
+            OmicsMissingPolicy missingPolicy,
+            int featureBlockSize,
+            AssociationFitter fitter,
+            AssociationEngineOptions engineOptions,
+            OmicsAssociationSink sink) throws IOException {
+        validate(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy);
+        if (sink == null || fitter == null || engineOptions == null
+                || response == null || covariates == null
+                || response.length != analysisSampleIds.size()
+                || covariates.length != analysisSampleIds.size())
+            throw new IllegalArgumentException(
+                "response, covariates, fitter, and omics sink must match analysis samples");
+        return scanTo(source, analysisSampleIds, featureBlockSize,
+            transform, missingPolicy, (matrix, names) ->
+                ParallelAssociationEngine.scanPredictors(
+                    response, covariates, matrix, names, fitter, engineOptions),
             sink);
     }
 

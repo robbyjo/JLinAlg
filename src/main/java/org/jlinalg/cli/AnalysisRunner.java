@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import org.jlinalg.association.AssociationFitter;
 import org.jlinalg.association.AssociationEngineOptions;
 import org.jlinalg.association.AssociationFailurePolicy;
 import org.jlinalg.association.VariableMissingPolicy;
@@ -25,9 +26,10 @@ import org.jlinalg.glm.GlmFamilies;
 import org.jlinalg.glm.GlmFamily;
 import org.jlinalg.glm.GlmOptions;
 import org.jlinalg.glm.GlmResult;
-import org.jlinalg.glmm.GlmmPql;
-import org.jlinalg.glmm.GlmmPqlOptions;
-import org.jlinalg.glmm.GlmmPqlResult;
+import org.jlinalg.glmm.GlmmLaplace;
+import org.jlinalg.glmm.GlmmLaplaceOptions;
+import org.jlinalg.glmm.GlmmLaplaceResult;
+import org.jlinalg.glmm.SparseGlmmLaplace;
 import org.jlinalg.genetics.GenomicRelationshipMatrix;
 import org.jlinalg.gwas.AssociationScanOptions;
 import org.jlinalg.gwas.GenotypeMissingPolicy;
@@ -35,6 +37,9 @@ import org.jlinalg.gwas.RemlAssociationScanner;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.mixed.RandomEffectTerm;
+import org.jlinalg.mixed.SparseLinearMixedModel;
+import org.jlinalg.mixed.SparseLinearMixedModelResult;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.jlinalg.model.MissingDataPolicy;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.ols.OlsResult;
@@ -51,6 +56,7 @@ import org.jlinalg.pipeline.StreamingOmicsAssociationPipeline;
 import org.jlinalg.pipeline.VariantFilterOptions;
 import org.jlinalg.pipeline.VariantSource;
 import org.jlinalg.pipeline.VariantSources;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.jlinalg.reml.Reml;
 import org.jlinalg.reml.RemlOptions;
 import org.jlinalg.reml.RemlResult;
@@ -70,6 +76,8 @@ final class AnalysisRunner {
     private final FormulaPlan plan;
     private final RunLog log;
     private final PrintStream output;
+    private String resolvedVarianceComponents = "not-applicable";
+    private String resolvedMixedFit = "not-applicable";
 
     AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log,
             PrintStream output) {
@@ -126,12 +134,13 @@ final class AnalysisRunner {
             idAlignedSamples, prepared.ids().size());
         logBinary(prepared);
         GrmContext grm = grm(phenotype, prepared);
+        PedigreeContext pedigree = pedigree(phenotype, prepared);
         String model = resolveModel();
         CompiledFormula fixed;
         CompiledMixedFormula mixed = null;
         if (plan.hasRandomEffects()) {
-            mixed = MixedFormula.compile(
-                plan.withoutOmics(), prepared.modelTable());
+            mixed = compileMixed(
+                plan.withoutOmics(), prepared.modelTable(), pedigree);
             fixed = mixed.fixed();
         } else {
             fixed = Formula.compile(
@@ -141,8 +150,13 @@ final class AnalysisRunner {
             fixed.design(), fixed.rows(), fixed.columns());
         int blockSize = AdaptiveBlockSizer.choose(prepared.ids().size(),
             options.blockSize);
+        resolvedVarianceComponents =
+            resolveVarianceComponents(model, genotype);
+        resolvedMixedFit = resolveMixedFit(
+            model, genotype, resolvedVarianceComponents);
         info("resolved_model=" + model);
-        info("variance_components=" + options.varianceComponents);
+        info("variance_components=" + resolvedVarianceComponents);
+        info("mixed_fit=" + resolvedMixedFit);
         info("block_size=" + blockSize);
         info("threads=" + options.threads);
         info("backend=" + options.backend);
@@ -150,6 +164,9 @@ final class AnalysisRunner {
             output.println("omics type: " + detection.type()
                 + " (" + detection.source() + ")");
             output.println("model: " + model);
+            output.println("variance components: "
+                + resolvedVarianceComponents);
+            output.println("mixed fit: " + resolvedMixedFit);
             output.println("adaptive block size: " + blockSize);
             output.println("backend: " + options.backend);
             output.println("output: " + options.output);
@@ -159,10 +176,6 @@ final class AnalysisRunner {
             throw new IllegalArgumentException(
                 "partial output lacks resumable block metadata; "
                     + "use --overwrite to restart");
-        if (options.varianceComponents.equals("refit"))
-            throw new IllegalArgumentException(
-                "per-feature variance-component refitting is not yet wired "
-                    + "to the streaming CLI");
         OmicsTransform transform = TransformParser.parse(
             options.transforms, options.transformPlugins);
         if (genotype && !options.transforms.isEmpty())
@@ -180,9 +193,11 @@ final class AnalysisRunner {
             .build();
         AssociationPipelineOptions pipeline =
             new AssociationPipelineOptions(blockSize, filters);
-        String statisticType = model.equals("glm") ? "t_approx" : "t";
-        String dfMethod = model.equals("glm") || model.equals("lmm")
-            ? "residual-approximation" : "residual";
+        String statisticType = model.equals("glmm") ? "z"
+            : model.equals("glm") ? "t_approx" : "t";
+        String dfMethod = model.equals("glmm") ? "asymptotic"
+            : model.equals("glm") || model.equals("lmm")
+                ? "residual-approximation" : "residual";
         Counts counts;
         try (CliResultSink sink = new CliResultSink(options.output,
                 options.overwrite, detection.type(), statisticType, dfMethod,
@@ -194,8 +209,12 @@ final class AnalysisRunner {
                 case "glm" -> scanGlm(variantSource, numericSource, genotype,
                     prepared.ids(), fixed, covariates, transform, blockSize,
                     engine, pipeline, sink);
-                case "lmm" -> scanLmm(variantSource, genotype, prepared.ids(),
-                    fixed, mixed, grm, covariates, blockSize, pipeline, sink);
+                case "lmm" -> scanLmm(variantSource, numericSource, genotype,
+                    prepared.ids(), fixed, mixed, grm, pedigree, covariates,
+                    transform, blockSize, engine, pipeline, sink);
+                case "glmm" -> scanGlmm(variantSource, numericSource, genotype,
+                    prepared.ids(), fixed, mixed, grm, pedigree, covariates,
+                    transform, blockSize, engine, sink);
                 default -> throw new IllegalArgumentException(
                     "omics model is not yet supported: " + model);
             };
@@ -259,19 +278,31 @@ final class AnalysisRunner {
     }
 
     private Counts scanLmm(
-            VariantSource variant, boolean genotype, List<String> ids,
+            VariantSource variant, NumericMatrixSource numeric,
+            boolean genotype, List<String> ids,
             CompiledFormula fixed, CompiledMixedFormula mixed,
-            GrmContext grm, double[][] covariates, int blockSize,
+            GrmContext grm, PedigreeContext pedigree,
+            double[][] covariates, OmicsTransform transform, int blockSize,
+            AssociationEngineOptions engine,
             AssociationPipelineOptions pipeline, CliResultSink sink)
             throws IOException {
-        if (!genotype)
-            throw new IllegalArgumentException(
-                "streamed non-genotype LMM scans are not yet available");
         if ((mixed == null && grm == null)
                 || mixed != null
                     && !mixed.correlatedRandomEffects().isEmpty())
             throw new IllegalArgumentException(
                 "omics LMM requires a GRM or independent random-effect terms");
+        if (!genotype) {
+            requireRefit("numeric LMM");
+            return scanExactReml(numeric, ids, fixed, mixed, grm, pedigree,
+                covariates, transform, blockSize, engine, sink);
+        }
+        if (!resolvedVarianceComponents.equals("null-model"))
+            throw new IllegalArgumentException(
+                "genotype LMM per-marker refitting is not yet available; "
+                    + "use --variance-components null-model");
+        if (pedigree != null)
+            throw new IllegalArgumentException(
+                "pedigree genotype scans require per-marker refitting");
         if (!options.degreesOfFreedom.equals("auto"))
             throw new IllegalArgumentException(
                 "Satterthwaite/KR marker tests require refit mode; "
@@ -291,6 +322,123 @@ final class AnalysisRunner {
         return Counts.of(summary);
     }
 
+    private Counts scanExactReml(
+            NumericMatrixSource numeric, List<String> ids,
+            CompiledFormula fixed, CompiledMixedFormula mixed,
+            GrmContext grm, PedigreeContext pedigree,
+            double[][] covariates, OmicsTransform transform, int blockSize,
+            AssociationEngineOptions engine, CliResultSink sink)
+            throws IOException {
+        if (grm != null && pedigree != null)
+            throw new IllegalArgumentException(
+                "a pedigree and --grm cannot be combined in one CLI model");
+        if (fixed.weights() != null)
+            throw new IllegalArgumentException(
+                "weighted streamed LMM refits are not yet supported");
+        double[] response = adjustedResponse(fixed);
+        RemlOptions reml = RemlOptions.builder()
+            .degreesOfFreedomMethod(
+                dfMethod(options.degreesOfFreedom)).build();
+        if (grm != null) {
+            AssociationFitter fitter = (values, design, rows, columns, backend) -> {
+                RemlResult fit = Reml.fit(values, design, rows, columns,
+                    components(mixed == null ? List.of() : mixed.randomEffects(),
+                        rows, grm.component()),
+                    reml, backend);
+                requireConverged(fit.converged(), "REML");
+                return fit.associationStatistics();
+            };
+            return exactOmicsScan(numeric, ids, response, covariates,
+                transform, blockSize, fitter, engine, sink);
+        }
+        if (mixed == null)
+            throw new IllegalArgumentException(
+                "numeric LMM requires a random-effect formula term");
+        SparseRandomStructure structure =
+            sparseStructure(mixed, pedigree);
+        try (SparseLinearMixedModel.Prepared prepared =
+                SparseLinearMixedModel.prepareWithPrecision(
+                    fixed.rows(), structure.terms(), structure.precisions(),
+                    reml, options.backend)) {
+            AssociationFitter fitter = (values, design, rows, columns, backend) -> {
+                SparseLinearMixedModelResult fit =
+                    prepared.fit(values, design, columns);
+                requireConverged(fit.converged(), "REML");
+                return fit.associationStatistics();
+            };
+            return exactOmicsScan(numeric, ids, response, covariates,
+                transform, blockSize, fitter, engine, sink);
+        }
+    }
+
+    private Counts scanGlmm(
+            VariantSource variant, NumericMatrixSource numeric,
+            boolean genotype, List<String> ids,
+            CompiledFormula fixed, CompiledMixedFormula mixed,
+            GrmContext grm, PedigreeContext pedigree,
+            double[][] covariates, OmicsTransform transform, int blockSize,
+            AssociationEngineOptions engine, CliResultSink sink)
+            throws IOException {
+        if (genotype)
+            throw new IllegalArgumentException(
+                "genotype Laplace GLMM scans are not yet available");
+        requireRefit("numeric GLMM");
+        if ((mixed == null && grm == null)
+                || mixed != null
+                    && !mixed.correlatedRandomEffects().isEmpty())
+            throw new IllegalArgumentException(
+                "omics GLMM requires a GRM or independent random-effect terms");
+        if (grm != null && pedigree != null)
+            throw new IllegalArgumentException(
+                "a pedigree and --grm cannot be combined in one CLI model");
+        GlmFamily family = family(options.family);
+        GlmmLaplaceOptions laplace = GlmmLaplaceOptions.defaults();
+        AssociationFitter fitter;
+        if (grm != null) {
+            fitter = (values, design, rows, columns, backend) -> {
+                GlmmLaplaceResult fit = GlmmLaplace.fit(
+                    values, design, rows, columns, family,
+                    randomComponents(
+                        mixed == null ? List.of() : mixed.randomEffects(),
+                        rows, grm.component()),
+                    fixed.weights(), fixed.offset(), laplace, backend);
+                requireConverged(fit.converged(), "Laplace GLMM");
+                return fit.associationStatistics();
+            };
+            return exactOmicsScan(numeric, ids, fixed.response(), covariates,
+                transform, blockSize, fitter, engine, sink);
+        }
+        SparseRandomStructure structure =
+            sparseStructure(mixed, pedigree);
+        try (SparseGlmmLaplace.Prepared prepared =
+                SparseGlmmLaplace.prepareWithPrecision(
+                    fixed.rows(), family, structure.terms(),
+                    structure.precisions(), laplace, options.backend)) {
+            fitter = (values, design, rows, columns, backend) -> {
+                GlmmLaplaceResult fit = prepared.fit(
+                    values, design, columns, fixed.weights(), fixed.offset());
+                requireConverged(fit.converged(), "Laplace GLMM");
+                return fit.associationStatistics();
+            };
+            return exactOmicsScan(numeric, ids, fixed.response(), covariates,
+                transform, blockSize, fitter, engine, sink);
+        }
+    }
+
+    private Counts exactOmicsScan(
+            NumericMatrixSource numeric, List<String> ids,
+            double[] response, double[][] covariates,
+            OmicsTransform transform, int blockSize,
+            AssociationFitter fitter, AssociationEngineOptions engine,
+            CliResultSink sink) throws IOException {
+        OmicsAssociationSummary summary =
+            StreamingOmicsAssociationPipeline.scanPredictorsRefitTo(
+                numeric, ids, response, covariates, transform,
+                OmicsMissingPolicy.MEAN_IMPUTE, blockSize,
+                fitter, engine, sink);
+        return Counts.of(summary);
+    }
+
     private int phenotypeOnly() throws IOException {
         String model = resolveModel();
         String preparedResponse = plan.isCox()
@@ -305,12 +453,19 @@ final class AnalysisRunner {
             options.family.equals("binomial") || plan.isCox());
         reportPhenotypeSamples(phenotypeSamples, prepared.ids().size());
         GrmContext grm = grm(phenotype, prepared);
+        PedigreeContext pedigree = pedigree(phenotype, prepared);
+        resolvedVarianceComponents =
+            resolveVarianceComponents(model, false);
+        resolvedMixedFit = resolveMixedFit(
+            model, false, resolvedVarianceComponents);
         info("resolved_model=" + model);
+        info("variance_components=" + resolvedVarianceComponents);
+        info("mixed_fit=" + resolvedMixedFit);
         long tests = switch (model) {
             case "ols" -> phenotypeOls(prepared);
             case "glm" -> phenotypeGlm(prepared);
-            case "lmm" -> phenotypeLmm(prepared, grm);
-            case "glmm" -> phenotypeGlmm(prepared, grm);
+            case "lmm" -> phenotypeLmm(prepared, grm, pedigree);
+            case "glmm" -> phenotypeGlmm(prepared, grm, pedigree);
             case "cox" -> phenotypeCox(prepared, grm);
             default -> throw new IllegalArgumentException(
                 "unsupported model: " + model);
@@ -353,37 +508,62 @@ final class AnalysisRunner {
     }
 
     private long phenotypeLmm(
-            PhenotypeData.Prepared prepared, GrmContext grm)
+            PhenotypeData.Prepared prepared, GrmContext grm,
+            PedigreeContext pedigree)
             throws IOException {
         CompiledFormula fixed;
-        List<RandomEffectTerm> randomEffects;
+        CompiledMixedFormula mixed = null;
         if (plan.hasRandomEffects()) {
-            CompiledMixedFormula compiled = MixedFormula.compile(
-                plan.withoutOmics(), prepared.modelTable());
-            if (!compiled.correlatedRandomEffects().isEmpty())
-                throw new IllegalArgumentException(
-                    "correlated random slopes are not yet exposed by the CLI");
-            fixed = compiled.fixed();
-            randomEffects = compiled.randomEffects();
+            mixed = compileMixed(
+                plan.withoutOmics(), prepared.modelTable(), pedigree);
+            fixed = mixed.fixed();
         } else {
             fixed = Formula.compile(
                 plan.withoutOmics(), prepared.modelTable());
-            randomEffects = List.of();
         }
-        if (grm == null && randomEffects.isEmpty())
+        if (grm == null && mixed == null)
             throw new IllegalArgumentException(
                 "LMM requires --grm or a random-effect formula term");
-        if (fixed.weights() != null || fixed.offset() != null)
-            throw new IllegalArgumentException(
-                "weighted or offset LMM is not supported by this CLI path");
+        requireRefit("LMM");
         RemlOptions reml = RemlOptions.builder()
             .degreesOfFreedomMethod(dfMethod(options.degreesOfFreedom)).build();
-        RemlResult fit = Reml.fit(fixed.response(), fixed.design(),
-            fixed.rows(), fixed.columns(),
-            components(randomEffects, fixed.rows(),
-                grm == null ? null : grm.component()),
-            reml, options.backend);
-        AssociationStatistics statistics = fit.associationStatistics();
+        AssociationStatistics statistics;
+        if (grm == null) {
+            if (pedigree == null) {
+                statistics = mixed.fitSparse(reml, options.backend)
+                    .associationStatistics();
+            } else {
+                if (!mixed.correlatedRandomEffects().isEmpty()
+                        || fixed.weights() != null)
+                    throw new IllegalArgumentException(
+                        "pedigree REML currently requires independent random "
+                            + "terms and unweighted observations");
+                SparseRandomStructure structure =
+                    sparseStructure(mixed, pedigree);
+                SparseLinearMixedModelResult fit =
+                    SparseLinearMixedModel.fitWithPrecision(
+                        adjustedResponse(fixed), fixed.design(),
+                        fixed.rows(), fixed.columns(), structure.terms(),
+                        structure.precisions(), reml, options.backend);
+                requireConverged(fit.converged(), "REML");
+                statistics = fit.associationStatistics();
+            }
+        } else {
+            if (!mixedCompatibleWithDenseKinship(mixed, pedigree))
+                throw new IllegalArgumentException(
+                    "--grm cannot currently be combined with pedigree or "
+                        + "correlated random-slope terms");
+            if (fixed.weights() != null)
+                throw new IllegalArgumentException(
+                    "weighted GRM LMM is not supported by this CLI path");
+            RemlResult fit = Reml.fit(adjustedResponse(fixed), fixed.design(),
+                fixed.rows(), fixed.columns(),
+                components(mixed == null ? List.of() : mixed.randomEffects(),
+                    fixed.rows(), grm.component()),
+                reml, options.backend);
+            requireConverged(fit.converged(), "REML");
+            statistics = fit.associationStatistics();
+        }
         return CoefficientOutput.write(options.output, options.overwrite,
             fixed.coefficientNames(), statistics.beta(),
             statistics.standardErrors(), statistics.statistics(),
@@ -394,44 +574,56 @@ final class AnalysisRunner {
     }
 
     private long phenotypeGlmm(
-            PhenotypeData.Prepared prepared, GrmContext grm)
+            PhenotypeData.Prepared prepared, GrmContext grm,
+            PedigreeContext pedigree)
             throws IOException {
         CompiledFormula fixed;
-        List<RandomEffectTerm> randomEffects;
+        CompiledMixedFormula mixed = null;
         if (plan.hasRandomEffects()) {
-            CompiledMixedFormula compiled = MixedFormula.compile(
-                plan.withoutOmics(), prepared.modelTable());
-            if (!compiled.correlatedRandomEffects().isEmpty())
+            mixed = compileMixed(
+                plan.withoutOmics(), prepared.modelTable(), pedigree);
+            if (!mixed.correlatedRandomEffects().isEmpty())
                 throw new IllegalArgumentException(
-                    "correlated random slopes are not supported by PQL CLI");
-            fixed = compiled.fixed();
-            randomEffects = compiled.randomEffects();
+                    "correlated random slopes are not yet supported by "
+                        + "the Laplace GLMM CLI");
+            fixed = mixed.fixed();
         } else {
             fixed = Formula.compile(
                 plan.withoutOmics(), prepared.modelTable());
-            randomEffects = List.of();
         }
-        if (grm == null && randomEffects.isEmpty())
+        if (grm == null && mixed == null)
             throw new IllegalArgumentException(
                 "GLMM requires --grm or a random-effect formula term");
-        GlmmPqlOptions pql = GlmmPqlOptions.builder()
-            .remlOptions(RemlOptions.builder()
-                .degreesOfFreedomMethod(
-                    DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION)
-                .build())
-            .build();
-        GlmmPqlResult fit = GlmmPql.fit(
-            fixed.response(),
-            matrix(fixed.design(), fixed.rows(), fixed.columns()),
-            family(options.family),
-            components(randomEffects, fixed.rows(),
-                grm == null ? null : grm.component()),
-            fixed.weights(), fixed.offset(),
-            pql, options.backend);
+        requireRefit("GLMM");
+        GlmmLaplaceResult fit;
+        if (grm == null) {
+            SparseRandomStructure structure =
+                sparseStructure(mixed, pedigree);
+            fit = SparseGlmmLaplace.fitWithPrecision(
+                fixed.response(), fixed.design(), fixed.rows(), fixed.columns(),
+                family(options.family), structure.terms(),
+                structure.precisions(), fixed.weights(), fixed.offset(),
+                GlmmLaplaceOptions.defaults(), options.backend);
+        } else {
+            if (!mixedCompatibleWithDenseKinship(mixed, pedigree))
+                throw new IllegalArgumentException(
+                    "--grm cannot currently be combined with pedigree or "
+                        + "correlated random-slope terms");
+            fit = GlmmLaplace.fit(
+                fixed.response(), fixed.design(), fixed.rows(), fixed.columns(),
+                family(options.family),
+                randomComponents(
+                    mixed == null ? List.of() : mixed.randomEffects(),
+                    fixed.rows(), grm.component()),
+                fixed.weights(), fixed.offset(),
+                GlmmLaplaceOptions.defaults(), options.backend);
+        }
+        requireConverged(fit.converged(), "Laplace GLMM");
         return CoefficientOutput.write(options.output, options.overwrite,
             fixed.coefficientNames(), fit.beta(),
-            fit.standardErrors(), fit.statistics(), fit.degreesOfFreedom(),
-            fit.pValues(), "t_approx", "residual-approximation",
+            fit.standardErrors(), fit.statistics(),
+            filled(fixed.columns(), Double.POSITIVE_INFINITY),
+            fit.pValues(), "z", "asymptotic",
             null, "transformed_effect");
     }
 
@@ -512,7 +704,8 @@ final class AnalysisRunner {
         String resolved;
         if (!options.model.equals("auto")) resolved = options.model;
         else if (plan.isCox()) resolved = "cox";
-        else if (plan.hasRandomEffects() || options.grm != null)
+        else if (plan.hasRandomEffects() || options.grm != null
+                || options.pedigree != null)
             resolved = options.family.equals("gaussian") ? "lmm" : "glmm";
         else resolved = options.family.equals("gaussian") ? "ols" : "glm";
         if (options.grm != null && !resolved.equals("lmm")
@@ -520,6 +713,31 @@ final class AnalysisRunner {
             throw new IllegalArgumentException(
                 "--grm is applicable to lmm, glmm, and Cox models");
         return resolved;
+    }
+
+    private String resolveVarianceComponents(
+            String model, boolean genotype) {
+        if (!model.equals("lmm") && !model.equals("glmm"))
+            return "not-applicable";
+        if (!options.varianceComponents.equals("auto"))
+            return options.varianceComponents;
+        return genotype && model.equals("lmm") ? "null-model" : "refit";
+    }
+
+    private void requireRefit(String model) {
+        if (!resolvedVarianceComponents.equals("refit"))
+            throw new IllegalArgumentException(
+                model + " uses per-feature variance-component refitting; "
+                    + "use --variance-components refit or auto");
+    }
+
+    private static String resolveMixedFit(
+            String model, boolean genotype, String varianceComponents) {
+        if (model.equals("lmm"))
+            return genotype && varianceComponents.equals("null-model")
+                ? "p3d-null-model" : "exact-reml-refit";
+        if (model.equals("glmm")) return "laplace-marginal-refit";
+        return "not-applicable";
     }
 
     private static GlmFamily family(String name) {
@@ -552,6 +770,15 @@ final class AnalysisRunner {
     private static List<VarianceComponent> components(
             List<RandomEffectTerm> terms, int rows,
             VarianceComponent grm) {
+        List<VarianceComponent> result =
+            new ArrayList<>(randomComponents(terms, rows, grm));
+        result.add(VarianceComponent.identity("residual", rows));
+        return result;
+    }
+
+    private static List<VarianceComponent> randomComponents(
+            List<RandomEffectTerm> terms, int rows,
+            VarianceComponent grm) {
         List<VarianceComponent> result = new ArrayList<>();
         for (RandomEffectTerm term : terms) {
             double[] design = term.design();
@@ -569,7 +796,77 @@ final class AnalysisRunner {
                 term.name(), rows, covariance));
         }
         if (grm != null) result.add(grm);
-        result.add(VarianceComponent.identity("residual", rows));
+        return result;
+    }
+
+    private static SparseRandomStructure sparseStructure(
+            CompiledMixedFormula mixed, PedigreeContext pedigree) {
+        if (mixed == null)
+            throw new IllegalArgumentException(
+                "a random-effect formula term is required");
+        List<RandomEffectTerm> terms = new ArrayList<>();
+        List<SparsePrecisionMatrix> precisions = new ArrayList<>();
+        String mappedName = pedigree == null ? null
+            : "1|" + pedigree.matchingColumn();
+        if (pedigree != null) {
+            PedigreeRandomEffectTerm value =
+                PedigreeRandomEffectTerm.ofSparse(
+                    mappedName, pedigree.observationIds(),
+                    pedigree.loaded().individuals(),
+                    pedigree.loaded().inbreedingCoefficients());
+            terms.add(value.randomEffect());
+            precisions.add(value.precision());
+        }
+        for (PedigreeRandomEffectTerm value :
+                mixed.pedigreeRandomEffects()) {
+            terms.add(value.randomEffect());
+            precisions.add(value.precision());
+        }
+        for (RandomEffectTerm value : mixed.randomEffects()) {
+            if (value.name().equals(mappedName)) continue;
+            terms.add(value);
+            precisions.add(
+                SparsePrecisionMatrix.identity(value.coefficients()));
+        }
+        return new SparseRandomStructure(terms, precisions);
+    }
+
+    private static boolean mixedCompatibleWithDenseKinship(
+            CompiledMixedFormula mixed, PedigreeContext pedigree) {
+        return pedigree == null && (mixed == null
+            || mixed.pedigreeRandomEffects().isEmpty()
+                && mixed.correlatedRandomEffects().isEmpty());
+    }
+
+    private static double[] adjustedResponse(CompiledFormula fixed) {
+        double[] response = fixed.response();
+        double[] offset = fixed.offset();
+        if (offset != null)
+            for (int row = 0; row < response.length; row++)
+                response[row] -= offset[row];
+        return response;
+    }
+
+    private static void requireConverged(
+            boolean converged, String model) {
+        if (!converged)
+            throw new IllegalArgumentException(
+                model + " association model did not converge");
+    }
+
+    private CompiledMixedFormula compileMixed(
+            String formula, org.jlinalg.formula.ModelTable table,
+            PedigreeContext pedigree) {
+        CompiledMixedFormula result = MixedFormula.compile(formula, table);
+        if (pedigree != null) {
+            String expected = "1|" + pedigree.matchingColumn();
+            long matches = result.randomEffects().stream()
+                .filter(term -> term.name().equals(expected)).count();
+            if (matches != 1)
+                throw new IllegalArgumentException(
+                    "--pedigree requires the formula term (1|"
+                        + pedigree.matchingColumn() + ")");
+        }
         return result;
     }
 
@@ -594,6 +891,34 @@ final class AnalysisRunner {
             Double.BYTES));
         return new GrmContext(
             loaded.matrix(), observationIds, component, matchingColumn);
+    }
+
+    private PedigreeContext pedigree(
+            PhenotypeData phenotype, PhenotypeData.Prepared prepared)
+            throws IOException {
+        if (options.pedigree == null) return null;
+        String matchingColumn = options.individualId == null
+            ? options.idColumn : options.individualId;
+        List<String> observationIds = matchingColumn.equals(options.idColumn)
+            ? prepared.ids()
+            : phenotype.alignedValues(prepared.ids(), matchingColumn);
+        PedigreeReader.Loaded value = PedigreeReader.read(
+            options.pedigree, options.pedigreeId, options.sireId,
+            options.damId, options.pedigreeFamilyId);
+        java.util.Set<String> pedigreeIds = value.individuals().stream()
+            .map(org.jlinalg.pedigree.PedigreeIndividual::id)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        for (String id : observationIds) {
+            if (!pedigreeIds.contains(id))
+                throw new IllegalArgumentException(
+                    "phenotype pedigree ID is absent from the pedigree: "
+                        + id + " (matching column " + matchingColumn + ")");
+        }
+        info("pedigree=" + options.pedigree.toAbsolutePath());
+        info("pedigree_members=" + value.individuals().size());
+        info("pedigree_match_column=" + matchingColumn);
+        info("pedigree_precision=sparse_additive_relationship_inverse");
+        return new PedigreeContext(value, observationIds, matchingColumn);
     }
 
     private static double[][] matrix(double[] values, int rows, int columns) {
@@ -726,11 +1051,19 @@ final class AnalysisRunner {
             .put("grm_match_column", options.grm == null ? null
                 : options.individualId == null
                     ? options.idColumn : options.individualId)
+            .put("pedigree", options.pedigree == null ? null
+                : options.pedigree.toAbsolutePath())
+            .put("pedigree_match_column", options.pedigree == null ? null
+                : options.individualId == null
+                    ? options.idColumn : options.individualId)
+            .put("pedigree_precision", options.pedigree == null ? null
+                : "sparse_additive_relationship_inverse")
             .put("formula", options.formula)
             .put("model", model)
             .put("family", options.family)
             .put("omics_type", omicsType)
-            .put("variance_components", options.varianceComponents)
+            .put("variance_components", resolvedVarianceComponents)
+            .put("mixed_fit", resolvedMixedFit)
             .put("df", options.degreesOfFreedom)
             .put("block_size", blockSize)
             .put("threads", options.threads)
@@ -765,6 +1098,23 @@ final class AnalysisRunner {
         VarianceComponent component, String matchingColumn) {
         private GrmContext {
             observationIds = List.copyOf(observationIds);
+        }
+    }
+
+    private record PedigreeContext(
+        PedigreeReader.Loaded loaded, List<String> observationIds,
+        String matchingColumn) {
+        private PedigreeContext {
+            observationIds = List.copyOf(observationIds);
+        }
+    }
+
+    private record SparseRandomStructure(
+        List<RandomEffectTerm> terms,
+        List<SparsePrecisionMatrix> precisions) {
+        private SparseRandomStructure {
+            terms = List.copyOf(terms);
+            precisions = List.copyOf(precisions);
         }
     }
 }

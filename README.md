@@ -89,8 +89,12 @@ java -jar build/cli/jlinalg-0.3.2.jar `
 response, fixed-effect, interaction, and random-effect name must be a phenotype
 column. Without `--omics`, the command fits one phenotype-only model and emits
 all fixed-effect coefficients. Gaussian fixed-only formulas resolve to OLS;
-Gaussian formulas containing terms such as `(1|Batch)` resolve to REML. A
-non-Gaussian `--family` resolves to GLM or PQL GLMM, and `Surv(time,event)`
+Gaussian formulas containing terms such as `(1|Batch)` resolve to REML. For
+numeric omics, every feature is added to the fixed design and all variance
+components are refitted by REML; this is the `lmer`-like path, not a
+P3D/EMMAX scan. A non-Gaussian `--family` resolves to GLM or a first-order
+Laplace GLMM. Mixed numeric omics scans refit that marginal model per feature,
+matching the `glmer` fitting strategy rather than PQL. `Surv(time,event)`
 uses Cox regression.
 
 Add a genomic relationship matrix with `--grm FILE`. Its presence makes an
@@ -114,6 +118,21 @@ unique, the reader exposes them as `FID:IID`. The GRM is necessarily retained
 as a dense sample-by-sample covariance matrix, while the much larger omics
 matrix remains block streamed. GRM provenance, format, matching column, and
 memory footprint are recorded in the run log and manifest.
+
+Add `--pedigree FILE --pedigree-id ID --sire-id SIRE --dam-id DAM` and map
+the phenotype individual column with `--individual-id`. The formula must
+contain the corresponding random intercept, for example
+`trait ~ age + <omics> + (1|animal)`. That term is fitted from Henderson's
+sparse additive relationship inverse, retaining unobserved pedigree members;
+it is the `pedigreemm`-style animal effect rather than an ordinary IID random
+intercept. Unknown parents may be blank, `NA`, `0`, `.`, or `-9`.
+`--pedigree-family-id` qualifies pedigree identifiers as `family:individual`;
+the phenotype matching column must then contain the same qualified IDs.
+
+For mixed scans, `--variance-components auto` is the default. It resolves to
+`refit` for numeric omics and phenotype-only LMM/GLMM fits. Genotype LMM
+scans retain the explicitly logged `null-model` P3D/EMMAX route; callers can
+select either behavior explicitly with `--variance-components`.
 
 Delimited omics inputs have features in rows and sample IDs in the header.
 VCF, BCF, and BGEN inputs use the existing streaming genotype readers.

@@ -28,7 +28,7 @@ final class CliOptions {
     String ties = "efron";
     String degreesOfFreedom = "auto";
     String omicsType = "auto";
-    String varianceComponents = "null-model";
+    String varianceComponents = "auto";
     BackendPolicy backend = BackendPolicy.PREFERRED;
     String annotationId;
     String individualId;
@@ -162,10 +162,11 @@ final class CliOptions {
                 || maximumMissingRate < 0 || maximumMissingRate > 1
                 || minimumHweP < 0 || minimumHweP > 1)
             throw new IllegalArgumentException("filter thresholds are invalid");
-        if (!varianceComponents.equals("null-model")
+        if (!varianceComponents.equals("auto")
+                && !varianceComponents.equals("null-model")
                 && !varianceComponents.equals("refit"))
             throw new IllegalArgumentException(
-                "--variance-components must be null-model or refit");
+                "--variance-components must be auto, null-model, or refit");
         if (!hweSamples.equals("all"))
             throw new IllegalArgumentException(
                 "--hwe-samples currently supports only its default, all");

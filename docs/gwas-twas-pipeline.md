@@ -146,6 +146,14 @@ of retaining the complete result. `OmicsAssociationSummary` reports source,
 tested, and failed feature counts. The Cox analogue is
 `scanPredictorsCoxTo`.
 
+`scanPredictorsRefitTo` is the full-refit streaming primitive. The CLI uses it
+for numeric mixed-model scans: Gaussian features are fitted with prepared sparse
+REML and non-Gaussian features with prepared first-order Laplace GLMM. The
+variance optimization is repeated after each feature is appended, while sparse
+random designs, pedigree additive precision, symbolic factorization, and
+bounded feature blocks are retained. P3D/EMMAX remains a separate genotype LMM
+option and is never selected automatically for numeric omics.
+
 ## Burden, SKAT, and SKAT-O
 
 Build a `VariantSet` from aligned `WeightedVariant` members. Effect-allele
@@ -184,13 +192,14 @@ provide set membership explicitly.
 ## Current boundaries
 
 - Quantitative-trait single-variant streaming is implemented for fast OLS and
-  frozen-null REML. File-backed binary/count GLM streaming still needs wiring
-  to the prepared GLM score engine.
+  frozen-null REML. Numeric TWAS/EWAS/PWAS mixed scans use per-feature REML or
+  Laplace GLMM refits.
 - BGEN multiallelic decoding, `.bgi`/tabix/CSI region queries, and resume
   checkpoints remain open.
-- PQL is the current fast GLMM approximation. Exact `glmer`-class Laplace and
-  adaptive Gauss-Hermite likelihoods are not implemented.
-- Full `lme4`/`pedigreemm` API and likelihood parity is not yet claimed; see
+- The CLI GLMM path uses first-order Laplace. Adaptive Gauss-Hermite likelihoods
+  are not implemented, and correlated random-slope blocks are not yet exposed
+  for streamed Laplace scans.
+- Full `lme4`/`pedigreemm` API parity is not claimed; see
   [the compatibility roadmap](lme4-pedigreemm-roadmap.md).
 
 The source design was informed by the user-authorized GPU_eQTL repository, but

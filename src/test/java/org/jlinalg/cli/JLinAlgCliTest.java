@@ -280,6 +280,142 @@ class JLinAlgCliTest {
             .contains("resolved_model=lmm"));
     }
 
+    @Test
+    void numericMixedScanDefaultsToPerFeatureRemlRefits() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("mixed-expression-pheno.tsv");
+        Path omics = temporaryDirectory.resolve("mixed-expression.tsv");
+        Path output = temporaryDirectory.resolve("mixed-expression-results.tsv");
+        StringBuilder observations = new StringBuilder("IID\ty\tx\tbatch\n");
+        StringBuilder features = new StringBuilder("gene");
+        for (int row = 0; row < 48; row++) {
+            int group = row / 4;
+            double x = (row % 7) - 3;
+            double gene = ((row * 5) % 13 - 6) / 3.0;
+            double noise = ((row * 17) % 9 - 4) / 20.0;
+            observations.append('S').append(row).append('\t')
+                .append(2.0 + 0.25 * x + 0.7 * gene
+                    + (group % 4 - 1.5) * 0.8 + noise)
+                .append('\t').append(x).append("\tB").append(group)
+                .append('\n');
+            features.append("\tS").append(row);
+        }
+        features.append('\n').append("GENE1");
+        for (int row = 0; row < 48; row++)
+            features.append('\t').append(((row * 5) % 13 - 6) / 3.0);
+        features.append('\n').append("GENE2");
+        for (int row = 0; row < 48; row++)
+            features.append('\t').append(((row * 7) % 17 - 8) / 4.0);
+        features.append('\n');
+        Files.writeString(phenotype, observations);
+        Files.writeString(omics, features);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--omics", omics.toString(), "--omics-type", "expression",
+            "--pheno", phenotype.toString(), "--id", "IID",
+            "--formula", "y ~ x + <omics> + (1|batch)",
+            "--threads", "2", "--block-size", "2",
+            "--backend", "cpu", "--out", output.toString()
+        });
+
+        assertEquals(0, status);
+        assertEquals(3, Files.readAllLines(output).size());
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("resolved_model=lmm"));
+        assertTrue(log.contains("variance_components=refit"));
+        assertTrue(log.contains("mixed_fit=exact-reml-refit"));
+        assertFalse(log.contains("P3D"));
+    }
+
+    @Test
+    void numericNonGaussianMixedScanUsesLaplaceGlmm() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("mixed-binary-pheno.tsv");
+        Path omics = temporaryDirectory.resolve("mixed-binary-expression.tsv");
+        Path output = temporaryDirectory.resolve("mixed-binary-results.tsv");
+        StringBuilder observations =
+            new StringBuilder("IID\tcase\tx\tbatch\n");
+        StringBuilder features = new StringBuilder("gene");
+        for (int row = 0; row < 60; row++) {
+            int group = row / 5;
+            double x = (row % 9) - 4;
+            int outcome = ((row * 11 + group * 3) % 17)
+                < 7 + (x > 0 ? 2 : 0) ? 1 : 0;
+            observations.append('S').append(row).append('\t')
+                .append(outcome).append('\t').append(x)
+                .append("\tB").append(group).append('\n');
+            features.append("\tS").append(row);
+        }
+        features.append('\n').append("GENE1");
+        for (int row = 0; row < 60; row++)
+            features.append('\t').append(((row * 5) % 19 - 9) / 4.0);
+        features.append('\n');
+        Files.writeString(phenotype, observations);
+        Files.writeString(omics, features);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--omics", omics.toString(), "--omics-type", "expression",
+            "--pheno", phenotype.toString(), "--id", "IID",
+            "--formula", "case ~ x + <omics> + (1|batch)",
+            "--family", "binomial", "--threads", "1",
+            "--block-size", "1", "--backend", "cpu",
+            "--out", output.toString()
+        });
+
+        assertEquals(0, status);
+        List<String> lines = Files.readAllLines(output);
+        assertEquals(2, lines.size());
+        String[] header = lines.get(0).split("\t", -1);
+        String[] estimate = lines.get(1).split("\t", -1);
+        assertEquals("z", estimate[index(header, "statistic_type")]);
+        assertEquals("asymptotic", estimate[index(header, "df_method")]);
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("resolved_model=glmm"));
+        assertTrue(log.contains("variance_components=refit"));
+        assertTrue(log.contains("mixed_fit=laplace-marginal-refit"));
+    }
+
+    @Test
+    void pedigreeCliUsesSparseAdditiveRelationshipPrecision() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("pedigree-pheno.tsv");
+        Path pedigree = temporaryDirectory.resolve("pedigree.tsv");
+        Path output = temporaryDirectory.resolve("pedigree-results.tsv");
+        StringBuilder observations =
+            new StringBuilder("observation\tanimal\ty\tx\n");
+        for (int animal = 1; animal <= 10; animal++)
+            for (int repeat = 0; repeat < 3; repeat++)
+                observations.append('O').append(animal).append('_').append(repeat)
+                    .append("\tA").append(animal).append('\t')
+                    .append(1.0 + animal * 0.18 + repeat * 0.11
+                        + ((animal * 7 + repeat * 3) % 5 - 2) * 0.07)
+                    .append('\t').append(repeat - 1).append('\n');
+        StringBuilder ancestry = new StringBuilder("animal\tsire\tdam\n");
+        ancestry.append("A1\t0\t0\nA2\t0\t0\n");
+        for (int animal = 3; animal <= 10; animal++)
+            ancestry.append('A').append(animal).append("\tA")
+                .append(Math.max(1, animal - 2)).append("\tA")
+                .append(Math.max(2, animal - 1)).append('\n');
+        Files.writeString(phenotype, observations);
+        Files.writeString(pedigree, ancestry);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--id", "observation",
+            "--individual-id", "animal",
+            "--formula", "y ~ x + (1|animal)",
+            "--pedigree", pedigree.toString(),
+            "--pedigree-id", "animal", "--sire-id", "sire",
+            "--dam-id", "dam", "--backend", "cpu",
+            "--out", output.toString()
+        });
+
+        assertEquals(0, status);
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("pedigree_members=10"));
+        assertTrue(log.contains(
+            "pedigree_precision=sparse_additive_relationship_inverse"));
+        String manifest = Files.readString(Path.of(output + ".manifest.json"));
+        assertTrue(manifest.contains(
+            "\"pedigree_precision\": \"sparse_additive_relationship_inverse\""));
+    }
+
     private static void writeBlockGrm(Path path, int size) throws Exception {
         StringBuilder matrix = new StringBuilder("IID");
         for (int id = 1; id <= size; id++) matrix.append("\tS").append(id);
