@@ -78,6 +78,9 @@ final class AnalysisRunner {
     private final PrintStream output;
     private String resolvedVarianceComponents = "not-applicable";
     private String resolvedMixedFit = "not-applicable";
+    private String resolvedStatisticType = "not-applicable";
+    private String resolvedDfMethod = "not-applicable";
+    private String resolvedPartialR2Method = "not-applicable";
 
     AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log,
             PrintStream output) {
@@ -154,9 +157,11 @@ final class AnalysisRunner {
             resolveVarianceComponents(model, genotype);
         resolvedMixedFit = resolveMixedFit(
             model, genotype, resolvedVarianceComponents);
+        resolveOutputMetadata(model, genotype);
         info("resolved_model=" + model);
         info("variance_components=" + resolvedVarianceComponents);
         info("mixed_fit=" + resolvedMixedFit);
+        logOutputMetadata();
         info("block_size=" + blockSize);
         info("threads=" + options.threads);
         info("backend=" + options.backend);
@@ -167,6 +172,7 @@ final class AnalysisRunner {
             output.println("variance components: "
                 + resolvedVarianceComponents);
             output.println("mixed fit: " + resolvedMixedFit);
+            output.println("output format: " + outputFormat());
             output.println("adaptive block size: " + blockSize);
             output.println("backend: " + options.backend);
             output.println("output: " + options.output);
@@ -193,14 +199,9 @@ final class AnalysisRunner {
             .build();
         AssociationPipelineOptions pipeline =
             new AssociationPipelineOptions(blockSize, filters);
-        String statisticType = model.equals("glmm") ? "z"
-            : model.equals("glm") ? "t_approx" : "t";
-        String dfMethod = model.equals("glmm") ? "asymptotic"
-            : model.equals("glm") || model.equals("lmm")
-                ? "residual-approximation" : "residual";
         Counts counts;
         try (CliResultSink sink = new CliResultSink(options.output,
-                options.overwrite, detection.type(), statisticType, dfMethod,
+                options.overwrite, genotype, resolvedStatisticType,
                 annotation, genotype ? prepared.caseControlGroups() : null)) {
             counts = switch (model) {
                 case "ols" -> scanOls(variantSource, numericSource, genotype,
@@ -458,9 +459,12 @@ final class AnalysisRunner {
             resolveVarianceComponents(model, false);
         resolvedMixedFit = resolveMixedFit(
             model, false, resolvedVarianceComponents);
+        resolveOutputMetadata(model, false);
+        info("omics_type=none");
         info("resolved_model=" + model);
         info("variance_components=" + resolvedVarianceComponents);
         info("mixed_fit=" + resolvedMixedFit);
+        logOutputMetadata();
         long tests = switch (model) {
             case "ols" -> phenotypeOls(prepared);
             case "glm" -> phenotypeGlm(prepared);
@@ -486,7 +490,7 @@ final class AnalysisRunner {
             compiled.coefficientNames(), fit.beta(), fit.standardErrors(),
             fit.tStatistics(), filled(compiled.columns(),
                 fit.residualDegreesOfFreedom()), fit.pValues(),
-            "t", "residual", null, "transformed_effect");
+            "t", null, "transformed_effect");
     }
 
     private long phenotypeGlm(PhenotypeData.Prepared prepared)
@@ -503,8 +507,7 @@ final class AnalysisRunner {
             compiled.coefficientNames(), statistics.beta(),
             statistics.standardErrors(), statistics.statistics(),
             statistics.degreesOfFreedom(), statistics.pValues(),
-            "t_approx", "residual-approximation",
-            null, "transformed_effect");
+            "t_approx", null, "transformed_effect");
     }
 
     private long phenotypeLmm(
@@ -568,8 +571,6 @@ final class AnalysisRunner {
             fixed.coefficientNames(), statistics.beta(),
             statistics.standardErrors(), statistics.statistics(),
             statistics.degreesOfFreedom(), statistics.pValues(), "t",
-            statistics.degreesOfFreedomMethod().name()
-                .toLowerCase(Locale.ROOT),
             null, "transformed_effect");
     }
 
@@ -623,8 +624,7 @@ final class AnalysisRunner {
             fixed.coefficientNames(), fit.beta(),
             fit.standardErrors(), fit.statistics(),
             filled(fixed.columns(), Double.POSITIVE_INFINITY),
-            fit.pValues(), "z", "asymptotic",
-            null, "transformed_effect");
+            fit.pValues(), "z", null, "transformed_effect");
     }
 
     private long phenotypeCox(
@@ -697,7 +697,7 @@ final class AnalysisRunner {
         return CoefficientOutput.write(options.output, options.overwrite,
             design.coefficientNames(), beta, standardErrors,
             statistics, filled(design.columns(), Double.POSITIVE_INFINITY),
-            pValues, "z", "asymptotic", hazardRatios, "hazard_ratio");
+            pValues, "z", hazardRatios, "hazard_ratio");
     }
 
     private String resolveModel() {
@@ -738,6 +738,38 @@ final class AnalysisRunner {
                 ? "p3d-null-model" : "exact-reml-refit";
         if (model.equals("glmm")) return "laplace-marginal-refit";
         return "not-applicable";
+    }
+
+    private void resolveOutputMetadata(
+            String model, boolean genotype) {
+        resolvedStatisticType = switch (model) {
+            case "glmm", "cox" -> "z";
+            case "glm" -> "t_approx";
+            default -> "t";
+        };
+        resolvedDfMethod = switch (model) {
+            case "glmm", "cox" -> "asymptotic";
+            case "glm" -> "residual-approximation";
+            case "lmm" -> genotype
+                ? "residual-approximation"
+                : dfMethod(options.degreesOfFreedom).name()
+                    .toLowerCase(Locale.ROOT).replace('_', '-');
+            default -> "residual";
+        };
+        resolvedPartialR2Method = resolvedStatisticType.equals("t")
+            ? "test-statistic" : "not-applicable";
+    }
+
+    private void logOutputMetadata() throws IOException {
+        info("statistic_type=" + resolvedStatisticType);
+        info("df_method=" + resolvedDfMethod);
+        info("partial_r2_method=" + resolvedPartialR2Method);
+        info("output_format=" + outputFormat());
+    }
+
+    private String outputFormat() {
+        return options.output.getFileName().toString()
+            .toLowerCase(Locale.ROOT).endsWith(".csv") ? "csv" : "tsv";
     }
 
     private static GlmFamily family(String name) {
@@ -1065,6 +1097,10 @@ final class AnalysisRunner {
             .put("variance_components", resolvedVarianceComponents)
             .put("mixed_fit", resolvedMixedFit)
             .put("df", options.degreesOfFreedom)
+            .put("statistic_type", resolvedStatisticType)
+            .put("df_method", resolvedDfMethod)
+            .put("partial_r2_method", resolvedPartialR2Method)
+            .put("output_format", outputFormat())
             .put("block_size", blockSize)
             .put("threads", options.threads)
             .put("transform_plugins", options.transformPlugins)

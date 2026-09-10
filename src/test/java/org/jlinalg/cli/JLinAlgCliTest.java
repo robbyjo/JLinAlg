@@ -101,7 +101,7 @@ class JLinAlgCliTest {
         Path phenotype = temporaryDirectory.resolve("phenotype.csv");
         Path omics = temporaryDirectory.resolve("methylation.csv");
         Path annotation = temporaryDirectory.resolve("annotation.tsv");
-        Path output = temporaryDirectory.resolve("ewas.tsv");
+        Path output = temporaryDirectory.resolve("ewas.csv");
         Files.writeString(phenotype,
             "IID,trait,age\n"
             + "S3,3.2,40\nS1,1.0,20\nS4,3.8,50\n"
@@ -125,15 +125,21 @@ class JLinAlgCliTest {
         });
 
         assertEquals(0, status);
-        List<String> lines = Files.readAllLines(output);
-        assertEquals(3, lines.size());
-        assertTrue(lines.get(0).contains("annot_gene"));
-        assertTrue(lines.get(0).endsWith("fdr_bh"));
-        assertTrue(lines.get(1).contains("\tewas\tcg12345678\t"));
-        assertTrue(lines.get(1).contains("\tGENE1\t"));
+        DelimitedData result = DelimitedData.read(output);
+        assertEquals(2, result.rows().size());
+        assertTrue(result.header().contains("annot_gene"));
+        assertEquals("fdr_bh",
+            result.header().get(result.header().size() - 1));
+        String[] first = result.rows().get(0);
+        assertEquals("ok", first[result.column("status")]);
+        assertEquals("cg12345678", first[result.column("id")]);
+        assertEquals("GENE1", first[result.column("annot_gene")]);
+        assertFalse(Files.readString(output).contains("\t"));
         assertFalse(Files.exists(Path.of(output + ".partial")));
-        assertTrue(Files.readString(Path.of(output + ".log"))
-            .contains("block_size=1"));
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("block_size=1"));
+        assertTrue(log.contains("omics_type=ewas"));
+        assertTrue(log.contains("output_format=csv"));
     }
 
     @Test
@@ -207,7 +213,9 @@ class JLinAlgCliTest {
         assertFalse(row[index(header, "hwe_p_all")].isEmpty());
         assertFalse(row[index(header, "hwe_p_cases")].isEmpty());
         assertFalse(row[index(header, "hwe_p_controls")].isEmpty());
-        assertEquals("t_approx", row[index(header, "statistic_type")]);
+        assertFalse(List.of(header).contains("statistic_type"));
+        assertTrue(Files.readString(Path.of(output + ".log"))
+            .contains("statistic_type=t_approx"));
     }
 
     @Test
@@ -364,13 +372,14 @@ class JLinAlgCliTest {
         List<String> lines = Files.readAllLines(output);
         assertEquals(2, lines.size());
         String[] header = lines.get(0).split("\t", -1);
-        String[] estimate = lines.get(1).split("\t", -1);
-        assertEquals("z", estimate[index(header, "statistic_type")]);
-        assertEquals("asymptotic", estimate[index(header, "df_method")]);
+        assertFalse(List.of(header).contains("statistic_type"));
+        assertFalse(List.of(header).contains("df_method"));
         String log = Files.readString(Path.of(output + ".log"));
         assertTrue(log.contains("resolved_model=glmm"));
         assertTrue(log.contains("variance_components=refit"));
         assertTrue(log.contains("mixed_fit=laplace-marginal-refit"));
+        assertTrue(log.contains("statistic_type=z"));
+        assertTrue(log.contains("df_method=asymptotic"));
     }
 
     @Test

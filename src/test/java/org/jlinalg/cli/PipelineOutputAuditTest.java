@@ -29,7 +29,15 @@ class PipelineOutputAuditTest {
             "--annot-cols","all","--out",output.toString(),"--threads","1","--no-log"},stream,stream));
         var rows=Files.readAllLines(output);assertEquals(4,rows.size());
         String[] header=rows.get(0).split("\t"),first=rows.get(1).split("\t",-1);
-        assertEquals("ok",first[0]);assertEquals("signal",first[2]);
+        assertEquals("ok",first[0]);assertEquals("signal",first[1]);
+        assertFalse(Arrays.asList(header).contains("omics_type"));
+        assertFalse(Arrays.asList(header).contains("position"));
+        assertFalse(Arrays.asList(header).contains("statistic_type"));
+        assertFalse(Arrays.asList(header).contains("df_method"));
+        assertFalse(Arrays.asList(header).contains("partial_r2_method"));
+        assertFalse(Arrays.asList(header).contains("filter_reason"));
+        assertFalse(Arrays.asList(header).contains("error_type"));
+        assertFalse(Arrays.asList(header).contains("message"));
         assertEquals(1.0,Double.parseDouble(first[Arrays.asList(header).indexOf("beta")]),.02);
         assertTrue(rows.get(2).startsWith("failed\t"));assertTrue(rows.get(3).startsWith("ok\t"));
         assertTrue(Files.readString(Path.of(output+".manifest.json")).contains("\"tested_features\": \"2\""));
@@ -91,11 +99,26 @@ class PipelineOutputAuditTest {
         try(var files=Files.list(directory)){assertEquals(1,files.count());}
     }
 
+    @Test void csvExtensionUsesCommaDelimiterAndCsvQuotingThroughBh() throws Exception {
+        Path target=directory.resolve("out.csv");
+        try(var bh=new ExternalBh(target,false,2)) {
+            bh.writeHeader(List.of("id","label"));
+            bh.write(List.of("one","a,b"),.01);
+            bh.write(List.of("two","quoted \"value\""),.04);
+            bh.finish();
+        }
+        String text=Files.readString(target);
+        assertTrue(text.startsWith("id,label,fdr_bh"));
+        assertTrue(text.contains("one,\"a,b\",0.02"));
+        assertTrue(text.contains("two,\"quoted \"\"value\"\"\",0.04"));
+        assertFalse(text.startsWith("id\t"));
+    }
+
     @Test void missingAnnotationIsBlankRatherThanFatal() throws Exception {
         Path annotation=directory.resolve("annotation.tsv");
         Files.writeString(annotation,"id\tgene\na\tA\n");
         Path target=directory.resolve("out.tsv");
-        try(var sink=new CliResultSink(target,false,"omics","t","residual",
+        try(var sink=new CliResultSink(target,false,false,"t",
                 AnnotationLookup.read(annotation,null,List.of("all")),null)) {
             sink.acceptEstimate(new OmicsAssociationEstimate("missing",1,.5,2,10,.07,-1,1));
             sink.finish();

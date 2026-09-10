@@ -17,41 +17,42 @@ import org.jlinalg.pipeline.VariantFilterResult;
 import org.jlinalg.pipeline.VariantRecord;
 import org.jlinalg.pipeline.VariantStatistics;
 
-/** Common streaming result table for genotype and generic omics scans. */
+/** Type-specific streaming result tables for genotype and numeric omics scans. */
 final class CliResultSink
         implements AssociationPipelineSink, OmicsAssociationSink, AutoCloseable {
-    private static final List<String> BASE_HEADER = List.of(
-        "status", "omics_type", "id", "chromosome", "position",
+    private static final List<String> GENOTYPE_HEADER = List.of(
+        "status", "id", "chromosome", "position",
         "reference_allele", "alternate_allele", "effect_allele",
         "other_allele", "effect_allele_frequency",
         "minor_allele_frequency", "minor_allele_count",
         "called", "missing", "missing_rate", "imputation_info",
         "hwe_p_all", "hwe_n_all", "hwe_p_cases", "hwe_n_cases",
         "hwe_p_controls", "hwe_n_controls", "hwe_method",
-        "beta", "standard_error", "statistic", "statistic_type",
-        "df_numerator", "df_denominator", "df_method",
-        "partial_r2", "partial_r2_method", "p_value",
-        "filter_reason", "error_type", "message");
-    private final String omicsType;
+        "beta", "standard_error", "statistic",
+        "df_numerator", "df_denominator", "partial_r2", "p_value",
+        "filter_reason", "failure_reason");
+    private static final List<String> OMICS_HEADER = List.of(
+        "status", "id", "beta", "standard_error", "statistic",
+        "df_numerator", "df_denominator", "partial_r2", "p_value",
+        "failure_reason");
+    private final boolean genotype;
     private final String statisticType;
-    private final String dfMethod;
     private final AnnotationLookup annotation;
     private final int[] caseControlGroups;
     private final ExternalBh output;
 
     CliResultSink(
-            Path path, boolean overwrite, String omicsType,
-            String statisticType, String dfMethod,
-            AnnotationLookup annotation, int[] caseControlGroups)
-            throws IOException {
-        this.omicsType = omicsType;
+            Path path, boolean overwrite, boolean genotype,
+            String statisticType, AnnotationLookup annotation,
+            int[] caseControlGroups) throws IOException {
+        this.genotype = genotype;
         this.statisticType = statisticType;
-        this.dfMethod = dfMethod;
         this.annotation = annotation;
         this.caseControlGroups = caseControlGroups == null ? null
             : caseControlGroups.clone();
         output = new ExternalBh(path, overwrite);
-        List<String> header = new ArrayList<>(BASE_HEADER);
+        List<String> header = new ArrayList<>(
+            genotype ? GENOTYPE_HEADER : OMICS_HEADER);
         for (String column : annotation.columns())
             header.add("annot_" + column);
         output.writeHeader(header);
@@ -63,7 +64,7 @@ final class CliResultSink
         VariantRecord variant = estimate.variant();
         VariantStatistics qc = estimate.variantStatistics();
         Hwe hwe = hwe(variant);
-        write("ok", variant.id(), variant.chromosome(),
+        writeGenotype("ok", variant.id(), variant.chromosome(),
             variant.position() == 0 ? "" : Long.toString(variant.position()),
             variant.referenceAllele(), variant.alternateAllele(),
             variant.alternateAllele(), variant.referenceAllele(),
@@ -74,7 +75,7 @@ final class CliResultSink
             Integer.toString(qc.missingSamples()),
             number(qc.missingRate()), number(variant.imputationQuality()), hwe,
             estimate.beta(), estimate.standardError(), estimate.statistic(),
-            estimate.degreesOfFreedom(), estimate.pValue(), "", "", "");
+            estimate.degreesOfFreedom(), estimate.pValue(), "", "");
     }
 
     @Override
@@ -83,7 +84,7 @@ final class CliResultSink
         VariantRecord variant = excluded.variant();
         VariantStatistics qc = excluded.statistics();
         Hwe hwe = hwe(variant);
-        write("filtered", variant.id(), variant.chromosome(),
+        writeGenotype("filtered", variant.id(), variant.chromosome(),
             variant.position() == 0 ? "" : Long.toString(variant.position()),
             variant.referenceAllele(), variant.alternateAllele(),
             variant.alternateAllele(), variant.referenceAllele(),
@@ -95,56 +96,93 @@ final class CliResultSink
             number(qc.missingRate()), number(variant.imputationQuality()), hwe,
             Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
             excluded.reasons().stream().map(Enum::name)
-                .collect(java.util.stream.Collectors.joining(";")), "", "");
+                .collect(java.util.stream.Collectors.joining(";")), "");
     }
 
     @Override
     public void acceptEstimate(OmicsAssociationEstimate estimate)
             throws IOException {
-        write("ok", estimate.featureId(), "", "", "", "", "", "",
-            "", "", "", "", "", "", "", Hwe.empty(),
-            estimate.beta(), estimate.standardError(), estimate.statistic(),
-            estimate.degreesOfFreedom(), estimate.pValue(), "", "", "");
+        writeOmics("ok", estimate.featureId(), estimate.beta(),
+            estimate.standardError(), estimate.statistic(),
+            estimate.degreesOfFreedom(), estimate.pValue(), "");
     }
 
     @Override
     public void acceptFailure(AssociationPipelineFailure failure)
             throws IOException {
-        write("failed", failure.variantId(), "", "", "", "", "", "",
-            "", "", "", "", "", "", "", Hwe.empty(),
-            Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
-            "", failure.exceptionType(), failure.message());
+        String reason = failureReason(
+            failure.exceptionType(), failure.message());
+        if (genotype)
+            writeGenotype("failed", failure.variantId(), "", "", "", "",
+                "", "", "", "", "", "", "", "", "", Hwe.empty(),
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
+                "", reason);
+        else
+            writeOmics("failed", failure.variantId(), Double.NaN,
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, reason);
     }
 
     void finish() throws IOException { output.finish(); }
     long adjustedTests() { return output.tests(); }
     @Override public void close() throws IOException { output.close(); }
 
-    private void write(
+    private void writeGenotype(
             String status, String id, String chromosome, String position,
             String reference, String alternate, String effect, String other,
             String eaf, String maf, String mac, String called, String missing,
             String missingRate, String info, Hwe hwe,
             double beta, double standardError, double statistic,
             double degreesOfFreedom, double pValue,
-            String filter, String error, String message) throws IOException {
-        double partial = statisticType.equals("t")
-            ? partialR2(statistic, degreesOfFreedom) : Double.NaN;
-        List<String> fields = new ArrayList<>(BASE_HEADER.size()
-            + annotation.columns().size());
-        fields.addAll(List.of(status, omicsType, id, chromosome, position,
+            String filterReason, String failureReason) throws IOException {
+        if (!genotype)
+            throw new IllegalStateException(
+                "genotype row sent to a numeric omics sink");
+        List<String> fields = new ArrayList<>(
+            GENOTYPE_HEADER.size() + annotation.columns().size());
+        fields.addAll(List.of(status, id, chromosome, position,
             reference, alternate, effect, other, eaf, maf, mac, called,
             missing, missingRate, info, number(hwe.all().pValue()),
             integer(hwe.all().samples()), number(hwe.cases().pValue()),
             integer(hwe.cases().samples()), number(hwe.controls().pValue()),
-            integer(hwe.controls().samples()), hwe.method(),
-            number(beta), number(standardError), number(statistic),
-            statisticType, "1", number(degreesOfFreedom), dfMethod,
-            number(partial), Double.isFinite(partial)
-                ? "test-statistic" : "", number(pValue),
-            filter, error, message));
+            integer(hwe.controls().samples()), hwe.method()));
+        addStatistics(fields, beta, standardError, statistic,
+            degreesOfFreedom, pValue);
+        fields.add(filterReason);
+        fields.add(failureReason);
         fields.addAll(List.of(annotation.values(id)));
         output.write(fields, pValue);
+    }
+
+    private void writeOmics(
+            String status, String id, double beta, double standardError,
+            double statistic, double degreesOfFreedom, double pValue,
+            String failureReason) throws IOException {
+        if (genotype)
+            throw new IllegalStateException(
+                "numeric omics row sent to a genotype sink");
+        List<String> fields = new ArrayList<>(
+            OMICS_HEADER.size() + annotation.columns().size());
+        fields.add(status);
+        fields.add(id);
+        addStatistics(fields, beta, standardError, statistic,
+            degreesOfFreedom, pValue);
+        fields.add(failureReason);
+        fields.addAll(List.of(annotation.values(id)));
+        output.write(fields, pValue);
+    }
+
+    private void addStatistics(
+            List<String> fields, double beta, double standardError,
+            double statistic, double degreesOfFreedom, double pValue) {
+        double partial = statisticType.equals("t")
+            ? partialR2(statistic, degreesOfFreedom) : Double.NaN;
+        fields.add(number(beta));
+        fields.add(number(standardError));
+        fields.add(number(statistic));
+        fields.add("1");
+        fields.add(number(degreesOfFreedom));
+        fields.add(number(partial));
+        fields.add(number(pValue));
     }
 
     private Hwe hwe(VariantRecord variant) {
@@ -158,6 +196,14 @@ final class CliResultSink
             ? new HardyWeinberg.Result(Double.NaN, 0, "")
             : HardyWeinberg.calculate(dosage, caseControlGroups, 0);
         return new Hwe(all, cases, controls, all.method());
+    }
+
+    private static String failureReason(String type, String message) {
+        String kind = type == null ? "" : type.trim();
+        String detail = message == null ? "" : message.trim();
+        if (kind.isEmpty()) return detail;
+        if (detail.isEmpty() || detail.equals(kind)) return kind;
+        return kind + ": " + detail;
     }
 
     private static double partialR2(double statistic, double df) {

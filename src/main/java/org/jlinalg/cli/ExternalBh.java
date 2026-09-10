@@ -41,6 +41,7 @@ final class ExternalBh implements AutoCloseable {
     private boolean closed;
     private boolean headerWritten;
     private final boolean overwrite;
+    private final char delimiter;
 
     ExternalBh(Path output, boolean overwrite) throws IOException {
         this(output, overwrite, (int) Math.max(10_000,
@@ -52,6 +53,9 @@ final class ExternalBh implements AutoCloseable {
         if (chunkCapacity < 1) throw new IllegalArgumentException("BH run size must be positive");
         this.overwrite = overwrite;
         this.output = output.toAbsolutePath().normalize();
+        delimiter = output.getFileName().toString()
+            .toLowerCase(java.util.Locale.ROOT).endsWith(".csv")
+                ? ',' : '\t';
         if (Files.exists(this.output) && !overwrite)
             throw new IOException("output exists; use --overwrite: " + output);
         Path parent = this.output.getParent();
@@ -73,14 +77,14 @@ final class ExternalBh implements AutoCloseable {
 
     void writeHeader(List<String> fields) throws IOException {
         if (closed || headerWritten) throw new IOException("BH header already written or output closed");
-        rawWriter.write(join(fields));
+        rawWriter.write(join(fields, delimiter));
         rawWriter.newLine();
         headerWritten = true;
     }
 
     void write(List<String> fields, double pValue) throws IOException {
         if (closed || !headerWritten) throw new IOException("BH output requires an open header");
-        rawWriter.write(join(fields));
+        rawWriter.write(join(fields, delimiter));
         rawWriter.newLine();
         initialQ.writeDouble(Double.NaN);
         if (Double.isFinite(pValue) && pValue >= 0.0 && pValue <= 1.0) {
@@ -103,7 +107,7 @@ final class ExternalBh implements AutoCloseable {
         Path sorted = work.resolve("sorted.bin");
         merge(sorted);
         assign(sorted);
-        Path complete = work.resolve("complete.tsv");
+        Path complete = work.resolve("complete.tmp");
         try (BufferedReader input = Files.newBufferedReader(
                     raw, StandardCharsets.UTF_8);
              BufferedWriter writer = Files.newBufferedWriter(
@@ -112,11 +116,12 @@ final class ExternalBh implements AutoCloseable {
                     new BufferedInputStream(Files.newInputStream(qValues)))) {
             String header = readRecord(input);
             writer.write(header);
-            writer.write("\tfdr_bh");
+            writer.write(delimiter);
+            writer.write("fdr_bh");
             writer.newLine();
             for (String line; (line = readRecord(input)) != null;) {
                 writer.write(line);
-                writer.write('\t');
+                writer.write(delimiter);
                 double q = qInput.readDouble();
                 if (Double.isFinite(q)) writer.write(Double.toString(q));
                 writer.newLine();
@@ -235,11 +240,11 @@ final class ExternalBh implements AutoCloseable {
         for (Path chunk : chunks) Files.deleteIfExists(chunk);
         Files.deleteIfExists(work.resolve("sorted.bin"));
         Files.deleteIfExists(qValues);
-        Files.deleteIfExists(work.resolve("complete.tsv"));
+        Files.deleteIfExists(work.resolve("complete.tmp"));
         Files.deleteIfExists(work);
     }
 
-    /** Reads one quoted TSV record, retaining embedded CR/LF verbatim. */
+    /** Reads one quoted delimited record, retaining embedded CR/LF verbatim. */
     private static String readRecord(BufferedReader input) throws IOException {
         StringBuilder record = new StringBuilder();
         boolean quoted = false;
@@ -259,18 +264,18 @@ final class ExternalBh implements AutoCloseable {
         return record.isEmpty() ? null : record.toString();
     }
 
-    private static String join(List<String> fields) {
+    private static String join(List<String> fields, char delimiter) {
         StringBuilder result = new StringBuilder();
         for (int index = 0; index < fields.size(); index++) {
-            if (index > 0) result.append('\t');
-            result.append(escape(fields.get(index)));
+            if (index > 0) result.append(delimiter);
+            result.append(escape(fields.get(index), delimiter));
         }
         return result.toString();
     }
 
-    private static String escape(String value) {
+    private static String escape(String value, char delimiter) {
         String text = value == null ? "" : value;
-        if (text.indexOf('\t') < 0 && text.indexOf('\n') < 0
+        if (text.indexOf(delimiter) < 0 && text.indexOf('\n') < 0
                 && text.indexOf('\r') < 0 && text.indexOf('"') < 0)
             return text;
         return "\"" + text.replace("\"", "\"\"") + "\"";

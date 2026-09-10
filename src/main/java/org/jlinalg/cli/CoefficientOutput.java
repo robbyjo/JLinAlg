@@ -17,15 +17,14 @@ final class CoefficientOutput {
             Path path, boolean overwrite, List<String> names,
             double[] beta, double[] standardErrors, double[] statistics,
             double[] degreesOfFreedom, double[] pValues,
-            String statisticType, String dfMethod,
+            String statisticType,
             double[] transformedEffects, String transformedEffectName)
             throws IOException {
         try (ExternalBh output = new ExternalBh(path, overwrite)) {
             output.writeHeader(List.of("status", "term", "beta",
-                "standard_error", "statistic", "statistic_type",
-                "df_numerator", "df_denominator", "df_method",
-                "partial_r2", "partial_r2_method", transformedEffectName,
-                "p_value"));
+                "standard_error", "statistic", "df_numerator",
+                "df_denominator", "partial_r2",
+                transformedEffectName, "p_value"));
             for (int index = 0; index < names.size(); index++) {
                 double df = degreesOfFreedom[index];
                 double squared = statistics[index] * statistics[index];
@@ -38,13 +37,9 @@ final class CoefficientOutput {
                 fields.add(number(beta[index]));
                 fields.add(number(standardErrors[index]));
                 fields.add(number(statistics[index]));
-                fields.add(statisticType);
                 fields.add("1");
                 fields.add(number(df));
-                fields.add(dfMethod);
                 fields.add(number(partial));
-                fields.add(Double.isFinite(partial)
-                    ? "test-statistic" : "");
                 fields.add(transformedEffects == null ? ""
                     : number(transformedEffects[index]));
                 fields.add(number(pValues[index]));

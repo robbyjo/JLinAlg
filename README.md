@@ -145,11 +145,19 @@ memory and process an adaptive block sized from current JVM heap headroom.
 arrive, and Benjamini-Hochberg adjustment uses bounded external sorting rather
 than retaining every result or p-value in memory.
 
-The common result table contains beta, standard error, test statistic,
-denominator DF, partial R-squared where defined, p-value, and BH FDR. Genotype
-results additionally report ALT-oriented effects, allele frequencies, MAC,
-missingness, and all-sample HWE. Recognized binary responses add separate case
-and control HWE columns. Non-WGS annotations can be joined with:
+Numeric omics results use a compact table containing status, feature ID, beta,
+standard error, test statistic, denominator DF, partial R-squared where
+defined, p-value, one combined failure reason, annotations, and BH FDR.
+Genotype-only outputs additionally report chromosome/position, ALT-oriented
+alleles and effects, allele frequencies, MAC, missingness, imputation quality,
+filters, and HWE. Recognized binary responses add separate case and control HWE
+columns.
+
+The output extension selects the delimiter: `.csv` writes quoted
+comma-separated records and `.tsv` writes tab-separated records. Run-invariant
+`omics_type`, `statistic_type`, `df_method`, and `partial_r2_method`
+belong to the log and manifest rather than being repeated on every result row.
+Non-WGS annotations can be joined with:
 
 ```text
 --annot annotation.tsv --annot-id probe_id --annot-cols chr,start,gene,strand

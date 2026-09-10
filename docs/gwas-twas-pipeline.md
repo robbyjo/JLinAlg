@@ -6,6 +6,13 @@ Genotypes remain block-streamed and `fastOlsTo`/`remlP3dTo` can stream results
 directly to a sink, so neither variants nor output rows need to accumulate in
 memory.
 
+CLI result delimiters follow the output suffix: `.csv` selects comma with
+standard doubled-quote escaping, while `.tsv` and other suffixes retain tab
+output. Numeric omics output omits every genotype-only position, allele, QC,
+HWE, and filter column. Failed rows retain one `failure_reason`; successful
+rows leave it blank. Invariant `omics_type`, `statistic_type`, `df_method`,
+and `partial_r2_method` are recorded once in both the run log and manifest.
+
 ## Inputs
 
 `VariantSources.open(path)` infers these suffixes:

@@ -174,7 +174,8 @@ public final class JLinAlgCli {
                                            only for genotype LMM scans
               --ties efron|breslow         Cox tied-event method
               --df auto|satterth|kr
-              --out FILE                   Log defaults to FILE.log
+              --out FILE                   .csv writes CSV; other suffixes
+                                           write TSV. Log defaults to FILE.log
 
             Streaming and reproducibility:
               --block-size auto|N           Default uses JVM heap headroom
