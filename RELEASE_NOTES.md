@@ -1,3 +1,38 @@
+# JLinAlg 0.3.2
+
+## Automatic phenotype/omics sample alignment
+
+- Omics scans now intersect phenotype and omics sample IDs automatically,
+  retaining deterministic omics-file order and subsetting both inputs to the
+  same analysis sample set.
+- The console and run log report aligned, omics-only, and phenotype-only sample
+  counts. Inputs with no sample IDs in common still fail explicitly.
+- Added end-to-end CLI coverage for unequal ID sets and verified the behavior
+  against a 5,100-sample TOPMed expression matrix.
+
+## Statistical and modeling extensions
+
+- Added complete-case mixed-formula compilation, sparse pedigree combinations,
+  richer covariance profiles, joint Kenward-Roger tests, and expanded
+  multilevel and sparse meta-analysis.
+- Added bounded multidimensional adaptive Gauss-Hermite quadrature and
+  deterministic multi-start diagnostics for sparse ZIP/ZINB fits.
+- Added covariance-aware multivariable MR conditional-strength inference and
+  strengthened positive-mixture and SKAT-O tail calibration.
+
+## Omics, runtime, and validation
+
+- Includes the v0.3.1 R-compatible `winsor_mad(k=4)` transform and its complete
+  CLI tutorial, with whitespace-tolerant transform pipeline syntax.
+- Upgraded the pinned runtime to JDistlib 0.10.2 with checksum verification and
+  independent downstream numerical validation.
+- Expanded Java/R fixtures, boundary tests, GPU runtime guidance, and
+  reproducible audit documentation.
+
+Release downloads: `jlinalg-0.3.2.jar` is the self-contained executable;
+`JLinAlg-0.3.2-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included.
+
 # JLinAlg 0.3.0
 
 ## Post-release development

@@ -72,7 +72,7 @@ Conditional instrument p-values and causal-estimate p-values are different
 quantities with separate output names.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.0.jar mr-estimate `
+java -jar build/cli/jlinalg-0.3.2.jar mr-estimate `
   --input harmonized.tsv --method conditional --joint --ld ld-correlation.tsv
 ```
 
