@@ -5,6 +5,7 @@
 package org.jlinalg.cli;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -66,11 +67,14 @@ final class AnalysisRunner {
     private final CliOptions options;
     private final FormulaPlan plan;
     private final RunLog log;
+    private final PrintStream output;
 
-    AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log) {
+    AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log,
+            PrintStream output) {
         this.options = options;
         this.plan = plan;
         this.log = log;
+        this.output = output;
     }
 
     int execute() throws IOException {
@@ -113,6 +117,8 @@ final class AnalysisRunner {
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(sourceIds,
             plan.response(), binomial, options.caseValue, options.controlValue);
+        reportSampleAlignment(sourceIds.size(), phenotype.originalIds().size(),
+            prepared.ids().size());
         logBinary(prepared);
         GrmContext grm = grm(phenotype, prepared);
         String model = resolveModel();
@@ -128,7 +134,7 @@ final class AnalysisRunner {
         }
         double[][] covariates = matrix(
             fixed.design(), fixed.rows(), fixed.columns());
-        int blockSize = AdaptiveBlockSizer.choose(sourceIds.size(),
+        int blockSize = AdaptiveBlockSizer.choose(prepared.ids().size(),
             options.blockSize);
         info("resolved_model=" + model);
         info("variance_components=" + options.varianceComponents);
@@ -136,13 +142,12 @@ final class AnalysisRunner {
         info("threads=" + options.threads);
         info("backend=" + options.backend);
         if (options.explain || options.dryRun) {
-            System.out.println("omics type: " + detection.type()
+            output.println("omics type: " + detection.type()
                 + " (" + detection.source() + ")");
-            System.out.println("model: " + model);
-            System.out.println("samples: " + sourceIds.size());
-            System.out.println("adaptive block size: " + blockSize);
-            System.out.println("backend: " + options.backend);
-            System.out.println("output: " + options.output);
+            output.println("model: " + model);
+            output.println("adaptive block size: " + blockSize);
+            output.println("backend: " + options.backend);
+            output.println("output: " + options.output);
             if (options.dryRun) return 0;
         }
         if (options.resume && Files.exists(Path.of(options.output + ".partial")))
@@ -179,12 +184,12 @@ final class AnalysisRunner {
                 annotation, genotype ? prepared.caseControlGroups() : null)) {
             counts = switch (model) {
                 case "ols" -> scanOls(variantSource, numericSource, genotype,
-                    sourceIds, fixed, covariates, transform, blockSize,
+                    prepared.ids(), fixed, covariates, transform, blockSize,
                     engine, pipeline, sink);
                 case "glm" -> scanGlm(variantSource, numericSource, genotype,
-                    sourceIds, fixed, covariates, transform, blockSize,
+                    prepared.ids(), fixed, covariates, transform, blockSize,
                     engine, pipeline, sink);
-                case "lmm" -> scanLmm(variantSource, genotype, sourceIds,
+                case "lmm" -> scanLmm(variantSource, genotype, prepared.ids(),
                     fixed, mixed, grm, covariates, blockSize, pipeline, sink);
                 default -> throw new IllegalArgumentException(
                     "omics model is not yet supported: " + model);
@@ -601,6 +606,22 @@ final class AnalysisRunner {
         if (prepared.binaryMapping() == null) return;
         info("case_value=" + prepared.binaryMapping().caseValue());
         info("control_value=" + prepared.binaryMapping().controlValue());
+    }
+
+    private void reportSampleAlignment(
+            int omicsSamples, int phenotypeSamples, int alignedSamples)
+            throws IOException {
+        int omicsOnly = omicsSamples - alignedSamples;
+        int phenotypeOnly = phenotypeSamples - alignedSamples;
+        info("omics_samples=" + omicsSamples);
+        info("phenotype_samples=" + phenotypeSamples);
+        info("aligned_samples=" + alignedSamples);
+        info("omics_only_samples=" + omicsOnly);
+        info("phenotype_only_samples=" + phenotypeOnly);
+        output.println("Aligned samples: " + alignedSamples
+            + " (omics=" + omicsSamples + ", phenotype=" + phenotypeSamples
+            + ", omics-only=" + omicsOnly
+            + ", phenotype-only=" + phenotypeOnly + ")");
     }
 
     private void manifest(

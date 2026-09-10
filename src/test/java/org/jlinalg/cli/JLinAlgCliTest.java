@@ -137,6 +137,43 @@ class JLinAlgCliTest {
     }
 
     @Test
+    void intersectsMismatchedOmicsAndPhenotypeSamplesAndReportsCounts()
+            throws Exception {
+        Path phenotype = temporaryDirectory.resolve("mismatched-phenotype.csv");
+        Path omics = temporaryDirectory.resolve("mismatched-expression.csv");
+        Path output = temporaryDirectory.resolve("aligned.tsv");
+        Files.writeString(phenotype,
+            "IID,trait,age\n"
+            + "S3,3.2,40\nS1,1.0,20\nS4,3.8,50\n"
+            + "S2,2.0,30\nS7,7.0,80\nS5,5.1,60\n");
+        Files.writeString(omics,
+            "gene,S1,S2,S3,S4,S5,S6\n"
+            + "GENE1,0.10,0.22,0.31,0.43,0.54,0.65\n"
+            + "GENE2,0.61,0.52,0.44,0.33,0.21,0.12\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--omics", omics.toString(), "--pheno", phenotype.toString(),
+            "--id", "IID", "--formula", "trait ~ age + <omics>",
+            "--threads", "1", "--block-size", "1",
+            "--out", output.toString()
+        }, console, console);
+
+        assertEquals(0, status);
+        assertEquals(3, Files.readAllLines(output).size());
+        assertTrue(bytes.toString().contains(
+            "Aligned samples: 5 (omics=6, phenotype=6, omics-only=1, "
+                + "phenotype-only=1)"));
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("omics_samples=6"));
+        assertTrue(log.contains("phenotype_samples=6"));
+        assertTrue(log.contains("aligned_samples=5"));
+        assertTrue(log.contains("omics_only_samples=1"));
+        assertTrue(log.contains("phenotype_only_samples=1"));
+    }
+
+    @Test
     void gwasOutputIsAltOrientedAndIncludesStratifiedHwe() throws Exception {
         Path phenotype = temporaryDirectory.resolve("case-control.tsv");
         Path variants = temporaryDirectory.resolve("variants.tsv");

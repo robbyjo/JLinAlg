@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.jlinalg.formula.ModelTable;
+import org.jlinalg.pipeline.SampleAlignment;
 
 /** In-memory phenotype table; large omics matrices remain block streamed. */
 final class PhenotypeData {
@@ -46,17 +47,8 @@ final class PhenotypeData {
             List<String> requestedIds, String response,
             boolean encodeBinomial, String requestedCase,
             String requestedControl) {
-        List<String> ids = requestedIds == null
-            ? originalIds() : List.copyOf(requestedIds);
-        if (requestedIds != null) {
-            if (ids.size() != rowById.size())
-                throw new IllegalArgumentException(
-                    "omics and phenotype ID sets differ; exact alignment is required");
-            for (String id : ids)
-                if (!rowById.containsKey(id))
-                    throw new IllegalArgumentException(
-                        "omics sample is absent from phenotype table: " + id);
-        }
+        List<String> ids = requestedIds == null ? originalIds()
+            : SampleAlignment.intersect(requestedIds, originalIds()).sampleIds();
         int[] order = new int[ids.size()];
         for (int index = 0; index < ids.size(); index++)
             order[index] = rowById.get(ids.get(index));

@@ -82,7 +82,8 @@ public final class JLinAlgCli {
             if (options.minimumHweP > 0)
                 throw new IllegalArgumentException(
                     "--min-hwe-p filtering is not yet available; HWE is reported");
-            AnalysisRunner runner = new AnalysisRunner(options, plan, log);
+            AnalysisRunner runner = new AnalysisRunner(
+                options, plan, log, output);
             int result = runner.execute();
             complete(log, "complete");
             return result;
@@ -156,7 +157,8 @@ public final class JLinAlgCli {
             Core options:
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix
               --pheno FILE                 Observation-by-variable CSV/TSV
-              --id COLUMN                  Phenotype sample-ID column
+              --id COLUMN                  Phenotype sample-ID column; omics
+                                           scans use the ID intersection
               --formula FORMULA            R-style fixed/random formula
               --model auto|ols|lmm|glm|glmm|cox
               --family gaussian|binomial|poisson|gamma
