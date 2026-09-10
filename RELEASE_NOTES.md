@@ -1,3 +1,22 @@
+# JLinAlg 0.3.1
+
+## MAD-based winsorization
+
+- Added `OmicsTransforms.winsorizeMad(k)` and the CLI stage
+  `--transform "<omics> = winsor_mad(k=4)"`.
+- The transform clamps finite values to `median +/- k * MAD`, using the
+  R-compatible normal-consistency scale
+  `MAD = median(abs(x - median)) / qnorm(0.75)`.
+- `k` defaults to 4 and must be finite and nonnegative. Missing values are
+  preserved and excluded from the median calculations; a zero or non-finite
+  MAD leaves the row unchanged.
+- Added focused numerical, parser, and file-pipeline tests plus a complete
+  command-line transform tutorial.
+
+Release downloads: `jlinalg-0.3.1.jar` is the self-contained executable;
+`JLinAlg-0.3.1-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included.
+
 # JLinAlg 0.3.0
 
 ## Remaining-code accuracy and performance audit

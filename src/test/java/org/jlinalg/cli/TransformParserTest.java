@@ -19,7 +19,7 @@ class TransformParserTest {
         OmicsTransform defaults = TransformParser.parse(
             List.of("<omics>=winsor_mad"), List.of());
         OmicsTransform parameterized = TransformParser.parse(
-            List.of("<omics>=winsor_mad(k=2)"), List.of());
+            List.of("<omics> = identity() | winsor_mad(k=2)"), List.of());
 
         assertArrayEquals(
             new double[] {1, 2, 3, 4, 3 + 4 * MAD_SCALE, Double.NaN},
