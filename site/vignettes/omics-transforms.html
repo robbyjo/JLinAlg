@@ -7,13 +7,13 @@
   --pheno phenotype.tsv `
   --id IID `
   --formula "trait ~ age + sex + &lt;omics&gt;" `
-  --transform "&lt;omics&gt;=mvalue(epsilon=1e-6)|zscore()" `
+  --transform "&lt;omics&gt; = mvalue(epsilon=1e-6) | zscore()" `
   --out ewas-results.tsv</code></pre></div>
 <p>The omics file has one feature per row and one sample per column. Its first column is the feature ID:</p><pre><code>feature_id  S1    S2    S3    S4
 cg000001    0.12  0.20  NA    0.85
 cg000002    0.44  0.51  0.49  0.55</code></pre>
-<h2 id="syntax">Read the pipeline syntax</h2><pre><code>--transform "&lt;omics&gt;=stage(parameters)|next_stage()"</code></pre>
-<p>Use the literal target <code>&lt;omics&gt;</code> and quote the complete specification so the shell does not interpret <code>&lt;</code>, <code>&gt;</code>, or <code>|</code>. Stages run left to right. JLinAlg aligns sample IDs first, then applies the complete pipeline independently to every feature row; it never pools values across features. Repeating <code>--transform</code> appends stages in command-line order. Omitting the option is equivalent to <code>identity()</code>.</p>
+<h2 id="syntax">Read the pipeline syntax</h2><pre><code>--transform "&lt;omics&gt; = stage(parameters) | next_stage()"</code></pre>
+<p>Use the literal target <code>&lt;omics&gt;</code> and quote the complete specification so the shell does not interpret <code>&lt;</code>, <code>&gt;</code>, or <code>|</code>. Whitespace around the target-assignment <code>=</code> and stage separator <code>|</code> is optional; the examples include it to make those boundaries clear. Stages run left to right. JLinAlg aligns sample IDs first, then applies the complete pipeline independently to every feature row; it never pools values across features. Repeating <code>--transform</code> appends stages in command-line order. Omitting the option is equivalent to <code>identity()</code>.</p>
 <h2 id="built-ins">Choose a built-in stage</h2>
 <div class="result-table"><table><thead><tr><th>Stage</th><th>Operation</th><th>Contract</th></tr></thead><tbody>
 <tr><td><code>identity()</code></td><td>Copy without changing values.</td><td><code>identity</code> is also accepted.</td></tr>
@@ -28,11 +28,11 @@ cg000002    0.44  0.51  0.49  0.55</code></pre>
 </tbody></table></div>
 <p>Names are case-insensitive. Use the parameter names shown. Custom expression syntax such as <code>expr(...)</code> is deliberately not enabled.</p>
 <h2 id="recipes">Match the pipeline to the data</h2>
-<h3>Robust median/MAD clipping</h3><pre><code>--transform "&lt;omics&gt;=winsor_mad(k=4)|zscore()"</code></pre><p>Clamp outliers relative to a robust row center and scale, then standardize. This matches R's <code>mad(..., constant = 1/qnorm(0.75), na.rm = TRUE)</code> scaling. A zero raw MAD leaves the row unchanged.</p>
-<h3>Methylation beta values</h3><pre><code>--transform "&lt;omics&gt;=mvalue(epsilon=1e-6)|zscore()"</code></pre><p>Convert beta values to M values, then report effects per one standard deviation of the transformed feature.</p>
-<h3>Nonnegative expression measurements</h3><pre><code>--transform "&lt;omics&gt;=log1p()|zscore()"</code></pre><p>Compress a long right tail and standardize. Use <code>log(offset=...)</code> when the required pseudocount is not one.</p>
-<h3>Protein abundance with outliers</h3><pre><code>--transform "&lt;omics&gt;=winsor(p=0.01)|int(method=blom)"</code></pre><p>Limit extreme observations, then use normal scores. Rank inverse-normalization changes the estimand; choose it as an analysis decision. Adding <code>zscore()</code> after <code>int()</code> is generally redundant.</p>
-<h3>Asymmetric clipping</h3><pre><code>--transform "&lt;omics&gt;=winsor(lower=0.005,upper=0.975)|zscore()"</code></pre><p>Use separate tails only when that asymmetry is part of the scientific preprocessing rule.</p>
+<h3>Robust median/MAD clipping</h3><pre><code>--transform "&lt;omics&gt; = winsor_mad(k=4) | zscore()"</code></pre><p>Clamp outliers relative to a robust row center and scale, then standardize. This matches R's <code>mad(..., constant = 1/qnorm(0.75), na.rm = TRUE)</code> scaling. A zero raw MAD leaves the row unchanged.</p>
+<h3>Methylation beta values</h3><pre><code>--transform "&lt;omics&gt; = mvalue(epsilon=1e-6) | zscore()"</code></pre><p>Convert beta values to M values, then report effects per one standard deviation of the transformed feature.</p>
+<h3>Nonnegative expression measurements</h3><pre><code>--transform "&lt;omics&gt; = log1p() | zscore()"</code></pre><p>Compress a long right tail and standardize. Use <code>log(offset=...)</code> when the required pseudocount is not one.</p>
+<h3>Protein abundance with outliers</h3><pre><code>--transform "&lt;omics&gt; = winsor(p=0.01) | int(method=blom)"</code></pre><p>Limit extreme observations, then use normal scores. Rank inverse-normalization changes the estimand; choose it as an analysis decision. Adding <code>zscore()</code> after <code>int()</code> is generally redundant.</p>
+<h3>Asymmetric clipping</h3><pre><code>--transform "&lt;omics&gt; = winsor(lower=0.005,upper=0.975) | zscore()"</code></pre><p>Use separate tails only when that asymmetry is part of the scientific preprocessing rule.</p>
 <h2 id="missing">Understand missing values and failures</h2><p>Blank cells plus <code>.</code>, <code>NA</code>, <code>N/A</code>, <code>null</code>, and <code>NaN</code> are missing. Built-in stages preserve them and calculate row statistics from finite values. After the complete transform pipeline, the CLI mean-imputes remaining missing entries within that transformed feature row.</p>
 <p>Domain checks are strict: <code>log1p()</code> rejects -1, <code>log()</code> rejects a nonpositive shifted value, <code>mvalue()</code> rejects values outside <code>[0,1]</code>, and <code>zscore()</code> rejects constant rows. A transform-domain error or a row with no finite values stops the run. A feature that passes the transform but is non-estimable after model adjustment uses the normal structured failure output and accounting.</p>
 <div class="note"><strong>Interpretation</strong>Coefficients are on the final transformed scale. Record the exact transform string, input version, and analysis choices with the result manifest and log.</div>
@@ -53,7 +53,7 @@ cg000002    0.44  0.51  0.49  0.55</code></pre>
     }
 }</code></pre></div>
 <p>The service file contains the fully qualified provider class, for example <code>example.ScaleTransformProvider</code>. Load and compose it like this:</p><pre><code>--transform-plugin transforms.jar \
---transform "&lt;omics&gt;=scale(factor=2)|zscore()"</code></pre><p>Plugin JARs execute arbitrary JVM code in the analysis process. Load only artifacts you trust.</p>
+--transform "&lt;omics&gt; = scale(factor=2) | zscore()"</code></pre><p>Plugin JARs execute arbitrary JVM code in the analysis process. Load only artifacts you trust.</p>
 <p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/omics-transforms.md">Markdown tutorial and complete provider example →</a></p>
 <div class="next-links"><a href="association.html"><small>Related</small><strong>Association pipelines</strong></a><a href="mendelian-randomization.html"><small>Next</small><strong>Mendelian randomization →</strong></a></div>
 </article><aside class="toc"><strong>On this page</strong><a href="#quick-start">Quick start</a><a href="#syntax">Syntax</a><a href="#built-ins">Built-ins</a><a href="#recipes">Recipes</a><a href="#missing">Missing values</a><a href="#plugins">Custom plugins</a></aside></div></main><site-footer root="../"></site-footer></body></html>
