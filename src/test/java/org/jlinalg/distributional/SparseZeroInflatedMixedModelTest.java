@@ -176,16 +176,13 @@ final class SparseZeroInflatedMixedModelTest {
                         count, 3, fixture.countFixed(), 2, dispersion, 2, offsets);
                     System.out.printf("ZI cache zeroRandom=%s pass=%d serial=%s calls=%d modes=%d LL=%.12f parallel=%s calls=%d%n",
                         zeroRandom,pass,expected.converged(),expected.objectiveEvaluations(),expected.modeIterations(),expected.marginalLogLikelihood(),actual.converged(),actual.objectiveEvaluations());
-                    if (zeroRandom && pass == 1) {
-                        // The changed-response, two-process model switches cold
-                        // conditional modes under tiny outer perturbations. It
-                        // is a nonregular failure regression, not a speed gate.
-                        assertFalse(expected.converged());
-                        assertFalse(actual.converged());
-                    } else {
-                        assertTrue(expected.converged(), expected.convergenceMessage());
-                        assertTrue(actual.converged(), actual.convergenceMessage());
-                    }
+                    assertTrue(expected.converged(), expected.convergenceMessage());
+                    assertTrue(actual.converged(), actual.convergenceMessage());
+                    assertTrue(expected.optimizationStarts() >= 5);
+                    assertEquals(expected.globalOptimumCertified(),
+                        actual.globalOptimumCertified());
+                    assertTrue(expected.globalOptimumCertified(),
+                        "selected likelihood must be best across multiple stationary starts");
                     assertArrayEquals(expected.outerParameterEstimates(),
                         actual.outerParameterEstimates(), 1e-8);
                     assertArrayEquals(expected.fittedMeans(), actual.fittedMeans(), 1e-8);
@@ -321,7 +318,14 @@ final class SparseZeroInflatedMixedModelTest {
             assertEquals(12, fit.randomEffects("zero:group").length);
             assertEquals(prepared.sparseEquationNonzeroCount(),
                 fit.sparseEquationNonzeroCount());
-            assertTrue(fit.inferenceAvailable());
+            assertTrue(fit.inferenceAvailable(), () ->
+                "converged=" + fit.converged()
+                    + " certified=" + fit.globalOptimumCertified()
+                    + " starts=" + fit.optimizationStarts()
+                    + " parameters="
+                    + java.util.Arrays.toString(
+                        fit.outerParameterEstimates())
+                    + " warnings=" + fit.warnings());
             assertEquals(3, fit.standardErrors().length);
             for (double value : fit.standardErrors())
                 assertTrue(Double.isFinite(value) && value >= 0.0);

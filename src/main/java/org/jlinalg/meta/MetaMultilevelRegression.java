@@ -9,11 +9,86 @@ import java.util.function.ToDoubleFunction;
 import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.mixed.MixedModelProfile;
+import org.jlinalg.mixed.ProfileLikelihoodInterval;
 
 /** Known-covariance GLS and joint ML/REML estimation of grouped random coefficients. */
 public final class MetaMultilevelRegression {
     private MetaMultilevelRegression() { }
     public enum Estimation { ML, REML }
+
+    /**
+     * Profiles a diagonal/common random-effect standard deviation while all
+     * remaining covariance coordinates are jointly refitted. Unstructured
+     * marginal SDs are excluded because a row norm, rather than one Cholesky
+     * coordinate, must be constrained.
+     */
+    public static ProfileLikelihoodInterval profileRandomStandardDeviation(
+            List<MetaStudy> studies, double[][] moderators,
+            List<String> moderatorNames, double[][] samplingCovariance,
+            boolean includeIntercept, List<MetaRandomEffect> randomEffects,
+            int randomEffect, int effect, Estimation estimation,
+            double confidence, double upper,
+            MetaAnalysisOptions options, BackendPolicy policy) {
+        double[] y = MetaMath.data(studies).effects(); int n = y.length;
+        double[] x = MetaGls.design(moderators, moderatorNames, n,
+            includeIntercept);
+        double[] sampling = MetaGls.matrix(samplingCovariance, n);
+        if (randomEffects == null || randomEffect < 0
+                || randomEffect >= randomEffects.size()
+                || !(upper > 0) || !Double.isFinite(upper)
+                || estimation == null || options == null || policy == null)
+            throw new IllegalArgumentException("profile target, bounds, estimation, controls and backend are required");
+        List<MetaRandomEffect> terms = List.copyOf(randomEffects);
+        MetaRandomEffect target = terms.get(randomEffect);
+        if (effect < 0 || effect >= target.columns()
+                || target.structure() == MetaRandomEffect.Structure.UNSTRUCTURED
+                    && target.columns() > 1
+                || (target.structure() == MetaRandomEffect.Structure.COMPOUND_SYMMETRY
+                    || target.structure() == MetaRandomEffect.Structure.AR1) && effect != 0)
+            throw new IllegalArgumentException("profile supports diagonal effects and structured common variance");
+        int p=x.length/n,d=terms.stream().mapToInt(MetaRandomEffect::parameters).sum();
+        int targetCoordinate=0;
+        for(int i=0;i<randomEffect;i++)targetCoordinate+=terms.get(i).parameters();
+        if(target.structure()==MetaRandomEffect.Structure.DIAGONAL)targetCoordinate+=effect;
+        final int selected=targetCoordinate;
+        try(BackendContext context=BackendContext.select(policy)){
+            ComputeBackend backend=context.backend();
+            checkIdentifiable(terms,y,x,p,estimation,backend);
+            MetaGls.Fit initialFit=MetaGls.fit(y,x,p,sampling,backend);
+            double variance=0;for(double e:initialFit.residual())variance+=e*e/(n-p);
+            double scale=Math.sqrt(Math.max(1e-8,variance)/terms.size());
+            double[] scales=new double[d],start=new double[d];int k=0;
+            for(MetaRandomEffect term:terms){term.initialize(scale,scales,start,k);k+=term.parameters();}
+            ToDoubleFunction<double[]> objective=point->{
+                double[] total=total(sampling,terms,physical(point,scales));
+                try{MetaGls.Fit fit=MetaGls.fit(y,x,p,total,backend);
+                    return -(estimation==Estimation.REML?fit.reml():fit.ml());
+                }catch(IllegalArgumentException|IllegalStateException failure){return Double.POSITIVE_INFINITY;}
+            };
+            MetaCovarianceOptimizer.Result optimum=MetaCovarianceOptimizer.minimize(
+                objective,start,options.maximumIterations()*d,options.tolerance());
+            if(!optimum.converged())throw new IllegalStateException("meta-analysis profile maximum did not converge");
+            double[] covariance=target.covariance(physical(optimum.point(),scales),
+                java.util.stream.IntStream.range(0,randomEffect).map(i->terms.get(i).parameters()).sum());
+            double estimate=Math.sqrt(covariance[effect*target.columns()+effect]);
+            double[] reduced=new double[d-1];
+            for(int i=0,j=0;i<d;i++)if(i!=selected)reduced[j++]=optimum.point()[i];
+            return MixedModelProfile.interval(sd->{
+                double[] localStart=reduced.clone();
+                ToDoubleFunction<double[]> constrained=free->{
+                    double[] full=new double[d];
+                    for(int i=0,j=0;i<d;i++)full[i]=i==selected
+                        ? sd/scales[selected]:free[j++];
+                    return objective.applyAsDouble(full);
+                };
+                MetaCovarianceOptimizer.Result fitted=MetaCovarianceOptimizer.minimize(
+                    constrained,localStart,options.maximumIterations()*Math.max(1,d-1),options.tolerance());
+                if(!fitted.converged())throw new IllegalStateException("constrained meta-analysis profile did not converge");
+                return -fitted.objective();
+            },estimate,-optimum.objective(),confidence,0,upper,12);
+        }
+    }
 
     /** Fit with a supplied, known total covariance (no covariance estimation). */
     public static MetaMultilevelRegressionResult fit(List<MetaStudy> studies, double[][] moderators,
@@ -56,11 +131,9 @@ public final class MetaMultilevelRegression {
             for (double e : initial.residual()) variance += e * e / (n - p);
             double scale = Math.sqrt(Math.max(1e-8, variance) / terms.size());
             double[] scales = new double[d], start = new double[d]; int k = 0;
-            for (MetaRandomEffect term : terms) for (int a = 0; a < term.columns(); a++) {
-                double norm = 0; for (int i = 0; i < n; i++) norm += term.z(i, a) * term.z(i, a) / n;
-                for (int b = 0; b <= a; b++) if (term.structure() == MetaRandomEffect.Structure.UNSTRUCTURED || a == b) {
-                    scales[k] = scale / Math.sqrt(norm); start[k++] = a == b ? 0.5 : 0;
-                }
+            for (MetaRandomEffect term : terms) {
+                term.initialize(scale, scales, start, k);
+                k += term.parameters();
             }
             ToDoubleFunction<double[]> objective = point -> {
                 double[] total = total(v, terms, physical(point, scales));
@@ -122,11 +195,11 @@ public final class MetaMultilevelRegression {
                 for (int a = 0; a < p; a++) for (int b = 0; b < p; b++)
                     projection[i * n + j] -= x[i * p + a] * bread[a * p + b] * x[j * p + b];
         }
-        for (MetaRandomEffect term : terms) for (int a = 0; a < term.columns(); a++)
-            for (int b = 0; b <= a; b++) if (a == b || term.structure() == MetaRandomEffect.Structure.UNSTRUCTURED) {
+        for (MetaRandomEffect term : terms) for (double[] coefficientBasis : term.covarianceBases()) {
                 double[] component = new double[n * n];
                 for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) if (term.sameGroup(i, j))
-                    component[i * n + j] = term.z(i, a) * term.z(j, b) + (a == b ? 0 : term.z(i, b) * term.z(j, a));
+                    for(int a=0;a<term.columns();a++)for(int b=0;b<term.columns();b++)
+                        component[i * n + j] += term.z(i,a)*coefficientBasis[a*term.columns()+b]*term.z(j,b);
                 double[] projected = multiply(multiply(projection, component, n), projection, n);
                 double norm = 0; for (double value : projected) norm += value * value;
                 if (!(norm > 1e-20)) throw new IllegalArgumentException("random covariance is unidentifiable after fixed effects");

@@ -5,6 +5,7 @@ package org.jlinalg.mr;
 import java.util.HashSet;
 import java.util.List;
 import jdistlib.accelerator.ComputeBackend;
+import jdistlib.accelerator.CholeskyFactor;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.inference.AssociationStatistics;
@@ -79,11 +80,189 @@ public final class MultivariableMendelianRandomization {
             double[] marginalF = marginalStrength(instruments, exposures);
             return new MultivariableMrResult(exposureNames,
                 AssociationStatistics.normal(beta, se), exposureCovariance,
-                marginalF,
+                marginalF, null,
                 intercept ? solution.coefficients()[0] : 0.0,
                 intercept ? Math.sqrt(Math.max(0.0, covariance[0])) : Double.NaN,
                 q, df);
         }
+    }
+
+    /**
+     * Generalized multivariable IVW/Egger with a known instrument-by-instrument
+     * outcome covariance and per-instrument cross-exposure sampling covariance.
+     * The latter is used for genuine conditional-strength diagnostics.
+     */
+    public static MultivariableMrResult generalizedFit(
+            List<MultivariableInstrument> instruments,
+            List<String> exposureNames, boolean intercept,
+            double[][] outcomeCovariance,
+            List<double[][]> exposureSamplingCovariances,
+            BackendPolicy backendPolicy) {
+        int exposures = validate(instruments, exposureNames);
+        int rows = instruments.size();
+        int columns = exposures + (intercept ? 1 : 0);
+        if (rows <= columns || backendPolicy == null)
+            throw new IllegalArgumentException("more instruments than coefficients and a backend are required");
+        double[] covariance = org.jlinalg.internal.MatrixOps.rowMajor(
+            outcomeCovariance, rows);
+        if (outcomeCovariance[0].length != rows)
+            throw new IllegalArgumentException("outcome covariance must be square");
+        double[] design = new double[rows * columns];
+        double[] outcome = new double[rows];
+        for (int row = 0; row < rows; row++) {
+            if (intercept) design[row * columns] = 1.0;
+            double[] effects = instruments.get(row).exposureEffects();
+            for (int exposure = 0; exposure < exposures; exposure++)
+                design[row * columns + exposure + (intercept ? 1 : 0)] = effects[exposure];
+            outcome[row] = instruments.get(row).outcomeEffect();
+            for (int column = 0; column < rows; column++) {
+                double a = covariance[row * rows + column];
+                double b = covariance[column * rows + row];
+                if (!Double.isFinite(a) || Math.abs(a - b) > 1e-12 * Math.max(1.0, Math.max(Math.abs(a), Math.abs(b))))
+                    throw new IllegalArgumentException("outcome covariance must be finite and symmetric");
+            }
+        }
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            ComputeBackend backend = context.backend();
+            CholeskyFactor vf;
+            try { vf = backend.dpotrf(covariance, rows); }
+            catch (IllegalArgumentException | IllegalStateException failure) {
+                throw new IllegalArgumentException("outcome covariance must be positive definite", failure);
+            }
+            double[] inverseDesign = vf.solve(design, columns);
+            double[] inverseOutcome = vf.solve(outcome);
+            double[] information = new double[columns * columns];
+            double[] rhs = new double[columns];
+            for (int a = 0; a < columns; a++) for (int row = 0; row < rows; row++) {
+                rhs[a] += design[row * columns + a] * inverseOutcome[row];
+                for (int b = 0; b < columns; b++)
+                    information[a * columns + b] += design[row * columns + a] * inverseDesign[row * columns + b];
+            }
+            CholeskyFactor factor;
+            try { factor = backend.dpotrf(information, columns); }
+            catch (IllegalArgumentException | IllegalStateException failure) {
+                throw new IllegalArgumentException("generalized multivariable design is rank deficient", failure);
+            }
+            double[] coefficients = factor.solve(rhs);
+            double[] coefficientCovariance = factor.solve(
+                org.jlinalg.internal.MatrixOps.identity(columns), columns);
+            double[] residual = outcome.clone();
+            for (int row = 0; row < rows; row++) for (int column = 0; column < columns; column++)
+                residual[row] -= design[row * columns + column] * coefficients[column];
+            double[] inverseResidual = vf.solve(residual);
+            double q = 0;
+            for (int row = 0; row < rows; row++) q += residual[row] * inverseResidual[row];
+            int df = rows - columns;
+            double dispersion = Math.max(1.0, q / df);
+            int offset = intercept ? 1 : 0;
+            double[] beta = new double[exposures], se = new double[exposures];
+            double[] effectCovariance = new double[exposures * exposures];
+            for (int a = 0; a < exposures; a++) {
+                beta[a] = coefficients[a + offset];
+                se[a] = Math.sqrt(dispersion * coefficientCovariance[(a + offset) * columns + a + offset]);
+                for (int b = 0; b < exposures; b++)
+                    effectCovariance[a * exposures + b] = dispersion * coefficientCovariance[(a + offset) * columns + b + offset];
+            }
+            ConditionalStrengthResult strength = conditionalStrength(
+                instruments, exposureNames, exposureSamplingCovariances,
+                backendPolicy);
+            return new MultivariableMrResult(exposureNames,
+                AssociationStatistics.normal(beta, se), effectCovariance,
+                marginalStrength(instruments, exposures), strength.fStatistics(),
+                intercept ? coefficients[0] : 0,
+                intercept ? Math.sqrt(dispersion * coefficientCovariance[0]) : Double.NaN,
+                q, df);
+        }
+    }
+
+    /** Conditional instrument strength using full within-instrument exposure covariance. */
+    public static ConditionalStrengthResult conditionalStrength(
+            List<MultivariableInstrument> instruments,
+            List<String> exposureNames,
+            List<double[][]> exposureSamplingCovariances,
+            BackendPolicy backendPolicy) {
+        int exposures = validate(instruments, exposureNames);
+        int variants = instruments.size();
+        if (exposureSamplingCovariances == null
+                || exposureSamplingCovariances.size() != variants
+                || backendPolicy == null)
+            throw new IllegalArgumentException("one exposure sampling covariance matrix and a backend are required per instrument");
+        double[][][] covariance = new double[variants][exposures][exposures];
+        for (int variant = 0; variant < variants; variant++) {
+            double[][] supplied = exposureSamplingCovariances.get(variant);
+            if (supplied == null || supplied.length != exposures)
+                throw new IllegalArgumentException("exposure sampling covariance dimensions are invalid");
+            for (int a = 0; a < exposures; a++) {
+                if (supplied[a] == null || supplied[a].length != exposures)
+                    throw new IllegalArgumentException("exposure sampling covariance dimensions are invalid");
+                for (int b = 0; b < exposures; b++) {
+                    double value = supplied[a][b];
+                    if (!Double.isFinite(value) || Math.abs(value - supplied[b][a]) > 1e-12 * Math.max(1.0, Math.abs(value)))
+                        throw new IllegalArgumentException("exposure sampling covariance must be finite and symmetric");
+                    covariance[variant][a][b] = value;
+                }
+                double expected = instruments.get(variant).exposureStandardErrors()[a];
+                if (Math.abs(supplied[a][a] - expected * expected) > 1e-8 * Math.max(1.0, supplied[a][a]))
+                    throw new IllegalArgumentException("exposure covariance diagonal must match reported standard errors");
+            }
+        }
+        double[] f = new double[exposures], q = new double[exposures];
+        int degrees = variants - exposures + 1;
+        if (degrees < 1) throw new IllegalArgumentException("conditional strength has no residual degrees of freedom");
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            ComputeBackend backend = context.backend();
+            for (int target = 0; target < exposures; target++) {
+                int predictors = exposures - 1;
+                double[] gamma = new double[predictors];
+                for (int iteration = 0; iteration < 100; iteration++) {
+                    double[] information = new double[predictors * predictors];
+                    double[] rhs = new double[predictors];
+                    for (int variant = 0; variant < variants; variant++) {
+                        double variance = covariance[variant][target][target];
+                        for (int a = 0, ia = 0; a < exposures; a++) if (a != target) {
+                            variance -= 2 * gamma[ia] * covariance[variant][target][a];
+                            for (int b = 0, ib = 0; b < exposures; b++) if (b != target)
+                                variance += gamma[ia] * gamma[ib++] * covariance[variant][a][b];
+                            ia++;
+                        }
+                        if (!(variance > 0) || !Double.isFinite(variance))
+                            throw new IllegalArgumentException("conditional exposure residual variance is not positive");
+                        double weight = 1 / variance;
+                        double y = instruments.get(variant).exposureEffects()[target];
+                        for (int a = 0, ia = 0; a < exposures; a++) if (a != target) {
+                            double xa = instruments.get(variant).exposureEffects()[a];
+                            rhs[ia] += weight * xa * y;
+                            for (int b = 0, ib = 0; b < exposures; b++) if (b != target)
+                                information[ia * predictors + ib++] += weight * xa * instruments.get(variant).exposureEffects()[b];
+                            ia++;
+                        }
+                    }
+                    double[] next = predictors == 0 ? new double[0]
+                        : backend.dpotrf(information, predictors).solve(rhs);
+                    double change = 0;
+                    for (int i = 0; i < predictors; i++) change = Math.max(change, Math.abs(next[i] - gamma[i]));
+                    gamma = next;
+                    if (change <= 1e-10 * (1 + java.util.Arrays.stream(gamma).map(Math::abs).max().orElse(0))) break;
+                    if (iteration == 99) throw new ArithmeticException("conditional-strength weighting did not converge");
+                }
+                double statistic = 0;
+                for (int variant = 0; variant < variants; variant++) {
+                    double residual = instruments.get(variant).exposureEffects()[target];
+                    double variance = covariance[variant][target][target];
+                    for (int a = 0, ia = 0; a < exposures; a++) if (a != target) {
+                        residual -= gamma[ia] * instruments.get(variant).exposureEffects()[a];
+                        variance -= 2 * gamma[ia] * covariance[variant][target][a];
+                        for (int b = 0, ib = 0; b < exposures; b++) if (b != target)
+                            variance += gamma[ia] * gamma[ib++] * covariance[variant][a][b];
+                        ia++;
+                    }
+                    statistic += residual * residual / variance;
+                }
+                q[target] = statistic;
+                f[target] = statistic / degrees;
+            }
+        }
+        return new ConditionalStrengthResult(exposureNames, f, q, degrees);
     }
 
     private static int validate(

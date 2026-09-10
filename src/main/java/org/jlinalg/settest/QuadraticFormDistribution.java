@@ -6,6 +6,7 @@ package org.jlinalg.settest;
 
 import java.util.Arrays;
 import jdistlib.ChiSquare;
+import jdistlib.Normal;
 
 /** Deterministic positive chi-square-mixture survival probabilities. */
 final class QuadraticFormDistribution {
@@ -62,8 +63,13 @@ final class QuadraticFormDistribution {
             return new Tail(probability(angularProbability(statistic, eigenvalues, false)),
                 "rank-two-angular-integral", degrees, maximum*scale);
         }
-        return new Tail(probability(gammaSeries(statistic, eigenvalues, false)),
-            "positive-gamma-series", degrees, maximum * scale);
+        try {
+            return new Tail(probability(gammaSeries(statistic, eigenvalues, false)),
+                "positive-gamma-series", degrees, maximum * scale);
+        } catch (SeriesResolutionException unresolved) {
+            return new Tail(probability(saddlepointSurvival(statistic, eigenvalues)),
+                "lugannani-rice-saddlepoint", degrees, maximum * scale);
+        }
     }
 
     static double critical(double[] eigenvalues, double survivalProbability) {
@@ -99,8 +105,11 @@ final class QuadraticFormDistribution {
     }
 
     private static double lowerProbability(double q, double[] eigenvalues) {
-        return eigenvalues.length == 2 ? angularProbability(q, eigenvalues, true)
-            : gammaSeries(q, eigenvalues, true);
+        if (eigenvalues.length == 2) return angularProbability(q, eigenvalues, true);
+        try { return gammaSeries(q, eigenvalues, true); }
+        catch (SeriesResolutionException unresolved) {
+            return 1 - saddlepointSurvival(q, eigenvalues);
+        }
     }
 
     private static double angularProbability(double q, double[] lambda, boolean lower) {
@@ -164,7 +173,7 @@ final class QuadraticFormDistribution {
         double z = 1 + .5*(1/maximumRatio-1), logZ = Math.log(z), logG = logC;
         for (double r : ratios) logG -= .5*Math.log1p(-r*z);
         if (!(logZ > 0) || !Double.isFinite(logG) || Math.exp(logC) == 0)
-            throw new IllegalArgumentException("positive gamma series cannot resolve this eigenvalue spectrum");
+            throw new SeriesResolutionException();
         double[] weights = new double[MAXIMUM_SERIES_TERMS+1];
         double[] coefficients = new double[MAXIMUM_SERIES_TERMS+1];
         weights[0] = Math.exp(logC);
@@ -188,8 +197,60 @@ final class QuadraticFormDistribution {
             if (probability > 0 && logRemainder <= Math.log(probability)+Math.log(RELATIVE_SERIES_TOLERANCE))
                 return Math.min(1, probability);
         }
-        throw new IllegalArgumentException("positive gamma series did not meet relative remainder tolerance in "
-            + MAXIMUM_SERIES_TERMS + " terms");
+        throw new SeriesResolutionException();
+    }
+
+    /** Lugannani-Rice tail for the weighted chi-square CGF. This is used only
+     * when the explicitly bounded positive series cannot represent its leading
+     * coefficient or exhausts its certified remainder budget. */
+    private static double saddlepointSurvival(double q, double[] lambda) {
+        if (q == 0) return 1;
+        if (!Double.isFinite(q)) return 0;
+        double mean = Arrays.stream(lambda).sum();
+        double variance = 2 * Arrays.stream(lambda).map(x -> x*x).sum();
+        if (Math.abs(q - mean) <= 1e-7 * Math.sqrt(variance)) {
+            double sumSquares = variance / 2;
+            double degrees = mean * mean / sumSquares;
+            return ChiSquare.cumulative(q / (sumSquares / mean), degrees,
+                false, false);
+        }
+        double upper = .5 / Arrays.stream(lambda).max().orElseThrow();
+        double left = q < mean ? -1 : 0;
+        while (q < mean && cgfPrime(left, lambda) > q) left *= 2;
+        double right = q < mean ? 0 : Math.nextDown(upper);
+        double t = 0;
+        for (int iteration = 0; iteration < 160; iteration++) {
+            t = left + (right-left)/2;
+            double derivative = cgfPrime(t, lambda);
+            if (derivative < q) left = t; else right = t;
+            if (right-left <= 2e-14 * Math.max(1, Math.abs(t))) break;
+        }
+        t = left + (right-left)/2;
+        double k = 0, second = 0;
+        for (double value : lambda) {
+            double denominator = 1 - 2*t*value;
+            k -= .5*Math.log(denominator);
+            second += 2*value*value/(denominator*denominator);
+        }
+        double w = Math.copySign(Math.sqrt(Math.max(0, 2*(t*q-k))), t);
+        double u = t*Math.sqrt(second);
+        if (w == 0 || u == 0 || !Double.isFinite(w) || !Double.isFinite(u))
+            return ChiSquare.cumulative(q / (variance/(2*mean)),
+                2*mean*mean/variance, false, false);
+        double upperNormal = Normal.cumulative(w, 0, 1, false, false);
+        double density = Math.exp(-.5*w*w)/Math.sqrt(2*Math.PI);
+        return upperNormal - density*(1/w-1/u);
+    }
+
+    private static double cgfPrime(double t, double[] lambda) {
+        double result = 0;
+        for (double value : lambda) result += value/(1-2*t*value);
+        return result;
+    }
+
+    private static final class SeriesResolutionException
+            extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
     }
 
     private static double probability(double value) {

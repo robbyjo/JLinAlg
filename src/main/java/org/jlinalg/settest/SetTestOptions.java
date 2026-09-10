@@ -62,6 +62,6 @@ public record SetTestOptions(
         return new SetTestOptions(VariantFilterOptions.defaults(),
             SetTestMissingPolicy.MEAN_IMPUTE,
             new double[] {0, 0.25, 0.5, 0.75, 1}, 10_000, 20260901L,
-            SkatOCalibration.ANALYTIC);
+            SkatOCalibration.PARAMETRIC_SIMULATION);
     }
 }

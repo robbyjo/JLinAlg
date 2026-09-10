@@ -96,6 +96,23 @@ public final class SparseMixedRReferenceTest {
         compare("two-correlated",DegreesOfFreedomMethod.SATTERTHWAITE);
         compare("two-correlated",DegreesOfFreedomMethod.KENWARD_ROGER);
     }
+
+    @Test void jointKenwardRogerSupportsMultipleRestrictions() throws Exception {
+        Fixture data=fixture("unbalanced");
+        var fit=data.formula().fitSparseUnstructured(RemlOptions.builder()
+            .maximumIterations(300)
+            .degreesOfFreedomMethod(DegreesOfFreedomMethod.KENWARD_ROGER)
+            .build(),BackendPolicy.CPU).fit();
+        var single=KenwardRogerTest.test(fit,new double[]{0,1},1,
+            new double[]{0},BackendPolicy.CPU);
+        assertEquals(fit.pValues()[1],single.pValue(),5e-5);
+        var joint=KenwardRogerTest.test(fit,new double[]{1,0,0,1},2,
+            new double[]{0,0},BackendPolicy.CPU);
+        assertEquals(2,joint.numeratorDegreesOfFreedom());
+        assertTrue(joint.denominatorDegreesOfFreedom()>0);
+        assertTrue(joint.scaling()>0&&Double.isFinite(joint.scaling()));
+        assertTrue(joint.pValue()>=0&&joint.pValue()<=1);
+    }
     @Test void formulaProfileEndpointsMatchR() throws Exception {
         Fixture data = fixture("sleepstudy");
         var ci = data.formula().profileFixedEffect(1,.95,3,18,

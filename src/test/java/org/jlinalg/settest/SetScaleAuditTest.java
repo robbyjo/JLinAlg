@@ -21,8 +21,14 @@ class SetScaleAuditTest {
             }
         }
     }
-    @Test void unresolvableHigherRankSpectrumFailsExplicitlyInsteadOfMomentMatching() {
-        assertThrows(IllegalArgumentException.class,()->QuadraticFormDistribution.survival(100,new double[]{1,.5,1e-20}));
+    @Test void unresolvableHigherRankSpectrumUsesLabeledSaddlepointFallback() {
+        var tail=QuadraticFormDistribution.survival(100,
+            new double[]{1,.5,1e-20});
+        assertEquals("lugannani-rice-saddlepoint",tail.method());
+        assertTrue(tail.pValue()>0&&tail.pValue()<1e-15);
+        double rankTwo=QuadraticFormDistribution.survival(100,
+            new double[]{1,.5}).pValue();
+        assertEquals(1,tail.pValue()/rankTwo,.12);
     }
     @Test void paddedExactRankQuantilesRemainAccurateNearOne() {
         double p=Math.nextDown(1.0);

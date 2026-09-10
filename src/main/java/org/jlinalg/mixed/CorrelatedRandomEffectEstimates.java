@@ -11,15 +11,22 @@ public final class CorrelatedRandomEffectEstimates {
     private final List<String> effectNames;
     private final double[] covariance;
     private final double[] modes;
+    private final double[] predictionErrorCovariances;
 
     CorrelatedRandomEffectEstimates(
             String name, List<String> groupNames, List<String> effectNames,
             double[] covariance, double[] modes) {
+        this(name,groupNames,effectNames,covariance,modes,new double[0]);
+    }
+    CorrelatedRandomEffectEstimates(String name,List<String> groupNames,
+            List<String> effectNames,double[] covariance,double[] modes,
+            double[] predictionErrorCovariances) {
         this.name = name;
         this.groupNames = List.copyOf(groupNames);
         this.effectNames = List.copyOf(effectNames);
         this.covariance = covariance.clone();
         this.modes = modes.clone();
+        this.predictionErrorCovariances=predictionErrorCovariances.clone();
     }
 
     public String name() { return name; }
@@ -28,6 +35,8 @@ public final class CorrelatedRandomEffectEstimates {
     public double[] covariance() { return covariance.clone(); }
     /** Group-major modes: all effects for group 1, then group 2, and so on. */
     public double[] modes() { return modes.clone(); }
+    /** Group-major full PEV matrices in the reported b=L*u coordinates. */
+    public double[] predictionErrorCovariances(){return predictionErrorCovariances.clone();}
     public double correlation(int firstEffect, int secondEffect) {
         int effects = effectNames.size();
         double covarianceValue = covariance[firstEffect * effects + secondEffect];

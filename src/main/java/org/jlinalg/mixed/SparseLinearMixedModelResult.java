@@ -27,6 +27,7 @@ public final class SparseLinearMixedModelResult {
     private final int equationNonzeroCount;
     private final int factorNonzeroCount;
     private final BackendProvenance backend;
+    private final SparseFiniteDf.JointState jointState;
 
     SparseLinearMixedModelResult(
             List<String> componentNames,
@@ -44,6 +45,24 @@ public final class SparseLinearMixedModelResult {
             int equationNonzeroCount,
             int factorNonzeroCount,
             BackendProvenance backend) {
+        this(componentNames, varianceComponents, associationStatistics,
+            fixedEffectCovariance, randomEffects, conditionalFittedValues,
+            conditionalResiduals, logLikelihood, varianceEstimation,
+            functionEvaluations, converged, randomCoefficientCount,
+            equationNonzeroCount, factorNonzeroCount, backend, null);
+    }
+
+    SparseLinearMixedModelResult(
+            List<String> componentNames, double[] varianceComponents,
+            AssociationStatistics associationStatistics,
+            double[] fixedEffectCovariance,
+            List<RandomEffectEstimates> randomEffects,
+            double[] conditionalFittedValues, double[] conditionalResiduals,
+            double logLikelihood, VarianceEstimation varianceEstimation,
+            int functionEvaluations, boolean converged,
+            int randomCoefficientCount, int equationNonzeroCount,
+            int factorNonzeroCount, BackendProvenance backend,
+            SparseFiniteDf.JointState jointState) {
         this.componentNames = List.copyOf(componentNames);
         this.varianceComponents = varianceComponents.clone();
         this.associationStatistics = associationStatistics;
@@ -63,6 +82,7 @@ public final class SparseLinearMixedModelResult {
         this.equationNonzeroCount = equationNonzeroCount;
         this.factorNonzeroCount = factorNonzeroCount;
         this.backend = backend;
+        this.jointState = jointState;
     }
 
     public List<String> componentNames() { return componentNames; }
@@ -123,11 +143,13 @@ public final class SparseLinearMixedModelResult {
     }
 
     SparseLinearMixedModelResult withInference(double[] covariance, double[] df,
-            org.jlinalg.inference.DegreesOfFreedomMethod method) {
+            org.jlinalg.inference.DegreesOfFreedomMethod method,
+            SparseFiniteDf.JointState state) {
         double[] se = new double[df.length];
         for (int i = 0; i < se.length; i++) se[i] = Math.sqrt(covariance[i * se.length + i]);
         return copy(AssociationStatistics.studentT(beta(), se, df, method), covariance,
-            conditionalFittedValues, conditionalResiduals, logLikelihood, functionEvaluations, converged);
+            conditionalFittedValues, conditionalResiduals, logLikelihood,
+            functionEvaluations, converged, state);
     }
 
     /** Reverses sqrt(weight) whitening and restores the response offset and likelihood Jacobian. */
@@ -147,13 +169,35 @@ public final class SparseLinearMixedModelResult {
             likelihood += .5 * Math.log(weight);
         }
         return copy(associationStatistics, fixedEffectCovariance, fitted, residuals,
-            likelihood, functionEvaluations, converged);
+            likelihood, functionEvaluations, converged, jointState);
     }
 
     private SparseLinearMixedModelResult copy(AssociationStatistics association, double[] covariance,
             double[] fitted, double[] residuals, double likelihood, int evaluations, boolean success) {
+        return copy(association,covariance,fitted,residuals,likelihood,
+            evaluations,success,jointState);
+    }
+
+    private SparseLinearMixedModelResult copy(AssociationStatistics association,
+            double[] covariance, double[] fitted, double[] residuals,
+            double likelihood, int evaluations, boolean success,
+            SparseFiniteDf.JointState state) {
         return new SparseLinearMixedModelResult(componentNames, varianceComponents, association,
             covariance, randomEffects, fitted, residuals, likelihood, varianceEstimation,
-            evaluations, success, randomCoefficientCount, equationNonzeroCount, factorNonzeroCount, backend);
+            evaluations, success, randomCoefficientCount, equationNonzeroCount,
+            factorNonzeroCount, backend, state);
+    }
+
+    SparseFiniteDf.JointState jointState() { return jointState; }
+
+    SparseLinearMixedModelResult withVarianceComponents(double[] values) {
+        if(values==null||values.length!=varianceComponents.length)
+            throw new IllegalArgumentException("reported variance count must not change");
+        return new SparseLinearMixedModelResult(componentNames,values,
+            associationStatistics,fixedEffectCovariance,randomEffects,
+            conditionalFittedValues,conditionalResiduals,logLikelihood,
+            varianceEstimation,functionEvaluations,converged,
+            randomCoefficientCount,equationNonzeroCount,factorNonzeroCount,
+            backend,jointState);
     }
 }

@@ -87,8 +87,43 @@ public final class SparseMixedReviewRegressionTest {
             else{assertEquals(-1,interval.lower(),1e-10);assertEquals(ref(p,"correlationUpper"),interval.upper(),2e-6);assertTrue(interval.upperFound());}
         }
     }
+    @Test void profilesAnyPairInAThreeCoefficientBlock() {
+        int n=96; double[] y=new double[n],x=new double[n],z=new double[n];
+        String[] g=new String[n];
+        for(int i=0;i<n;i++){
+            int j=i%8,group=i/8;
+            x[i]=j-3.5;z[i]=(j%3)-1;g[i]="g"+group;
+            double randomIntercept=1.2*Math.sin(.7*group);
+            double randomX=.35*Math.cos(.5*group);
+            double randomZ=.25*Math.sin(1.1*group);
+            y[i]=2+.2*x[i]-.15*z[i]+randomIntercept
+                +randomX*x[i]+randomZ*z[i]+.08*Math.cos(1.7*i);
+        }
+        var table=ModelTable.builder(n).numeric("y",y).numeric("x",x)
+            .numeric("z",z).categorical("g",g).build();
+        var formula=MixedFormula.compile("y~x+z+(1+x+z|g)",table);
+        var options=RemlOptions.builder().maximumIterations(500).build();
+        var fitted=formula.fitCorrelated(options,BackendPolicy.CPU);
+        double[] pev=fitted.randomEffects().get(0)
+            .predictionErrorCovariances();
+        assertEquals(12*9,pev.length);
+        for(int group=0;group<12;group++)for(int first=0;first<3;first++){
+            assertTrue(pev[group*9+first*3+first]>=0);
+            for(int second=0;second<3;second++)
+                assertEquals(pev[group*9+first*3+second],
+                    pev[group*9+second*3+first],2e-10);
+        }
+        var interval=formula.profileCorrelation(
+            0,1,2,.90,options,BackendPolicy.CPU);
+        assertEquals(fitted.randomEffects().get(0).correlation(1,2),
+            interval.estimate(),2e-4);
+        assertTrue(interval.estimate()>=-1&&interval.estimate()<=1);
+        assertTrue(interval.lowerFound()||interval.upperFound()
+            || interval.lower()==-1||interval.upper()==1);
+    }
     public static void main(String[]args)throws Exception{
         var t=new SparseMixedReviewRegressionTest();t.responseShiftCannotChangeVarianceEstimatesOrLikelihood();
         t.varianceBoundsConstrainPhysicalVariancesInBothFitters();t.boundaryCorrelationsHaveAnEstimableOneSidedProfile();
+        t.profilesAnyPairInAThreeCoefficientBlock();
     }
 }

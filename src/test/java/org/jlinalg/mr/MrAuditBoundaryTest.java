@@ -76,4 +76,30 @@ class MrAuditBoundaryTest {
         assertEquals(2550,fit.marginalFStatistics()[0],1e-10);
         assertThrows(UnsupportedOperationException.class,fit::conditionalFStatistics);
     }
+
+    @Test @SuppressWarnings("deprecation")
+    void covarianceAwareFitReportsTrueConditionalStrength() {
+        var values=new ArrayList<MultivariableInstrument>();
+        var sampling=new ArrayList<double[][]>();
+        int n=10;
+        double[][] outcomeCovariance=new double[n][n];
+        for(int i=0;i<n;i++){
+            double x1=.08+.02*i;
+            double x2=.18-.012*i+.025*Math.sin(i);
+            values.add(new MultivariableInstrument("c"+i,
+                new double[]{x1,x2},new double[]{.02,.03},
+                .6*x1-.25*x2,.04));
+            sampling.add(new double[][]{{.0004,.00012},{.00012,.0009}});
+            outcomeCovariance[i][i]=.0016;
+        }
+        var fit=MultivariableMendelianRandomization.generalizedFit(values,
+            List.of("x1","x2"),false,outcomeCovariance,sampling,
+            BackendPolicy.CPU);
+        assertArrayEquals(new double[]{.6,-.25},fit.beta(),1e-10);
+        assertTrue(fit.conditionalStrengthAvailable());
+        for(double value:fit.conditionalFStatistics())
+            assertTrue(Double.isFinite(value)&&value>0);
+        assertFalse(java.util.Arrays.equals(fit.marginalFStatistics(),
+            fit.conditionalFStatistics()));
+    }
 }

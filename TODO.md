@@ -1,6 +1,6 @@
 # Development TODO
 
-Last reviewed: 2026-09-09.
+Last reviewed: 2026-09-10.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
@@ -66,6 +66,31 @@ benchmarks. Zelig often wraps other packages and must not be the sole numerical
 reference. Document estimator assumptions, convergence failures, and supported
 scope; scenario contrasts require additional assumptions for causal interpretation.
 
+## Completed audit tranche — 2026-09-10
+
+- Sparse-precision meta-analysis now estimates independent heterogeneity by
+  REML or Paule-Mandel without materializing the sampling covariance;
+  multilevel covariance supports compound-symmetry and AR(1) families plus
+  nuisance-refitted standard-deviation profiles.
+- Sparse mixed models now provide joint multi-DF Kenward-Roger tests,
+  one-boundary mixture profile intervals, selected-pair correlation profiles
+  in larger blocks, original-coordinate full within-group PEV blocks, and
+  joint unstructured-plus-pedigree covariance optimization. Formula pedigree
+  mapping and complete-case alignment are also implemented.
+- Multivariable MR now accepts known outcome and per-instrument cross-exposure
+  covariance for generalized estimation and true conditional-strength
+  diagnostics.
+- Low-dimensional binomial-logit and Poisson-log GLMMs now support bounded
+  tensor adaptive quadrature for crossed and sparse-precision/pedigree random
+  effects.
+- Sparse ZIP/ZINB fitting now performs deterministic multi-start outer
+  optimization, reports the stationary modes found, and certifies selection
+  of the best reproducible stationary solution among those starts.
+- Positive-mixture tails now use a labeled saddlepoint fallback when the
+  bounded gamma series cannot certify a result. SKAT-O defaults to an exact
+  Gaussian-score-null parametric simulation; analytic moment matching remains
+  an explicit option.
+
 ## Remaining extensions and limits
 
 These boundaries are explicit; this release does not claim complete parity
@@ -73,37 +98,31 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
 
 - SEM: DWLS/WLSMV, mixed/missing ordinal responses, multigroup invariance,
   ordinal modification indices, and FIML robust scaled fit statistics.
-- Meta-analysis: sparse large-study covariance estimation, variance-component
-  profiles, and additional structured covariance families.
-- Mixed models: joint multi-DF KR tests, nonregular boundary-profile coverage,
-  general correlation profiles in blocks larger than two, original-coordinate
-  full PEV blocks, and joint unstructured-plus-pedigree covariance optimization.
-  Formula-level pedigree mapping and automatic complete-case alignment remain open.
 - Time series: diffuse coefficient covariance, general regression terms, and
   historical state smoothing.
-- MR: additional generalized estimators requiring richer summary statistics;
-  conditional GWAS calculations currently use the documented Gaussian score model.
-- GLMM: multidimensional/crossed/pedigree adaptive quadrature beyond the new
-  scalar Gaussian random-intercept path.
-- Zero-inflated mixed models: a reproduced competing-mode ZINB refit is not
-  certified. It now reports nonconvergence and unavailable inference instead of
-  false success; see the exact case in the distributional audit. General
-  multi-mode integration and global optimization remain open.
+- MR conditional GWAS remains the documented Gaussian score model; other
+  outcome likelihoods require individual-level data or additional sufficient
+  statistics rather than reinterpretation of the available summary inputs.
+- Multidimensional quadrature is deliberately tensor-node bounded and supports
+  binomial-logit and Poisson-log likelihoods. Higher-dimensional structures
+  should use sparse Laplace/PQL unless a non-tensor integration method is added.
+- Zero-inflated deterministic multi-start certification is relative to the
+  configured starts, not a mathematical global optimum over the parameter
+  continuum. The random-effect integral remains a single-mode Laplace
+  approximation rather than a sum over separated conditional modes.
 - Nonlinear models: floating-point quantization under very large response
   offsets can prevent a score certificate even when fitted SSE is near optimal.
   Such fits return nonconvergence. Mixed effects are additive Gaussian effects,
   not a general nonlinear random-parameter likelihood.
-- MR conditional strength: the old conditional-F accessor is deprecated and
-  throws because it only held marginal F values. True conditional strength needs
-  cross-exposure covariance; use the explicitly named marginal accessor meanwhile.
 - Selective inference: unknown-noise or response-selected penalties, dependent
   sample splits, and non-Gaussian selection require different inferential methods.
 - Quantile/nonparametric regression: quantile inferential covariance,
   mixed-type/multidimensional kernels, and automatic inference-valid bandwidth
   selection remain distinct extensions; exact nonsmoothed quantile fitting is implemented.
-- Kernel set tests: ill-conditioned positive-mixture spectra can exceed the
-  bounded gamma-series calculation and now fail explicitly. Analytic SKAT-O
-  remains moment-matched; no exact finite-sample calibration is implied.
+- Kernel set tests: the saddlepoint positive-mixture fallback is approximate,
+  as is opt-in analytic SKAT-O. Default parametric SKAT-O simulation is exact
+  for its Gaussian score-null model up to Monte Carlo error, not an exact
+  finite-sample phenotype calibration.
 - Numerical identification: extreme original-coordinate deficient SVD fits
   and inconclusive sparse covariance-rank checks reject rather than returning
   a numerically unsupported estimator or variance decomposition.

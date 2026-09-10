@@ -33,6 +33,9 @@ public final class ZeroInflatedMixedResult {
     private final List<String> warnings;
     private final List<String> outerParameterNames;
     private final double[] outerParameterEstimates;
+    private final int optimizationStarts;
+    private final int stationaryModes;
+    private final boolean globalOptimumCertified;
 
     ZeroInflatedMixedResult(
             String family,
@@ -59,7 +62,8 @@ public final class ZeroInflatedMixedResult {
             double[] marginalCovariance,
             List<String> warnings,
             List<String> outerParameterNames,
-            double[] outerParameterEstimates) {
+            double[] outerParameterEstimates,int optimizationStarts,
+            int stationaryModes,boolean globalOptimumCertified) {
         this.family = family;
         this.countCoefficients = countCoefficients.clone();
         this.zeroCoefficients = zeroCoefficients.clone();
@@ -89,6 +93,9 @@ public final class ZeroInflatedMixedResult {
         this.warnings = List.copyOf(warnings);
         this.outerParameterNames = List.copyOf(outerParameterNames);
         this.outerParameterEstimates = outerParameterEstimates.clone();
+        this.optimizationStarts=optimizationStarts;
+        this.stationaryModes=stationaryModes;
+        this.globalOptimumCertified=globalOptimumCertified;
     }
 
     public String family() { return family; }
@@ -147,7 +154,11 @@ public final class ZeroInflatedMixedResult {
     public List<String> marginalParameterNames() {
         return marginalParameterNames;
     }
-    /** Row-major observed-Hessian covariance; empty unless requested. */
+    /**
+     * Row-major observed-Hessian covariance; empty unless requested.
+     * Covariance is conditional on any nuisance variance fixed at an active
+     * optimization bound.
+     */
     public double[] marginalCovariance() { return marginalCovariance.clone(); }
     public boolean inferenceAvailable() { return marginalCovariance.length > 0; }
     public double[] standardErrors() {
@@ -171,4 +182,8 @@ public final class ZeroInflatedMixedResult {
     public double[] outerParameterEstimates() {
         return outerParameterEstimates.clone();
     }
+    public int optimizationStarts(){return optimizationStarts;}
+    public int stationaryModes(){return stationaryModes;}
+    /** True when the selected objective is best across multiple stationary deterministic starts. */
+    public boolean globalOptimumCertified(){return globalOptimumCertified;}
 }

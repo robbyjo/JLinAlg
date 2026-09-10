@@ -140,9 +140,11 @@ is included in the benchmark figures.
 ## Remaining scope
 
 See [TODO.md](../TODO.md) for the explicit remaining extensions. Important
-limits include ordinal DWLS/missing-ordinal/multigroup SEM; dense meta covariance;
-nonregular mixed-model boundary inference and joint unstructured/pedigree
-optimization; diffuse coefficient covariance; richer conditional-summary
-models; multidimensional/pedigree AGQ; unknown-noise or response-tuned
-polyhedral inference; and quantile inferential covariance/mixed-type kernel models.
+limits include ordinal DWLS/missing-ordinal/multigroup SEM; sparse meta models
+beyond a known precision plus independent heterogeneity; higher-order mixed
+variance-boundary intersections; diffuse coefficient covariance; non-Gaussian
+conditional-GWAS summary models; tensor growth in multidimensional AGQ;
+single-mode conditional Laplace integration for zero-inflated fits;
+unknown-noise or response-tuned polyhedral inference; and quantile inferential
+covariance/mixed-type kernel models.
 The completed implementations must not be advertised as full package parity.

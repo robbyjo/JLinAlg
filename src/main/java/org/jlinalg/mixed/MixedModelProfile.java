@@ -23,7 +23,31 @@ public final class MixedModelProfile {
                 || !(lowerBound <= estimate) || !(upperBound >= estimate)
                 || !(lowerBound < upperBound) || gridSize < 8)
             throw new IllegalArgumentException("invalid profile-likelihood interval inputs");
-        double cutoff = 0.5 * ChiSquare.quantile(confidenceLevel, 1.0, true, false);
+        return interval(profiledLogLikelihood,estimate,maximumLogLikelihood,
+            confidenceLevel,lowerBound,upperBound,gridSize,
+            0.5 * ChiSquare.quantile(confidenceLevel, 1.0, true, false));
+    }
+
+    /**
+     * One-sided variance-boundary profile using the 50:50 point-mass/chi-square
+     * likelihood-ratio law. The confidence level must exceed one half.
+     */
+    public static ProfileLikelihoodInterval boundaryInterval(
+            DoubleUnaryOperator profiledLogLikelihood, double estimate,
+            double maximumLogLikelihood, double confidenceLevel,
+            double lowerBound, double upperBound, int gridSize) {
+        if (!(confidenceLevel > .5))
+            throw new IllegalArgumentException("boundary profile confidence must exceed one half");
+        return interval(profiledLogLikelihood,estimate,maximumLogLikelihood,
+            confidenceLevel,lowerBound,upperBound,gridSize,
+            0.5 * ChiSquare.quantile(2*confidenceLevel-1,1,true,false));
+    }
+
+    private static ProfileLikelihoodInterval interval(
+            DoubleUnaryOperator profiledLogLikelihood, double estimate,
+            double maximumLogLikelihood, double confidenceLevel,
+            double lowerBound, double upperBound, int gridSize,
+            double cutoff) {
         double target = maximumLogLikelihood - cutoff;
         double lower = estimate == lowerBound ? lowerBound : Double.NaN;
         double upper = estimate == upperBound ? upperBound : Double.NaN;

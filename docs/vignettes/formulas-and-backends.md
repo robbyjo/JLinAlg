@@ -66,8 +66,39 @@ CorrelatedLinearMixedModelResult fit = correlated.fitCorrelated(
     RemlOptions.defaults(), BackendPolicy.PREFERRED);
 ```
 
-Correlated random blocks currently use the dense reference likelihood. The
-sparse formula path is for independent random terms.
+`fitSparse` handles independent terms. `fitSparseUnstructured` and the
+`fitCorrelated` convenience view use the sparse grouped-covariance optimizer
+for correlated blocks.
+
+Map an independent random-intercept group to pedigree precision at compile
+time. Unobserved pedigree members remain random coefficients, and ordinary
+independent terms may be fitted alongside the mapped term:
+
+```java
+CompiledMixedFormula pedigreeModel = MixedFormula.compile(
+    "trait ~ age + (1 | individual) + (1 | site)", table,
+    MixedFormulaOptions.builder()
+        .pedigree("individual", pedigree)
+        .missingDataPolicy(MissingDataPolicy.OMIT)
+        .build());
+SparseLinearMixedModelResult pedigreeFit = pedigreeModel.fitSparse(
+    RemlOptions.defaults(), BackendPolicy.PREFERRED);
+System.out.println(Arrays.toString(pedigreeModel.retainedRows()));
+```
+
+`MissingDataPolicy.OMIT` computes one mask across the response, every fixed
+and random predictor, grouping columns, weights, and offset. This keeps all
+compiled matrices and pedigree incidence rows aligned. The default
+`MissingDataPolicy.ERROR` reports the first incomplete model row. Pedigree
+mappings currently accept `(1|group)`. Mapped pedigree terms may be combined
+with an unstructured grouped block; their covariance scales are optimized
+jointly.
+
+For an unstructured block with more than two coefficients,
+`profileCorrelation(block, firstEffect, secondEffect, ...)` profiles any
+selected effect pair. The implementation preserves the full covariance family
+by permuting that pair into the leading Cholesky coordinates, including the
+plus/minus-one correlation boundaries.
 
 ## Backend policy
 
