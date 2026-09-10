@@ -182,7 +182,10 @@ public final class JLinAlgCli {
 
             Filtering and processing:
               --min-maf X --min-mac X --max-marker-missing X --min-info X
-              --transform "<omics>=winsor(p=.01)|log1p()|zscore()"
+              --transform SPEC             Row-wise <omics> stages, left to right
+                Built-ins: identity(), winsor(...), log1p(), log(offset=...),
+                zscore(), int(), mvalue(epsilon=...)
+                Guide: https://robbyjo.github.io/JLinAlg/vignettes/omics-transforms.html
               --transform-plugin JAR       Trusted Java transform provider
               --omics-type auto|gwas|ewas|expression|proteomics|generic
               --annot FILE --annot-id COLUMN --annot-cols c1,c2,...

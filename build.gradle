@@ -226,6 +226,7 @@ tasks.register('checkWebsite') {
             'vignettes/pedigree.html',
             'vignettes/glmm.html',
             'vignettes/association.html',
+            'vignettes/omics-transforms.html',
             'vignettes/mendelian-randomization.html',
             'vignettes/xwas-mr-pipeline.html',
             'vignettes/meta-analysis.html',

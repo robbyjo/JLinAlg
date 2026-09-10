@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Tutorial for JLinAlg command-line omics transforms: syntax, built-in stages, examples, missing values, and custom providers."><title>Omics transform tutorial · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Omics transforms</span></div><h1>Transform each molecular feature deliberately.</h1><p>Choose a built-in stage, compose stages from left to right, and keep the tested scale explicit in EWAS, TWAS, and PWAS command-line analyses.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>Scope</strong><code>--transform</code> applies only to the <code>&lt;omics&gt;</code> term in feature-by-sample CSV or TSV matrices. Genotype transforms are not supported for VCF, BCF, or BGEN inputs.</div>
+<h2 id="quick-start">Run a complete example</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>PowerShell · EWAS</span></div><pre><code>java -jar build/cli/jlinalg-0.3.0.jar `
+  --omics methylation.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --formula "trait ~ age + sex + &lt;omics&gt;" `
+  --transform "&lt;omics&gt;=mvalue(epsilon=1e-6)|zscore()" `
+  --out ewas-results.tsv</code></pre></div>
+<p>The omics file has one feature per row and one sample per column. Its first column is the feature ID:</p><pre><code>feature_id  S1    S2    S3    S4
+cg000001    0.12  0.20  NA    0.85
+cg000002    0.44  0.51  0.49  0.55</code></pre>
+<h2 id="syntax">Read the pipeline syntax</h2><pre><code>--transform "&lt;omics&gt;=stage(parameters)|next_stage()"</code></pre>
+<p>Use the literal target <code>&lt;omics&gt;</code> and quote the complete specification so the shell does not interpret <code>&lt;</code>, <code>&gt;</code>, or <code>|</code>. Stages run left to right. JLinAlg aligns sample IDs first, then applies the complete pipeline independently to every feature row; it never pools values across features. Repeating <code>--transform</code> appends stages in command-line order. Omitting the option is equivalent to <code>identity()</code>.</p>
+<h2 id="built-ins">Choose a built-in stage</h2>
+<div class="result-table"><table><thead><tr><th>Stage</th><th>Operation</th><th>Contract</th></tr></thead><tbody>
+<tr><td><code>identity()</code></td><td>Copy without changing values.</td><td><code>identity</code> is also accepted.</td></tr>
+<tr><td><code>winsor(p=0.01)</code></td><td>Clamp to symmetric empirical quantiles.</td><td><code>p</code> means lower <code>p</code> and upper <code>1-p</code>; linear-interpolation quantiles.</td></tr>
+<tr><td><code>winsor(lower=0.01,upper=0.99)</code></td><td>Clamp to separate lower and upper quantiles.</td><td>Defaults are 0 and 1; require <code>0 &lt;= lower &lt;= upper &lt;= 1</code>.</td></tr>
+<tr><td><code>log1p()</code></td><td>Compute <code>ln(1+x)</code>.</td><td>Finite values must be greater than -1; <code>log1p</code> is accepted.</td></tr>
+<tr><td><code>log(offset=1)</code></td><td>Compute <code>ln(x+offset)</code>.</td><td>Offset must be finite and shifted finite values must be positive.</td></tr>
+<tr><td><code>zscore()</code></td><td>Center and divide by the row's sample SD.</td><td>Requires two varying finite values; <code>zscore</code> and <code>zscore(ddof=1)</code> are aliases.</td></tr>
+<tr><td><code>int()</code></td><td>Tie-aware Blom rank inverse-normal transform.</td><td>Uses average ranks; <code>int</code> and <code>int(method=blom)</code> are aliases.</td></tr>
+<tr><td><code>mvalue(epsilon=1e-6)</code></td><td>Clip methylation beta values, then compute base-2 log odds.</td><td>Inputs in <code>[0,1]</code>; epsilon defaults to <code>1e-6</code> and must be in <code>(0,0.5)</code>.</td></tr>
+</tbody></table></div>
+<p>Names are case-insensitive. Use the parameter names shown. Custom expression syntax such as <code>expr(...)</code> is deliberately not enabled.</p>
+<h2 id="recipes">Match the pipeline to the data</h2>
+<h3>Methylation beta values</h3><pre><code>--transform "&lt;omics&gt;=mvalue(epsilon=1e-6)|zscore()"</code></pre><p>Convert beta values to M values, then report effects per one standard deviation of the transformed feature.</p>
+<h3>Nonnegative expression measurements</h3><pre><code>--transform "&lt;omics&gt;=log1p()|zscore()"</code></pre><p>Compress a long right tail and standardize. Use <code>log(offset=...)</code> when the required pseudocount is not one.</p>
+<h3>Protein abundance with outliers</h3><pre><code>--transform "&lt;omics&gt;=winsor(p=0.01)|int(method=blom)"</code></pre><p>Limit extreme observations, then use normal scores. Rank inverse-normalization changes the estimand; choose it as an analysis decision. Adding <code>zscore()</code> after <code>int()</code> is generally redundant.</p>
+<h3>Asymmetric clipping</h3><pre><code>--transform "&lt;omics&gt;=winsor(lower=0.005,upper=0.975)|zscore()"</code></pre><p>Use separate tails only when that asymmetry is part of the scientific preprocessing rule.</p>
+<h2 id="missing">Understand missing values and failures</h2><p>Blank cells plus <code>.</code>, <code>NA</code>, <code>N/A</code>, <code>null</code>, and <code>NaN</code> are missing. Built-in stages preserve them and calculate row statistics from finite values. After the complete transform pipeline, the CLI mean-imputes remaining missing entries within that transformed feature row.</p>
+<p>Domain checks are strict: <code>log1p()</code> rejects -1, <code>log()</code> rejects a nonpositive shifted value, <code>mvalue()</code> rejects values outside <code>[0,1]</code>, and <code>zscore()</code> rejects constant rows. A transform-domain error or a row with no finite values stops the run. A feature that passes the transform but is non-estimable after model adjustment uses the normal structured failure output and accounting.</p>
+<div class="note"><strong>Interpretation</strong>Coefficients are on the final transformed scale. Record the exact transform string, input version, and analysis choices with the result manifest and log.</div>
+<h2 id="plugins">Add a trusted custom stage</h2><p>Implement <code>OmicsTransformProvider</code>, package it in a JAR, and register its class in <code>META-INF/services/org.jlinalg.pipeline.OmicsTransformProvider</code>. The provider receives named string parameters and must return the same number of sample values.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Custom provider</span></div><pre><code>public final class ScaleTransformProvider
+        implements OmicsTransformProvider {
+    public String name() { return "scale"; }
+
+    public OmicsTransform create(Map&lt;String, String&gt; parameters) {
+        double factor = Double.parseDouble(
+            parameters.getOrDefault("factor", "1"));
+        return values -&gt; {
+            double[] result = values.clone();
+            for (int i = 0; i &lt; result.length; i++)
+                if (Double.isFinite(result[i])) result[i] *= factor;
+            return result;
+        };
+    }
+}</code></pre></div>
+<p>The service file contains the fully qualified provider class, for example <code>example.ScaleTransformProvider</code>. Load and compose it like this:</p><pre><code>--transform-plugin transforms.jar \
+--transform "&lt;omics&gt;=scale(factor=2)|zscore()"</code></pre><p>Plugin JARs execute arbitrary JVM code in the analysis process. Load only artifacts you trust.</p>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/omics-transforms.md">Markdown tutorial and complete provider example →</a></p>
+<div class="next-links"><a href="association.html"><small>Related</small><strong>Association pipelines</strong></a><a href="mendelian-randomization.html"><small>Next</small><strong>Mendelian randomization →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#quick-start">Quick start</a><a href="#syntax">Syntax</a><a href="#built-ins">Built-ins</a><a href="#recipes">Recipes</a><a href="#missing">Missing values</a><a href="#plugins">Custom plugins</a></aside></div></main><site-footer root="../"></site-footer></body></html>

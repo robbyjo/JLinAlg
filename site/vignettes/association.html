@@ -81,7 +81,7 @@ OmicsAssociationResult traits =
         matrix, analysisSampleIds, design,
         testedCoefficient, transform,
         OmicsMissingPolicy.MEAN_IMPUTE, 512,
-        null, null, OlsOptions.defaults(), execution);</code></pre></div><p>Identity, Winsorization, log, shifted log, z-score, and tie-aware Blom inverse-normal transforms compose without mutating source rows.</p>
+        null, null, OlsOptions.defaults(), execution);</code></pre></div><p>Identity, Winsorization, log, shifted log, z-score, and tie-aware Blom inverse-normal transforms compose without mutating source rows. The <a href="omics-transforms.html">command-line transform tutorial</a> lists every stage, exact syntax, missing-value behavior, and practical recipes.</p>
 <h2 id="sets">Test rare-variant sets</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Burden, SKAT, and SKAT-O</span></div><pre><code>LinearSetTestNullModel nullModel =
     LinearSetTestNullModel.prepare(
         phenotype, covariates,
