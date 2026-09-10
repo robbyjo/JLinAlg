@@ -50,6 +50,7 @@ pipeline is usually easier to audit. Omitting the option is the same as
 | `identity()` | Copies values without changing them. | `identity` is also accepted. |
 | `winsor(p=0.01)` | Clamps finite values to symmetric empirical quantiles. | `p` sets lower `p` and upper `1-p`. Quantiles use linear interpolation. |
 | `winsor(lower=0.01,upper=0.99)` | Clamps finite values to separate empirical quantiles. | Defaults are `lower=0` and `upper=1`; require `0 <= lower <= upper <= 1`. |
+| `winsor_mad(k=4)` | Clamps finite values to `median +/- k * MAD`, with `MAD = median(abs(x-median)) / qnorm(0.75)`. | `k` defaults to 4 and must be finite and nonnegative. Missing values do not enter either median; zero MAD leaves the row unchanged. `winsor_mad` and `winsor_mad()` are also accepted. |
 | `log1p()` | Computes `ln(1+x)`. | Every finite value must be greater than `-1`. `log1p` is also accepted. |
 | `log(offset=1)` | Computes `ln(x+offset)`. | The offset must be finite and every shifted finite value must be positive. |
 | `zscore()` | Centers and scales using the row's sample standard deviation. | Requires at least two varying finite values. `zscore`, `zscore()`, and `zscore(ddof=1)` are accepted. |
@@ -60,6 +61,18 @@ Names are case-insensitive. Use the parameter names shown above. Custom
 expression syntax such as `expr(...)` is deliberately not enabled.
 
 ## Choose a pipeline
+
+### Robust median/MAD clipping
+
+Clamp outliers relative to a robust row center and scale, then standardize:
+
+```text
+--transform "<omics>=winsor_mad(k=4)|zscore()"
+```
+
+This matches R's `mad(..., constant = 1/qnorm(0.75), na.rm = TRUE)`
+scaling. When the raw MAD is zero, the winsorization stage returns the row
+unchanged rather than clipping values to the median.
 
 ### Methylation beta values
 

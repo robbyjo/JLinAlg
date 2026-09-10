@@ -57,6 +57,11 @@ final class TransformParser {
             return OmicsTransforms.rankInverseNormal();
         if (lower.startsWith("mvalue("))
             return OmicsTransforms.mValue(parameter(lower, "epsilon", 1e-6));
+        if (lower.equals("winsor_mad"))
+            return OmicsTransforms.winsorizeMad(4.0);
+        if (lower.startsWith("winsor_mad("))
+            return OmicsTransforms.winsorizeMad(
+                parameter(lower, "k", 4.0));
         if (lower.startsWith("winsor(")) {
             double symmetric = parameter(lower, "p", Double.NaN);
             double low = Double.isNaN(symmetric)

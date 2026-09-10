@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -178,6 +179,33 @@ class PipelineInputTest {
         double[] z = OmicsTransforms.zScore().apply(new double[] {1, 2, 3});
         assertEquals(0, z[1], 1e-12);
         assertEquals(0, (z[0] + z[1] + z[2]) / 3, 1e-12);
+    }
+
+    @Test
+    void medianMadWinsorizationMatchesRAndPreservesZeroMadRows() {
+        double scale = 1.482602218505602;
+        double[] source = {1, 2, 3, 4, 100, Double.NaN};
+        double[] transformed = OmicsTransforms.winsorizeMad(2).apply(source);
+
+        assertArrayEquals(
+            new double[] {1, 2, 3, 4, 3 + 2 * scale, Double.NaN},
+            transformed, 1e-12);
+        assertArrayEquals(
+            new double[] {1, 2, 3, 4, 100, Double.NaN}, source);
+
+        double[] even = OmicsTransforms.winsorizeMad(1).apply(
+            new double[] {0, 2, 4, 100});
+        assertArrayEquals(new double[] {
+            3 - 2 * scale, 2, 4, 3 + 2 * scale
+        }, even, 1e-12);
+
+        double[] zeroMad = {1, 1, 1, 100, Double.NaN};
+        assertArrayEquals(zeroMad,
+            OmicsTransforms.winsorizeMad(4).apply(zeroMad));
+        assertThrows(IllegalArgumentException.class,
+            () -> OmicsTransforms.winsorizeMad(-1));
+        assertThrows(IllegalArgumentException.class,
+            () -> OmicsTransforms.winsorizeMad(Double.POSITIVE_INFINITY));
     }
 
     @Test

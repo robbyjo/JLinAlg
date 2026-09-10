@@ -137,9 +137,10 @@ OmicsAssociationResult results =
         weights, offset, OlsOptions.defaults(), execution);
 ```
 
-Identity, empirical-quantile Winsorization, `log1p`, shifted log, sample
-z-score, tie-aware Blom rank inverse-normal, and transform composition are
-implemented. Use `scanPredictorsTo` or `scanPredictorsGlmTo` with an
+Identity, empirical-quantile or scaled-median-MAD Winsorization, `log1p`,
+shifted log, sample z-score, tie-aware Blom rank inverse-normal, and transform
+composition are implemented. Use `scanPredictorsTo` or
+`scanPredictorsGlmTo` with an
 `OmicsAssociationSink` to stream deterministic estimates and failures instead
 of retaining the complete result. `OmicsAssociationSummary` reports source,
 tested, and failed feature counts. The Cox analogue is

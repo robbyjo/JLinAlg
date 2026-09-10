@@ -12,6 +12,9 @@ import jdistlib.Normal;
 
 /** Common deterministic row-wise preprocessing for TWAS, EWAS, and PWAS. */
 public final class OmicsTransforms {
+    private static final double NORMAL_MAD_SCALE =
+        1.0 / Normal.quantile(0.75, 0, 1, true, false);
+
     private OmicsTransforms() { }
 
     public static OmicsTransform identity() {
@@ -36,6 +39,38 @@ public final class OmicsTransforms {
             for (int index = 0; index < result.length; index++) {
                 if (Double.isFinite(result[index]))
                     result[index] = Math.max(lower, Math.min(upper, result[index]));
+            }
+            return result;
+        };
+    }
+
+    /**
+     * Clamps finite values to median +/- k times the normal-consistency
+     * scaled median absolute deviation. A zero or non-finite scaled MAD
+     * leaves the row unchanged.
+     */
+    public static OmicsTransform winsorizeMad(double k) {
+        if (!Double.isFinite(k) || k < 0)
+            throw new IllegalArgumentException(
+                "MAD winsorization k must be finite and nonnegative");
+        return values -> {
+            double[] result = required(values).clone();
+            double[] finite = Arrays.stream(result)
+                .filter(Double::isFinite).sorted().toArray();
+            if (finite.length == 0) return result;
+            double median = quantile(finite, 0.5);
+            double[] deviations = Arrays.stream(finite)
+                .map(value -> Math.abs(value - median)).sorted().toArray();
+            double scaledMad = quantile(deviations, 0.5)
+                * NORMAL_MAD_SCALE;
+            if (!(scaledMad > 0) || !Double.isFinite(scaledMad))
+                return result;
+            double lower = median - k * scaledMad;
+            double upper = median + k * scaledMad;
+            for (int index = 0; index < result.length; index++) {
+                if (Double.isFinite(result[index]))
+                    result[index] = Math.min(upper,
+                        Math.max(lower, result[index]));
             }
             return result;
         };
