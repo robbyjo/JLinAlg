@@ -75,10 +75,11 @@ portable CPU according to the existing policy.
 ## Pedigree performance
 
 Pedigree prediction and the sparse variance fitter incorporate `A^-1`
-directly. Multiple named pedigree terms, ordinary terms in the same model, and
-unphenotyped ancestors are supported. Remaining work is scalable animal-level
-PEV/reliability extraction and formula-level pedigree mapping. The dense
-reference path continues to provide complete PEV/reliability results.
+directly. Multiple named pedigree terms, ordinary terms in the same model,
+unphenotyped ancestors, and formula-level pedigree group mappings are
+supported. Remaining work is scalable individual-level PEV/reliability
+extraction. The dense reference path continues to provide complete
+PEV/reliability results.
 
 ## GLMM likelihoods
 
@@ -95,7 +96,7 @@ tests, as detailed below. GLMM likelihoods are a separate implementation and
 validation area; these Gaussian results do not certify them. `pedigreemm`'s core Gaussian animal model,
 pedigree PQL facade, sparse `A^-1`, multiple pedigree terms, BLUP, and dense
 PEV/reliability paths are present; scalable sparse PEV diagonals and
-formula-native pedigree/new-data mapping remain open.
+formula-native new-data mapping remain open.
 
 ## User-facing compatibility
 
@@ -104,10 +105,10 @@ offsets/weights, numeric and categorical random slopes, `||`, nested grouping,
 and dense/sparse correlated blocks. Categorical slopes support treatment/sum
 contrasts, full indicators, and `:`/`*` interaction expansion. As in lme4,
 `||` splits formula terms, not every factor indicator column: a factor's
-indicator columns remain a correlated block. Remaining formula work includes automatic
-complete-case alignment for missing grouping rows and pedigree mappings.
-Post-fit work still includes richer singular-fit diagnostics and boundary
-profile coverage. Conditional/marginal prediction, response refit,
+indicator columns remain a correlated block. One complete-case mask now aligns
+fixed/random predictors, grouping rows, weights, offsets, and mapped pedigree
+terms. Post-fit work still includes richer singular-fit diagnostics and
+higher-order boundary-intersection coverage. Conditional/marginal prediction, response refit,
 response simulation, and parametric bootstrap are now available as matrix-
 first APIs; formula-native `newdata` compilation remains to be added.
 
@@ -179,9 +180,11 @@ Formula-native `profileFixedEffect`, `profileResidualSd`, `profileRandomSd`,
 and `profileCorrelation` re-optimize nuisance parameters under ML, even if
 the supplied options request REML. Fixed coefficients are eliminated
 algebraically, including the one-fixed-coefficient case. Random SDs are
-constrained by a fixed Cholesky-row norm; two-coefficient correlations use
-a fixed row angle. Nonconverged/nonfinite refits raise an error rather than
-producing an apparently valid crossing.
+constrained by a fixed Cholesky-row norm. Correlations use a fixed leading-row
+angle; arbitrary pairs in larger unstructured blocks are permuted into those
+leading coordinates without changing the covariance family or likelihood.
+Nonconverged/nonfinite refits raise an error rather than producing an
+apparently valid crossing.
 Correlation profiles centered at `rho = -1` or `rho = 1` now evaluate the
 estimable side and retain the boundary as the opposite endpoint. A boundary
 endpoint is not an observed likelihood-ratio crossing: its corresponding
@@ -320,34 +323,33 @@ initial 12,000-row Java timing from roughly 13 seconds to under one second.
 - Finite DF require REML and a converged, identifiable **interior** covariance
   estimate. Boundary fits can be returned with residual-approximation DF;
   singular finite-DF information and estimates numerically near physical
-  variance bounds are rejected. Joint multi-DF KR F tests and
-  boundary-adjusted finite-DF inference are not implemented by this API.
+  variance bounds are rejected. KR fits retain the state required by
+  `KenwardRogerTest` for joint multi-DF F tests. Boundary-adjusted likelihood
+  profiles are separate from coefficient finite-DF inference.
 - The derivative machinery uses scaled central differences, not analytic
   covariance derivatives. It takes quadratically many sparse evaluations in
   covariance-parameter count and stores parameter/fixed-effect-sized arrays.
   Sparse factor fill can still grow substantially for crossed designs.
-- Profiles currently use regular one-parameter chi-square cutoffs. Automatic
-  profiles centered at zero random SD, general correlations in blocks larger
-  than two coefficients, and nonregular boundary-coverage corrections remain
-  open. Automatic handling of SD profiles reaching physical variance-box
-  boundaries is also incomplete; infeasible constrained refits raise errors.
+- Profiles use the one-boundary 50:50 mixture cutoff when a random SD is
+  centered at zero, and regular one-parameter chi-square cutoffs otherwise.
+  Higher-order intersections of multiple active variance boundaries remain a
+  separate extension. Infeasible constrained refits raise errors.
   The supported correlation profiles centered at `+/-1` retain that boundary
   with its crossing flag false; unfound general bounds remain NaN.
-- Full original-coordinate random-effect conditional covariance/PEV blocks
-  are not exported by the unstructured result. Its latent equation PEVs must
-  not be interpreted as original-coordinate PEVs.
-- The new grouped unstructured optimizer does not yet jointly estimate a
-  grouped covariance and arbitrary pedigree precision scales in one model.
-  The existing multiple-precision sparse/pedigree path remains supported;
-  formula-level pedigree mapping and new-data compilation remain open.
+- Full within-group random-effect conditional covariance/PEV blocks are
+  exported in original coordinates. Extraction is bounded by grouped block
+  size; diagonal PEVs remain available for all coefficients.
+- The grouped unstructured optimizer jointly estimates grouped covariance and
+  arbitrary ordinary/pedigree precision scales. Formula-level mapped pedigree
+  terms flow through this path; formula-level new-data compilation remains open.
 - The specialized changing-term scan fitter retains residual-approximation
   DF. Ordinary prepared sparse fits now support Satterthwaite and KR.
 - Backend calls support the existing prepared native sparse-factor interface,
   but the measured validation here used portable CPU. No CHOLMOD native run
   was certified on this host. Sparse `PREFERRED` uses the existing sparse
   backend preference, avoiding repeated GPU setup for host sparse equations.
-- Automatic complete-case alignment, arbitrary R formula expressions, and
-  complete reproduction of lme4 optimization controls remain incomplete.
+- Arbitrary R formula expressions and complete reproduction of lme4
+  optimization controls remain incomplete.
   Categorical treatment/sum slopes, full indicators, and `:`/`*` interactions
   are implemented and tested as described above. Physical marginal variance
   bounds are enforced, but neither the local stationarity check nor the

@@ -5,6 +5,14 @@ zero-inflated count models. Shared Laplace-engine changes were coordinated
 with the GLMM owner. No new pedigree covariance optimizer or native-runtime
 certification is claimed. The owned isolated suite passes 70/70 tests.
 
+Post-release follow-up (2026-09-10) adds deterministic five-start outer-mode
+search plus stationary-basin confirmation. The previously failing competing-
+mode ZINB regression now converges and certifies the selected objective as best
+and reproducible among those deterministic starts. This is a bounded
+multi-start certificate, not a proof of the continuous global optimum or a
+multi-mode random-effect integral. Observed-Hessian fixed-effect covariance is
+reported conditional on nuisance variances at active bounds.
+
 ## Reproduced defects and repairs
 
 | Case | Before | Repair / independent gate |

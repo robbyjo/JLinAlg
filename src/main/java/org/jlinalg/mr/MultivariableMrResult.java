@@ -11,6 +11,7 @@ public final class MultivariableMrResult {
     private final AssociationStatistics statistics;
     private final double[] covariance;
     private final double[] marginalFStatistics;
+    private final double[] conditionalFStatistics;
     private final double intercept;
     private final double interceptStandardError;
     private final double q;
@@ -18,12 +19,15 @@ public final class MultivariableMrResult {
 
     MultivariableMrResult(List<String> names, AssociationStatistics statistics,
             double[] covariance, double[] marginalFStatistics,
+            double[] conditionalFStatistics,
             double intercept, double interceptStandardError,
             double q, int qDegreesOfFreedom) {
         this.exposureNames = List.copyOf(names);
         this.statistics = statistics;
         this.covariance = covariance.clone();
         this.marginalFStatistics = marginalFStatistics.clone();
+        this.conditionalFStatistics = conditionalFStatistics == null
+            ? null : conditionalFStatistics.clone();
         this.intercept = intercept;
         this.interceptStandardError = interceptStandardError;
         this.q = q;
@@ -38,15 +42,21 @@ public final class MultivariableMrResult {
     /** Mean squared marginal exposure z scores; not conditional instrument strength. */
     public double[] marginalFStatistics() { return marginalFStatistics.clone(); }
     /**
-     * @deprecated This accessor previously mislabeled marginal statistics as
-     * conditional F statistics. Conditional strength requires a specified
-     * cross-exposure sampling covariance model, which this fit does not have.
-     * Use {@link #marginalFStatistics()} only for marginal strength.
-     * @throws UnsupportedOperationException always
+     * Sanderson-Windmeijer-style conditional F statistics when this result was
+     * created by a covariance-aware generalized fit.
+     *
+     * @deprecated Prefer the explicitly typed {@link ConditionalStrengthResult}
+     * returned by {@link MultivariableMendelianRandomization#conditionalStrength}
+     * because it also retains conditional Q and degrees of freedom.
      */
     @Deprecated
     public double[] conditionalFStatistics() {
-        throw new UnsupportedOperationException("conditional F statistics require cross-exposure sampling covariance; marginalFStatistics() reports marginal strength only");
+        if (conditionalFStatistics == null)
+            throw new UnsupportedOperationException("conditional F statistics require cross-exposure sampling covariance; use the covariance-aware fit overload");
+        return conditionalFStatistics.clone();
+    }
+    public boolean conditionalStrengthAvailable() {
+        return conditionalFStatistics != null;
     }
     public double intercept() { return intercept; }
     public double interceptStandardError() { return interceptStandardError; }

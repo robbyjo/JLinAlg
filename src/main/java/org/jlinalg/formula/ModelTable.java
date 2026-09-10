@@ -6,6 +6,8 @@ package org.jlinalg.formula;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import org.jlinalg.model.MissingDataPolicy;
 
 /** Immutable named numeric and categorical columns used by formula compilation. */
 public final class ModelTable {
@@ -43,6 +45,77 @@ public final class ModelTable {
 
     boolean isNumeric(String name) { return numeric.containsKey(name); }
     boolean isCategorical(String name) { return categorical.containsKey(name); }
+
+    int[] completeRows(Set<String> columns, MissingDataPolicy policy) {
+        if (columns == null || columns.isEmpty() || policy == null) {
+            throw new IllegalArgumentException(
+                "formula columns and missing-data policy are required");
+        }
+        for (String column : columns) {
+            if (!isNumeric(column) && !isCategorical(column)) {
+                throw new IllegalArgumentException("column is absent: " + column);
+            }
+        }
+        int[] retained = new int[rows];
+        int count = 0;
+        for (int row = 0; row < rows; row++) {
+            String missing = null;
+            for (String column : columns) {
+                if (isNumeric(column) && !Double.isFinite(numeric.get(column)[row])
+                        || isCategorical(column) && categorical.get(column)[row] == null) {
+                    missing = column;
+                    break;
+                }
+            }
+            if (missing == null) {
+                retained[count++] = row;
+            } else if (policy == MissingDataPolicy.ERROR) {
+                throw new IllegalArgumentException(
+                    "model table contains a missing value in column "
+                        + missing + " at row " + row);
+            }
+        }
+        if (count == 0) {
+            throw new IllegalArgumentException("no complete observations remain");
+        }
+        return java.util.Arrays.copyOf(retained, count);
+    }
+
+    ModelTable retainRows(int[] retained) {
+        if (retained == null || retained.length == 0) {
+            throw new IllegalArgumentException("retained rows are required");
+        }
+        if (retained.length == rows) {
+            boolean identity = true;
+            for (int row = 0; row < rows; row++) identity &= retained[row] == row;
+            if (identity) return this;
+        }
+        Builder builder = builder(retained.length);
+        for (Map.Entry<String, double[]> entry : numeric.entrySet()) {
+            double[] values = new double[retained.length];
+            for (int row = 0; row < retained.length; row++) {
+                values[row] = entry.getValue()[checkedRow(retained, row)];
+            }
+            builder.numeric(entry.getKey(), values);
+        }
+        for (Map.Entry<String, String[]> entry : categorical.entrySet()) {
+            String[] values = new String[retained.length];
+            for (int row = 0; row < retained.length; row++) {
+                values[row] = entry.getValue()[checkedRow(retained, row)];
+            }
+            builder.categorical(entry.getKey(), values);
+        }
+        return builder.build();
+    }
+
+    private int checkedRow(int[] retained, int position) {
+        int row = retained[position];
+        if (row < 0 || row >= rows || position > 0 && row <= retained[position - 1]) {
+            throw new IllegalArgumentException(
+                "retained rows must be strictly increasing and in range");
+        }
+        return row;
+    }
 
     private static Map<String, double[]> copyNumeric(Map<String, double[]> source) {
         Map<String, double[]> result = new LinkedHashMap<>();

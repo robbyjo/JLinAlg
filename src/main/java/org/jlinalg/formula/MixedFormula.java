@@ -6,11 +6,17 @@ package org.jlinalg.formula;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jlinalg.mixed.RandomEffectTerm;
 import org.jlinalg.mixed.CorrelatedRandomEffectBlock;
+import org.jlinalg.model.MissingDataPolicy;
+import org.jlinalg.pedigree.Pedigree;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 
 /** Compiler for lme4-style grouped blocks with numeric/categorical slopes and interactions. */
 public final class MixedFormula {
@@ -24,18 +30,38 @@ public final class MixedFormula {
      * The compiled sparse random designs are reused by every subsequent fit.
      */
     public static CompiledMixedFormula compile(String formula, ModelTable table) {
-        return compile(formula, table, FormulaOptions.defaults());
+        return compile(formula, table, MixedFormulaOptions.defaults());
     }
 
     /** Compiles fixed-effect contrasts and residual precision weights as well as random blocks. */
     public static CompiledMixedFormula compile(String formula, ModelTable table, FormulaOptions options) {
-        if (formula == null || table == null || options == null) {
+        if (options == null) {
+            throw new IllegalArgumentException("formula options are required");
+        }
+        return compile(formula, table, new MixedFormulaOptions(
+            options, MissingDataPolicy.ERROR, Map.of()));
+    }
+
+    /**
+     * Compiles fixed, grouped, and mapped pedigree terms after applying one
+     * complete-case selection to every column used by the model.
+     */
+    public static CompiledMixedFormula compile(
+            String formula, ModelTable table, MixedFormulaOptions mixedOptions) {
+        if (formula == null || table == null || mixedOptions == null) {
             throw new IllegalArgumentException("formula and table are required");
         }
+        FormulaOptions options = mixedOptions.formulaOptions();
+        int originalRows = table.rows();
+        int[] retainedRows = table.completeRows(
+            requiredColumns(formula, options), mixedOptions.missingDataPolicy());
+        table = table.retainRows(retainedRows);
         Matcher matcher = RANDOM_TERM.matcher(formula.replaceAll("\\s+", ""));
         String responseName = formula.split("~", -1)[0].trim();
         List<RandomEffectTerm> random = new ArrayList<>();
         List<CorrelatedRandomEffectBlock> correlated = new ArrayList<>();
+        List<PedigreeRandomEffectTerm> pedigree = new ArrayList<>();
+        Set<String> usedPedigreeMappings = new LinkedHashSet<>();
         StringBuffer fixedFormula = new StringBuffer();
         while (matcher.find()) {
             String expression = matcher.group(1);
@@ -43,13 +69,27 @@ public final class MixedFormula {
             String groupExpression = matcher.group(3);
             for (String groupName : expandedGroups(groupExpression)) {
                 List<String> groups = groupLabels(groupName, table);
-                addTerms(random, correlated, expression, groupName, groups,
-                    explicitlyIndependent, table, responseName, options);
+                Pedigree mapped = mixedOptions.pedigreeMappings().get(groupName);
+                if (mapped == null) {
+                    addTerms(random, correlated, expression, groupName, groups,
+                        explicitlyIndependent, table, responseName, options);
+                } else {
+                    addPedigreeTerm(pedigree, expression, groupName, groups, mapped);
+                    usedPedigreeMappings.add(groupName);
+                }
             }
             matcher.appendReplacement(fixedFormula, "");
         }
         matcher.appendTail(fixedFormula);
-        if (random.isEmpty() && correlated.isEmpty()) {
+        if (!usedPedigreeMappings.containsAll(
+                mixedOptions.pedigreeMappings().keySet())) {
+            Set<String> unused = new LinkedHashSet<>(
+                mixedOptions.pedigreeMappings().keySet());
+            unused.removeAll(usedPedigreeMappings);
+            throw new IllegalArgumentException(
+                "pedigree mapping has no matching random group: " + unused);
+        }
+        if (random.isEmpty() && correlated.isEmpty() && pedigree.isEmpty()) {
             throw new IllegalArgumentException("mixed formula has no random-effect term");
         }
         String cleaned = fixedFormula.toString()
@@ -58,7 +98,79 @@ public final class MixedFormula {
             .replaceAll("\\+$", "");
         if (cleaned.endsWith("~")) cleaned += "1";
         CompiledFormula fixed = Formula.compile(cleaned, table, options);
-        return new CompiledMixedFormula(fixed, random, correlated);
+        return new CompiledMixedFormula(fixed, random, correlated, pedigree,
+            retainedRows, originalRows);
+    }
+
+    private static void addPedigreeTerm(
+            List<PedigreeRandomEffectTerm> destination,
+            String expression,
+            String groupName,
+            List<String> groups,
+            Pedigree pedigree) {
+        RandomTerms terms = randomTerms(expression);
+        if (!terms.intercept() || !terms.terms().isEmpty()) {
+            throw new IllegalArgumentException(
+                "pedigree formula mappings currently require (1|"
+                    + groupName + ")");
+        }
+        destination.add(PedigreeRandomEffectTerm.of(
+            "1|" + groupName, groups, pedigree));
+    }
+
+    private static Set<String> requiredColumns(
+            String formula, FormulaOptions options) {
+        String compact = formula.replaceAll("\\s+", "");
+        String[] sides = compact.split("~", -1);
+        if (sides.length != 2 || sides[0].isEmpty() || sides[1].isEmpty()) {
+            throw new IllegalArgumentException(
+                "formula must have the form response ~ terms");
+        }
+        Set<String> columns = new LinkedHashSet<>();
+        columns.add(sides[0]);
+        Matcher matcher = RANDOM_TERM.matcher(compact);
+        StringBuffer fixed = new StringBuffer();
+        while (matcher.find()) {
+            addExpressionColumns(matcher.group(1), columns);
+            for (String group : matcher.group(3).split("[/:]", -1)) {
+                if (group.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "random-effect group is empty");
+                }
+                columns.add(group);
+            }
+            matcher.appendReplacement(fixed, "");
+        }
+        matcher.appendTail(fixed);
+        String[] fixedSides = fixed.toString().split("~", -1);
+        if (fixedSides.length == 2) {
+            addExpressionColumns(fixedSides[1], columns);
+        }
+        if (options.weightColumn() != null) {
+            columns.add(options.weightColumn());
+        }
+        return columns;
+    }
+
+    private static void addExpressionColumns(
+            String expression, Set<String> columns) {
+        for (String token : expression.replace("-1", "+-1").split("\\+")) {
+            if (token.isEmpty() || token.equals("0")
+                    || token.equals("1") || token.equals("-1")) {
+                continue;
+            }
+            if (token.startsWith("offset(") && token.endsWith(")")) {
+                columns.add(token.substring(7, token.length() - 1));
+                continue;
+            }
+            for (String column : token.split("[*:]", -1)) {
+                if (column.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "empty formula interaction variable");
+                }
+                columns.add(column);
+            }
+        }
     }
 
     private static void addTerms(

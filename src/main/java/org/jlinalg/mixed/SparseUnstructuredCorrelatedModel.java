@@ -14,6 +14,7 @@ import org.jlinalg.inference.DegreesOfFreedomMethod;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.reml.RemlOptions;
 import org.jlinalg.reml.VarianceEstimation;
+import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 
 /** Sparse grouped Gaussian likelihood with one estimated Cholesky factor per block. */
 public final class SparseUnstructuredCorrelatedModel {
@@ -34,13 +35,25 @@ public final class SparseUnstructuredCorrelatedModel {
      */
     public static Result fit(double[] response, double[] fixed, int rows, int columns,
             List<CorrelatedRandomEffectBlock> blocks, RemlOptions options, BackendPolicy policy) {
-        try (Model model = new Model(response, fixed, rows, columns, blocks, options, policy)) {
+        return fit(response,fixed,rows,columns,blocks,List.of(),options,policy);
+    }
+
+    /** Jointly optimizes unstructured blocks and pedigree variance components. */
+    public static Result fit(double[] response,double[] fixed,int rows,int columns,
+            List<CorrelatedRandomEffectBlock> blocks,
+            List<PedigreeRandomEffectTerm> pedigreeEffects,
+            RemlOptions options,BackendPolicy policy) {
+        try (Model model = new Model(response, fixed, rows, columns, blocks,
+                pedigreeEffects, options, policy)) {
         Optimum optimum = model.optimize(model.initial(), model::objective);
         try (SparseLinearMixedModel.Prepared prepared = model.prepare(optimum.point())) {
             double[] scaleBounds = model.scaleBounds(optimum.point());
             SparseLinearMixedModelResult fitted = prepared.evaluateAt(response, fixed,
-                columns, new double[blocks.size()], scaleBounds[0], scaleBounds[1]);
-            double scale = fitted.varianceComponents()[blocks.size()];
+                columns, new double[model.termCount()], scaleBounds[0],
+                scaleBounds[1], model.pevBlockSizes());
+            double scale = fitted.varianceComponents()[model.termCount()];
+            fitted=fitted.withVarianceComponents(model.reportedVariances(
+                optimum.point(),scale));
             if (options.degreesOfFreedomMethod() != DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION) {
                 if (!optimum.converged()) throw new IllegalStateException("finite-DF inference requires a converged fit");
                 if (options.varianceEstimation() != VarianceEstimation.REML)
@@ -48,18 +61,21 @@ public final class SparseUnstructuredCorrelatedModel {
                 try (BackendContext context = policy == BackendPolicy.PREFERRED
                         ? BackendContext.preferredSparse() : BackendContext.select(policy)) {
                     double[] absolute = model.absolute(optimum.point(), scale);
-                    double[] marginal = new double[1 + blocks.stream().mapToInt(CorrelatedRandomEffectBlock::effectCount).sum()];
+                    double[] marginal = new double[1 + pedigreeEffects.size()
+                        + blocks.stream().mapToInt(CorrelatedRandomEffectBlock::effectCount).sum()];
                     int index = 0, start = 0;
                     for (CorrelatedRandomEffectBlock block : blocks) {
                         for (int r = 0; r < block.effectCount(); r++) marginal[index++] = absolute[start + r*(r+1)/2 + r];
                         start += block.effectCount() * (block.effectCount() + 1) / 2;
                     }
+                    for(int extra=0;extra<pedigreeEffects.size();extra++)
+                        marginal[index++]=absolute[model.blockParameters()+extra];
                     marginal[index] = scale;
                     SparseFiniteDf.requireInteriorVariances(marginal, options.minimumVariance(), options.maximumVariance());
                     SparseFiniteDf.Inference inference = SparseFiniteDf.compute(absolute, model.derivativeScales(absolute),
                         model::absolutePoint, columns, options.degreesOfFreedomMethod(), context.backend());
                     fitted = fitted.withInference(inference.covariance(), inference.degreesOfFreedom(),
-                        options.degreesOfFreedomMethod());
+                        options.degreesOfFreedomMethod(), inference.jointState());
                 }
             }
             return new Result(fitted.withOptimization(optimum.evaluations(), optimum.converged()),
@@ -133,7 +149,8 @@ public final class SparseUnstructuredCorrelatedModel {
         for (int i = 0; i < block; i++) start += blocks.get(i).effectCount() * (blocks.get(i).effectCount() + 1) / 2;
         final int rowStart = start + effect * (effect + 1) / 2, diagonal = rowStart + effect;
         double estimate = Math.sqrt(covariance(model.factors(optimum.point()).get(block), scale)[effect][effect]);
-        if (!(estimate > lower)) throw new IllegalArgumentException("profile estimate is on the supplied lower boundary");
+        boolean boundaryEstimate = estimate <= lower
+            + 1e-7*Math.max(1,upper-lower);
         // Replace the constrained row diagonal with log(sigma); offdiagonals
         // become row ratios. This enforces a fixed row norm without PD rejection.
         double[] initial = optimum.point().clone(), lo = model.lower.clone(), hi = model.upper.clone();
@@ -141,7 +158,7 @@ public final class SparseUnstructuredCorrelatedModel {
         initial[diagonal] = .5 * Math.log(scale);
         lo[diagonal] = .5 * Math.log(options.minimumVariance());
         hi[diagonal] = .5 * Math.log(options.maximumVariance());
-        ProfileLikelihoodInterval interval = MixedModelProfile.interval(value -> {
+        java.util.function.DoubleUnaryOperator profile = value -> {
             Optimum refit = model.optimize(initial, free -> {
                 double residual = Math.exp(2 * free[diagonal]);
                 double norm = 1;
@@ -153,7 +170,12 @@ public final class SparseUnstructuredCorrelatedModel {
             }, lo, hi);
             if (!refit.converged()) throw new IllegalStateException("random SD profile did not converge");
             return -refit.value();
-        }, estimate, -optimum.value(), confidence, lower, upper, 12);
+        };
+        ProfileLikelihoodInterval interval = boundaryEstimate
+            ? MixedModelProfile.boundaryInterval(profile, lower,
+                -optimum.value(), confidence, lower, upper, 12)
+            : MixedModelProfile.interval(profile, estimate,
+                -optimum.value(), confidence, lower, upper, 12);
         if (!interval.lowerFound() && lower == 0)
             return new ProfileLikelihoodInterval(interval.estimate(), 0, interval.upper(), interval.cutoff(),
                 false, interval.upperFound());
@@ -166,12 +188,17 @@ public final class SparseUnstructuredCorrelatedModel {
             .degreesOfFreedomMethod(DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION).build();
     }
 
-    /** Marginal-correlation profile for a two-coefficient block, including +/-1 boundaries. */
+    /**
+     * Marginal-correlation profile for the first two coefficients of a block,
+     * including +/-1 boundaries.
+     */
     public static ProfileLikelihoodInterval profileCorrelation(double[] response, double[] fixed,
             int rows, int columns, List<CorrelatedRandomEffectBlock> blocks, int block,
             double confidence, RemlOptions options, BackendPolicy policy) {
-        if (block < 0 || block >= blocks.size() || blocks.get(block).effectCount() != 2)
-            throw new IllegalArgumentException("correlation profiles currently require a two-coefficient block");
+        if (block < 0 || block >= blocks.size()
+                || blocks.get(block).effectCount() < 2)
+            throw new IllegalArgumentException(
+                "correlation profiles require a block with at least two coefficients");
         try (Model model = new Model(response, fixed, rows, columns, blocks, profileOptions(options), policy)) {
         Optimum optimum = model.optimize(model.initial(), model::objective);
         if (!optimum.converged()) throw new IllegalStateException("profile maximum did not converge");
@@ -202,22 +229,90 @@ public final class SparseUnstructuredCorrelatedModel {
         }, estimate, -optimum.value(), confidence, -1, 1, 12);
         }
     }
+
+    /**
+     * Profiles the marginal correlation of any two coefficients in an
+     * unstructured block. Reordering the selected pair into the leading
+     * Cholesky coordinates leaves the covariance family and likelihood
+     * unchanged while retaining the exact +/-1 boundary representation.
+     */
+    public static ProfileLikelihoodInterval profileCorrelation(
+            double[] response, double[] fixed, int rows, int columns,
+            List<CorrelatedRandomEffectBlock> blocks, int block,
+            int firstEffect, int secondEffect, double confidence,
+            RemlOptions options, BackendPolicy policy) {
+        if (blocks == null || block < 0 || block >= blocks.size()) {
+            throw new IllegalArgumentException(
+                "correlation profile block is out of range");
+        }
+        CorrelatedRandomEffectBlock selected = blocks.get(block);
+        if (selected.observations() != rows) {
+            throw new IllegalArgumentException(
+                "correlated block rows must match model rows");
+        }
+        int effects = selected.effectCount();
+        if (firstEffect < 0 || firstEffect >= effects
+                || secondEffect < 0 || secondEffect >= effects
+                || firstEffect == secondEffect) {
+            throw new IllegalArgumentException(
+                "correlation profile effects must be distinct and in range");
+        }
+        int[] order = new int[effects];
+        order[0] = firstEffect;
+        order[1] = secondEffect;
+        for (int effect = 0, target = 2; effect < effects; effect++) {
+            if (effect != firstEffect && effect != secondEffect) {
+                order[target++] = effect;
+            }
+        }
+        int[] groupIndices = selected.groupIndices();
+        List<String> groups = new ArrayList<>(rows);
+        for (int row = 0; row < rows; row++) {
+            groups.add(selected.groupNames().get(groupIndices[row]));
+        }
+        double[] source = selected.effectDesign();
+        double[][] design = new double[rows][effects];
+        List<String> names = new ArrayList<>(effects);
+        for (int target = 0; target < effects; target++) {
+            int sourceEffect = order[target];
+            names.add(selected.effectNames().get(sourceEffect));
+            for (int row = 0; row < rows; row++) {
+                design[row][target] = source[row * effects + sourceEffect];
+            }
+        }
+        List<CorrelatedRandomEffectBlock> reordered =
+            new ArrayList<>(blocks);
+        reordered.set(block, CorrelatedRandomEffectBlock.of(
+            selected.name(), groups, names, design));
+        return profileCorrelation(response, fixed, rows, columns,
+            reordered, block, confidence, options, policy);
+    }
+
     private static final class Model implements AutoCloseable {
         final double[] response, fixed, lower, upper;
         final int rows, columns, parameters;
+        final int blockParameters;
         final List<CorrelatedRandomEffectBlock> blocks;
+        final List<PedigreeRandomEffectTerm> pedigreeEffects;
         final RemlOptions options;
         final BackendPolicy policy;
         final SparseLinearMixedModel.TransformedLikelihood likelihood;
         Model(double[] response, double[] fixed, int rows, int columns,
                 List<CorrelatedRandomEffectBlock> blocks, RemlOptions options, BackendPolicy policy) {
+            this(response,fixed,rows,columns,blocks,List.of(),options,policy);
+        }
+        Model(double[] response,double[] fixed,int rows,int columns,
+                List<CorrelatedRandomEffectBlock> blocks,
+                List<PedigreeRandomEffectTerm> pedigreeEffects,
+                RemlOptions options,BackendPolicy policy) {
             if (columns > 0) MatrixOps.validateModelData(response, fixed, rows, columns);
             else if (columns != 0 || response == null || response.length != rows || fixed.length != 0)
                 throw new IllegalArgumentException("invalid constrained design");
             if (blocks == null || blocks.isEmpty() || options == null || policy == null)
                 throw new IllegalArgumentException("blocks and controls are required");
             this.response = response; this.fixed = fixed; this.rows = rows; this.columns = columns;
-            this.blocks = List.copyOf(blocks); this.options = options; this.policy = policy;
+            this.blocks = List.copyOf(blocks); this.pedigreeEffects=List.copyOf(pedigreeEffects);
+            this.options = options; this.policy = policy;
             int count = 0;
             java.util.HashSet<String> names = new java.util.HashSet<>();
             for (CorrelatedRandomEffectBlock block : blocks) {
@@ -225,26 +320,38 @@ public final class SparseUnstructuredCorrelatedModel {
                     throw new IllegalArgumentException("block rows must match and names must be unique");
                 count += block.effectCount() * (block.effectCount() + 1) / 2;
             }
-            parameters = count;
-            lower = new double[count]; upper = new double[count];
+            blockParameters=count;
+            for(PedigreeRandomEffectTerm pedigree:this.pedigreeEffects)
+                if(pedigree==null||pedigree.randomEffect().observations()!=rows
+                        ||!names.add(pedigree.randomEffect().name()))
+                    throw new IllegalArgumentException("pedigree term rows must match and names must be unique");
+            parameters = count+this.pedigreeEffects.size();
+            lower = new double[parameters]; upper = new double[parameters];
             double limit = Math.sqrt(options.maximumVariance() / options.minimumVariance());
             Arrays.fill(upper, limit);
             for (int b = 0, k = 0; b < blocks.size(); b++)
                 for (int r = 0; r < blocks.get(b).effectCount(); r++) for (int c = 0; c <= r; c++)
                     lower[k++] = r == c ? (r == 0 ? 1 / limit : 0) : -limit;
+            for(int k=blockParameters;k<parameters;k++){
+                lower[k]=-.5*Math.log(limit*limit);upper[k]=.5*Math.log(limit*limit);
+            }
             likelihood = new SparseLinearMixedModel.TransformedLikelihood(policy);
         }
         public void close() { likelihood.close(); }
         double[] initial() {
             double[] result = new double[parameters];
             double[] supplied = options.initialVariances();
-            if (supplied != null && supplied.length != blocks.size() + 1)
+            if (supplied != null && supplied.length != termCount() + 1)
                 throw new IllegalArgumentException("initial variances require one block scale plus residual");
+            int residualIndex=termCount();
             for (int b = 0, i = 0; b < blocks.size(); b++) {
-                double sd = supplied == null ? 1 : Math.sqrt(supplied[b] / supplied[blocks.size()]);
+                double sd = supplied == null ? 1 : Math.sqrt(supplied[b] / supplied[residualIndex]);
                 int d = blocks.get(b).effectCount();
                 for (int r = 0; r < d; r++) for (int c = 0; c <= r; c++) result[i++] = r == c ? sd : 0;
             }
+            for(int extra=0;extra<pedigreeEffects.size();extra++)
+                result[blockParameters+extra]=supplied==null?0:.5*Math.log(
+                    supplied[blocks.size()+extra]/supplied[residualIndex]);
             return result;
         }
         List<double[][]> factors(double[] point) {
@@ -278,15 +385,50 @@ public final class SparseUnstructuredCorrelatedModel {
                 terms.add(RandomEffectTerm.ofSparseCsr("latent:" + block.name(), rows,
                     block.groupCount() * d, starts, indices, values, names));
             }
+            for(int extra=0;extra<pedigreeEffects.size();extra++)
+                terms.add(scale(pedigreeEffects.get(extra).randomEffect(),
+                    Math.exp(point[blockParameters+extra])));
             return terms;
         }
+        List<SparsePrecisionMatrix> precisions(){
+            List<SparsePrecisionMatrix> result=new ArrayList<>();
+            for(CorrelatedRandomEffectBlock block:blocks)
+                result.add(SparsePrecisionMatrix.identity(block.groupCount()*block.effectCount()));
+            for(PedigreeRandomEffectTerm pedigree:pedigreeEffects)result.add(pedigree.precision());
+            return result;
+        }
+        private RandomEffectTerm scale(RandomEffectTerm term,double multiplier){
+            if(term.sparse()){
+                double[] values=term.sparseValues();for(int i=0;i<values.length;i++)values[i]*=multiplier;
+                return RandomEffectTerm.ofSparseCsr(term.name(),term.observations(),term.coefficients(),
+                    term.rowPointers(),term.columnIndices(),values,term.coefficientNames());
+            }
+            double[] values=term.design();for(int i=0;i<values.length;i++)values[i]*=multiplier;
+            return RandomEffectTerm.of(term.name(),values,term.observations(),term.coefficients(),term.coefficientNames());
+        }
         SparseLinearMixedModel.Prepared prepare(double[] point) {
-            return SparseLinearMixedModel.prepare(rows, terms(point), options.toBuilder()
+            return SparseLinearMixedModel.prepareWithPrecision(rows, terms(point),precisions(), options.toBuilder()
                 .degreesOfFreedomMethod(DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION).build(), policy);
+        }
+        int[] pevBlockSizes(){
+            int[] result=new int[blocks.size()+pedigreeEffects.size()];
+            for(int i=0;i<blocks.size();i++)result[i]=blocks.get(i).effectCount();
+            for(int i=blocks.size();i<result.length;i++)result[i]=1;
+            return result;
+        }
+        int termCount(){return blocks.size()+pedigreeEffects.size();}
+        int blockParameters(){return blockParameters;}
+        double[] reportedVariances(double[] theta,double scale){
+            double[] result=new double[termCount()+1];
+            Arrays.fill(result,0,blocks.size(),scale);
+            for(int extra=0;extra<pedigreeEffects.size();extra++)
+                result[blocks.size()+extra]=scale*Math.exp(
+                    2*theta[blockParameters+extra]);
+            result[termCount()]=scale;return result;
         }
         SparseFiniteDf.Point point(double[] theta, double scale) {
             double[] bounds = scaleBounds(theta);
-            return likelihood.point(response, fixed, rows, columns, terms(theta), options.varianceEstimation(), scale,
+            return likelihood.point(response, fixed, rows, columns, terms(theta),precisions(), options.varianceEstimation(), scale,
                 bounds[0], bounds[1]);
         }
         double[] scaleBounds(double[] theta) {
@@ -297,6 +439,11 @@ public final class SparseUnstructuredCorrelatedModel {
                 if (!(ratio > 0)) throw new IllegalArgumentException("random variance below physical lower bound");
                 lo = Math.max(lo, options.minimumVariance() / ratio);
                 hi = Math.min(hi, options.maximumVariance() / ratio);
+            }
+            for(int extra=0;extra<pedigreeEffects.size();extra++){
+                double ratio=Math.exp(2*theta[blockParameters+extra]);
+                lo=Math.max(lo,options.minimumVariance()/ratio);
+                hi=Math.min(hi,options.maximumVariance()/ratio);
             }
             if (lo > hi * (1 + 1e-12)) throw new IllegalArgumentException("infeasible covariance bounds");
             return new double[] {Math.min(lo, hi), hi};
@@ -394,6 +541,8 @@ public final class SparseUnstructuredCorrelatedModel {
                 double[][] covariance = covariance(l, scale);
                 for (int r = 0; r < l.length; r++) for (int c = 0; c <= r; c++) result[k++] = covariance[r][c];
             }
+            for(int extra=0;extra<pedigreeEffects.size();extra++)
+                result[k++]=scale*Math.exp(2*theta[blockParameters+extra]);
             result[k] = scale; return result;
         }
         SparseFiniteDf.Point absolutePoint(double[] absolute) {
@@ -407,6 +556,10 @@ public final class SparseUnstructuredCorrelatedModel {
                 double[][] l = cholesky(covariance); int start = k - d * (d + 1) / 2;
                 for (int r = 0; r < d; r++) for (int c = 0; c <= r; c++) theta[start++] = l[r][c];
             }
+            for(int extra=0;extra<pedigreeEffects.size();extra++){
+                if(!(absolute[k]>0))throw new IllegalArgumentException("pedigree variance must be positive");
+                theta[blockParameters+extra]=.5*Math.log(absolute[k++]/scale);
+            }
             return point(theta, scale);
         }
         double[] derivativeScales(double[] absolute) {
@@ -419,6 +572,7 @@ public final class SparseUnstructuredCorrelatedModel {
                         * absolute[start + c*(c+1)/2 + c]);
                 start = k;
             }
+            for(int extra=0;extra<pedigreeEffects.size();extra++)scales[k]=absolute[k++];
             scales[parameters] = absolute[parameters];
             return scales;
         }
@@ -451,17 +605,23 @@ public final class SparseUnstructuredCorrelatedModel {
                 List<double[][]> factors) {
             this.fit = fit; shapes = new ArrayList<>();
             List<CorrelatedRandomEffectEstimates> estimates = new ArrayList<>();
-            double scale = fit.varianceComponents()[blocks.size()];
+            double scale = fit.varianceComponents()[fit.varianceComponents().length-1];
             for (int b = 0; b < blocks.size(); b++) {
                 CorrelatedRandomEffectBlock block = blocks.get(b); int d = block.effectCount();
                 double[][] l = factors.get(b); shapes.add(covariance(l, 1));
                 double[] cov = new double[d * d]; double[][] matrix = covariance(l, scale);
                 for (int r = 0; r < d; r++) System.arraycopy(matrix[r], 0, cov, r * d, d);
-                double[] latent = fit.randomEffects().get(b).estimates(), modes = new double[latent.length];
+                RandomEffectEstimates latentResult=fit.randomEffects().get(b);
+                double[] latent = latentResult.estimates(), modes = new double[latent.length];
+                double[] latentPev=latentResult.predictionErrorCovariances();
+                double[] pev=new double[block.groupCount()*d*d];
                 for (int g = 0; g < block.groupCount(); g++) for (int r = 0; r < d; r++)
                     for (int c = 0; c <= r; c++) modes[g * d + r] += l[r][c] * latent[g * d + c];
+                for(int g=0;g<block.groupCount();g++)for(int r=0;r<d;r++)for(int c=0;c<d;c++)
+                    for(int a=0;a<d;a++)for(int j=0;j<d;j++)
+                        pev[g*d*d+r*d+c]+=l[r][a]*latentPev[g*d*d+a*d+j]*l[c][j];
                 estimates.add(new CorrelatedRandomEffectEstimates(block.name(), block.groupNames(),
-                    block.effectNames(), cov, modes));
+                    block.effectNames(), cov, modes,pev));
             }
             randomEffects = List.copyOf(estimates);
         }
@@ -478,7 +638,7 @@ public final class SparseUnstructuredCorrelatedModel {
         public boolean converged() { return fit.converged(); }
         public CorrelatedLinearMixedModelResult correlatedFit() {
             return new CorrelatedLinearMixedModelResult(fit.associationStatistics(), fit.fixedEffectCovariance(),
-                randomEffects, fit.varianceComponents()[randomEffects.size()], fit.fittedValues(), fit.residuals(),
+                randomEffects, fit.varianceComponents()[fit.varianceComponents().length-1], fit.fittedValues(), fit.residuals(),
                 fit.logLikelihood(), fit.varianceEstimation(), evaluations(), converged(), fit.backend());
         }
         public Result withObservationScale(double[] weights, double[] offsets) {

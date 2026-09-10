@@ -8,6 +8,6 @@ package org.jlinalg.settest;
 public enum SkatOCalibration {
     /** GMMAT-compatible moment matching followed by one-dimensional quadrature. */
     ANALYTIC,
-    /** Reproducible correlated parametric-null simulation. */
+    /** Reproducible Monte Carlo calibration from the exact Gaussian score null. */
     PARAMETRIC_SIMULATION
 }

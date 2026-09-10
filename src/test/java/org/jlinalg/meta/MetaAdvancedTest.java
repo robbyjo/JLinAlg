@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.junit.jupiter.api.Test;
 
 class MetaAdvancedTest {
@@ -41,5 +42,31 @@ class MetaAdvancedTest {
         MetaPublicationBiasResult bias = MetaPublicationBias.diagnose(STUDIES);
         assertTrue(Double.isFinite(bias.eggerPValue()));
         assertTrue(Double.isFinite(bias.rankPValue()));
+    }
+
+    @Test void sparsePrecisionRemlMatchesDenseCorrelatedAnalysis() {
+        int n=STUDIES.size();double variance=.04,rho=.2;
+        double[][] covariance=new double[n][n];
+        for(int i=0;i<n;i++)for(int j=0;j<n;j++)
+            covariance[i][j]=variance*Math.pow(rho,Math.abs(i-j));
+        double denominator=variance*(1-rho*rho);
+        int[] starts={0,2,5,8,10};
+        int[] columns={0,1,0,1,2,1,2,3,2,3};
+        double[] values={1/denominator,-rho/denominator,
+            -rho/denominator,(1+rho*rho)/denominator,-rho/denominator,
+            -rho/denominator,(1+rho*rho)/denominator,-rho/denominator,
+            -rho/denominator,1/denominator};
+        var precision=new SparsePrecisionMatrix(n,starts,columns,values);
+        var options=MetaAnalysisOptions.builder()
+            .tauSquaredEstimator(TauSquaredEstimator.REML)
+            .maximumIterations(1000).tolerance(1e-11).build();
+        var dense=MetaCorrelatedAnalysis.fit(STUDIES,covariance,options,
+            BackendPolicy.CPU);
+        var sparse=SparseMetaAnalysis.fit(STUDIES,precision,options,
+            BackendPolicy.CPU);
+        assertEquals(dense.tauSquared(),sparse.tauSquared(),2e-9);
+        assertEquals(dense.pooledEffectSize(),sparse.pooledEffectSize(),2e-10);
+        assertEquals(dense.covariance()[0],sparse.covariance()[0],2e-10);
+        assertEquals(dense.generalizedQ(),sparse.generalizedQ(),2e-10);
     }
 }

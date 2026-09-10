@@ -82,6 +82,30 @@ public class MetaMetaforParityTest {
         close("diagonal.REML.ll",new double[] {f.logLikelihood()},1e-8);
     }
 
+    @Test void structuredCovariancesAndVarianceProfilesAreEstimable() throws IOException {
+        Data d=data();
+        for(var structure:List.of(MetaRandomEffect.Structure.COMPOUND_SYMMETRY,
+                MetaRandomEffect.Structure.AR1)){
+            var fit=MetaMultilevelRegression.fit(d.studies,d.mods,List.of("x"),
+                d.v,true,List.of(new MetaRandomEffect("study",d.groups,
+                    d.random,structure)),MetaMultilevelRegression.Estimation.REML,
+                options("REML",MetaInferenceMethod.NORMAL),CPU);
+            assertTrue(fit.converged());
+            double[] covariance=fit.randomCovariances().get(0);
+            assertEquals(covariance[0],covariance[3],1e-12);
+            assertTrue(Math.abs(covariance[1])<covariance[0]);
+        }
+        var interval=MetaMultilevelRegression.profileRandomStandardDeviation(
+            d.studies,d.mods,List.of("x"),d.v,true,
+            List.of(new MetaRandomEffect("study",d.groups,d.random,
+                MetaRandomEffect.Structure.DIAGONAL)),0,0,
+            MetaMultilevelRegression.Estimation.REML,.90,2,
+            options("REML",MetaInferenceMethod.NORMAL),CPU);
+        assertTrue(interval.estimate()>0);
+        assertTrue(interval.lowerFound()||interval.lower()==0);
+        assertTrue(interval.upperFound());
+    }
+
     @Test void knownCovarianceLikelihoodIncludesGaussianConstant() throws IOException {
         Data d = data();
         var fit = MetaMultilevelRegression.fit(d.studies, d.mods, List.of("x"), d.v, true, CPU);

@@ -448,13 +448,17 @@ terms in this facade are therefore independent. Use
 `SparseLinearMixedModel` is the scalable identity-residual alternative for
 independent terms. It evaluates ML/REML through sparse random-coefficient
 precision equations, uses reusable minimum-degree sparse Cholesky, and avoids
-forming observation-scale covariance matrices. The dense path remains the
-reference for Satterthwaite/Kenward-Roger and full PEV calculations.
+forming observation-scale covariance matrices. Sparse REML supports
+coefficient-wise Satterthwaite/Kenward-Roger inference and joint multi-DF KR
+tests through `KenwardRogerTest`. Results retain diagonal PEVs and bounded full
+within-group PEV blocks in original random-effect coordinates.
 
 `CorrelatedLinearMixedModel` adds unstructured grouped intercept/slope blocks
 using a positive-definite Cholesky covariance parameterization. Its current
 likelihood evaluator is dense; moving correlated blocks onto the sparse
-equation optimizer remains performance work.
+equation optimizer remains performance work. The sparse unstructured optimizer
+can jointly estimate these grouped covariances with ordinary and pedigree
+sparse-precision variance components.
 
 ## Pedigree animal-model REML
 
@@ -590,7 +594,10 @@ numeric sparse Cholesky factor per worker, avoiding both observation-scale
 covariance matrices and repeated backend discovery. `GlmmLaplace` remains the
 dense reference implementation. `GlmmQuadrature` additionally provides
 adaptive, node-refined quadrature for independent scalar Gaussian random
-intercepts in binomial and Poisson models; it is not pedigree or multidimensional AGQ.
+intercepts in binomial and Poisson models. `MultidimensionalGlmmQuadrature`
+extends adaptive quadrature to low-dimensional crossed and arbitrary
+sparse-precision/pedigree Gaussian effects. Tensor growth is controlled by an
+explicit total-node budget; larger random spaces should use sparse Laplace/PQL.
 
 `SparseZeroInflatedMixedModel` fits frequentist zero-inflated Poisson and NB2
 mixed models. Separate fixed designs control the conditional count mean,
@@ -631,7 +638,13 @@ including changes in the random-effect mode and Laplace log determinant. Set
 fully derivative-free fit, or set `maximumGradientThreads` to one for serial
 BFGS. `fitWithInference` separately computes a post-optimization observed
 numerical Hessian—this is not Fisher information supplied to either optimizer—
-and returns nuisance-adjusted marginal covariance and standard errors. The
+and returns nuisance-adjusted marginal covariance and standard errors,
+conditional on any nuisance variance at an active optimization bound. Every
+fit evaluates deterministic zero-process and variance starts and locally
+confirms the selected stationary basin when needed. The result reports
+`optimizationStarts()`, `stationaryModes()`, and
+`globalOptimumCertified()`; the last means best and reproducible among those
+starts, not a mathematical proof over the continuous parameter space. The
 prepared object reuses symbolic sparse analysis and one numeric factor per
 worker; it also provides profile likelihood and deterministic conditional
 parametric bootstrap. Checked-in fixtures gate grouped models against
@@ -804,7 +817,12 @@ supports sparse `(1|group)` and independent `(0+x|group)` terms. Compilation
 builds contiguous matrices once; fitting does not parse formulas.
 It also expands `(1+x||group)` into independent terms, supports nested grouping
 such as `(1|site/subject)`, and compiles `(1+x|group)` to a true
-Cholesky-parameterized correlated block.
+Cholesky-parameterized correlated block. `MixedFormulaOptions` can map a
+grouping column in `(1|individual)` to a `Pedigree`, retaining unobserved
+ancestors and combining the mapped precision term with ordinary independent
+random effects. Its `MissingDataPolicy.OMIT` applies one complete-case mask
+across the response, fixed/random predictors, grouping columns, weights, and
+offset; `retainedRows()` records the original table positions.
 
 `RemlAssociationScanner` implements a batched P3D/EMMAX-style GWAS/TWAS path.
 It estimates a null model once, caches its GLS projection, mean-imputes missing
@@ -950,6 +968,14 @@ not automatic proof of causality. Instrument selection, phenotype-scale
 assumptions, and the exclusion restriction remain scientific responsibilities
 of the caller.
 
+`MultivariableMendelianRandomization.generalizedFit` accepts a known covariance
+for the outcome summaries plus one cross-exposure sampling-covariance matrix
+per instrument. The same richer inputs enable `conditionalStrength`, which
+reports covariance-aware conditional Q and F statistics. Covariance-unaware
+fits retain `marginalFStatistics()`; their deprecated
+`conditionalFStatistics()` accessor continues to fail explicitly rather than
+relabeling marginal strength.
+
 ## Meta-analysis and meta-regression
 
 `MetaAnalysis` pools study-level effects with positive sampling SEs. It supports
@@ -989,6 +1015,15 @@ an intercept, and uses the same fixed/random heterogeneity estimators. It
 returns named coefficient effect sizes, SE/statistic/p-values (including log10
 forms), the full coefficient covariance, residual `Q_E`, omnibus moderator
 `Q_M`, residual I-squared/H-squared, heterogeneity R-squared, and weights.
+
+For large correlated study collections supplied as a sparse precision,
+`SparseMetaAnalysis.fit` performs fixed-effect pooling or estimates an
+independent tau-squared by REML/Paule-Mandel without materializing the sampling
+covariance. `MetaRandomEffect` additionally provides diagonal, unstructured,
+compound-symmetry, and AR(1) grouped covariance families;
+`MetaMultilevelRegression.profileRandomStandardDeviation` profiles a selected
+standard deviation while jointly refitting all remaining covariance
+coordinates.
 
 ## SuSiE fine mapping
 

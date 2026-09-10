@@ -1,5 +1,35 @@
 # JLinAlg 0.3.0
 
+## Post-release development
+
+- Mixed formulas can map `(1|individual)` grouping columns to pedigree
+  precision terms, retain unobserved pedigree members, and combine them with
+  ordinary independent random effects. Optional complete-case compilation
+  applies one row mask to fixed/random predictors, grouping columns, weights,
+  and offsets and exposes the retained original rows.
+- Correlation likelihood profiles now accept any selected effect pair in
+  unstructured random blocks larger than two while retaining exact plus/minus
+  one boundary coordinates.
+- Sparse meta-analysis accepts a known sparse sampling precision and estimates
+  independent REML or Paule-Mandel heterogeneity without forming its inverse.
+  Multilevel meta-analysis adds compound-symmetry and AR(1) covariance families
+  and nuisance-refitted random-standard-deviation profiles.
+- Sparse mixed models add joint Kenward-Roger F tests, one-boundary mixture
+  profile intervals, original-coordinate within-group PEV blocks, and joint
+  unstructured grouped plus sparse-pedigree covariance optimization.
+- Multivariable MR adds covariance-aware generalized estimation and true
+  conditional-strength statistics when per-instrument cross-exposure
+  covariance is supplied.
+- Added bounded multidimensional adaptive Gauss-Hermite quadrature for
+  binomial-logit and Poisson-log crossed or sparse-precision random effects.
+- Sparse ZIP/ZINB fits now use deterministic multi-start outer optimization and
+  report start count, distinct stationary modes, and whether the selected mode
+  was reproduced and best among the deterministic starts. Fixed-effect
+  covariance conditions on nuisance variances at active bounds.
+- Positive-mixture tails fall back to a labeled saddlepoint calculation when
+  the bounded gamma series is unavailable. SKAT-O now defaults to parametric
+  Gaussian-score-null simulation; analytic moment matching is opt-in.
+
 ## Remaining-code accuracy and performance audit
 
 - Corrected shared statistical scaling, exact Kendall tails, rank-test cutoffs,
@@ -23,7 +53,8 @@
 Compatibility correction: `MultivariableMrResult.conditionalFStatistics()`
 previously returned marginal mean z², not conditional strength. It is deprecated
 and now fails explicitly. Use `marginalFStatistics()` for the actual statistic;
-true multivariable conditional F requires a richer covariance model.
+covariance-aware fits now populate it with true conditional strength, also
+available with its Q statistics from `conditionalStrength()`.
 
 The [release audit](https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/release-0.3.0-audit.md)
 records reproduction commands, measured faster/slower cases, test gates, and

@@ -426,6 +426,9 @@ public final class SparseZeroInflatedMixedModel {
                     || (options.outerOptimizer()
                             == ZeroInflatedOuterOptimizer.AUTO
                         && design.columns() > 128);
+                ThreadLocal<Objective> workerObjectives =
+                    ThreadLocal.withInitial(() ->
+                        objective.fork(localFactor.get()));
                 if (derivativeFree) {
                     optimized = bobyqa(initial, lower, upper, objective,
                         interpolationPoints, options);
@@ -434,9 +437,6 @@ public final class SparseZeroInflatedMixedModel {
                     optimized.numFunctionCalls += checked.calls();
                     outerConverged = checked.converged();
                 } else {
-                    ThreadLocal<Objective> workerObjectives =
-                        ThreadLocal.withInitial(() ->
-                            objective.fork(localFactor.get()));
                     optimized = boundedBfgs(initial, lower, upper, objective,
                         options, initial.length >= 8
                             && options.maximumGradientThreads() > 1
@@ -458,6 +458,131 @@ public final class SparseZeroInflatedMixedModel {
                         outerConverged = checked.converged();
                     }
                 }
+                int optimizationStarts = 1;
+                List<Double> stationaryValues = new ArrayList<>();
+                if (outerConverged) stationaryValues.add(optimized.mF);
+                int varianceStart = countColumns + zeroColumns
+                    + (family == CountFamily.NEGATIVE_BINOMIAL
+                        ? dispersionColumns : 0);
+                List<double[]> starts = new ArrayList<>();
+                for (double zeroIntercept : new double[] {-4.0, 2.0}) {
+                    double[] restart=initial.clone();
+                    Arrays.fill(restart, 0, countColumns + zeroColumns, 0.0);
+                    if (zeroColumns > 0) {
+                        restart[countColumns] = Math.max(lower[countColumns],
+                            Math.min(upper[countColumns], zeroIntercept));
+                    }
+                    starts.add(restart);
+                }
+                for (double variance : new double[] {
+                        options.minimumVariance() * 10.0,
+                        Math.sqrt(options.minimumVariance()
+                            * options.maximumVariance())}) {
+                    double[] restart = initial.clone();
+                    for (int i = 0; i < structure.varianceCount(); i++) {
+                        restart[varianceStart + i] = Math.log(variance);
+                    }
+                    starts.add(restart);
+                }
+                int multiStartCalls = 0;
+                for (double[] restart : starts) {
+                    optimizationStarts++;
+                    OptimizationResult candidate = derivativeFree
+                        ? bobyqa(restart, lower, upper, objective,
+                            interpolationPoints, options)
+                        : boundedBfgs(restart, lower, upper, objective, options,
+                            restart.length >= 8
+                                && options.maximumGradientThreads() > 1
+                                    ? gradientExecutor() : null,
+                            workerObjectives);
+                    Stationarity stationarity = checkStationarity(candidate.mX,
+                        lower, upper, objective::coldValue,
+                        options.relativeTolerance());
+                    candidate.numFunctionCalls += stationarity.calls();
+                    if (!stationarity.converged() && !derivativeFree) {
+                        candidate = bobyqa(candidate.mX, lower, upper, objective,
+                            interpolationPoints, options);
+                        stationarity = checkStationarity(candidate.mX, lower,
+                            upper, objective::coldValue,
+                            options.relativeTolerance());
+                        candidate.numFunctionCalls += stationarity.calls();
+                    }
+                    multiStartCalls += candidate.numFunctionCalls;
+                    if (stationarity.converged()) {
+                        stationaryValues.add(candidate.mF);
+                        if (!outerConverged || candidate.mF < optimized.mF) {
+                            optimized = candidate;
+                            outerConverged = true;
+                        }
+                    }
+                }
+                double provisionalBest = optimized.mF;
+                double provisionalTolerance = 20.0
+                    * options.relativeTolerance()
+                    * Math.max(1.0, Math.abs(provisionalBest));
+                long provisionalSupport = stationaryValues.stream()
+                    .filter(value -> Math.abs(value - provisionalBest)
+                        <= provisionalTolerance)
+                    .count();
+                if (outerConverged && provisionalSupport < 2) {
+                    double[] confirmationStart = optimized.mX.clone();
+                    double step = 1e-6 * Math.max(1.0,
+                        Math.abs(confirmationStart[0]));
+                    confirmationStart[0] = Math.min(upper[0],
+                        confirmationStart[0] + step);
+                    if (confirmationStart[0] == optimized.mX[0]) {
+                        confirmationStart[0] = Math.max(lower[0],
+                            confirmationStart[0] - step);
+                    }
+                    optimizationStarts++;
+                    OptimizationResult confirmation = derivativeFree
+                        ? bobyqa(confirmationStart, lower, upper, objective,
+                            interpolationPoints, options)
+                        : boundedBfgs(confirmationStart, lower, upper,
+                            objective, options,
+                            confirmationStart.length >= 8
+                                && options.maximumGradientThreads() > 1
+                                    ? gradientExecutor() : null,
+                            workerObjectives);
+                    Stationarity stationarity = checkStationarity(
+                        confirmation.mX, lower, upper, objective::coldValue,
+                        options.relativeTolerance());
+                    confirmation.numFunctionCalls += stationarity.calls();
+                    if (!stationarity.converged() && !derivativeFree) {
+                        confirmation = bobyqa(confirmation.mX, lower, upper,
+                            objective, interpolationPoints, options);
+                        stationarity = checkStationarity(confirmation.mX,
+                            lower, upper, objective::coldValue,
+                            options.relativeTolerance());
+                        confirmation.numFunctionCalls += stationarity.calls();
+                    }
+                    multiStartCalls += confirmation.numFunctionCalls;
+                    if (stationarity.converged()) {
+                        stationaryValues.add(confirmation.mF);
+                        if (confirmation.mF < optimized.mF) {
+                            optimized = confirmation;
+                        }
+                    }
+                }
+                double bestObjective = optimized.mF;
+                List<Double> distinct = new ArrayList<>();
+                double modeTolerance = 20.0 * options.relativeTolerance()
+                    * Math.max(1.0, Math.abs(bestObjective));
+                int support = 0;
+                for (double value : stationaryValues) {
+                    if (Math.abs(value - bestObjective) <= modeTolerance) {
+                        support++;
+                    }
+                    boolean seen = false;
+                    for (double other : distinct) {
+                        seen |= Math.abs(value - other) <= modeTolerance;
+                    }
+                    if (!seen) distinct.add(value);
+                }
+                boolean globalCertified = outerConverged
+                    && support >= 2
+                    && stationaryValues.stream().noneMatch(value ->
+                        value < bestObjective - modeTolerance);
                 double[] parameters = optimized.mX == null
                     ? initial : optimized.mX;
                 InferenceData inferenceData = inference && outerConverged
@@ -470,9 +595,11 @@ public final class SparseZeroInflatedMixedModel {
                 return result(fitted, parameters, countColumns, zeroColumns,
                     dispersionColumns, family, structure, design,
                     pattern, factor.factorNonzeroCount(),
-                    priorEvaluations + optimized.numFunctionCalls,
+                    priorEvaluations + optimized.numFunctionCalls
+                        + multiStartCalls,
                     outerConverged, inferenceData,
-                    options);
+                    options, optimizationStarts, distinct.size(),
+                    globalCertified);
         }
 
         public int randomCoefficientCount() { return design.columns(); }
@@ -955,25 +1082,34 @@ public final class SparseZeroInflatedMixedModel {
             double[] lower, double[] upper,
             int countColumns, int zeroColumns, int dispersionColumns) {
         int dimensions = parameters.length;
+        int reported = countColumns + zeroColumns + dispersionColumns;
         double[] steps = new double[dimensions];
+        List<Integer> free = new ArrayList<>(dimensions);
         for (int index = 0; index < dimensions; index++) {
             double proposed = 2e-4 * (1.0 + Math.abs(parameters[index]));
             double room = Math.min(parameters[index] - lower[index],
                 upper[index] - parameters[index]);
             steps[index] = Math.min(proposed, 0.45 * room);
-            if (!(steps[index] > 1e-8)) return InferenceData.unavailable();
+            if (steps[index] > 1e-8) {
+                free.add(index);
+            } else if (index < reported) {
+                return InferenceData.unavailable();
+            }
         }
+        int freeDimensions = free.size();
         double center = objective.coldValue(parameters);
-        double[] hessian = new double[dimensions * dimensions];
-        for (int left = 0; left < dimensions; left++) {
+        double[] hessian = new double[freeDimensions * freeDimensions];
+        for (int freeLeft = 0; freeLeft < freeDimensions; freeLeft++) {
+            int left = free.get(freeLeft);
             double[] plus = parameters.clone();
             double[] minus = parameters.clone();
             plus[left] += steps[left];
             minus[left] -= steps[left];
             double diagonal = (objective.coldValue(plus) - 2.0 * center
                 + objective.coldValue(minus)) / (steps[left] * steps[left]);
-            hessian[left * dimensions + left] = diagonal;
-            for (int right = 0; right < left; right++) {
+            hessian[freeLeft * freeDimensions + freeLeft] = diagonal;
+            for (int freeRight = 0; freeRight < freeLeft; freeRight++) {
+                int right = free.get(freeRight);
                 double[] pp = parameters.clone();
                 double[] pm = parameters.clone();
                 double[] mp = parameters.clone();
@@ -990,17 +1126,17 @@ public final class SparseZeroInflatedMixedModel {
                     - objective.coldValue(pm) - objective.coldValue(mp)
                     + objective.coldValue(mm))
                     / (4.0 * steps[left] * steps[right]);
-                hessian[left * dimensions + right] = value;
-                hessian[right * dimensions + left] = value;
+                hessian[freeLeft * freeDimensions + freeRight] = value;
+                hessian[freeRight * freeDimensions + freeLeft] = value;
             }
         }
-        double[] inverse = inverseWithRidge(hessian, dimensions);
+        double[] inverse = inverseWithRidge(hessian, freeDimensions);
         if (inverse == null) return InferenceData.unavailable();
-        int reported = countColumns + zeroColumns + dispersionColumns;
         double[] covariance = new double[reported * reported];
-        for (int row = 0; row < reported; row++)
-            System.arraycopy(inverse, row * dimensions, covariance,
+        for (int row = 0; row < reported; row++) {
+            System.arraycopy(inverse, row * freeDimensions, covariance,
                 row * reported, reported);
+        }
         List<String> names = new ArrayList<>(reported);
         for (int index = 0; index < countColumns; index++)
             names.add("count[" + index + "]");
@@ -1095,7 +1231,9 @@ public final class SparseZeroInflatedMixedModel {
             CountFamily family, RandomStructure structure,
             CombinedDesign design, SparsePattern pattern,
             int factorNonzeros, int evaluations, boolean outerConverged,
-            InferenceData inference, ZeroInflatedMixedOptions options) {
+            InferenceData inference, ZeroInflatedMixedOptions options,
+            int optimizationStarts,int stationaryModes,
+            boolean globalCertified) {
         int zeroStart = countColumns;
         int dispersionStart = zeroStart + zeroColumns;
         int varianceStart = dispersionStart
@@ -1123,6 +1261,12 @@ public final class SparseZeroInflatedMixedModel {
         DataState data = fitted.data();
         List<String> warnings = diagnostics(parameters, varianceStart,
             structure, data, options, outerConverged && fitted.converged());
+        if (!globalCertified) {
+            warnings = new ArrayList<>(warnings);
+            warnings.add("fewer than two deterministic starts reached "
+                + "stationary modes; the multi-start optimum is not certified");
+            warnings = List.copyOf(warnings);
+        }
         return new ZeroInflatedMixedResult(
             family == CountFamily.POISSON
                 ? "zero-inflated-poisson" : "zero-inflated-negative-binomial-2",
@@ -1136,7 +1280,8 @@ public final class SparseZeroInflatedMixedModel {
             inference.parameterNames(), inference.covariance(), warnings,
             outerParameterNames(countColumns, zeroColumns,
                 family == CountFamily.NEGATIVE_BINOMIAL
-                    ? dispersionColumns : 0, structure), parameters);
+                    ? dispersionColumns : 0, structure), parameters,
+            optimizationStarts,stationaryModes,globalCertified);
     }
 
     private static List<String> outerParameterNames(

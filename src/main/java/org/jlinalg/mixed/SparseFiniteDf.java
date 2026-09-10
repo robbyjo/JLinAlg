@@ -19,7 +19,11 @@ public final class SparseFiniteDf {
     /** One sparse likelihood evaluation in absolute, linear covariance coordinates. */
     record Point(double logLikelihood, double restrictedLogDeterminant,
                  double[] covariance, double residualVariance) { }
-    record Inference(double[] covariance, double[] degreesOfFreedom) { }
+    record JointState(double[] unadjustedCovariance,
+            double[][] covarianceGradient,
+            double[] varianceParameterCovariance) { }
+    record Inference(double[] covariance, double[] degreesOfFreedom,
+            JointState jointState) { }
 
     /** Box-boundary estimates do not have the unconstrained information law. */
     static void requireInteriorVariances(double[] variances, double minimum, double maximum) {
@@ -130,7 +134,9 @@ public final class SparseFiniteDf {
                     || !(covariance[c * columns + c] > 0))
                 throw new IllegalArgumentException("finite-DF inference is not estimable");
         }
-        return new Inference(covariance, degrees);
+        return new Inference(covariance, degrees,
+            kr ? new JointState(center.covariance().clone(), gradient,
+                parameterCovariance.clone()) : null);
     }
 
     private static Point shifted(Function<double[], Point> evaluate, double[] parameters,

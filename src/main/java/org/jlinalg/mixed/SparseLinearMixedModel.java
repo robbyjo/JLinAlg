@@ -47,8 +47,16 @@ public final class SparseLinearMixedModel {
         SparseFiniteDf.Point point(double[] response, double[] fixed, int rows, int columns,
                 List<RandomEffectTerm> terms, VarianceEstimation estimation, double scale,
                 double minimumScale, double maximumScale) {
+            return point(response,fixed,rows,columns,terms,null,estimation,
+                scale,minimumScale,maximumScale);
+        }
+        SparseFiniteDf.Point point(double[] response,double[] fixed,int rows,
+                int columns,List<RandomEffectTerm> terms,
+                List<SparsePrecisionMatrix> precisionBases,
+                VarianceEstimation estimation,double scale,
+                double minimumScale,double maximumScale) {
             CombinedDesign design = combine(terms, rows, false, true);
-            if (bases == null) bases = precisions(terms, null);
+            if (bases == null) bases = precisions(terms, precisionBases);
             SparsePattern pattern = crossProductPattern(design, terms, bases);
             double[] ratios = new double[terms.size()];
             if (factor == null) {
@@ -304,13 +312,21 @@ public final class SparseLinearMixedModel {
 
         SparseLinearMixedModelResult evaluateAt(double[] response, double[] fixed,
                 int columns, double[] logRatios, double minimumScale, double maximumScale) {
+            return evaluateAt(response,fixed,columns,logRatios,minimumScale,
+                maximumScale,null);
+        }
+
+        SparseLinearMixedModelResult evaluateAt(double[] response,double[] fixed,
+                int columns,double[] logRatios,double minimumScale,
+                double maximumScale,int[] pevBlockSizes) {
             MatrixOps.validateModelData(response, fixed, rows, columns);
             try (PreparedSparseCholesky factor = backend.prepareDcsrpotrf(
                     pattern.matrix(relativeVariances(logRatios)),
                     MatrixTriangle.LOWER, SparseOrdering.MINIMUM_DEGREE)) {
                 Objective objective = new Objective(response, fixed, rows, columns,
                     terms, design, pattern, factor, precisionLogDeterminants,
-                    options.varianceEstimation(), backend, 0, design.columns());
+                    options.varianceEstimation(), backend, 0, design.columns(),
+                    pevBlockSizes);
                 objective.bounds(minimumScale, maximumScale);
                 return result(objective.evaluate(logRatios), factor.factorNonzeroCount(),
                     1, false, objective);
@@ -368,6 +384,7 @@ public final class SparseLinearMixedModel {
             double[] variances = fitted.variances();
             int columns = fitted.beta().length;
             double[] covariance = fitted.fixedCovariance();
+            SparseFiniteDf.JointState jointState = null;
             double[] df = new double[columns];
             Arrays.fill(df, rows - columns - 1.0);
             if (options.degreesOfFreedomMethod() != DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION) {
@@ -388,6 +405,7 @@ public final class SparseLinearMixedModel {
                     }, columns, options.degreesOfFreedomMethod(), backend);
                 covariance = inference.covariance();
                 df = inference.degreesOfFreedom();
+                jointState = inference.jointState();
             }
             double[] standardErrors = new double[columns];
             for (int column = 0; column < columns; column++)
@@ -400,7 +418,9 @@ public final class SparseLinearMixedModel {
                 fitted.beta(), standardErrors, df, options.degreesOfFreedomMethod());
             List<RandomEffectEstimates> estimates = estimates(
                 terms, design.termStarts(), variances, fitted.randomModes(),
-                fitted.randomPredictionErrorVariances());
+                fitted.randomPredictionErrorVariances(),
+                fitted.randomPredictionErrorCovariances(),
+                objective.pevBlockSizes());
             List<String> names = new ArrayList<>(terms.size() + 1);
             for (RandomEffectTerm term : terms) names.add(term.name());
             names.add("residual");
@@ -410,7 +430,7 @@ public final class SparseLinearMixedModel {
                 fitted.logLikelihood(), options.varianceEstimation(),
                 evaluations, converged,
                 design.columns(), pattern.values().length,
-                factorNonzeroCount, provenance);
+                factorNonzeroCount, provenance, jointState);
         }
 
         /** Uses one deterministic fitted variance start for subsequent fits. */
@@ -682,7 +702,9 @@ public final class SparseLinearMixedModel {
                 DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
             List<RandomEffectEstimates> estimates = estimates(
                 terms, design.termStarts(), variances, fitted.randomModes(),
-                fitted.randomPredictionErrorVariances());
+                fitted.randomPredictionErrorVariances(),
+                fitted.randomPredictionErrorCovariances(),
+                objective.pevBlockSizes());
             List<String> names = new ArrayList<>(terms.size() + 1);
             for (RandomEffectTerm term : terms) names.add(term.name());
             names.add("residual");
@@ -977,6 +999,7 @@ public final class SparseLinearMixedModel {
         private final double[] fixedCross;
         private final double[] randomResponse;
         private final double[] randomFixedCross;
+        private final int[] pevBlockSizes;
 
         Objective(double[] response, double[] fixed, int rows, int columns,
                 List<RandomEffectTerm> terms, CombinedDesign design,
@@ -984,6 +1007,17 @@ public final class SparseLinearMixedModel {
                 double[] precisionLogDeterminants,
                 VarianceEstimation estimation, ComputeBackend backend,
                 int pevStart, int pevCount) {
+            this(response,fixed,rows,columns,terms,design,pattern,factor,
+                precisionLogDeterminants,estimation,backend,pevStart,pevCount,
+                null);
+        }
+
+        Objective(double[] response,double[] fixed,int rows,int columns,
+                List<RandomEffectTerm> terms,CombinedDesign design,
+                SparsePattern pattern,PreparedSparseCholesky factor,
+                double[] precisionLogDeterminants,
+                VarianceEstimation estimation,ComputeBackend backend,
+                int pevStart,int pevCount,int[] pevBlockSizes) {
             double shift = 0;
             if (columns > 0) {
                 int anchor = 0;
@@ -1015,7 +1049,10 @@ public final class SparseLinearMixedModel {
                 transposeMultiply(design, fixed, columns);
             this.pevStart = pevStart;
             this.pevCount = pevCount;
+            this.pevBlockSizes=pevBlockSizes==null?null:pevBlockSizes.clone();
         }
+
+        int[] pevBlockSizes(){return pevBlockSizes==null?null:pevBlockSizes.clone();}
 
         void bounds(double minimum, double maximum) {
             minimumVariance = minimum; maximumVariance = maximum;
@@ -1138,27 +1175,34 @@ public final class SparseLinearMixedModel {
             variances[ratios.length] = residualVariance;
             if (columns > 0) beta[0] += betaShift;
             if (!materializeResult)
-                return new Evaluation(beta, fixedCovariance, null, null, null, null,
+                return new Evaluation(beta, fixedCovariance, null, null, null, null, null,
                     logLikelihood, variances, restrictedLogDeterminant);
             if (columns > 0) for (int r = 0; r < rows; r++) conditionalFitted[r] += fixed[r * columns] * betaShift;
-            double[] randomPredictionErrorVariances =
-                randomPredictionErrorVariances(
+            PredictionErrors predictionErrors =
+                randomPredictionErrors(
                     fixedCovariance, residualVariance,
                     solvedRandomFixed);
             return new Evaluation(beta, fixedCovariance, randomModes,
-                randomPredictionErrorVariances,
+                predictionErrors.variances(),predictionErrors.covariances(),
                 conditionalFitted,
                 residual, logLikelihood, variances, restrictedLogDeterminant);
         }
 
-        private double[] randomPredictionErrorVariances(
+        private PredictionErrors randomPredictionErrors(
                 double[] fixedCovariance,
                 double residualVariance,
                 double[] adjustedCross) {
             int randomColumns = design.columns();
             double[] result = new double[randomColumns];
             Arrays.fill(result, Double.NaN);
-            if (pevStart < 0 || pevCount == 0) return result;
+            int[] blocks=pevBlockSizes;
+            double[] covariance=null;
+            if(blocks!=null){
+                if(blocks.length!=terms.size())throw new IllegalArgumentException("PEV block sizes must match random terms");
+                covariance=new double[randomColumns*Arrays.stream(blocks).max().orElse(1)];
+                Arrays.fill(covariance,Double.NaN);
+            }
+            if (pevStart < 0 || pevCount == 0) return new PredictionErrors(result,covariance);
             for (int first = 0; first < pevCount;
                     first += PEV_SOLVE_BATCH_SIZE) {
                 int count = Math.min(PEV_SOLVE_BATCH_SIZE, pevCount - first);
@@ -1182,13 +1226,30 @@ public final class SparseLinearMixedModel {
                         }
                     }
                     result[random] = Math.max(0.0, value);
+                    if(covariance!=null){
+                        int term=terms.size()-1;
+                        for(int t=1;t<terms.size();t++)if(random<design.termStarts()[t]){term=t-1;break;}
+                        int size=blocks[term],termStart=design.termStarts()[term];
+                        if(size<1||(random-termStart)%size<0||terms.get(term).coefficients()%size!=0)
+                            throw new IllegalArgumentException("invalid PEV block size");
+                        int blockStart=termStart+((random-termStart)/size)*size;
+                        int max=Arrays.stream(blocks).max().orElse(1);
+                        for(int other=blockStart;other<blockStart+size;other++){
+                            double entry=residualVariance*inverseColumns[other*count+selected];
+                            for(int left=0;left<columns;left++)for(int right=0;right<columns;right++)
+                                entry+=adjustedCross[other*columns+left]*fixedCovariance[left*columns+right]
+                                    *adjustedCross[random*columns+right];
+                            covariance[other*max+(random-blockStart)]=entry;
+                        }
+                    }
                 }
             }
-            return result;
+            return new PredictionErrors(result,covariance);
         }
 
         private final int pevStart;
         private final int pevCount;
+        private record PredictionErrors(double[] variances,double[] covariances){ }
 
     }
 
@@ -1438,7 +1499,8 @@ public final class SparseLinearMixedModel {
     private static List<RandomEffectEstimates> estimates(
             List<RandomEffectTerm> terms, int[] starts,
             double[] variances, double[] modes,
-            double[] predictionErrorVariances) {
+            double[] predictionErrorVariances,double[] predictionErrorCovariances,
+            int[] blockSizes) {
         List<RandomEffectEstimates> result = new ArrayList<>(terms.size());
         for (int term = 0; term < terms.size(); term++) {
             RandomEffectTerm value = terms.get(term);
@@ -1449,9 +1511,19 @@ public final class SparseLinearMixedModel {
                 : Arrays.copyOfRange(predictionErrorVariances, starts[term],
                     starts[term] + value.coefficients());
             if (predictionErrorVariances == null) Arrays.fill(pev, Double.NaN);
+            int block=blockSizes==null?1:blockSizes[term];
+            double[] full;
+            if(predictionErrorCovariances==null)full=pev.clone();
+            else{
+                int maximum=Arrays.stream(blockSizes).max().orElse(1);
+                full=new double[value.coefficients()*block];
+                for(int row=0;row<value.coefficients();row++)
+                    System.arraycopy(predictionErrorCovariances,
+                        (starts[term]+row)*maximum,full,row*block,block);
+            }
             result.add(new RandomEffectEstimates(value.name(),
                 value.coefficientNames(), variances[term], selected,
-                pev));
+                pev,block,full));
         }
         return List.copyOf(result);
     }
@@ -1564,6 +1636,7 @@ public final class SparseLinearMixedModel {
     private record Evaluation(double[] beta, double[] fixedCovariance,
                               double[] randomModes,
                               double[] randomPredictionErrorVariances,
+                              double[] randomPredictionErrorCovariances,
                               double[] conditionalFitted,
                               double[] conditionalResiduals,
                               double logLikelihood,

@@ -4,14 +4,143 @@
  */
 package org.jlinalg.formula;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.model.MissingDataPolicy;
+import org.jlinalg.pedigree.Pedigree;
+import org.jlinalg.pedigree.PedigreeIndividual;
 import org.jlinalg.reml.RemlOptions;
 import org.junit.jupiter.api.Test;
 
 class MixedFormulaTest {
+    @Test
+    void completeCasesAlignFixedRandomWeightOffsetAndGroupingRows() {
+        int n = 24;
+        double[] y = new double[n], x = new double[n], z = new double[n];
+        double[] weights = new double[n], offset = new double[n];
+        double[] unused = new double[n];
+        String[] group = new String[n];
+        for (int row = 0; row < n; row++) {
+            x[row] = row / 10.0;
+            z[row] = row % 3 - 1;
+            weights[row] = 1 + row % 2;
+            offset[row] = .1 * Math.sin(row);
+            unused[row] = row;
+            group[row] = "g" + row / 4;
+            y[row] = 2 + .4 * x[row] + .2 * z[row] + offset[row];
+        }
+        y[1] = Double.NaN;
+        x[2] = Double.NaN;
+        z[3] = Double.NaN;
+        offset[4] = Double.NaN;
+        weights[5] = Double.NaN;
+        group[6] = null;
+        unused[7] = Double.NaN;
+        ModelTable table = ModelTable.builder(n)
+            .numeric("y", y).numeric("x", x).numeric("z", z)
+            .numeric("w", weights).numeric("o", offset)
+            .numeric("unused", unused)
+            .categorical("g", group).build();
+        FormulaOptions formulaOptions =
+            new FormulaOptions(ContrastCoding.TREATMENT, "w");
+
+        assertThrows(IllegalArgumentException.class, () ->
+            MixedFormula.compile("y~x+offset(o)+(1+z||g)", table,
+                formulaOptions));
+        CompiledMixedFormula compiled = MixedFormula.compile(
+            "y~x+offset(o)+(1+z||g)", table,
+            MixedFormulaOptions.builder()
+                .formulaOptions(formulaOptions)
+                .missingDataPolicy(MissingDataPolicy.OMIT)
+                .build());
+
+        int[] expected = new int[n - 6];
+        expected[0] = 0;
+        for (int row = 7; row < n; row++) expected[row - 6] = row;
+        assertArrayEquals(expected, compiled.retainedRows());
+        assertEquals(n, compiled.originalRows());
+        assertEquals(6, compiled.omittedRows());
+        assertEquals(n - 6, compiled.fixed().rows());
+        for (var term : compiled.randomEffects()) {
+            assertEquals(n - 6, term.observations());
+        }
+        var fit = compiled.fitSparse(
+            RemlOptions.builder().initialVariances(1, 1, 1).build(),
+            BackendPolicy.CPU);
+        assertEquals(n - 6, fit.fittedValues().length);
+        assertEquals(3, fit.varianceComponents().length);
+    }
+
+    @Test
+    void mapsFormulaGroupToPedigreePrecisionAndKeepsOrdinaryTerms() {
+        Pedigree pedigree = Pedigree.of(List.of(
+            PedigreeIndividual.founder("parent1"),
+            PedigreeIndividual.founder("parent2"),
+            new PedigreeIndividual("member1", "parent1", "parent2"),
+            new PedigreeIndividual("member2", "parent1", "parent2")));
+        int n = 24;
+        double[] y = new double[n];
+        String[] individual = new String[n], batch = new String[n];
+        for (int row = 0; row < n; row++) {
+            individual[row] = row % 2 == 0 ? "member1" : "member2";
+            batch[row] = "b" + row / 4;
+            y[row] = 3 + (row % 2 == 0 ? -.8 : .8)
+                + .3 * Math.sin(row / 4.0) + .05 * Math.cos(row);
+        }
+        ModelTable table = ModelTable.builder(n).numeric("y", y)
+            .categorical("individual", individual)
+            .categorical("batch", batch).build();
+        CompiledMixedFormula compiled = MixedFormula.compile(
+            "y~1+(1|individual)+(1|batch)", table,
+            MixedFormulaOptions.builder()
+                .pedigree("individual", pedigree)
+                .build());
+
+        assertEquals(1, compiled.pedigreeRandomEffects().size());
+        assertEquals(1, compiled.randomEffects().size());
+        assertEquals(pedigree.individualIds(), compiled.pedigreeRandomEffects()
+            .get(0).randomEffect().coefficientNames());
+        var fit = compiled.fitSparse(
+            RemlOptions.builder().initialVariances(1, 1, 1)
+                .maximumIterations(300).build(), BackendPolicy.CPU);
+        assertTrue(fit.converged());
+        assertEquals(3, fit.varianceComponents().length);
+    }
+
+    @Test
+    void pedigreeMappingRejectsSlopeAndFitsJointUnstructuredCovariance() {
+        List<PedigreeIndividual> members=new java.util.ArrayList<>();
+        for(int i=0;i<8;i++)members.add(PedigreeIndividual.founder("i"+i));
+        Pedigree pedigree=Pedigree.of(members);
+        int n=80;double[] y=new double[n],x=new double[n];
+        String[] id=new String[n],g=new String[n];
+        for(int row=0;row<n;row++){
+            int individual=row%8,group=row/8;
+            id[row]="i"+individual;g[row]="g"+group;x[row]=row%5-2;
+            y[row]=2+.3*x[row]+.7*Math.sin(individual)
+                +.5*Math.cos(group)*(1+.2*x[row])+.08*Math.sin(2.3*row);
+        }
+        ModelTable table=ModelTable.builder(n).numeric("y",y).numeric("x",x)
+            .categorical("id",id).categorical("g",g).build();
+        MixedFormulaOptions options = MixedFormulaOptions.builder()
+            .pedigree("id", pedigree).build();
+        assertThrows(IllegalArgumentException.class, () ->
+            MixedFormula.compile("y~x+(1+x|id)", table, options));
+        CompiledMixedFormula joint = MixedFormula.compile(
+            "y~x+(1|id)+(1+x|g)", table, options);
+        var fit=joint.fitSparse(RemlOptions.builder()
+            .initialVariances(1,1,1).maximumIterations(500).build(),
+            BackendPolicy.CPU);
+        assertTrue(fit.converged());
+        assertEquals(3,fit.varianceComponents().length);
+        assertTrue(fit.varianceComponents()[1]>0);
+    }
+
     @Test
     void offsetDoesNotConsumeTheFollowingRandomTermAndZeroInterceptSlopesStayCorrelated() {
         ModelTable table = ModelTable.builder(4).numeric("y",1,2,3,4).numeric("x",0,1,2,3)
