@@ -15,6 +15,7 @@ Run the complete verification suite before adapting an example:
 
 | Vignette | Features covered |
 | --- | --- |
+| [Command-line-only workflows](command-line.md) | phenotype-only and omics OLS/GLM, exact LMM/GLMM, pedigree/GRM matching, family-qualified and singleton IDs, genotype scans, Cox, and operational controls |
 | [Basic statistical tests](basic-statistical-tests.md) | unit-safe correlation/mean/variance inference, exact/asymptotic rank tests, tables, blocked designs, and ANOVA power |
 | [Nonlinear models](nonlinear-models.md) | analytic Gaussian fixed means, additive mixed effects, sparse pedigree structures |
 | [Mediation](mediation.md) | deterministic Gaussian path analysis, Sobel inference, ordinary and pedigree mixed effects |

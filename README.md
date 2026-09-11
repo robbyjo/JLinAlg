@@ -66,6 +66,11 @@ No system Gradle installation is needed.
 
 ## Executable command line
 
+The [command-line-only workflow guide](docs/vignettes/command-line.md) covers
+phenotype-only and omics scans, OLS/GLM/LMM/GLMM routing, pedigrees, family
+qualifiers, singleton families, GRMs, genotype inputs, Cox regression, and
+specialized regression/MR subcommands without requiring Java API code.
+
 Build the self-contained command-line JAR with:
 
 ```powershell
@@ -127,7 +132,14 @@ sparse additive relationship inverse, retaining unobserved pedigree members;
 it is the `pedigreemm`-style animal effect rather than an ordinary IID random
 intercept. Unknown parents may be blank, `NA`, `0`, `.`, or `-9`.
 `--pedigree-family-id` qualifies pedigree identifiers as `family:individual`;
-the phenotype matching column must then contain the same qualified IDs.
+the phenotype matching column must then contain the same qualified IDs for
+known members. After sample alignment, phenotype pedigree IDs absent from the
+file are retained as unrelated, noninbred singleton families. Repeated rows
+sharing one missing individual ID remain grouped under one singleton founder.
+The console, log, and manifest report file members, singleton families and
+observations, and total pedigree members.
+An unqualified phenotype ID remains a distinct singleton when family
+qualification is enabled; it is not guessed to be a qualified member.
 
 For mixed scans, `--variance-components auto` is the default. It resolves to
 `refit` for numeric omics and phenotype-only LMM/GLMM fits. Genotype LMM

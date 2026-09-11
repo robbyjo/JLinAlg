@@ -168,6 +168,9 @@ public final class JLinAlgCli {
               --sire-id COLUMN            Pedigree sire/parent-1 ID column
               --dam-id COLUMN             Pedigree dam/parent-2 ID column
               --pedigree-family-id COLUMN Optional family qualifier column
+                                           Absent IDs become unrelated
+                                           singleton families; repeated IDs
+                                           stay in the same family
               --variance-components auto|refit|null-model
                                            auto uses per-feature refits for
                                            numeric mixed scans and a null model

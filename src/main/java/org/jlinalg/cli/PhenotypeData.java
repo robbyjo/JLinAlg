@@ -46,7 +46,7 @@ final class PhenotypeData {
     Prepared prepare(
             List<String> requestedIds, String response,
             boolean encodeBinomial, String requestedCase,
-            String requestedControl) {
+            String requestedControl, String categoricalIdColumn) {
         List<String> ids = requestedIds == null ? originalIds()
             : SampleAlignment.intersect(requestedIds, originalIds()).sampleIds();
         int[] order = new int[ids.size()];
@@ -58,7 +58,7 @@ final class PhenotypeData {
         ModelTable.Builder builder = ModelTable.builder(order.length);
         for (int column = 0; column < table.header().size(); column++) {
             String name = table.header().get(column);
-            if (column == idIndex) {
+            if (column == idIndex || name.equals(categoricalIdColumn)) {
                 String[] values = strings(column, order);
                 builder.categorical(name, values);
                 continue;

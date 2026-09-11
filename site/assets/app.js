@@ -25,6 +25,7 @@ class SiteHeader extends HTMLElement {
           <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
           <nav class="nav-links" aria-label="Primary navigation">
             <a href="${root}index.html#features">Features</a>
+            <a href="${root}vignettes/command-line.html">Command line</a>
             <a href="${root}vignettes/index.html">Vignettes</a>
             <a href="${root}verification.html">Verification</a>
             <a href="${root}index.html#architecture">Architecture</a>
@@ -64,7 +65,7 @@ class SiteFooter extends HTMLElement {
         <div class="container">
           <div class="footer-grid">
             <div><a class="brand" href="${root}index.html"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><span>JLinAlg</span></a><p>High-performance Java statistical models for genetic association, causal inference, fine mapping, and quantitative research.</p></div>
-            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}verification.html">Accuracy and performance</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
+            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/command-line.html">Command-line guide</a><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}verification.html">Accuracy and performance</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
             <div class="footer-links"><strong>Project</strong><a href="https://github.com/robbyjo/JLinAlg">Source code</a><a href="https://github.com/robbyjo/JLinAlg/issues">Issues</a><a href="https://github.com/robbyjo/JDistlib">JDistlib</a></div>
           </div>
           <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>JLinAlg v0.3.3 · Java 17+ · Source: JDistlib 0.10.2 · FP64</span></div>

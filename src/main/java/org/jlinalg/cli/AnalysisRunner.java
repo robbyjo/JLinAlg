@@ -10,8 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.jlinalg.association.AssociationFitter;
 import org.jlinalg.association.AssociationEngineOptions;
 import org.jlinalg.association.AssociationFailurePolicy;
@@ -56,6 +58,7 @@ import org.jlinalg.pipeline.StreamingOmicsAssociationPipeline;
 import org.jlinalg.pipeline.VariantFilterOptions;
 import org.jlinalg.pipeline.VariantSource;
 import org.jlinalg.pipeline.VariantSources;
+import org.jlinalg.pedigree.PedigreeIndividual;
 import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.jlinalg.reml.Reml;
 import org.jlinalg.reml.RemlOptions;
@@ -81,6 +84,10 @@ final class AnalysisRunner {
     private String resolvedStatisticType = "not-applicable";
     private String resolvedDfMethod = "not-applicable";
     private String resolvedPartialR2Method = "not-applicable";
+    private int pedigreeFileMembers;
+    private int pedigreeSingletonsAdded;
+    private int pedigreeSingletonObservations;
+    private int pedigreeMembers;
 
     AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log,
             PrintStream output) {
@@ -129,7 +136,8 @@ final class AnalysisRunner {
         PhenotypeData phenotype = PhenotypeData.read(
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(sourceIds,
-            plan.response(), binomial, options.caseValue, options.controlValue);
+            plan.response(), binomial, options.caseValue, options.controlValue,
+            options.individualId);
         int idAlignedSamples = prepared.ids().size();
         prepared = completeCases(
             phenotype, prepared, plan.response(), binomial);
@@ -448,7 +456,7 @@ final class AnalysisRunner {
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(null,
             preparedResponse, options.family.equals("binomial") || plan.isCox(),
-            options.caseValue, options.controlValue);
+            options.caseValue, options.controlValue, options.individualId);
         int phenotypeSamples = prepared.ids().size();
         prepared = completeCases(phenotype, prepared, preparedResponse,
             options.family.equals("binomial") || plan.isCox());
@@ -934,22 +942,44 @@ final class AnalysisRunner {
         List<String> observationIds = matchingColumn.equals(options.idColumn)
             ? prepared.ids()
             : phenotype.alignedValues(prepared.ids(), matchingColumn);
-        PedigreeReader.Loaded value = PedigreeReader.read(
+        PedigreeReader.Loaded fileValue = PedigreeReader.read(
             options.pedigree, options.pedigreeId, options.sireId,
             options.damId, options.pedigreeFamilyId);
-        java.util.Set<String> pedigreeIds = value.individuals().stream()
-            .map(org.jlinalg.pedigree.PedigreeIndividual::id)
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        List<PedigreeIndividual> individuals =
+            new ArrayList<>(fileValue.individuals());
+        Set<String> pedigreeIds = new LinkedHashSet<>();
+        for (PedigreeIndividual individual : individuals)
+            pedigreeIds.add(individual.id());
+        Set<String> singletonIds = new LinkedHashSet<>();
         for (String id : observationIds) {
-            if (!pedigreeIds.contains(id))
-                throw new IllegalArgumentException(
-                    "phenotype pedigree ID is absent from the pedigree: "
-                        + id + " (matching column " + matchingColumn + ")");
+            if (!pedigreeIds.contains(id)) {
+                pedigreeSingletonObservations++;
+                if (singletonIds.add(id))
+                    individuals.add(PedigreeIndividual.founder(id));
+            }
         }
+        pedigreeFileMembers = fileValue.individuals().size();
+        pedigreeSingletonsAdded = singletonIds.size();
+        pedigreeMembers = individuals.size();
+        PedigreeReader.Loaded value = pedigreeSingletonsAdded == 0
+            ? fileValue
+            : new PedigreeReader.Loaded(individuals, Arrays.copyOf(
+                fileValue.inbreedingCoefficients(), individuals.size()));
         info("pedigree=" + options.pedigree.toAbsolutePath());
-        info("pedigree_members=" + value.individuals().size());
+        info("pedigree_file_members=" + pedigreeFileMembers);
+        info("pedigree_singletons_added=" + pedigreeSingletonsAdded);
+        info("pedigree_singleton_observations="
+            + pedigreeSingletonObservations);
+        info("pedigree_members=" + pedigreeMembers);
         info("pedigree_match_column=" + matchingColumn);
         info("pedigree_precision=sparse_additive_relationship_inverse");
+        if (pedigreeSingletonsAdded > 0)
+            output.println("Pedigree members: " + pedigreeMembers
+                + " (file=" + pedigreeFileMembers
+                + ", singleton families=" + pedigreeSingletonsAdded
+                + ", singleton observations="
+                + pedigreeSingletonObservations
+                + ", matching column=" + matchingColumn + ")");
         return new PedigreeContext(value, observationIds, matchingColumn);
     }
 
@@ -1015,7 +1045,7 @@ final class AnalysisRunner {
         List<String> ids = new ArrayList<>(retained.length);
         for (int row : retained) ids.add(prepared.ids().get(row));
         return phenotype.prepare(ids, response, encodeBinomial,
-            options.caseValue, options.controlValue);
+            options.caseValue, options.controlValue, options.individualId);
     }
 
     private int[] completeCaseRows(org.jlinalg.formula.ModelTable table) {
@@ -1088,6 +1118,15 @@ final class AnalysisRunner {
             .put("pedigree_match_column", options.pedigree == null ? null
                 : options.individualId == null
                     ? options.idColumn : options.individualId)
+            .put("pedigree_file_members", options.pedigree == null ? null
+                : pedigreeFileMembers)
+            .put("pedigree_singletons_added", options.pedigree == null ? null
+                : pedigreeSingletonsAdded)
+            .put("pedigree_singleton_observations",
+                options.pedigree == null ? null
+                    : pedigreeSingletonObservations)
+            .put("pedigree_members", options.pedigree == null ? null
+                : pedigreeMembers)
             .put("pedigree_precision", options.pedigree == null ? null
                 : "sparse_additive_relationship_inverse")
             .put("formula", options.formula)

@@ -389,22 +389,24 @@ class JLinAlgCliTest {
         Path output = temporaryDirectory.resolve("pedigree-results.tsv");
         StringBuilder observations =
             new StringBuilder("observation\tanimal\ty\tx\n");
-        for (int animal = 1; animal <= 10; animal++)
+        for (int animal = 1; animal <= 11; animal++)
             for (int repeat = 0; repeat < 3; repeat++)
                 observations.append('O').append(animal).append('_').append(repeat)
-                    .append("\tA").append(animal).append('\t')
+                    .append('\t').append(animal).append('\t')
                     .append(1.0 + animal * 0.18 + repeat * 0.11
                         + ((animal * 7 + repeat * 3) % 5 - 2) * 0.07)
                     .append('\t').append(repeat - 1).append('\n');
         StringBuilder ancestry = new StringBuilder("animal\tsire\tdam\n");
-        ancestry.append("A1\t0\t0\nA2\t0\t0\n");
+        ancestry.append("1\t0\t0\n2\t0\t0\n");
         for (int animal = 3; animal <= 10; animal++)
-            ancestry.append('A').append(animal).append("\tA")
-                .append(Math.max(1, animal - 2)).append("\tA")
+            ancestry.append(animal).append('\t')
+                .append(Math.max(1, animal - 2)).append('\t')
                 .append(Math.max(2, animal - 1)).append('\n');
         Files.writeString(phenotype, observations);
         Files.writeString(pedigree, ancestry);
 
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
         int status = JLinAlgCli.run(new String[] {
             "--pheno", phenotype.toString(), "--id", "observation",
             "--individual-id", "animal",
@@ -413,14 +415,29 @@ class JLinAlgCliTest {
             "--pedigree-id", "animal", "--sire-id", "sire",
             "--dam-id", "dam", "--backend", "cpu",
             "--out", output.toString()
-        });
+        }, console, console);
 
         assertEquals(0, status);
+        assertTrue(bytes.toString().contains(
+            "Pedigree members: 11 (file=10, singleton families=1, "
+                + "singleton observations=3, "
+                + "matching column=animal)"));
         String log = Files.readString(Path.of(output + ".log"));
-        assertTrue(log.contains("pedigree_members=10"));
+        assertTrue(log.contains("pedigree_file_members=10"));
+        assertTrue(log.contains("pedigree_singletons_added=1"));
+        assertTrue(log.contains("pedigree_singleton_observations=3"));
+        assertTrue(log.contains("pedigree_members=11"));
         assertTrue(log.contains(
             "pedigree_precision=sparse_additive_relationship_inverse"));
         String manifest = Files.readString(Path.of(output + ".manifest.json"));
+        assertTrue(manifest.contains(
+            "\"pedigree_file_members\": \"10\""));
+        assertTrue(manifest.contains(
+            "\"pedigree_singletons_added\": \"1\""));
+        assertTrue(manifest.contains(
+            "\"pedigree_singleton_observations\": \"3\""));
+        assertTrue(manifest.contains(
+            "\"pedigree_members\": \"11\""));
         assertTrue(manifest.contains(
             "\"pedigree_precision\": \"sparse_additive_relationship_inverse\""));
     }

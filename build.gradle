@@ -215,6 +215,7 @@ tasks.register('checkWebsite') {
             'index.html',
             'verification.html',
             'vignettes/index.html',
+            'vignettes/command-line.html',
             'vignettes/linear-models.html',
             'vignettes/basic-statistical-tests.html',
             'vignettes/nonlinear-models.html',
