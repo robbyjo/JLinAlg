@@ -138,8 +138,16 @@ class JLinAlgCliTest {
         assertFalse(Files.exists(Path.of(output + ".partial")));
         String log = Files.readString(Path.of(output + ".log"));
         assertTrue(log.contains("block_size=1"));
+        assertTrue(log.contains("association_chunk_size=1"));
+        assertTrue(log.contains("scan_worker_capacity=1"));
         assertTrue(log.contains("omics_type=ewas"));
         assertTrue(log.contains("output_format=csv"));
+        String manifest = Files.readString(
+            Path.of(output + ".manifest.json"));
+        assertTrue(manifest.contains(
+            "\"association_chunk_size\": \"1\""));
+        assertTrue(manifest.contains(
+            "\"scan_worker_capacity\": \"1\""));
     }
 
     @Test

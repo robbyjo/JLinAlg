@@ -182,6 +182,7 @@ public final class JLinAlgCli {
 
             Streaming and reproducibility:
               --block-size auto|N           Default uses JVM heap headroom
+                                           and available scan threads
               --threads N
               --backend POLICY              preferred (default), cholmod, gpu,
                                             cuda, opencl, vulkan, onemkl,

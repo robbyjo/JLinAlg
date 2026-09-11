@@ -160,7 +160,10 @@ final class AnalysisRunner {
         double[][] covariates = matrix(
             fixed.design(), fixed.rows(), fixed.columns());
         int blockSize = AdaptiveBlockSizer.choose(prepared.ids().size(),
-            options.blockSize);
+            options.blockSize, options.threads);
+        int associationChunkSize = AdaptiveBlockSizer.chunkSize(blockSize);
+        int scanWorkerCapacity = AdaptiveBlockSizer.workerCapacity(
+            blockSize, associationChunkSize, options.threads);
         resolvedVarianceComponents =
             resolveVarianceComponents(model, genotype);
         resolvedMixedFit = resolveMixedFit(
@@ -171,6 +174,8 @@ final class AnalysisRunner {
         info("mixed_fit=" + resolvedMixedFit);
         logOutputMetadata();
         info("block_size=" + blockSize);
+        info("association_chunk_size=" + associationChunkSize);
+        info("scan_worker_capacity=" + scanWorkerCapacity);
         info("threads=" + options.threads);
         info("backend=" + options.backend);
         if (options.explain || options.dryRun) {
@@ -182,6 +187,8 @@ final class AnalysisRunner {
             output.println("mixed fit: " + resolvedMixedFit);
             output.println("output format: " + outputFormat());
             output.println("adaptive block size: " + blockSize);
+            output.println("scan worker capacity: " + scanWorkerCapacity
+                + " (chunk size=" + associationChunkSize + ")");
             output.println("backend: " + options.backend);
             output.println("output: " + options.output);
             if (options.dryRun) return 0;
@@ -196,7 +203,7 @@ final class AnalysisRunner {
             throw new IllegalArgumentException(
                 "genotype transforms are not supported in the variant pipeline");
         AssociationEngineOptions engine = new AssociationEngineOptions(
-            options.threads, Math.max(1, Math.min(256, blockSize)),
+            options.threads, associationChunkSize,
             options.backend, AssociationFailurePolicy.RECORD_NAN,
             VariableMissingPolicy.MEAN_IMPUTE);
         VariantFilterOptions filters = VariantFilterOptions.builder()
@@ -233,7 +240,8 @@ final class AnalysisRunner {
         info("source_features=" + counts.source());
         info("tested_features=" + counts.tested());
         info("failed_features=" + counts.failed());
-        manifest(model, detection.type(), blockSize, counts);
+        manifest(model, detection.type(), blockSize, associationChunkSize,
+            scanWorkerCapacity, counts);
         return 0;
     }
 
@@ -483,7 +491,7 @@ final class AnalysisRunner {
                 "unsupported model: " + model);
         };
         info("fdr_tests=" + tests);
-        manifest(model, "none", 0,
+        manifest(model, "none", 0, 0, 0,
             new Counts(prepared.ids().size(), tests, 0));
         return 0;
     }
@@ -1100,7 +1108,8 @@ final class AnalysisRunner {
     }
 
     private void manifest(
-            String model, String omicsType, int blockSize, Counts counts)
+            String model, String omicsType, int blockSize,
+            int associationChunkSize, int scanWorkerCapacity, Counts counts)
             throws IOException {
         new ManifestWriter()
             .put("run_id", log == null ? null : log.runId())
@@ -1141,6 +1150,8 @@ final class AnalysisRunner {
             .put("partial_r2_method", resolvedPartialR2Method)
             .put("output_format", outputFormat())
             .put("block_size", blockSize)
+            .put("association_chunk_size", associationChunkSize)
+            .put("scan_worker_capacity", scanWorkerCapacity)
             .put("threads", options.threads)
             .put("transform_plugins", options.transformPlugins)
             .put("source_features", counts.source())

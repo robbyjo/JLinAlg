@@ -152,10 +152,13 @@ CSV/TSV feature identifiers are inspected conservatively to infer GWAS, EWAS,
 or Ensembl expression schemas; `--omics-type` overrides the inference.
 
 The omics matrix is never materialized in full. Readers validate in constant
-memory and process an adaptive block sized from current JVM heap headroom.
-`--block-size N` overrides the automatic choice. Results are spooled as they
-arrive, and Benjamini-Hochberg adjustment uses bounded external sorting rather
-than retaining every result or p-value in memory.
+memory and process an adaptive block sized from current JVM heap headroom and
+the requested thread count. Automatic scheduling targets enough feature chunks
+to keep the available scan workers busy when the heap permits; under tighter
+memory it caps both the block and worker capacity rather than exceeding the
+safe budget. `--block-size N` overrides the automatic block choice. Results
+are spooled as they arrive, and Benjamini-Hochberg adjustment uses bounded
+external sorting rather than retaining every result or p-value in memory.
 
 Numeric omics results use a compact table containing status, feature ID, beta,
 standard error, test statistic, denominator DF, partial R-squared where
