@@ -156,9 +156,11 @@ or Ensembl expression schemas; `--omics-type` overrides the inference.
 The omics matrix is never materialized in full. Readers validate in constant
 memory and process an adaptive block sized from current JVM heap headroom and
 the requested thread count. Automatic scheduling targets enough feature chunks
-to keep the available scan workers busy when the heap permits; under tighter
-memory it caps both the block and worker capacity rather than exceeding the
-safe budget. `--block-size N` overrides the automatic block choice. Results
+for at least two complete worker waves when the heap permits, allowing work
+stealing to absorb slower chunks without leaving cores idle at each block
+barrier. Under tighter memory it uses the largest complete wave that fits, or
+caps worker capacity rather than exceeding the safe budget. `--block-size N`
+overrides the automatic block choice. Results
 are spooled as they arrive, and Benjamini-Hochberg adjustment uses bounded
 external sorting rather than retaining every result or p-value in memory.
 

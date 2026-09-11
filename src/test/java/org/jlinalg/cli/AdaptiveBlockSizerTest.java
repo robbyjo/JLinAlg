@@ -12,13 +12,14 @@ class AdaptiveBlockSizerTest {
     private static final long GIB = 1024L * 1024 * 1024;
 
     @Test
-    void abundantMemoryExpandsBlockForAvailableThreads() {
+    void abundantMemoryQueuesTwoCompleteHighCoreWorkerWaves() {
         int block = AdaptiveBlockSizer.choose(
             5027, 0, 96, 128 * GIB, GIB, GIB / 2);
 
-        assertEquals(24576, block);
+        assertEquals(49152, block);
         int chunk = AdaptiveBlockSizer.chunkSize(block);
         assertEquals(256, chunk);
+        assertEquals(192, block / chunk);
         assertEquals(96,
             AdaptiveBlockSizer.workerCapacity(block, chunk, 96));
     }
@@ -45,6 +46,27 @@ class AdaptiveBlockSizerTest {
         assertEquals(256, chunk);
         assertEquals(3,
             AdaptiveBlockSizer.workerCapacity(block, chunk, 96));
+    }
+
+    @Test
+    void intermediateMemoryUsesOneCompleteWorkerWave() {
+        int block = AdaptiveBlockSizer.choose(
+            5027, 0, 96, 16 * GIB, GIB, GIB);
+
+        assertEquals(24576, block);
+        int chunk = AdaptiveBlockSizer.chunkSize(block);
+        assertEquals(256, chunk);
+        assertEquals(96,
+            AdaptiveBlockSizer.workerCapacity(block, chunk, 96));
+    }
+
+    @Test
+    void baselineRoundsUpToCompleteWorkerWaves() {
+        int block = AdaptiveBlockSizer.choose(
+            5027, 0, 12, 128 * GIB, GIB, GIB / 2);
+
+        assertEquals(9216, block);
+        assertEquals(36, block / AdaptiveBlockSizer.chunkSize(block));
     }
 
     @Test

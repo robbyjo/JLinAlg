@@ -8,6 +8,7 @@ package org.jlinalg.cli;
 final class AdaptiveBlockSizer {
     private static final int BASELINE_BLOCK_SIZE = 8192;
     private static final int FEATURES_PER_CHUNK = 256;
+    private static final int MINIMUM_CHUNKS_PER_WORKER = 2;
     private static final int MINIMUM_BLOCK = 1;
     private static final long FIXED_RESERVE = 64L * 1024 * 1024;
 
@@ -32,11 +33,20 @@ final class AdaptiveBlockSizer {
             (headroom - Math.min(headroom / 2, FIXED_RESERVE)) / 4);
         long bytesPerFeature = Math.max(128L, 8L * samples * 4L + 256L);
         long calculated = budget / bytesPerFeature;
-        long threadTarget = Math.max(BASELINE_BLOCK_SIZE,
-            Math.min(Integer.MAX_VALUE,
-                (long) threads * FEATURES_PER_CHUNK));
+        long workerWave = (long) threads * FEATURES_PER_CHUNK;
+        long baselineWaves = (BASELINE_BLOCK_SIZE + workerWave - 1)
+            / workerWave;
+        long targetWaves = Math.max(
+            MINIMUM_CHUNKS_PER_WORKER, baselineWaves);
+        long threadTarget = Math.min(
+            Integer.MAX_VALUE, workerWave * targetWaves);
+        long bounded = Math.min(threadTarget, calculated);
+        // Keep complete worker waves whenever memory permits. A partial extra
+        // wave can leave most workers idle at the streaming-block barrier.
+        if (bounded >= workerWave)
+            bounded -= bounded % workerWave;
         return (int) Math.max(MINIMUM_BLOCK,
-            Math.min(threadTarget, calculated));
+            bounded);
     }
 
     static int chunkSize(int blockSize) {

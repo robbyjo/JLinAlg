@@ -169,9 +169,10 @@ are CLI-native; see the end-to-end MR and xWAS guides for their schemas.
 - Start with <code>--dry-run</code>; use <code>--explain</code> to print
   routing and still fit.
 - Automatic block sizing uses both JVM heap headroom and the requested thread
-  count. The reported scan-worker capacity shows how many workers a full block
-  can keep busy. Low heap headroom safely limits that capacity; explicit
-  <code>--block-size N</code> remains available.
+  count. When memory permits it queues at least two complete worker waves so
+  work stealing can absorb slow chunks at block boundaries. Low heap headroom
+  uses the largest complete wave that fits or safely limits worker capacity;
+  explicit <code>--block-size N</code> remains available.
 - Inspect aligned, omitted, and pedigree-singleton counts before interpreting
   results.
 - Keep <code>--id</code> for observation/omics alignment and
