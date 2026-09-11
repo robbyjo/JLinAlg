@@ -4,9 +4,8 @@ Colocalization asks whether two association signals in the same region are
 best explained by a shared causal variant. It does not estimate a causal
 effect and does not replace Mendelian randomization.
 
-> **Version availability:** the `coloc` CLI command was added after v0.3.4.
-> Use current `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release; it
-> is not present in the published v0.3.4 JAR.
+> **Release availability:** the `coloc` CLI command is included in v0.3.5
+> and later.
 
 ## 1. Prepare two comparable regional analyses
 

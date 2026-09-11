@@ -1,4 +1,23 @@
-# JLinAlg 0.3.5 (unreleased)
+# JLinAlg 0.3.5
+
+## Executable mediation and fine-mapping workflows
+
+- The executable JAR now exposes Gaussian `mediation` workflows for ordinary,
+  grouped-REML, and pedigree-REML models, with common complete-case alignment
+  and explicit component-model convergence output.
+- New `susie` and `coloc` commands run summary-statistic fine mapping from
+  labeled LD matrices and multi-signal colocalization from the resulting
+  effect tables.
+- Progressive CLI tutorials now cover association, Mendelian randomization,
+  mediation, SuSiE, and colocalization from input files through interpretation.
+
+## Association preflight and option validation
+
+- `--max-maf` and `--max-mac` complement the existing lower-bound variant
+  filters and are applied after sample alignment.
+- Phenotype-only `--dry-run` and `--explain` now compile and validate the
+  selected route before fitting. Genotype transforms, unsupported family/link
+  combinations, and the common `--explains` typo fail with specific guidance.
 
 ## Pedigree identity and hierarchy
 
@@ -13,6 +32,10 @@
 - Runs with zero aligned source-pedigree matches now fail rather than silently
   constructing an all-singleton model. Logs and manifests distinguish matched
   source observations, automatically resolved aliases, and true singletons.
+
+Release downloads: `jlinalg-0.3.5.jar` is the self-contained executable;
+`JLinAlg-0.3.5-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included.
 
 # JLinAlg 0.3.4
 

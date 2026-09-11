@@ -6,9 +6,8 @@ probabilities (PIPs) and credible sets. This command uses summary statistics,
 an LD correlation matrix, and the analysis sample size. No Java code is
 required.
 
-> **Version availability:** the `susie` CLI command was added after v0.3.4.
-> Use current `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release; it
-> is not present in the published v0.3.4 JAR.
+> **Release availability:** the `susie` CLI command is included in v0.3.5
+> and later.
 
 ## 1. Define and harmonize one locus
 

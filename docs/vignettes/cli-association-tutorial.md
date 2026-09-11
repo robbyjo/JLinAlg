@@ -5,10 +5,9 @@ one phenotype model, then adds numeric omics, genotype files, relatedness,
 non-Gaussian outcomes, survival analysis, and penalized regression. Replace
 `jlinalg-<version>.jar` with the downloaded filename.
 
-> **Version availability:** the published v0.3.4 JAR predates
-> `--max-maf`/`--max-mac`, phenotype-only `--dry-run`/`--explain`
-> handling, and safe `--link` validation described below. Use current
-> `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release for those items.
+> **Release availability:** `--max-maf`/`--max-mac`, phenotype-only
+> `--dry-run`/`--explain`, and the `--link` validation described below are
+> included in v0.3.5 and later.
 
 `--dry-run` and `--explain` belong to the general association command that
 starts with `--pheno`; they are not options for specialized subcommands such

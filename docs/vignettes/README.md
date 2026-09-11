@@ -13,10 +13,9 @@ Run the complete verification suite before adapting an example:
 
 ## Choose a vignette
 
-The published v0.3.4 JAR predates the `mediation`, `susie`, and `coloc`
-CLI subcommands and the post-release association preflight/filter fixes.
-Those examples require the current `jlinalg-0.3.5-SNAPSHOT.jar` build or a
-later release. Examples that explicitly name `jlinalg-0.3.4.jar` are
+The v0.3.5 executable includes the `mediation`, `susie`, and `coloc` CLI
+subcommands, association preflight and variant-filter updates, and recursive
+pedigree identity resolution. Examples that name `jlinalg-0.3.5.jar` are
 release-compatible.
 
 | Vignette | Features covered |

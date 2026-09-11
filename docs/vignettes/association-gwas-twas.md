@@ -3,11 +3,11 @@
 ## CLI-only association workflows
 
 ```bash
-java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --omics-type expression --formula "BMI ~ Sex + Age + <omics>" --transform "<omics> = winsor_mad(k=4) | zscore()" --annot genes.tsv --annot-id gene_id --annot-cols symbol,chromosome --out bmi-expression.csv
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --omics-type expression --formula "BMI ~ Sex + Age + <omics>" --transform "<omics> = winsor_mad(k=4) | zscore()" --annot genes.tsv --annot-id gene_id --annot-cols symbol,chromosome --out bmi-expression.csv
 
-java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.csv
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.csv
 
-java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics cohort.bgen --sample-file cohort.sample --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --grm cohort --variance-components null-model --out bmi-gwas-grm.tsv
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics cohort.bgen --sample-file cohort.sample --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --grm cohort --variance-components null-model --out bmi-gwas-grm.tsv
 ```
 
 BCF and biallelic layout-2 BGEN are supported. Numeric omics mixed scans refit

@@ -9,8 +9,7 @@ For a file-based executable-JAR workflow, use the
 [CLI-only SuSiE tutorial](cli-susie-tutorial.md), then the
 [CLI-only colocalization tutorial](cli-colocalization-tutorial.md). The Java
 examples below additionally cover individual-level and sufficient-statistic
-SuSiE plus SEM. These CLI commands require current
-`jlinalg-0.3.5-SNAPSHOT.jar` or a later release; they are not in v0.3.4.
+SuSiE plus SEM. These CLI commands are included in v0.3.5 and later.
 
 ## SuSiE with individual-level data
 

@@ -3,9 +3,9 @@
 ## CLI-only formula and backend preflight
 
 ```bash
-java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex * treatment + Age + <omics> + (1|site)" --backend preferred --threads 96 --block-size auto --out bmi-model.csv --dry-run
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex * treatment + Age + <omics> + (1|site)" --backend preferred --threads 96 --block-size auto --out bmi-model.csv --dry-run
 
-java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex * treatment + Age + <omics> + (1|site)" --backend cpu --threads 96 --block-size auto --out bmi-model.csv --overwrite
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex * treatment + Age + <omics> + (1|site)" --backend cpu --threads 96 --block-size auto --out bmi-model.csv --overwrite
 ```
 
 `--dry-run` reports alignment, resolved model, exact-refit versus null-model

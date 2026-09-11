@@ -6,8 +6,8 @@ Monte Carlo draws, or posterior sampling.
 
 The [CLI-only mediation tutorial](cli-mediation-tutorial.md) gives complete
 tabular examples for ordinary, grouped-REML, and pedigree mediation, including
-missing-row handling and output interpretation. The CLI command requires
-current `jlinalg-0.3.5-SNAPSHOT.jar` or a later release; it is not in v0.3.4.
+missing-row handling and output interpretation. The CLI command is included
+in v0.3.5 and later.
 
 ## Model
 
