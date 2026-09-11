@@ -5,9 +5,11 @@ complete feature map and browser-friendly worked vignettes.
 
 JLinAlg implements Java linear and mixed-model algorithms on top of
 [JDistlib 0.10.2](https://github.com/robbyjo/JDistlib/releases/tag/v0.10.2).
-Version 0.3.3 adds default complete-case phenotype filtering, per-feature exact
-REML and Laplace GLMM refits for numeric omics, sparse pedigree support, and
-format-aware compact result schemas.
+Version 0.3.4 retains the exact REML and Laplace GLMM workflows from v0.3.3
+while retaining unpedigreed samples as singleton founders, adding RAM/core-aware
+omics block scheduling with extra queued worker waves, and expanding CLI-only
+vignettes.
+Omics transforms deliberately run after phenotype complete-case filtering.
 Version 0.3.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, penalized-quasi-likelihood generalized linear
@@ -23,16 +25,16 @@ fitting, prediction, leverage, and reusable predictor geometry.
 > [advanced-method validation](docs/advanced-validation.md) for evidence and
 > explicit approximation limits. Profile representative data before production use.
 
-Version 0.3.3 uses JDistlib 0.10.2; see the
+Version 0.3.4 uses JDistlib 0.10.2; see the
 [dependency-upgrade accuracy report](docs/jdistlib-0.10.2-validation.md).
 The historical v0.3.0 and v0.3.1 binaries retain JDistlib 0.10.1.
 
 ## Requirements and build
 
-- Prebuilt v0.3.3 artifacts and checksums are on the
-  [GitHub release page](https://github.com/robbyjo/JLinAlg/releases/tag/v0.3.3).
-  Use `jlinalg-0.3.3.jar` for the self-contained CLI; the separate
-  `JLinAlg-0.3.3-library.jar` is the thin library.
+- Prebuilt v0.3.4 artifacts and checksums are on the
+  [GitHub release page](https://github.com/robbyjo/JLinAlg/releases/tag/v0.3.4).
+  Use `jlinalg-0.3.4.jar` for the self-contained CLI; the separate
+  `JLinAlg-0.3.4-library.jar` is the thin library.
 - A JDK 17 or newer.
 - Network access on the first build. The build downloads the pinned
   `jdistlib-all-0.10.2.jar` and verifies its SHA-256 digest before compiling.
@@ -83,7 +85,7 @@ The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
 runtime dependencies. A fixed-effect omics scan can then be run as:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.3.jar `
+java -jar build/cli/jlinalg-0.3.4.jar `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
   --id IID `
@@ -111,7 +113,7 @@ repeated observations, `--individual-id COLUMN` names the phenotype column
 that maps rows to GRM individuals. It defaults to the `--id` column.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.3.jar `
+java -jar build/cli/jlinalg-0.3.4.jar `
   --pheno phenotype.tsv --id observation_id --individual-id IID `
   --formula "trait ~ age + sex" --grm cohort `
   --out trait-grm.tsv
@@ -334,7 +336,7 @@ The beta fitter is also available from the command line for numeric CSV/TSV
 files:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.3.jar beta-regression `
+java -jar build/cli/jlinalg-0.3.4.jar beta-regression `
   --input proportions.tsv --response proportion --mean dose `
   --precision batch_score --out beta-coefficients.tsv
 ```
@@ -383,7 +385,7 @@ variable selection and should not be presented as selection-valid inference.
 The Gaussian penalized fitter is also available as a file-oriented command:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.3.jar penalized-regression `
+java -jar build/cli/jlinalg-0.3.4.jar penalized-regression `
   --input continuous.tsv --response y --predictors x1,x2,x3 `
   --model elastic-net --alpha 0.5 `
   --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 `

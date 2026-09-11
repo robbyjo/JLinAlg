@@ -1,3 +1,37 @@
+# JLinAlg 0.3.4
+
+## High-core adaptive omics scheduling
+
+- Automatic feature blocks are sized from both current JVM heap headroom and
+  the requested thread count.
+- When memory permits, each block queues at least two complete 256-feature
+  chunks per scan worker, giving work stealing enough queued work to absorb
+  uneven feature-fit times without leaving cores idle at block barriers.
+- Under tighter memory, JLinAlg selects the largest complete worker wave that
+  fits or safely caps worker capacity. An explicit `--block-size` remains
+  authoritative.
+
+## Pedigree singleton handling
+
+- Phenotype individuals absent from the pedigree file are retained as
+  unrelated, noninbred singleton founders instead of stopping the analysis.
+- Repeated observations with the same missing pedigree ID remain grouped in
+  one singleton family. The console, log, and manifest report singleton
+  families and observations.
+
+## CLI documentation and transform semantics
+
+- Added a comprehensive CLI-only guide and copy-pasteable command-line examples
+  to the model vignettes, including grouped REML, pedigrees, GRMs, GLMMs,
+  genotype scans, Cox models, and specialized subcommands.
+- Omics row transforms intentionally run after phenotype complete-case
+  filtering, so `winsor_mad` and other row-statistic transforms use the final
+  analysis sample set.
+
+Release downloads: `jlinalg-0.3.4.jar` is the self-contained executable;
+`JLinAlg-0.3.4-library.jar` is the thin library. Sources and Javadoc JARs and
+`SHA256SUMS.txt` are also included.
+
 # JLinAlg 0.3.3
 
 ## Complete-case sample handling

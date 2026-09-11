@@ -5,11 +5,11 @@
 These workflows require only the executable JAR:
 
 ```bash
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-ols.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-ols.csv
 
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out case-expression.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out case-expression.csv
 
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "count ~ Sex + Age + <omics>" --family poisson --out count-expression.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "count ~ Sex + Age + <omics>" --family poisson --out count-expression.csv
 ```
 
 Use `--family gamma` for positive continuous outcomes. Phenotype rows missing

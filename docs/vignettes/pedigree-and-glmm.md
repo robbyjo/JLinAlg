@@ -3,11 +3,11 @@
 ## CLI-only pedigree LMM and GLMM workflows
 
 ```bash
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-expression-pedigree.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-expression-pedigree.csv
 
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "case_status ~ Sex + Age + <omics> + (1|sabreid)" --family binomial --case-value case --control-value control --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out case-expression-pedigree.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "case_status ~ Sex + Age + <omics> + (1|sabreid)" --family binomial --case-value case --control-value control --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out case-expression-pedigree.csv
 
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id pedigree_key --formula "BMI ~ Sex + Age + <omics> + (1|pedigree_key) + (1|Levy_Set)" --pedigree pedigree.csv --pedigree-family-id pedno --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-qualified-pedigree.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id pedigree_key --formula "BMI ~ Sex + Age + <omics> + (1|pedigree_key) + (1|Levy_Set)" --pedigree pedigree.csv --pedigree-family-id pedno --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-qualified-pedigree.csv
 ```
 
 The matching pedigree term uses Henderson's sparse additive relationship

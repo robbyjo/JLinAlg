@@ -6,7 +6,7 @@ methylation, protein, or other numeric molecular features before an OLS or GLM
 association scan.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.3.jar `
+java -jar build/cli/jlinalg-0.3.4.jar `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
   --id IID `
@@ -38,9 +38,11 @@ separated by `|`:
 Quote the complete specification so that the shell does not interpret `<`,
 `>`, or `|`. Whitespace around the target-assignment `=` and stage separator
 `|` is optional; the examples include it to make those boundaries clear.
-Stages run from left to right. The transform is applied
-independently to every feature row after sample IDs have been aligned to the
-phenotype file; it never pools values across features. Repeating
+Stages run from left to right. The transform is applied independently to every
+feature row after sample IDs have been aligned and phenotype rows with missing
+model values have been omitted. Thus `winsor_mad`, `zscore`, and other
+row-statistic transforms use the final analysis samples; values are never
+pooled across features. Repeating
 `--transform` appends more stages in command-line order, although one quoted
 pipeline is usually easier to audit. Omitting the option is the same as
 `identity()`.

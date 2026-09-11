@@ -3,9 +3,9 @@
 ## CLI-only Cox workflows
 
 ```bash
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --formula "Surv(followup,event) ~ Sex + Age" --ties efron --out cox.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --id SampleName --formula "Surv(followup,event) ~ Sex + Age" --ties efron --out cox.csv
 
-java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --individual-id IID --formula "Surv(followup,event) ~ Sex + Age" --grm cohort --ties efron --out cox-grm.csv
+java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --id SampleName --individual-id IID --formula "Surv(followup,event) ~ Sex + Age" --grm cohort --ties efron --out cox-grm.csv
 ```
 
 The general CLI supports right-censored Cox models and Gaussian GRM kinship
