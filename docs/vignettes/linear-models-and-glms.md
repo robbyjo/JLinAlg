@@ -1,5 +1,22 @@
 # Linear models, GLMs, and penalized regression
 
+## CLI-only OLS and GLM quick starts
+
+These workflows require only the executable JAR:
+
+```bash
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-ols.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out case-expression.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "count ~ Sex + Age + <omics>" --family poisson --out count-expression.csv
+```
+
+Use `--family gamma` for positive continuous outcomes. Phenotype rows missing
+the response or any formula variable are omitted together. Add `--dry-run` to
+inspect sample alignment and model routing without fitting. The sections below
+show the Java APIs for controls not exposed by the general CLI.
+
 ## Ordinary least squares
 
 Include an intercept explicitly as a column of ones:

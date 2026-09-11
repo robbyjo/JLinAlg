@@ -1,5 +1,18 @@
 # Cox proportional-hazards, frailty, and pedigree survival models
 
+## CLI-only Cox workflows
+
+```bash
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --formula "Surv(followup,event) ~ Sex + Age" --ties efron --out cox.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --id SampleName --individual-id IID --formula "Surv(followup,event) ~ Sex + Age" --grm cohort --ties efron --out cox-grm.csv
+```
+
+The general CLI supports right-censored Cox models and Gaussian GRM kinship
+frailty. Streamed `<omics>` Cox scans, start-stop intervals, strata, ordinary
+formula frailty, and pedigree-correlated Cox models shown below remain Java
+APIs.
+
 ## Encode the survival response
 
 Right-censored observations use one time and event flag per row:

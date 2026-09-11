@@ -245,6 +245,29 @@ tasks.register('checkWebsite') {
             }
         }
 
+        List<String> cliExamplePages = [
+            'vignettes/command-line.html',
+            'vignettes/linear-models.html',
+            'vignettes/beta-regression.html',
+            'vignettes/penalized-regression.html',
+            'vignettes/mixed-models.html',
+            'vignettes/survival.html',
+            'vignettes/pedigree.html',
+            'vignettes/glmm.html',
+            'vignettes/association.html',
+            'vignettes/omics-transforms.html',
+            'vignettes/mendelian-randomization.html',
+            'vignettes/xwas-mr-pipeline.html',
+            'vignettes/formulas-backends.html'
+        ]
+        cliExamplePages.each { String relative ->
+            String source = new File(siteRoot, relative).getText('UTF-8')
+            if (!source.contains('java -jar')) {
+                throw new GradleException(
+                    "CLI vignette lacks an executable-JAR example: ${relative}")
+            }
+        }
+
         htmlFiles.each { File page ->
             String source = page.getText('UTF-8')
             def references = source =~ /(?i)(?:href|src)="([^"]+)"/

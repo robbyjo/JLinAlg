@@ -1,5 +1,20 @@
 # REML and Gaussian mixed models
 
+## CLI-only exact REML workflows
+
+```bash
+java -jar jlinalg-0.3.3.jar --pheno repeated.csv --id SampleName --formula "BMI ~ Sex + Age + (1|subject)" --out bmi-subject.csv
+
+java -jar jlinalg-0.3.3.jar --pheno repeated.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics> + (1|subject)" --variance-components auto --df satterth --out bmi-expression-subject.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id IID --formula "BMI ~ Sex + Age + <omics>" --grm cohort --out bmi-expression-grm.csv
+```
+
+Numeric omics uses exact per-feature REML refits by default, not P3D/EMMAX.
+The CLI supports independent grouping terms, GRMs, and pedigrees. Correlated
+random slopes, prediction, simulation, bootstrap, and likelihood profiles
+shown below remain Java APIs.
+
 ## General covariance-component REML
 
 REML models `V` as a nonnegative combination of known covariance bases. This

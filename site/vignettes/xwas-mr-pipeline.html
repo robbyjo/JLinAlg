@@ -16,7 +16,7 @@
 <ol><li>Download an ancestry-matched LD panel and record its manifest.</li><li>Search public GWAS results or format custom exposure summary statistics.</li><li>Clump each exposure once with the chosen LD threshold and window.</li><li>Combine clumped exposures and all outcomes into two long-format tables.</li><li>Run <code>mr-xwas</code>, then inspect retained hits, failures, and multiplicity.</li></ol>
 <p>The single-outcome <a href="mendelian-randomization.html">MR vignette</a> explains harmonization and estimator interpretation. This page concentrates on the high-throughput command and its operational safeguards.</p>
 
-<h2 id="command">Run the multi-phenotype CLI</h2>
+<h2 id="command">Run the CLI-only multi-phenotype scan</h2>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Bounded parallel xWAS MR</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-xwas &#92;
   --exposure molecular-traits.clumped.tsv &#92;
   --outcome phenotypes.tsv.gz &#92;

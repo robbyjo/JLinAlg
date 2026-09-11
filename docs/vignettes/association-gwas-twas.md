@@ -1,5 +1,20 @@
 # Repeated association, GWAS, and TWAS
 
+## CLI-only association workflows
+
+```bash
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --omics-type expression --formula "BMI ~ Sex + Age + <omics>" --transform "<omics> = winsor_mad(k=4) | zscore()" --annot genes.tsv --annot-id gene_id --annot-cols symbol,chromosome --out bmi-expression.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics cohort.bgen --sample-file cohort.sample --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --grm cohort --variance-components null-model --out bmi-gwas-grm.tsv
+```
+
+BCF and biallelic layout-2 BGEN are supported. Numeric omics mixed scans refit
+every feature; genotype LMM uses the explicitly logged null-model P3D/EMMAX
+route. Add `--dry-run` to inspect alignment, model routing, block size, worker
+capacity, and backend before scanning.
+
 JLinAlg distinguishes fast prepared scans from exact repeated fits. Both
 return ordered effect size, SE, statistic, p-value, log10 p-value, and
 `-log10(p)`.

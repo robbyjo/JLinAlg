@@ -70,6 +70,8 @@ The [command-line-only workflow guide](docs/vignettes/command-line.md) covers
 phenotype-only and omics scans, OLS/GLM/LMM/GLMM routing, pedigrees, family
 qualifiers, singleton families, GRMs, genotype inputs, Cox regression, and
 specialized regression/MR subcommands without requiring Java API code.
+The corresponding model vignettes also begin with copy-pasteable CLI-only
+examples and label later capabilities that remain Java-only.
 
 Build the self-contained command-line JAR with:
 

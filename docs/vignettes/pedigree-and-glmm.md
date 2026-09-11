@@ -1,5 +1,27 @@
 # Pedigree models and generalized mixed models
 
+## CLI-only pedigree LMM and GLMM workflows
+
+```bash
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-expression-pedigree.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "case_status ~ Sex + Age + <omics> + (1|sabreid)" --family binomial --case-value case --control-value control --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out case-expression-pedigree.csv
+
+java -jar jlinalg-0.3.3.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id pedigree_key --formula "BMI ~ Sex + Age + <omics> + (1|pedigree_key) + (1|Levy_Set)" --pedigree pedigree.csv --pedigree-family-id pedno --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-qualified-pedigree.csv
+```
+
+The matching pedigree term uses Henderson's sparse additive relationship
+inverse. IDs present in the phenotype but absent from the pedigree become
+reported singleton families; repeated rows with the same absent ID share one
+founder. The Gaussian command uses exact per-feature REML and the non-Gaussian
+command uses first-order Laplace refits. PQL, adaptive quadrature, and
+zero-inflated fits in later sections are Java APIs.
+Use `--pedigree-family-id pedno` only when member IDs repeat between pedigree
+families; the phenotype matching column must then contain exact
+`pedno:sabreid` keys. A batch such as `Levy_Set` belongs in a separate
+`(1|Levy_Set)` term and is not a pedigree-family column unless it truly
+identifies pedigree families.
+
 ## Build and validate a pedigree
 
 Individuals may arrive in any order. Parents must either be present or `null`:

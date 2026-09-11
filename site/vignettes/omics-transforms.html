@@ -2,7 +2,7 @@
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Omics transforms</span></div><h1>Transform each molecular feature deliberately.</h1><p>Choose a built-in stage, compose stages from left to right, and keep the tested scale explicit in EWAS, TWAS, and PWAS command-line analyses.</p></div></section>
 <div class="container page-layout"><article class="prose">
 <div class="note"><strong>Scope</strong><code>--transform</code> applies only to the <code>&lt;omics&gt;</code> term in feature-by-sample CSV or TSV matrices. Genotype transforms are not supported for VCF, BCF, or BGEN inputs.</div>
-<h2 id="quick-start">Run a complete example</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>PowerShell · EWAS</span></div><pre><code>java -jar build/cli/jlinalg-0.3.3.jar `
+<h2 id="quick-start">CLI-only transform quick start</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>PowerShell · EWAS</span></div><pre><code>java -jar build/cli/jlinalg-0.3.3.jar `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
   --id IID `

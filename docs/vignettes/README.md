@@ -20,16 +20,16 @@ Run the complete verification suite before adapting an example:
 | [Nonlinear models](nonlinear-models.md) | analytic Gaussian fixed means, additive mixed effects, sparse pedigree structures |
 | [Mediation](mediation.md) | deterministic Gaussian path analysis, Sobel inference, ordinary and pedigree mixed effects |
 | [Beta regression](../beta-regression.md) | classical mean/precision beta ML, CLI, link options, and independent R validation |
-| [Linear models and GLMs](linear-models-and-glms.md) | OLS, weights, offsets, missing rows, contrasts, GLM families, ridge, LASSO, elastic net, cross-validation |
+| [Linear models and GLMs](linear-models-and-glms.md) | CLI-only phenotype/omics OLS and GLM commands; Java weights, offsets, contrasts, penalized fits, and inference |
 | [Regression families](regression-families.md) | multivariate OLS, multinomial logistic, supersmoother, quantile, kernel nonparametric, and partially linear semiparametric regression |
 | [Advanced extensions](advanced-extensions.md) | SEM extensions, full-covariance meta-regression, sparse unstructured mixed effects, diffuse/missing time series, generalized MR, quadrature GLMM, and selection-aware penalized inference |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
 | [LOESS local polynomial regression](../loess.md) | direct tricube fitting, prior weights, robust symmetric passes, prediction, leverage, R accuracy and speed |
-| [REML and mixed models](reml-and-mixed-models.md) | covariance-component REML/ML, finite DF, dense/sparse LMMs, correlated effects, prediction, refit, comparison |
-| [Pedigree and generalized mixed models](pedigree-and-glmm.md) | pedigree construction, dense/sparse animal models, GLMM PQL/Laplace, frequentist ZIP/ZINB mixed models |
-| [Cox and frailty survival models](cox-survival.md) | right-censoring, delayed entry, strata, Efron/Breslow ties, hazard ratios, Gaussian, GRM, and pedigree frailty |
-| [Formulas and compute backends](formulas-and-backends.md) | model tables, contrasts, offsets, mixed formulas, nested/correlated terms, GPU/oneMKL/OpenBLAS policy |
-| [Association, GWAS, and omics QTL](association-gwas-twas.md) | CSV/TSV/VCF/BCF/BGEN, cohort QC, cryptic-relatedness GRMs, fast OLS/GLM, P3D/EMMAX, omics transforms, Burden/SKAT/SKAT-O |
+| [REML and mixed models](reml-and-mixed-models.md) | CLI-only grouped/GRM exact REML; Java covariance components, correlated effects, prediction, refit, and comparison |
+| [Pedigree and generalized mixed models](pedigree-and-glmm.md) | CLI-only pedigree LMM/GLMM; Java pedigree construction, PQL, adaptive quadrature, and ZIP/ZINB |
+| [Cox and frailty survival models](cox-survival.md) | CLI-only fixed/GRM Cox; Java streamed omics, delayed entry, strata, shared frailty, and pedigree frailty |
+| [Formulas and compute backends](formulas-and-backends.md) | CLI-only formula/backend preflight; Java model tables, contrasts, offsets, and nested/correlated terms |
+| [Association, GWAS, and omics QTL](association-gwas-twas.md) | CLI-only numeric omics, VCF/BCF/BGEN, and GRM scans; Java prepared scans and Burden/SKAT/SKAT-O |
 | [Omics transforms from the command line](omics-transforms.md) | exact `--transform` syntax, all built-in stages, pipeline recipes, missing values, failure conditions, and trusted plugin providers |
 | [End-to-end Mendelian randomization](mr-end-to-end.md) | database installation, public/custom instruments, LD clumping, analysis, diagnostics, plotting exports, bidirectional and molecular MR |
 | [Parallel xWAS MR](xwas-mr-pipeline.md) | reusable clumped instruments, phenotype families, bounded parallel exposure-outcome scans, all-pairs BH/FDR, scale-safe thresholds, and two-stage diagnostics |
