@@ -6,6 +6,10 @@ probabilities (PIPs) and credible sets. This command uses summary statistics,
 an LD correlation matrix, and the analysis sample size. No Java code is
 required.
 
+> **Version availability:** the `susie` CLI command was added after v0.3.4.
+> Use current `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release; it
+> is not present in the published v0.3.4 JAR.
+
 ## 1. Define and harmonize one locus
 
 Choose a locus window and one genome build. Use the same effect-allele
@@ -44,9 +48,9 @@ An unlabeled LD CSV/TSV is accepted only when its rows and columns are in the
 exact summary-row order:
 
 ```text
-1.0    0.31   0.02
-0.31   1.0    0.08
-0.02   0.08   1.0
+1.0,0.31,0.02
+0.31,1.0,0.08
+0.02,0.08,1.0
 ```
 
 A labeled matrix is safer because JLinAlg checks identifiers and reorders it

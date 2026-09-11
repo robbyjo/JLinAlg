@@ -171,7 +171,10 @@ public final class JLinAlgCli {
                                            scans use the ID intersection
               --formula FORMULA            R-style fixed/random formula
               --model auto|ols|lmm|glm|glmm|cox
-              --family gaussian|binomial|poisson|gamma
+              --family gaussian|binomial|poisson|gamma|
+                       inverse-gaussian|quasi-binomial|quasi-poisson
+              --link LINK                 Restate the family's canonical link;
+                                          noncanonical overrides are unavailable
               --grm FILE|PREFIX           Labeled dense matrix or GCTA prefix
               --individual-id COLUMN      Phenotype-to-GRM/pedigree ID
                                            (defaults to --id)
@@ -204,8 +207,10 @@ public final class JLinAlgCli {
               --checkpoint-every N
               --log FILE
               --no-log
-              --dry-run
-              --explain
+              --dry-run                  Print the resolved general analysis
+                                         plan and stop before model fitting
+              --explain                  Print that plan, then continue fitting
+                                         (singular; --explains is invalid)
               --overwrite
 
             Filtering and processing:

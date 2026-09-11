@@ -9,7 +9,9 @@
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI colocalization</span></div><h1>Ask whether two regional signals are shared.</h1><p>Fine-map each trait, intersect credible-effect evidence safely, and report signal-level H0-H4 with H4-conditional shared variants.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<div class="note"><strong>Version availability</strong>The <code>coloc</code> CLI command was added after v0.3.4. Use current <code>jlinalg-0.3.5-SNAPSHOT.jar</code> or a later release; it is not present in the published v0.3.4 JAR.</div>
 <div class="note"><strong>Colocalization is not MR</strong>It tests whether association signals in a region appear to share a causal variant. It neither estimates nor proves a causal effect between traits.</div>
+<div class="note"><strong>Shell syntax</strong>Website command blocks use the POSIX-shell <code>&#92;</code> line continuation. In PowerShell replace it with a backtick or put the command on one line.</div>
 
 <h2 id="prepare">1. Fine-map both traits</h2>
 <p>Use the same genome build, explicit allele alignment, a common defensible locus, and an appropriate LD matrix for each trait.</p>
@@ -23,10 +25,10 @@ java -jar jlinalg-&lt;version&gt;.jar susie &#92;
 <p>Require convergence in both logs. The inputs below are the generated <code>*.effects.tsv</code> files.</p>
 
 <h2 id="input">2. Understand the long input</h2>
-<pre><code>effect_index  variant_id  log_bayes_factor
-1             rs1001      15.22
-1             rs1002       4.01
-1             rs1003      -0.30</code></pre>
+<pre><code>effect_index,variant_id,log_bayes_factor
+1,rs1001,15.22
+1,rs1002,4.01
+1,rs1003,-0.30</code></pre>
 <p>A custom CSV/TSV may use aliases <code>effect</code>, SNP/rsid, and lbf/logbf. Every effect within one file must contain the same unique variant set. The two traits may differ: exact variant IDs are intersected in trait-1 order. Coordinates or alleles are never guessed.</p>
 
 <h2 id="run">3. Run colocalization</h2>

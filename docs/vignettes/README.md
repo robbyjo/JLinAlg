@@ -13,6 +13,12 @@ Run the complete verification suite before adapting an example:
 
 ## Choose a vignette
 
+The published v0.3.4 JAR predates the `mediation`, `susie`, and `coloc`
+CLI subcommands and the post-release association preflight/filter fixes.
+Those examples require the current `jlinalg-0.3.5-SNAPSHOT.jar` build or a
+later release. Examples that explicitly name `jlinalg-0.3.4.jar` are
+release-compatible.
+
 | Vignette | Features covered |
 | --- | --- |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |

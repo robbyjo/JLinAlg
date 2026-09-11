@@ -9,7 +9,9 @@
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI association tutorial</span></div><h1>Start with one phenotype. Build toward xWAS.</h1><p>A gentle executable-JAR workflow for OLS, exact REML, numeric omics, common and rare variants, pedigree, GLM/GLMM, survival, and regularization.</p></div></section>
 <div class="container page-layout"><article class="prose">
-<div class="note"><strong>No Java code is required</strong>Replace <code>jlinalg-&lt;version&gt;.jar</code> with the downloaded filename. Start a new analysis with <code>--dry-run</code>; use <code>--explain</code> to print routing and continue fitting.</div>
+<div class="note"><strong>Version availability</strong>The published v0.3.4 JAR predates <code>--max-maf</code>/<code>--max-mac</code>, phenotype-only <code>--dry-run</code>/<code>--explain</code> handling, and safe <code>--link</code> validation described below. Use current <code>jlinalg-0.3.5-SNAPSHOT.jar</code> or a later release for those items.</div>
+<div class="note"><strong>No Java code is required</strong>Replace <code>jlinalg-&lt;version&gt;.jar</code> with the downloaded filename. Website command blocks use the POSIX-shell <code>&#92;</code> line continuation; in PowerShell replace it with a backtick or put the command on one line. On the general <code>--pheno</code> command, <code>--dry-run</code> prints the resolved plan and stops before fitting; singular <code>--explain</code> prints it and continues. Specialized subcommands use their own <code>--help</code>.</div>
+<p>Both general-command switches read and align inputs, select complete phenotype rows, compile the formula, load a requested GRM or pedigree, validate the transform, and report model, variance-component route, output format, backend policy, and output path. Omics preflight also reports block and worker sizing. A dry run writes the normal log unless <code>--no-log</code> is set, but no result table or manifest. It cannot detect feature-specific numerical failures because it does not scan feature rows.</p>
 
 <h2 id="phenotype">1. Begin with a phenotype file</h2>
 <p>A phenotype CSV/TSV has one observation per row. The <code>--id</code> column must be unique and later matches omics sample headers.</p>
@@ -48,7 +50,7 @@ GENE_B,2.0,2.4,2.2,NA</code></pre>
 <p>For non-genotype omics, <code>--variance-components auto</code> also selects an exact per-feature lmer-like REML refit.</p>
 
 <h2 id="common-gwas">3. Common-variant GWAS</h2>
-<p>Accepted inputs are VCF, VCF.gz, BCF, BGEN layout 2, and additive-dosage CSV/TSV. VCF/BCF prefers FORMAT/DS and falls back to GT; multiallelic records produce one row per ALT. BGEN supports layout-2 zlib, zstd, or uncompressed blocks; add <code>--sample-file</code> when IDs are external.</p>
+<p>Accepted inputs are VCF, VCF.gz, BCF, biallelic BGEN layout 2, and additive-dosage CSV/TSV. VCF/BCF prefers FORMAT/DS and falls back to GT; multiallelic VCF records produce one row per ALT. BGEN supports layout-2 zlib, zstd, or uncompressed blocks but rejects multiallelic records; add <code>--sample-file</code> when IDs are external.</p>
 <pre><code>id,chromosome,position,ref,alt,S001,S002,S003,S004
 rs100,1,101001,A,G,0,1,2,1</code></pre>
 <p>A compact delimited matrix may contain only <code>id</code> then sample columns. Dosages are ALT counts in [0,2]; blank, <code>.</code>, <code>NA</code>, <code>N/A</code>, <code>null</code>, and <code>NaN</code> mean missing. Set <code>--omics-type gwas</code> if IDs do not make a delimited genotype file recognizable.</p>
@@ -98,7 +100,7 @@ F10,1003,1001,1002</code></pre>
   --id omics_id --formula "case_status ~ Sex + Age + &lt;omics&gt;" &#92;
   --family binomial --case-value case --control-value control &#92;
   --out disease-expression.csv</code></pre></div>
-<p>Without a random effect this is a GLM. Add <code>(1|clinic)</code>, a GRM, or a matching pedigree term for a first-order Laplace, glmer-like GLMM. Use <code>--link</code> only to override a supported family default. Genotype Laplace-GLMM scans are not currently exposed.</p>
+<p>Without a random effect this is a GLM. Add <code>(1|clinic)</code>, a GRM, or a matching pedigree term for a first-order Laplace, glmer-like GLMM. The CLI uses fixed canonical links: identity for Gaussian, logit for binomial, and log for Poisson and Gamma. <code>--link</code> may restate that choice, such as <code>--family binomial --link logit</code>, but a noncanonical link is rejected rather than silently ignored. Use the Java API when a custom link is required. Genotype Laplace-GLMM scans are not currently exposed.</p>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree binomial GLMM</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
   --id omics_id --individual-id subject_id &#92;
   --formula "case_status ~ Sex + Age + &lt;omics&gt; + (1|subject_id)" &#92;

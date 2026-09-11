@@ -10,6 +10,7 @@
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI MR tutorial</span></div><h1>From GWAS download to MR results.</h1><p>A file-by-file workflow for public or custom instruments, ancestry-matched LD clumping, automatic allele harmonization, diagnostics, and auditable outputs.</p></div></section>
 <div class="container page-layout"><article class="prose">
 <div class="note"><strong>Design first</strong>Record the exposure, outcome, units, ancestry, genome build, covariates, sample sizes, overlap, and licenses before downloading data. Exposure p-values select instruments; outcome p-values must not.</div>
+<div class="note"><strong>Shell syntax</strong>Website command blocks use the POSIX-shell <code>&#92;</code> line continuation. In PowerShell replace it with a backtick or put the command on one line.</div>
 
 <h2 id="discover">1. Find a public exposure GWAS</h2>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>GWAS Catalog</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-instruments search &#92;
@@ -33,12 +34,12 @@ units ncase ncontrol samplesize gene</code></pre>
 <h2 id="ld">3. Install an ancestry-matched LD panel</h2>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>LD reference</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar ld-db list
 java -jar jlinalg-&lt;version&gt;.jar ld-db download &#92;
-  --database 1000g-phase3 --location D:&#92;reference&#92;1000g-phase3</code></pre></div>
+  --database 1000g-phase3 --location reference/1000g-phase3</code></pre></div>
 <p>The package offers AFR, AMR, EAS, EUR, and SAS panels. Match the exposure study; EUR being the default is not scientific justification.</p>
 
 <h2 id="clump">4. LD-clump the exposure</h2>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Independent instruments</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar clump &#92;
-  --database D:&#92;reference&#92;1000g-phase3 --population EUR &#92;
+  --database reference/1000g-phase3 --population EUR &#92;
   --instrument exposure-candidates.tsv --clump-kb 10000 &#92;
   --ld-threshold 0.001 --p-threshold 1 --output exposure-clumped.tsv</code></pre></div>
 <p>The output preserves original columns and order. Variants absent from the panel are excluded; large losses suggest a build, ancestry, or identifier mismatch. Use <code>--snp-column</code>, <code>--pval-column</code>, or <code>--id-column</code> for unusual files. Multiple exposure groups are clumped independently.</p>
@@ -67,9 +68,9 @@ java -jar jlinalg-&lt;version&gt;.jar ld-db download &#92;
 <p>Pairs with fewer than three harmonized instruments have no full diagnostic fit. Inspect exclusions and failures before treating an empty result as a null finding.</p>
 
 <h2 id="harmonized">8. If a table is already harmonized</h2>
-<pre><code>variant_id beta_exposure se_exposure beta_outcome se_outcome
-rs101      0.08          0.02        0.03         0.01</code></pre>
-<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Estimator-only command</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-estimate --input harmonized.tsv &#92;
+<pre><code>variant_id,beta_exposure,se_exposure,beta_outcome,se_outcome
+rs101,0.08,0.02,0.03,0.01</code></pre>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Estimator-only command</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-estimate --input harmonized.csv &#92;
   --method all --output mr-estimates.tsv --plot mr-scatter.svg</code></pre></div>
 <p>The output has method, estimate, standard error, causal p-value, confidence limits, and instrument count. <code>mr-estimate</code> assumes outcome effects already point to the exposure effect allele; because its input has no alleles, it cannot detect a flip. Use <code>mr-xwas</code> for separate unharmonized files.</p>
 

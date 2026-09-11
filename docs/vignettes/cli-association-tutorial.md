@@ -5,9 +5,27 @@ one phenotype model, then adds numeric omics, genotype files, relatedness,
 non-Gaussian outcomes, survival analysis, and penalized regression. Replace
 `jlinalg-<version>.jar` with the downloaded filename.
 
-Start any new analysis with `--dry-run`. It validates files and the formula
-and prints the chosen model without fitting. Add `--explain` to print the
-same routing information and continue with the analysis.
+> **Version availability:** the published v0.3.4 JAR predates
+> `--max-maf`/`--max-mac`, phenotype-only `--dry-run`/`--explain`
+> handling, and safe `--link` validation described below. Use current
+> `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release for those items.
+
+`--dry-run` and `--explain` belong to the general association command that
+starts with `--pheno`; they are not options for specialized subcommands such
+as `susie` or `mediation`. Both read and align the selected inputs, apply
+phenotype complete-case selection, compile the formula, load a requested GRM
+or pedigree, validate the transform specification, and print the resolved
+model, variance-component route, output format, backend policy, and output
+path. Omics scans also print block and worker sizing.
+
+- `--dry-run` stops there, before model fitting or feature scanning. It
+  creates the normal log unless `--no-log` is used, but creates no result
+  table or manifest.
+- `--explain` prints the same plan and then continues with the fit.
+
+The spelling is singular: `--explain`, not `--explains`. A preflight cannot
+detect feature-specific numerical failures because it deliberately does not
+scan feature rows.
 
 ## 1. Begin with a phenotype file
 
@@ -98,10 +116,11 @@ single-null-model approximation.
 
 ## 3. Common-variant GWAS
 
-Accepted genotype inputs are VCF, BGZF-compressed VCF, BCF, BGEN layout 2, and
-additive-dosage CSV/TSV. VCF/BCF uses FORMAT/DS when available and otherwise
-called GT. Multiallelic VCF records become one row per alternate allele. BGEN
-supports zlib, zstd, or uncompressed layout-2 blocks; use
+Accepted genotype inputs are VCF, BGZF-compressed VCF, BCF, biallelic BGEN
+layout 2, and additive-dosage CSV/TSV. VCF/BCF uses FORMAT/DS when available
+and otherwise called GT. Multiallelic VCF records become one row per alternate
+allele. BGEN supports zlib, zstd, or uncompressed layout-2 blocks but rejects
+multiallelic records; use
 `--sample-file cohort.sample` when sample IDs are external.
 
 A delimited dosage file can be compact:
@@ -244,8 +263,11 @@ java -jar jlinalg-<version>.jar --pheno phenotype.csv --omics expression.csv `
   --out disease-pedigree-expression.csv
 ```
 
-`--link` overrides a supported family default when needed; omit it for the
-canonical link. Genotype Laplace-GLMM scans are not currently exposed.
+The CLI currently uses fixed canonical links: identity for Gaussian, logit
+for binomial, and log for Poisson and Gamma. You may restate that choice with
+`--link`, such as `--family binomial --link logit`, but a noncanonical link is
+rejected rather than silently ignored. Use the Java API when a custom link is
+required. Genotype Laplace-GLMM scans are not currently exposed.
 
 ## 7. Cox survival analysis
 

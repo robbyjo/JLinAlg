@@ -4,6 +4,10 @@ Colocalization asks whether two association signals in the same region are
 best explained by a shared causal variant. It does not estimate a causal
 effect and does not replace Mendelian randomization.
 
+> **Version availability:** the `coloc` CLI command was added after v0.3.4.
+> Use current `main` (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release; it
+> is not present in the published v0.3.4 JAR.
+
 ## 1. Prepare two comparable regional analyses
 
 Before fitting either trait, verify:
@@ -35,10 +39,10 @@ Check that both logs report convergence. The two files needed below are
 The `susie` effects sidecar is long format. The required columns are:
 
 ```text
-effect_index  variant_id  log_bayes_factor
-1             rs1001      15.22
-1             rs1002       4.01
-1             rs1003      -0.30
+effect_index,variant_id,log_bayes_factor
+1,rs1001,15.22
+1,rs1002,4.01
+1,rs1003,-0.30
 ```
 
 The sidecar contains all variants for every credible effect, not only members

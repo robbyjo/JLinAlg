@@ -178,6 +178,11 @@ final class AnalysisRunner {
         info("scan_worker_capacity=" + scanWorkerCapacity);
         info("threads=" + options.threads);
         info("backend=" + options.backend);
+        OmicsTransform transform = TransformParser.parse(
+            options.transforms, options.transformPlugins);
+        if (genotype && !options.transforms.isEmpty())
+            throw new IllegalArgumentException(
+                "genotype transforms are not supported in the variant pipeline");
         if (options.explain || options.dryRun) {
             output.println("omics type: " + detection.type()
                 + " (" + detection.source() + ")");
@@ -197,11 +202,6 @@ final class AnalysisRunner {
             throw new IllegalArgumentException(
                 "partial output lacks resumable block metadata; "
                     + "use --overwrite to restart");
-        OmicsTransform transform = TransformParser.parse(
-            options.transforms, options.transformPlugins);
-        if (genotype && !options.transforms.isEmpty())
-            throw new IllegalArgumentException(
-                "genotype transforms are not supported in the variant pipeline");
         AssociationEngineOptions engine = new AssociationEngineOptions(
             options.threads, associationChunkSize,
             options.backend, AssociationFailurePolicy.RECORD_NAN,
@@ -483,6 +483,18 @@ final class AnalysisRunner {
         info("variance_components=" + resolvedVarianceComponents);
         info("mixed_fit=" + resolvedMixedFit);
         logOutputMetadata();
+        validatePhenotypeRoute(model, grm);
+        if (options.explain || options.dryRun) {
+            output.println("omics type: none");
+            output.println("model: " + model);
+            output.println("variance components: "
+                + resolvedVarianceComponents);
+            output.println("mixed fit: " + resolvedMixedFit);
+            output.println("output format: " + outputFormat());
+            output.println("backend: " + options.backend);
+            output.println("output: " + options.output);
+            if (options.dryRun) return 0;
+        }
         long tests = switch (model) {
             case "ols" -> phenotypeOls(prepared);
             case "glm" -> phenotypeGlm(prepared);
@@ -496,6 +508,32 @@ final class AnalysisRunner {
         manifest(model, "none", 0, 0, 0,
             new Counts(prepared.ids().size(), tests, 0));
         return 0;
+    }
+
+    private void validatePhenotypeRoute(String model, GrmContext grm) {
+        switch (model) {
+            case "ols", "glm" -> {
+                if (plan.hasRandomEffects() || options.pedigree != null)
+                    throw new IllegalArgumentException(
+                        model.toUpperCase(Locale.ROOT)
+                            + " does not accept random effects or --pedigree");
+            }
+            case "lmm", "glmm" -> {
+                if (grm == null && !plan.hasRandomEffects())
+                    throw new IllegalArgumentException(
+                        model.toUpperCase(Locale.ROOT)
+                            + " requires --grm or a random-effect formula term");
+                requireRefit(model.toUpperCase(Locale.ROOT));
+            }
+            case "cox" -> {
+                if (plan.hasRandomEffects() || options.pedigree != null)
+                    throw new IllegalArgumentException(
+                        "Cox formula frailty and pedigree terms are not yet "
+                            + "exposed by the CLI");
+            }
+            default -> throw new IllegalArgumentException(
+                "unsupported model: " + model);
+        }
     }
 
     private long phenotypeOls(PhenotypeData.Prepared prepared)

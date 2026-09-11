@@ -177,14 +177,14 @@ If another tool has already aligned outcome effects to the exposure effect
 allele, prepare:
 
 ```text
-variant_id beta_exposure se_exposure beta_outcome se_outcome
-rs101      0.08          0.02        0.03         0.01
+variant_id,beta_exposure,se_exposure,beta_outcome,se_outcome
+rs101,0.08,0.02,0.03,0.01
 ```
 
 Then run:
 
 ```powershell
-java -jar jlinalg-<version>.jar mr-estimate --input harmonized.tsv `
+java -jar jlinalg-<version>.jar mr-estimate --input harmonized.csv `
   --method all --output mr-estimates.tsv --plot mr-scatter.svg
 ```
 

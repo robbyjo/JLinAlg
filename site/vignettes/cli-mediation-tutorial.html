@@ -9,6 +9,8 @@
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI mediation</span></div><h1>Five mediation effects, one common sample.</h1><p>Fit Gaussian OLS, grouped-REML, or pedigree-REML mediation from an observation table using only the executable JAR.</p></div></section>
 <div class="container page-layout"><article class="prose">
+<div class="note"><strong>Version availability</strong>The <code>mediation</code> CLI command was added after v0.3.4. Use current <code>jlinalg-0.3.5-SNAPSHOT.jar</code> or a later release; it is not present in the published v0.3.4 JAR.</div>
+<div class="note"><strong>Shell syntax</strong>Website command blocks use the POSIX-shell <code>&#92;</code> line continuation. In PowerShell replace it with a backtick or put the command on one line.</div>
 <h2 id="model">1. State the model</h2>
 <pre><code>M = intercept + a X + alpha C + error
 Y = intercept + direct X + b M + gamma C + error

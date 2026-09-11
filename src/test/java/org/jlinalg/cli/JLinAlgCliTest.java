@@ -489,6 +489,111 @@ class JLinAlgCliTest {
             "\"pedigree_precision\": \"sparse_additive_relationship_inverse\""));
     }
 
+    @Test
+    void phenotypeOnlyDryRunExplainsAndStopsBeforeFitting() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("dry-run-pheno.tsv");
+        Path output = temporaryDirectory.resolve("dry-run-output.tsv");
+        Files.writeString(phenotype,
+            "IID\ty\tx\nS1\t1\t0\nS2\t2\t1\nS3\t4\t2\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--id", "IID",
+            "--formula", "y ~ x", "--out", output.toString(), "--dry-run"
+        }, console, console);
+
+        assertEquals(0, status, bytes.toString());
+        assertTrue(bytes.toString().contains("omics type: none"));
+        assertTrue(bytes.toString().contains("model: ols"));
+        assertTrue(bytes.toString().contains("output format: tsv"));
+        assertFalse(Files.exists(output));
+        assertFalse(Files.exists(Path.of(output + ".manifest.json")));
+        assertTrue(Files.exists(Path.of(output + ".log")));
+    }
+
+    @Test
+    void phenotypeOnlyExplainPrintsPlanAndContinuesFitting() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("explain-pheno.csv");
+        Path output = temporaryDirectory.resolve("explain-output.csv");
+        Files.writeString(phenotype,
+            "IID,y,x\nS1,1,0\nS2,2,1\nS3,4,2\nS4,7,3\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--id", "IID",
+            "--formula", "y ~ x", "--out", output.toString(), "--explain"
+        }, console, console);
+
+        assertEquals(0, status, bytes.toString());
+        assertTrue(bytes.toString().contains("model: ols"));
+        assertTrue(bytes.toString().contains("output format: csv"));
+        assertTrue(Files.exists(output));
+        assertTrue(Files.exists(Path.of(output + ".manifest.json")));
+    }
+
+    @Test
+    void omicsDryRunValidatesTransformBeforeStopping() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("transform-pheno.csv");
+        Path omics = temporaryDirectory.resolve("transform-omics.csv");
+        Path output = temporaryDirectory.resolve("transform-output.csv");
+        Files.writeString(phenotype,
+            "IID,y,x\nS1,1,0\nS2,2,1\nS3,4,2\nS4,7,3\n");
+        Files.writeString(omics,
+            "feature_id,S1,S2,S3,S4\ngene1,1,2,3,4\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--omics", omics.toString(),
+            "--id", "IID", "--formula", "y ~ x + <omics>",
+            "--transform", "<omics> = nonexistent()",
+            "--out", output.toString(), "--dry-run"
+        }, console, console);
+
+        assertEquals(1, status);
+        assertTrue(bytes.toString().contains(
+            "unknown transform stage: nonexistent"));
+        assertFalse(Files.exists(output));
+        assertFalse(Files.exists(Path.of(output + ".manifest.json")));
+    }
+
+    @Test
+    void noncanonicalLinkIsRejectedInsteadOfIgnored() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("link-pheno.csv");
+        Path output = temporaryDirectory.resolve("link-output.csv");
+        Files.writeString(phenotype,
+            "IID,case,x\nS1,0,0\nS2,1,1\nS3,0,2\nS4,1,3\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--id", "IID",
+            "--formula", "case ~ x", "--family", "binomial",
+            "--link", "probit", "--out", output.toString(), "--dry-run"
+        }, console, console);
+
+        assertEquals(2, status);
+        assertTrue(bytes.toString().contains(
+            "--family binomial uses the fixed logit link"));
+        assertFalse(Files.exists(output));
+        assertFalse(Files.exists(Path.of(output + ".log")));
+    }
+
+    @Test
+    void pluralExplainsReportsTheValidSingularOption() {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {"--explains"},
+            console, console);
+
+        assertEquals(2, status);
+        assertTrue(bytes.toString().contains(
+            "--explains is not an option; use --explain (singular)"));
+    }
+
     private static void writeBlockGrm(Path path, int size) throws Exception {
         StringBuilder matrix = new StringBuilder("IID");
         for (int id = 1; id <= size; id++) matrix.append("\tS").append(id);

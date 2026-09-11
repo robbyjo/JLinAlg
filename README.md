@@ -35,6 +35,10 @@ The historical v0.3.0 and v0.3.1 binaries retain JDistlib 0.10.1.
   [GitHub release page](https://github.com/robbyjo/JLinAlg/releases/tag/v0.3.4).
   Use `jlinalg-0.3.4.jar` for the self-contained CLI; the separate
   `JLinAlg-0.3.4-library.jar` is the thin library.
+- Current `main` is post-v0.3.4 development and builds
+  `jlinalg-0.3.5-SNAPSHOT.jar`. The new `mediation`, `susie`, and `coloc`
+  CLI subcommands and post-release preflight/filter corrections are not in
+  the published v0.3.4 JAR.
 - A JDK 17 or newer.
 - Network access on the first build. The build downloads the pinned
   `jdistlib-all-0.10.2.jar` and verifies its SHA-256 digest before compiling.
@@ -86,7 +90,7 @@ The artifact is written to `build/cli/jlinalg-<version>.jar` and includes its
 runtime dependencies. A fixed-effect omics scan can then be run as:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.4.jar `
+java -jar build/cli/jlinalg-<version>.jar `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
   --id IID `
@@ -114,7 +118,7 @@ repeated observations, `--individual-id COLUMN` names the phenotype column
 that maps rows to GRM individuals. It defaults to the `--id` column.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.4.jar `
+java -jar build/cli/jlinalg-<version>.jar `
   --pheno phenotype.tsv --id observation_id --individual-id IID `
   --formula "trait ~ age + sex" --grm cohort `
   --out trait-grm.tsv
@@ -347,7 +351,7 @@ The beta fitter is also available from the command line for numeric CSV/TSV
 files:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.4.jar beta-regression `
+java -jar build/cli/jlinalg-<version>.jar beta-regression `
   --input proportions.tsv --response proportion --mean dose `
   --precision batch_score --out beta-coefficients.tsv
 ```
@@ -396,7 +400,7 @@ variable selection and should not be presented as selection-valid inference.
 The Gaussian penalized fitter is also available as a file-oriented command:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.4.jar penalized-regression `
+java -jar build/cli/jlinalg-<version>.jar penalized-regression `
   --input continuous.tsv --response y --predictors x1,x2,x3 `
   --model elastic-net --alpha 0.5 `
   --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 `

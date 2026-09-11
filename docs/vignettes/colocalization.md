@@ -6,7 +6,9 @@ or cis-MR, not evidence that one trait causes the other.
 
 The [CLI-only colocalization tutorial](cli-colocalization-tutorial.md) starts
 with the effect sidecars written by the `susie` command and follows them
-through tabular H0-H4 and conditional shared-variant outputs.
+through tabular H0-H4 and conditional shared-variant outputs. Both CLI
+commands require current `jlinalg-0.3.5-SNAPSHOT.jar` or a later release;
+they are not in v0.3.4.
 
 ## Align the inputs
 

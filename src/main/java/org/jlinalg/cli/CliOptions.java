@@ -71,6 +71,8 @@ final class CliOptions {
                 case "--resume" -> result.resume = true;
                 case "--dry-run" -> result.dryRun = true;
                 case "--explain" -> result.explain = true;
+                case "--explains" -> throw new IllegalArgumentException(
+                    "--explains is not an option; use --explain (singular)");
                 case "--overwrite" -> result.overwrite = true;
                 case "--no-log" -> result.noLog = true;
                 case "--omics" -> result.omics = path(value(arguments, ++index, option));
@@ -175,6 +177,7 @@ final class CliOptions {
                 && !varianceComponents.equals("refit"))
             throw new IllegalArgumentException(
                 "--variance-components must be auto, null-model, or refit");
+        validateFamilyAndLink();
         if (!hweSamples.equals("all"))
             throw new IllegalArgumentException(
                 "--hwe-samples currently supports only its default, all");
@@ -188,6 +191,22 @@ final class CliOptions {
             throw new IllegalArgumentException(
                 "--pedigree requires --pedigree-id, --sire-id, and --dam-id");
         PipelinePaths.validate(this);
+    }
+
+    private void validateFamilyAndLink() {
+        String canonical = switch (family) {
+            case "gaussian" -> "identity";
+            case "binomial", "quasi-binomial" -> "logit";
+            case "poisson", "gamma", "inverse-gaussian", "quasi-poisson" ->
+                "log";
+            default -> throw new IllegalArgumentException(
+                "unsupported family: " + family);
+        };
+        if (link != null && !link.equals(canonical))
+            throw new IllegalArgumentException(
+                "--family " + family + " uses the fixed " + canonical
+                    + " link; noncanonical --link overrides are not available"
+                    + " in this CLI");
     }
 
     Path logPath() {

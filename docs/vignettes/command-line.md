@@ -1,8 +1,15 @@
 # Command-line-only workflows
 
-Every workflow here uses only the executable JAR. No Java source code, build
-tool, or dataframe runtime is required. Start a new file/formula/pedigree with
-<code>--dry-run</code>.
+Every workflow here is invoked through the executable JAR; no Java API code or
+dataframe runtime is required. Start a new general association
+file/formula/pedigree with <code>--dry-run</code>. Until the next release,
+post-v0.3.4 commands require a JAR built from current `main`.
+
+> **Version availability:** commands that explicitly name
+> `jlinalg-0.3.4.jar` work with that release. The `mediation`, `susie`, and
+> `coloc` CLI subcommands, `--max-maf`/`--max-mac`, and the corrected
+> phenotype-only preflight require current `main`
+> (`jlinalg-0.3.5-SNAPSHOT.jar`) or a later release.
 
 For a slower first-principles walkthrough, start with the
 [progressive association tutorial](cli-association-tutorial.md). Separate
@@ -37,7 +44,15 @@ This retains observations without inventing parentage.
 java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics>" --out bmi-expression.csv --dry-run
 ~~~
 
-<code>--explain</code> prints the resolved choices and continues with the fit.
+For the general command, <code>--dry-run</code> reads and aligns inputs,
+selects complete phenotype rows, compiles the formula, loads a requested GRM
+or pedigree, validates the transform, and prints model routing, output format,
+backend policy, and (for omics) block/worker sizing. It then stops before
+model fitting or feature scanning, leaving only the normal log unless
+<code>--no-log</code> is set. <code>--explain</code> prints the same plan and
+continues with the fit. The option is singular: <code>--explain</code>.
+Specialized subcommands have their own <code>--help</code> and do not accept
+these two general-command switches.
 Logs default to <code>OUT.log</code>; manifests default to
 <code>OUT.manifest.json</code>. A <code>.csv</code> output is comma-separated;
 <code>.tsv</code> and other suffixes are tab-separated.
@@ -180,8 +195,9 @@ are CLI-native. See the dedicated
 
 ## Operational checklist
 
-- Start with <code>--dry-run</code>; use <code>--explain</code> to print
-  routing and still fit.
+- Start a general association command with <code>--dry-run</code>; use the
+  singular <code>--explain</code> to print routing and still fit. These
+  switches do not apply to specialized subcommands.
 - Automatic block sizing uses both JVM heap headroom and the requested thread
   count. When memory permits it queues at least two complete worker waves so
   work stealing can absorb slow chunks at block boundaries. Low heap headroom
