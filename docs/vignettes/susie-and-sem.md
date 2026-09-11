@@ -5,6 +5,12 @@
 > `N3finemapping` vignette data, and SEM is validated against `lavaan` and
 > benchmarked on a TOPMed cardiometabolic path model.
 
+For a file-based executable-JAR workflow, use the
+[CLI-only SuSiE tutorial](cli-susie-tutorial.md), then the
+[CLI-only colocalization tutorial](cli-colocalization-tutorial.md). The Java
+examples below additionally cover individual-level and sufficient-statistic
+SuSiE plus SEM.
+
 ## SuSiE with individual-level data
 
 Rows are samples and columns are candidate variables in the same order as the

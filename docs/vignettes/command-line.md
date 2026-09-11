@@ -4,6 +4,13 @@ Every workflow here uses only the executable JAR. No Java source code, build
 tool, or dataframe runtime is required. Start a new file/formula/pedigree with
 <code>--dry-run</code>.
 
+For a slower first-principles walkthrough, start with the
+[progressive association tutorial](cli-association-tutorial.md). Separate
+file-to-result tutorials cover [mediation](cli-mediation-tutorial.md),
+[Mendelian randomization](cli-mr-tutorial.md),
+[SuSiE](cli-susie-tutorial.md), and
+[multi-signal colocalization](cli-colocalization-tutorial.md).
+
 ## Understand the three ID layers
 
 | Option | Meaning |
@@ -159,10 +166,17 @@ not yet through this general CLI.
 ~~~powershell
 java -jar jlinalg-0.3.4.jar beta-regression --input proportions.tsv --response proportion --mean dose,age --precision batch --out beta.tsv
 java -jar jlinalg-0.3.4.jar penalized-regression --input continuous.tsv --response y --predictors x1,x2,x3 --model elastic-net --alpha 0.5 --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 --out elastic-net.tsv
+java -jar jlinalg-<version>.jar mediation --input mediation.tsv --outcome y --treatment x --mediator m --covariates age --out mediation-effects.tsv
+java -jar jlinalg-<version>.jar susie --summary locus.tsv --ld locus-ld.tsv --sample-size 10000 --out locus-susie.tsv
+java -jar jlinalg-<version>.jar coloc --trait1 trait1-susie.tsv.effects.tsv --trait2 trait2-susie.tsv.effects.tsv --out coloc.tsv
 ~~~
 
 MR preparation, LD installation/clumping, MR estimation, and parallel xWAS MR
-are CLI-native; see the end-to-end MR and xWAS guides for their schemas.
+are CLI-native. See the dedicated
+[mediation](cli-mediation-tutorial.md), [MR](cli-mr-tutorial.md),
+[SuSiE](cli-susie-tutorial.md), and
+[colocalization](cli-colocalization-tutorial.md) tutorials and the parallel
+[xWAS MR guide](xwas-mr-pipeline.md) for their schemas.
 
 ## Operational checklist
 

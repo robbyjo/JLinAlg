@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="CLI-only SuSiE fine mapping with summary statistics, labeled or ordered LD, PIPs, credible effects, output files, and diagnostics.">
+  <title>CLI SuSiE tutorial &middot; JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI SuSiE</span></div><h1>Fine-map one locus from files.</h1><p>Supply summary statistics, LD, and sample size; receive PIPs, credible effects, convergence provenance, and coloc-ready evidence.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="summary">1. Define and harmonize the locus</h2>
+<p>Use one genome build, unambiguous unique variant IDs, allele-aligned summary effects, and ancestry-matched LD. Summary CSV/TSV needs either z:</p>
+<pre><code>variant_id,z
+rs1001,8.42
+rs1002,2.13
+rs1003,-6.90</code></pre>
+<p>or beta and positive SE:</p>
+<pre><code>SNP,beta,se,effect_allele,other_allele
+rs1001,0.168,0.020,A,G
+rs1002,0.041,0.019,C,T
+rs1003,-0.138,0.020,T,C</code></pre>
+<p>Standard names are detected. Use <code>--variant-column</code>, <code>--z-column</code>, or paired <code>--beta-column</code>/<code>--se-column</code> for custom names. Allele columns are provenance: this command does not flip alleles or perform liftover.</p>
+
+<h2 id="ld">2. Supply safe LD</h2>
+<p>An unlabeled square matrix must be in exact summary-row order. A labeled matrix is safer and is automatically reordered:</p>
+<pre><code>variant_id,rs1003,rs1001,rs1002
+rs1003,1.0,0.02,0.08
+rs1001,0.02,1.0,0.31
+rs1002,0.08,0.31,1.0</code></pre>
+<p>Row and column IDs must be unique and equal the summary variant set. LD must be finite, symmetric, positive semidefinite, and have a correlation diagonal. Singular LD is allowed; indefinite or inconsistent LD is rejected.</p>
+
+<h2 id="run">3. Run SuSiE</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Summary-statistic fine mapping</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar susie &#92;
+  --summary locus-summary.csv --ld locus-ld.csv --sample-size 125000 &#92;
+  --effects 10 --coverage 0.95 --min-purity 0.5 &#92;
+  --max-iterations 200 --tolerance 1e-6 &#92;
+  --out locus-susie.csv</code></pre></div>
+<p>Defaults are 10 effects, 200 iterations, tolerance 1e-6, prior variance 0.2, 95% coverage, purity 0.5, and estimated residual variance. Use <code>--fixed-residual-variance</code> only when planned. <code>--backend cpu</code> forces the portable path.</p>
+
+<h2 id="outputs">4. Read the three outputs</h2>
+<ol><li><code>locus-susie.csv</code>: variant ID, PIP, and posterior mean.</li><li><code>locus-susie.csv.effects.tsv</code>: every locus variant for each retained credible effect, including alpha, effect mean, log Bayes factor, membership, coverage, and purity. The one-based effect index is preserved. This is direct <code>coloc</code> input.</li><li><code>locus-susie.csv.log</code>: inputs, sample size, counts, iterations, convergence, objective, residual variance, backend, and paths.</li></ol>
+<p>Choose sidecars with <code>--effects-output FILE --log FILE</code>. Each output's own suffix controls commas versus tabs. Existing files require <code>--overwrite</code>.</p>
+
+<h2 id="checks">5. Check before interpreting</h2>
+<ul><li>Require <code>converged=true</code>.</li><li>Read PIP together with credible-set membership, coverage, and purity.</li><li>Check sensitivity to effect count, prior variance, locus boundary, and LD source.</li><li>Remember that summary-mode posterior means are on the standardized summary-statistic scale, not automatically original GWAS units.</li></ul>
+<p>If no effect passes the purity rule, the effects sidecar has only its header. Do not lower purity after seeing a desired answer without reporting that decision.</p>
+<div class="note warning"><strong>Common failures</strong>ID mismatch calls for a labeled LD matrix or an explicit input intersection. Indefinite LD calls for checking order, alleles, missingness, and LD calculation&mdash;not replacing LD with identity. An ancestry mismatch calls for a better reference.</div>
+<div class="next-links"><a href="cli-colocalization-tutorial.html"><small>Next</small><strong>CLI colocalization &rarr;</strong></a><a href="susie.html"><small>Methods</small><strong>SuSiE validation &rarr;</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#summary">Summary input</a><a href="#ld">LD matrix</a><a href="#run">Run SuSiE</a><a href="#outputs">Outputs</a><a href="#checks">Checks</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>

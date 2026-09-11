@@ -44,7 +44,9 @@ final class CliOptions {
     final List<String> transforms = new ArrayList<>();
     final List<Path> transformPlugins = new ArrayList<>();
     double minimumMaf;
+    double maximumMaf = 0.5;
     double minimumMac;
+    double maximumMac = Double.POSITIVE_INFINITY;
     double maximumMissingRate = 1.0;
     double minimumInfo = Double.NaN;
     double minimumHweP;
@@ -126,8 +128,12 @@ final class CliOptions {
                     result.hweFilterScope = lower(value(arguments, ++index, option));
                 case "--min-maf" ->
                     result.minimumMaf = number(arguments, ++index, option);
+                case "--max-maf" ->
+                    result.maximumMaf = number(arguments, ++index, option);
                 case "--min-mac" ->
                     result.minimumMac = number(arguments, ++index, option);
+                case "--max-mac" ->
+                    result.maximumMac = number(arguments, ++index, option);
                 case "--max-marker-missing" ->
                     result.maximumMissingRate = number(arguments, ++index, option);
                 case "--min-info" ->
@@ -158,7 +164,9 @@ final class CliOptions {
         if (threads < 1 || checkpointEvery < 1)
             throw new IllegalArgumentException(
                 "--threads and --checkpoint-every must be positive");
-        if (minimumMaf < 0 || minimumMaf > 0.5 || minimumMac < 0
+        if (minimumMaf < 0 || maximumMaf > 0.5
+                || minimumMaf > maximumMaf || minimumMac < 0
+                || minimumMac > maximumMac
                 || maximumMissingRate < 0 || maximumMissingRate > 1
                 || minimumHweP < 0 || minimumHweP > 1)
             throw new IllegalArgumentException("filter thresholds are invalid");

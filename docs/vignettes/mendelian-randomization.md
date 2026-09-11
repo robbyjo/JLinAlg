@@ -6,6 +6,9 @@
 
 For a single workflow connecting CLI preparation through diagnostics and
 figures, start with the [end-to-end MR vignette](mr-end-to-end.md).
+New command-line users may prefer the gentler
+[CLI-only MR tutorial](cli-mr-tutorial.md), which begins with public and custom
+GWAS files and names every intermediate and output file.
 
 ## Find and prepare instruments from the CLI
 

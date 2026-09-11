@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A CLI-only Mendelian-randomization tutorial from GWAS discovery and custom columns through LD clumping, harmonization, analysis, and output files.">
+  <title>CLI Mendelian randomization tutorial &middot; JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI MR tutorial</span></div><h1>From GWAS download to MR results.</h1><p>A file-by-file workflow for public or custom instruments, ancestry-matched LD clumping, automatic allele harmonization, diagnostics, and auditable outputs.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>Design first</strong>Record the exposure, outcome, units, ancestry, genome build, covariates, sample sizes, overlap, and licenses before downloading data. Exposure p-values select instruments; outcome p-values must not.</div>
+
+<h2 id="discover">1. Find a public exposure GWAS</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>GWAS Catalog</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-instruments search &#92;
+  --trait "body mass index" --limit 20
+
+java -jar jlinalg-&lt;version&gt;.jar mr-instruments download &#92;
+  --study GCST00000000 --out bmi-candidates.tsv --p-threshold 5e-8</code></pre></div>
+<p>Replace the fictitious accession. Review its exact phenotype, ancestry, sample description, genome build, full-summary availability, and license. Downloading selects candidates; it does not establish LD independence.</p>
+
+<h2 id="custom">2. Format your own instruments</h2>
+<p>A candidate row needs SNP, exposure beta, SE, effect allele, other allele, and p-value. EAF is optional but strongly recommended. Normalized output columns are:</p>
+<pre><code>Phenotype SNP beta se eaf effect_allele other_allele pval
+units ncase ncontrol samplesize gene</code></pre>
+<p>CSV, TSV, and gzip-compressed forms are accepted. Common names are detected. For unusual columns, map canonical target names to source names:</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Custom GWAS/QTL</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-instruments format &#92;
+  --input my-exposure.csv.gz --out exposure-candidates.tsv &#92;
+  --trait "LDL cholesterol" --p-threshold 5e-8 &#92;
+  --map SNP=MarkerName,beta=Effect,se=StdErr,eaf=Freq1,effect_allele=Allele1,other_allele=Allele2,pval=Pvalue</code></pre></div>
+<p>The direction is <code>TARGET=SOURCE</code>. Add <code>--effect-scale odds-ratio</code> or <code>hazard-ratio</code> when Effect is a ratio; JLinAlg converts it to a log effect. A list containing only rsIDs is insufficient: join exposure beta, SE, alleles, and preferably EAF first.</p>
+
+<h2 id="ld">3. Install an ancestry-matched LD panel</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>LD reference</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar ld-db list
+java -jar jlinalg-&lt;version&gt;.jar ld-db download &#92;
+  --database 1000g-phase3 --location D:&#92;reference&#92;1000g-phase3</code></pre></div>
+<p>The package offers AFR, AMR, EAS, EUR, and SAS panels. Match the exposure study; EUR being the default is not scientific justification.</p>
+
+<h2 id="clump">4. LD-clump the exposure</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Independent instruments</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar clump &#92;
+  --database D:&#92;reference&#92;1000g-phase3 --population EUR &#92;
+  --instrument exposure-candidates.tsv --clump-kb 10000 &#92;
+  --ld-threshold 0.001 --p-threshold 1 --output exposure-clumped.tsv</code></pre></div>
+<p>The output preserves original columns and order. Variants absent from the panel are excluded; large losses suggest a build, ancestry, or identifier mismatch. Use <code>--snp-column</code>, <code>--pval-column</code>, or <code>--id-column</code> for unusual files. Multiple exposure groups are clumped independently.</p>
+
+<h2 id="outcome">5. Prepare outcome associations</h2>
+<p>The outcome needs results for the clumped variants. Normalize it without an outcome-significance filter:</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Outcome table</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-instruments format &#92;
+  --input coronary-disease.tsv.gz --out outcome-mr.tsv &#92;
+  --trait "coronary artery disease" --p-threshold 1 &#92;
+  --map SNP=variant,beta=log_odds,se=standard_error,eaf=effect_af,effect_allele=effect_allele,other_allele=other_allele,pval=p_value</code></pre></div>
+<p>Resolve genome builds before MR. Allele harmonization is not liftover.</p>
+
+<h2 id="run">6. Run MR with automatic harmonization</h2>
+<p><code>mr-xwas</code> also handles one exposure and one outcome. It groups rows, intersects SNPs, harmonizes alleles, and estimates MR. A threshold of 1 retains the analyzable pair regardless of causal p-value.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>One complete CLI MR</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-xwas &#92;
+  --exposure exposure-clumped.tsv --outcome outcome-mr.tsv &#92;
+  --output bmi-cad-mr.tsv --p-threshold 1 &#92;
+  --screen-method random --threads 1 &#92;
+  --fdr-output bmi-cad-all-pairs.tsv &#92;
+  --follow-up-output bmi-cad-follow-up.tsv</code></pre></div>
+<p>Exposure input needs SNP, beta, SE, effect/other allele and <code>id.exposure</code>, <code>gene</code>, or <code>Phenotype</code>. Outcome needs the same association fields and <code>id.outcome</code> or <code>Phenotype</code>. Override custom grouping fields with <code>--exposure-id-column</code> and <code>--outcome-id-column</code>. EAF helps resolve palindromic alleles.</p>
+<p>For many traits, combine normalized rows into two long tables, clump each exposure once, increase threads, and set exactly one p, log10(p), or -log10(p) threshold.</p>
+
+<h2 id="outputs">7. Read every output</h2>
+<ul><li><code>bmi-cad-mr.tsv</code>: retained pairs, IVW estimate/SE/p/CI, heterogeneity, mean F, Egger, weighted median, exclusions, and warnings.</li><li><code>bmi-cad-mr.failures.tsv</code>: always written; identifies diagnostic failures.</li><li><code>bmi-cad-all-pairs.tsv</code>: every successful screen plus <code>threshold_passed</code> and BH <code>fdr_bh</code> over the complete analyzable family.</li><li><code>bmi-cad-follow-up.tsv</code>: optional hit-only RAPS, contamination-mixture, and PRESSO-style results.</li></ul>
+<p>Pairs with fewer than three harmonized instruments have no full diagnostic fit. Inspect exclusions and failures before treating an empty result as a null finding.</p>
+
+<h2 id="harmonized">8. If a table is already harmonized</h2>
+<pre><code>variant_id beta_exposure se_exposure beta_outcome se_outcome
+rs101      0.08          0.02        0.03         0.01</code></pre>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Estimator-only command</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mr-estimate --input harmonized.tsv &#92;
+  --method all --output mr-estimates.tsv --plot mr-scatter.svg</code></pre></div>
+<p>The output has method, estimate, standard error, causal p-value, confidence limits, and instrument count. <code>mr-estimate</code> assumes outcome effects already point to the exposure effect allele; because its input has no alleles, it cannot detect a flip. Use <code>mr-xwas</code> for separate unharmonized files.</p>
+
+<h2 id="interpret">9. Interpretation checklist</h2>
+<ul><li>Interpret strength, heterogeneity, Egger intercept, robust estimates, and leave-one-out behavior together.</li><li>Record harmonization exclusions and variants missing from the LD panel.</li><li>Exponentiate only a log-odds or log-hazard outcome estimate and state the exposure unit.</li><li>Reverse MR is a second prespecified analysis with independently selected instruments.</li><li>Colocalization tests regional sharing; it does not prove causality.</li></ul>
+<div class="next-links"><a href="cli-susie-tutorial.html"><small>Next</small><strong>CLI SuSiE fine mapping &rarr;</strong></a><a href="mendelian-randomization.html"><small>Details</small><strong>MR methods vignette &rarr;</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#discover">Discover GWAS</a><a href="#custom">Custom columns</a><a href="#ld">LD reference</a><a href="#clump">Clump</a><a href="#outcome">Outcome</a><a href="#run">Run MR</a><a href="#outputs">Outputs</a><a href="#harmonized">Harmonized input</a><a href="#interpret">Interpretation</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>

@@ -216,6 +216,11 @@ tasks.register('checkWebsite') {
             'verification.html',
             'vignettes/index.html',
             'vignettes/command-line.html',
+            'vignettes/cli-association-tutorial.html',
+            'vignettes/cli-mediation-tutorial.html',
+            'vignettes/cli-mr-tutorial.html',
+            'vignettes/cli-susie-tutorial.html',
+            'vignettes/cli-colocalization-tutorial.html',
             'vignettes/linear-models.html',
             'vignettes/basic-statistical-tests.html',
             'vignettes/nonlinear-models.html',
@@ -247,6 +252,11 @@ tasks.register('checkWebsite') {
 
         List<String> cliExamplePages = [
             'vignettes/command-line.html',
+            'vignettes/cli-association-tutorial.html',
+            'vignettes/cli-mediation-tutorial.html',
+            'vignettes/cli-mr-tutorial.html',
+            'vignettes/cli-susie-tutorial.html',
+            'vignettes/cli-colocalization-tutorial.html',
             'vignettes/linear-models.html',
             'vignettes/beta-regression.html',
             'vignettes/penalized-regression.html',

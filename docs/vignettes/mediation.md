@@ -4,6 +4,10 @@
 three ordinary least-squares fits. It does not use bootstrap resampling,
 Monte Carlo draws, or posterior sampling.
 
+The [CLI-only mediation tutorial](cli-mediation-tutorial.md) gives complete
+tabular examples for ordinary, grouped-REML, and pedigree mediation, including
+missing-row handling and output interpretation.
+
 ## Model
 
 For treatment `X`, mediator `M`, outcome `Y`, and optional covariates `C`, the

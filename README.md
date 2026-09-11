@@ -71,7 +71,8 @@ No system Gradle installation is needed.
 The [command-line-only workflow guide](docs/vignettes/command-line.md) covers
 phenotype-only and omics scans, OLS/GLM/LMM/GLMM routing, pedigrees, family
 qualifiers, singleton families, GRMs, genotype inputs, Cox regression, and
-specialized regression/MR subcommands without requiring Java API code.
+specialized regression, mediation, MR, SuSiE, and colocalization subcommands
+without requiring Java API code.
 The corresponding model vignettes also begin with copy-pasteable CLI-only
 examples and label later capabilities that remain Java-only.
 
@@ -204,6 +205,16 @@ randomization, meta-analysis/meta-regression, time series, SuSiE, and SEM. Each
 vignette explains input layout, result interpretation, performance choices,
 and estimator limitations rather than presenting code without its statistical
 contract.
+
+CLI users can begin with the
+[progressive association tutorial](docs/vignettes/cli-association-tutorial.md),
+then continue to the standalone
+[mediation](docs/vignettes/cli-mediation-tutorial.md),
+[Mendelian-randomization](docs/vignettes/cli-mr-tutorial.md),
+[SuSiE](docs/vignettes/cli-susie-tutorial.md), and
+[colocalization](docs/vignettes/cli-colocalization-tutorial.md) tutorials.
+These pages specify file layouts, exact commands, generated files, and the
+boundary between CLI-exposed and Java-only APIs.
 
 The [regression families vignette](docs/vignettes/regression-families.md)
 covers the deterministic multivariate OLS, multinomial logistic, quantile,

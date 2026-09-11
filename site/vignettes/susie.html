@@ -3,6 +3,7 @@
 <div class="container page-layout"><article class="prose">
 <div class="note"><strong>v0.3.0 audit update</strong>Coloc retains disjoint and tiny evidence support and applies shared weights to conditional SNP posteriors. SuSiE validates covariance and preserves the residual variance used by the returned fit. Large negative ELBO changes no longer count as convergence; fresh package-speed parity is not claimed. <a href="https://github.com/robbyjo/JLinAlg/blob/v0.3.0/docs/vignettes/susie-and-sem.md">Updated guide and evidence →</a></div>
 <div class="note"><strong>Validated and benchmarked</strong>On susieR's 574-by-1,001 N3finemapping vignette data, PIPs and coefficients match within 2e-10 and JLinAlg's portable CPU path is 4.83 times faster on the documented host.</div>
+<div class="note"><strong>CLI-only workflows</strong>Use the <a href="cli-susie-tutorial.html">SuSiE tutorial</a> for summary statistics plus LD, then the <a href="cli-colocalization-tutorial.html">colocalization tutorial</a> for the generated effect sidecars.</div>
 <h2 id="options">Set the single-effect model</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>SuSiE controls</span></div><pre><code>SusieOptions options = new SusieOptions(
     5,      // maximum effects L
     200,    // iterations

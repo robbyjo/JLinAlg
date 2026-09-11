@@ -208,7 +208,9 @@ final class AnalysisRunner {
             VariableMissingPolicy.MEAN_IMPUTE);
         VariantFilterOptions filters = VariantFilterOptions.builder()
             .minimumMaf(options.minimumMaf)
+            .maximumMaf(options.maximumMaf)
             .minimumMac(options.minimumMac)
+            .maximumMac(options.maximumMac)
             .maximumMissingRate(options.maximumMissingRate)
             .minimumImputationQuality(options.minimumInfo)
             .build();

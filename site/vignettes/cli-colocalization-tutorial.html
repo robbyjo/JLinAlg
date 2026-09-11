@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="CLI-only multi-signal colocalization from SuSiE effect files through priors, H0-H4, shared-variant posteriors, and sensitivity checks.">
+  <title>CLI colocalization tutorial &middot; JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI colocalization</span></div><h1>Ask whether two regional signals are shared.</h1><p>Fine-map each trait, intersect credible-effect evidence safely, and report signal-level H0-H4 with H4-conditional shared variants.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>Colocalization is not MR</strong>It tests whether association signals in a region appear to share a causal variant. It neither estimates nor proves a causal effect between traits.</div>
+
+<h2 id="prepare">1. Fine-map both traits</h2>
+<p>Use the same genome build, explicit allele alignment, a common defensible locus, and an appropriate LD matrix for each trait.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Two converged SuSiE fits</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar susie &#92;
+  --summary expression-locus.tsv --ld expression-ld.tsv &#92;
+  --sample-size 1200 --effects 10 --out expression-susie.tsv
+
+java -jar jlinalg-&lt;version&gt;.jar susie &#92;
+  --summary disease-locus.tsv --ld disease-ld.tsv &#92;
+  --sample-size 85000 --effects 10 --out disease-susie.tsv</code></pre></div>
+<p>Require convergence in both logs. The inputs below are the generated <code>*.effects.tsv</code> files.</p>
+
+<h2 id="input">2. Understand the long input</h2>
+<pre><code>effect_index  variant_id  log_bayes_factor
+1             rs1001      15.22
+1             rs1002       4.01
+1             rs1003      -0.30</code></pre>
+<p>A custom CSV/TSV may use aliases <code>effect</code>, SNP/rsid, and lbf/logbf. Every effect within one file must contain the same unique variant set. The two traits may differ: exact variant IDs are intersected in trait-1 order. Coordinates or alleles are never guessed.</p>
+
+<h2 id="run">3. Run colocalization</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Default coloc.susie priors</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar coloc &#92;
+  --trait1 expression-susie.tsv.effects.tsv &#92;
+  --trait2 disease-susie.tsv.effects.tsv &#92;
+  --out expression-disease-coloc.csv</code></pre></div>
+<p>Defaults are p1=1e-4, p2=1e-4, p12=5e-6, and minimum common-variant posterior overlap 0.5. Specify sensitivity runs with <code>--trait1-prior</code>, <code>--trait2-prior</code>, <code>--shared-prior</code>, and <code>--minimum-overlap</code>. <code>--no-trim</code> evaluates low-overlap pairs for diagnosis; it does not repair coverage.</p>
+
+<h2 id="outputs">4. Read the outputs</h2>
+<ol><li>The main file has one retained signal pair per row, source effect indices, common count, lead variants, and <code>posterior_h0</code> through <code>posterior_h4</code>.</li><li><code>OUT.variants.tsv</code> has each common variant's <code>posterior_shared_given_h4</code> for each pair.</li><li><code>OUT.log</code> records inputs, signal counts, common variants, retained/skipped pairs, priors, overlap control, and paths.</li></ol>
+<p>Use <code>--variant-output</code> and <code>--log</code> for explicit names. Output suffix controls delimiter; existing files require <code>--overwrite</code>.</p>
+
+<h2 id="interpret">5. Interpret H0-H4</h2>
+<ul><li>H0: neither trait is associated.</li><li>H1/H2: only trait 1/trait 2 is associated.</li><li>H3: both are associated with distinct causal variants.</li><li>H4: both are associated and share a causal variant.</li></ul>
+<p>The five values sum to one for a signal pair. The variant posterior is conditional on H4: a 0.90 shared-variant posterior is not an unconditional 90% claim when H4 is 0.05. Report both.</p>
+
+<h2 id="sensitivity">6. Diagnose and vary assumptions</h2>
+<p>Inspect common variants and skipped pairs. Heavy trimming usually signals mismatched coverage or a signal outside the overlap. Repeat prespecified plausible priors and appropriate LD/locus choices. For an MR/xWAS follow-up, report the MR estimate separately from H3/H4, priors, common count, skipped pairs, and leading conditional-H4 variants.</p>
+<div class="next-links"><a href="colocalization.html"><small>Methods</small><strong>Algorithm and R validation &rarr;</strong></a><a href="cli-mr-tutorial.html"><small>Related workflow</small><strong>CLI MR tutorial &rarr;</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#prepare">Fine-map traits</a><a href="#input">Input</a><a href="#run">Run coloc</a><a href="#outputs">Outputs</a><a href="#interpret">H0-H4</a><a href="#sensitivity">Sensitivity</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>

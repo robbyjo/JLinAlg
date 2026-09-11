@@ -227,6 +227,45 @@ class JLinAlgCliTest {
     }
 
     @Test
+    void maximumMafSelectsRareVariantsAndReportsFilteredCommonVariants()
+            throws Exception {
+        Path phenotype = temporaryDirectory.resolve("rare-pheno.tsv");
+        Path variants = temporaryDirectory.resolve("rare-variants.tsv");
+        Path output = temporaryDirectory.resolve("rare-scan.tsv");
+        Files.writeString(phenotype,
+            "IID\ty\tage\n"
+            + "S1\t1.0\t20\nS2\t2.2\t25\nS3\t1.7\t30\n"
+            + "S4\t3.5\t35\nS5\t2.8\t40\nS6\t4.4\t45\n"
+            + "S7\t3.9\t50\nS8\t5.3\t55\nS9\t4.8\t60\n"
+            + "S10\t6.1\t65\n");
+        Files.writeString(variants,
+            "id\tchr\tposition\tref\talt\tS1\tS2\tS3\tS4\tS5\tS6\tS7\tS8\tS9\tS10\n"
+            + "rs100\t1\t100\tA\tG\t0\t0\t0\t1\t0\t0\t0\t0\t0\t0\n"
+            + "rs200\t1\t200\tC\tT\t0\t1\t2\t0\t1\t2\t0\t1\t2\t1\n");
+
+        int status = JLinAlgCli.run(new String[] {
+            "--omics", variants.toString(), "--pheno", phenotype.toString(),
+            "--id", "IID", "--formula", "y ~ age + <omics>",
+            "--max-maf", "0.1", "--max-mac", "2",
+            "--threads", "1", "--block-size", "1",
+            "--out", output.toString()
+        });
+
+        assertEquals(0, status);
+        DelimitedData result = DelimitedData.read(output);
+        String[] rare = result.rows().stream()
+            .filter(row -> row[result.column("id")].equals("rs100"))
+            .findFirst().orElseThrow();
+        String[] common = result.rows().stream()
+            .filter(row -> row[result.column("id")].equals("rs200"))
+            .findFirst().orElseThrow();
+        assertEquals("ok", rare[result.column("status")]);
+        assertEquals("filtered", common[result.column("status")]);
+        assertTrue(common[result.column("filter_reason")]
+            .contains("ABOVE_MAXIMUM_MAF"));
+    }
+
+    @Test
     void grmSelectsRemlAndAlignsThroughIndividualId() throws Exception {
         Path phenotype = temporaryDirectory.resolve("repeated.tsv");
         Path grm = temporaryDirectory.resolve("grm.tsv");

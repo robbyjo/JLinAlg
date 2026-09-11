@@ -4,6 +4,10 @@ Colocalization asks whether two association signals in the same region are
 best explained by one shared causal variant. It is a follow-up to fine mapping
 or cis-MR, not evidence that one trait causes the other.
 
+The [CLI-only colocalization tutorial](cli-colocalization-tutorial.md) starts
+with the effect sidecars written by the `susie` command and follows them
+through tabular H0-H4 and conditional shared-variant outputs.
+
 ## Align the inputs
 
 Fit each trait with variants from the same genome build and ancestry-matched

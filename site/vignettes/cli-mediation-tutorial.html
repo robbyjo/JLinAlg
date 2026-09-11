@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="CLI-only Gaussian mediation with numeric covariates, grouped REML, pedigree relatedness, singleton handling, and Sobel inference.">
+  <title>CLI mediation tutorial &middot; JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI mediation</span></div><h1>Five mediation effects, one common sample.</h1><p>Fit Gaussian OLS, grouped-REML, or pedigree-REML mediation from an observation table using only the executable JAR.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="model">1. State the model</h2>
+<pre><code>M = intercept + a X + alpha C + error
+Y = intercept + direct X + b M + gamma C + error
+Y = intercept + total X + delta C + error
+indirect = a * b</code></pre>
+<p>The input is observation-by-variable CSV/TSV. Outcome Y, treatment X, mediator M, and selected covariates must be numeric. Encode categorical covariates as numeric indicators; do not add an intercept.</p>
+<pre><code>sample_id,treatment,mediator,outcome,age,sex01,subject
+O001,0.2,1.1,2.8,51,0,P001
+O002,0.8,1.7,3.9,48,1,P002
+O003,1.1,2.2,4.7,61,0,P003</code></pre>
+
+<h2 id="ols">2. Ordinary mediation</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Gaussian OLS mediation</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mediation --input mediation.csv &#92;
+  --outcome outcome --treatment treatment --mediator mediator &#92;
+  --covariates age,sex01 --confidence 0.95 &#92;
+  --out mediation-effects.csv</code></pre></div>
+<p>One complete-case sample is used for all three component fits. Missing outcome, treatment, mediator, or selected covariate rows are omitted and counted.</p>
+
+<h2 id="effects">3. Read the five effects</h2>
+<ul><li><code>a</code>: treatment to mediator.</li><li><code>b</code>: mediator to outcome adjusted for treatment.</li><li><code>indirect</code>: product a x b.</li><li><code>direct</code>: treatment effect in the outcome model containing M.</li><li><code>total</code>: treatment effect in the outcome model without M.</li></ul>
+<p>Each row reports estimate, SE, statistic, p-value, confidence limits, and degrees of freedom. The indirect SE is the first-order Sobel value <code>sqrt(b^2 Var(a) + a^2 Var(b))</code> with normal inference. There is no bootstrap, simulation, or posterior sampling.</p>
+
+<h2 id="groups">4. Repeated observations and clusters</h2>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Grouped REML mediation</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mediation --input repeated.tsv &#92;
+  --outcome outcome --treatment treatment --mediator mediator &#92;
+  --covariates age,sex01 --group subject &#92;
+  --out mediation-subject-reml.tsv</code></pre></div>
+<p>The same sparse random-intercept structure enters all three component models. Repeat <code>--group</code> or pass comma-separated columns for multiple independent random intercepts. Check <code>converged=true</code> in the log.</p>
+
+<h2 id="pedigree">5. Pedigree mediation</h2>
+<p>The analysis table supplies a repeatable subject key; the pedigree supplies members and two parents:</p>
+<pre><code>observation,subject,treatment,mediator,outcome,age
+O101,1001,0.2,1.1,2.8,51
+O102,1002,0.8,1.7,3.9,48
+O103,1003,1.1,2.2,4.7,29
+O104,1003,1.3,2.5,5.0,31
+O105,9009,0.5,1.4,3.3,44
+
+family_id,member_id,parent1_id,parent2_id
+F10,1001,0,0
+F10,1002,0,0
+F10,1003,1001,1002</code></pre>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree REML mediation</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar mediation --input mediation-pedigree.csv &#92;
+  --outcome outcome --treatment treatment --mediator mediator &#92;
+  --covariates age --individual-id subject &#92;
+  --pedigree pedigree.csv --pedigree-id member_id &#92;
+  --sire-id parent1_id --dam-id parent2_id &#92;
+  --out mediation-pedigree.tsv</code></pre></div>
+<p>Blank, NA, 0, <code>.</code>, and -9 parent values mean unknown. If the family column is used, known analysis IDs must be qualified as <code>family_id:member_id</code>, such as <code>F10:1003</code>; omit it when IDs are globally unique.</p>
+<p>Subject 9009 is absent from the pedigree, so it becomes a reported unrelated singleton. Repeated rows with the same absent ID share one founder and random effect. Add ordinary effects such as <code>--group clinic</code> alongside pedigree relatedness when needed.</p>
+
+<h2 id="outputs">6. Outputs and interpretation</h2>
+<p><code>--out mediation-effects.csv</code> writes the five-row result and <code>mediation-effects.csv.log</code>. The log records model type, variables, covariates/groups, input and retained rows, pedigree singleton counts, confidence, backend, and convergence. Output suffix controls CSV versus TSV; existing files require <code>--overwrite</code>.</p>
+<div class="note warning"><strong>Causal assumptions remain scientific assumptions</strong>Assess treatment-outcome, treatment-mediator, and mediator-outcome confounding, temporal order, measurement error, and model form. Sobel inference assumes zero cross-model covariance between a and b. This is not a correlated-equation, random-slope, or general multilevel causal mediation model.</div>
+<div class="next-links"><a href="mediation.html"><small>Methods</small><strong>Mediation API and validation &rarr;</strong></a><a href="cli-association-tutorial.html"><small>Broader workflow</small><strong>CLI association tutorial &rarr;</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#model">Model and input</a><a href="#ols">OLS</a><a href="#effects">Effects</a><a href="#groups">Grouped REML</a><a href="#pedigree">Pedigree</a><a href="#outputs">Outputs</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>

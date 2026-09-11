@@ -39,6 +39,13 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("mr-estimate"))
             return MrEstimatorCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && (arguments[0].equals("susie")
+                || arguments[0].equals("coloc")))
+            return FineMappingCli.run(arguments[0], Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mediation"))
+            return MediationCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && (arguments[0].equals("beta-regression")
                 || arguments[0].equals("penalized-regression")))
             return RegressionCli.run(arguments[0], Arrays.copyOfRange(
@@ -145,6 +152,12 @@ public final class JLinAlgCli {
                  ivw-generalized-fixed|ivw-generalized-random|egger-generalized|
                  overlap-aware|conditional|all] [--ld MATRIX]
                 [--sampling-covariance FILE] [--output FILE] [--plot FILE]
+              java -jar jlinalg-<version>.jar susie --summary FILE --ld FILE
+                --sample-size N --out FILE
+              java -jar jlinalg-<version>.jar coloc --trait1 FILE
+                --trait2 FILE --out FILE
+              java -jar jlinalg-<version>.jar mediation --input FILE
+                --outcome Y --treatment X --mediator M --out FILE
               java -jar jlinalg-<version>.jar beta-regression --input FILE
                 --response COLUMN [--mean COLUMNS] [--precision COLUMNS]
               java -jar jlinalg-<version>.jar penalized-regression --input FILE
@@ -196,7 +209,8 @@ public final class JLinAlgCli {
               --overwrite
 
             Filtering and processing:
-              --min-maf X --min-mac X --max-marker-missing X --min-info X
+              --min-maf X --max-maf X --min-mac X --max-mac X
+              --max-marker-missing X --min-info X
               --transform SPEC             Row-wise <omics> stages, left to right
                 Built-ins: identity(), winsor(...), winsor_mad(k=4),
                 log1p(), log(offset=...), zscore(), int(), mvalue(epsilon=...)

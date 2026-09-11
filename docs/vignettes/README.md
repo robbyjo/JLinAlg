@@ -15,6 +15,11 @@ Run the complete verification suite before adapting an example:
 
 | Vignette | Features covered |
 | --- | --- |
+| [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
+| [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |
+| [CLI-only Mendelian-randomization tutorial](cli-mr-tutorial.md) | public or custom GWAS inputs, canonical columns, LD-panel installation, clumping, harmonization, estimation, and outputs |
+| [CLI-only SuSiE tutorial](cli-susie-tutorial.md) | summary statistics plus labeled or ordered LD, fine-mapping controls, PIPs, credible sets, and diagnostics |
+| [CLI-only colocalization tutorial](cli-colocalization-tutorial.md) | two SuSiE effect tables, priors, overlap trimming, H0-H4, conditional shared-variant posteriors, and sensitivity checks |
 | [Command-line-only workflows](command-line.md) | phenotype-only and omics OLS/GLM, exact LMM/GLMM, pedigree/GRM matching, family-qualified and singleton IDs, genotype scans, Cox, and operational controls |
 | [Basic statistical tests](basic-statistical-tests.md) | unit-safe correlation/mean/variance inference, exact/asymptotic rank tests, tables, blocked designs, and ANOVA power |
 | [Nonlinear models](nonlinear-models.md) | analytic Gaussian fixed means, additive mixed effects, sparse pedigree structures |

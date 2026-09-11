@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A gentle CLI-only JLinAlg tutorial from phenotype OLS and REML through omics, GWAS, pedigree, GLMM, Cox, ridge, lasso, and elastic net.">
+  <title>CLI association tutorial &middot; JLinAlg</title>
+  <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script>
+</head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>CLI association tutorial</span></div><h1>Start with one phenotype. Build toward xWAS.</h1><p>A gentle executable-JAR workflow for OLS, exact REML, numeric omics, common and rare variants, pedigree, GLM/GLMM, survival, and regularization.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>No Java code is required</strong>Replace <code>jlinalg-&lt;version&gt;.jar</code> with the downloaded filename. Start a new analysis with <code>--dry-run</code>; use <code>--explain</code> to print routing and continue fitting.</div>
+
+<h2 id="phenotype">1. Begin with a phenotype file</h2>
+<p>A phenotype CSV/TSV has one observation per row. The <code>--id</code> column must be unique and later matches omics sample headers.</p>
+<pre><code>sample_id,BMI,Sex,Age,clinic
+S001,24.8,F,52,A
+S002,31.1,M,60,A
+S003,27.5,F,47,B
+S004,29.0,M,55,B</code></pre>
+<h3>Phenotype-only OLS</h3>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>OLS</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --id sample_id &#92;
+  --formula "BMI ~ Sex + Age" --model ols --out bmi-ols.csv</code></pre></div>
+<p>Rows missing BMI, Sex, or Age are omitted jointly and counted. A <code>.csv</code> result is comma-separated; <code>.tsv</code> and other suffixes use tabs. The run also writes <code>bmi-ols.csv.log</code> and <code>bmi-ols.csv.manifest.json</code>.</p>
+<h3>Phenotype-only REML</h3>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Exact mixed model</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --id sample_id &#92;
+  --formula "BMI ~ Sex + Age + (1|clinic)" --model lmm &#92;
+  --variance-components refit --df satterth --out bmi-clinic-reml.csv</code></pre></div>
+<p>This is a likelihood-based Gaussian mixed model with variance components estimated by REML, not P3D/EMMAX. <code>--df kr</code> requests Kenward-Roger inference.</p>
+
+<h2 id="omics">2. Add numeric omics</h2>
+<p>Expression, methylation, protein, and generic numeric matrices are feature-by-sample. The first column is the feature ID; every remaining header is a sample ID.</p>
+<pre><code>gene_id,S001,S002,S003,S004
+GENE_A,5.2,5.7,4.9,5.1
+GENE_B,2.0,2.4,2.2,NA</code></pre>
+<p>JLinAlg intersects and reorders omics and phenotype IDs automatically and reports every alignment count.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Omics OLS</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
+  --id sample_id --omics-type expression &#92;
+  --formula "BMI ~ Sex + Age + &lt;omics&gt;" --model ols &#92;
+  --transform "&lt;omics&gt; = winsor_mad(k=4) | zscore()" &#92;
+  --threads 8 --block-size auto --out bmi-expression-ols.csv</code></pre></div>
+<p>Each feature replaces <code>&lt;omics&gt;</code>. Filtering and alignment occur before row-wise transformation; missing feature values are mean-imputed for the fit. Annotation can be appended with <code>--annot genes.tsv --annot-id gene_id --annot-cols symbol,chr</code>.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Omics exact REML</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
+  --id sample_id --omics-type expression &#92;
+  --formula "BMI ~ Sex + Age + &lt;omics&gt; + (1|clinic)" &#92;
+  --model lmm --variance-components refit --df satterth &#92;
+  --transform "&lt;omics&gt; = winsor_mad(k=4)" --out bmi-expression-reml.csv</code></pre></div>
+<p>For non-genotype omics, <code>--variance-components auto</code> also selects an exact per-feature lmer-like REML refit.</p>
+
+<h2 id="common-gwas">3. Common-variant GWAS</h2>
+<p>Accepted inputs are VCF, VCF.gz, BCF, BGEN layout 2, and additive-dosage CSV/TSV. VCF/BCF prefers FORMAT/DS and falls back to GT; multiallelic records produce one row per ALT. BGEN supports layout-2 zlib, zstd, or uncompressed blocks; add <code>--sample-file</code> when IDs are external.</p>
+<pre><code>id,chromosome,position,ref,alt,S001,S002,S003,S004
+rs100,1,101001,A,G,0,1,2,1</code></pre>
+<p>A compact delimited matrix may contain only <code>id</code> then sample columns. Dosages are ALT counts in [0,2]; blank, <code>.</code>, <code>NA</code>, <code>N/A</code>, <code>null</code>, and <code>NaN</code> mean missing. Set <code>--omics-type gwas</code> if IDs do not make a delimited genotype file recognizable.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Common variants</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics cohort.vcf.gz &#92;
+  --id sample_id --formula "BMI ~ Sex + Age + PC1 + PC2 + &lt;omics&gt;" &#92;
+  --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --min-info 0.8 &#92;
+  --threads 16 --block-size auto --out bmi-gwas.csv</code></pre></div>
+<p>Excluded variants remain auditable with <code>status=filtered</code> and a reason. Add a labeled dense GRM or GCTA prefix for a genotype LMM. That high-throughput genotype path uses one REML null model and P3D/EMMAX score tests; this is intentionally different from numeric-omics per-feature REML.</p>
+
+<h2 id="rare-gwas">4. Rare-variant GWAS</h2>
+<p>For a single-marker rare scan, add an upper MAF or MAC threshold:</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Rare single variants</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics cohort.bgen &#92;
+  --sample-file cohort.sample --id sample_id --omics-type gwas &#92;
+  --formula "BMI ~ Sex + Age + PC1 + PC2 + &lt;omics&gt;" &#92;
+  --max-maf 0.01 --min-mac 3 --max-mac 40 &#92;
+  --max-marker-missing 0.02 --out bmi-rare-single-variant.tsv</code></pre></div>
+<div class="note warning"><strong>Single marker is not a set test</strong>JLinAlg implements Burden, SKAT, and SKAT-O in the Java API, but gene/set-membership CLI input is not yet exposed. Do not label this upper-MAF scan as SKAT or a gene-based result.</div>
+
+<h2 id="pedigree">5. Pedigree, one identifier at a time</h2>
+<p>There may be three IDs: an <strong>omics ID</strong> for a measured sample, a repeatable <strong>subject ID</strong> for an individual, and the <strong>pedigree ID</strong> that names that subject in the ancestry file.</p>
+<p>The phenotype file contains both omics and subject IDs:</p>
+<pre><code>omics_id,subject_id,BMI,Sex,Age,visit
+OM9001,1001,24.8,F,52,1
+OM9002,1002,31.1,M,60,1
+OM9003,1003,27.5,F,28,1
+OM9004,1003,28.0,F,30,2
+OM9005,9009,26.2,M,44,1</code></pre>
+<p>The omics matrix headers are OM9001 through OM9005, so <code>--id omics_id</code>. The pedigree file names subjects:</p>
+<pre><code>family_id,member_id,parent1_id,parent2_id
+F10,1001,0,0
+F10,1002,0,0
+F10,1003,1001,1002</code></pre>
+<ul><li><code>--individual-id subject_id</code> chooses the phenotype-to-pedigree key.</li><li><code>--pedigree-id member_id</code> identifies the member row.</li><li><code>--sire-id parent1_id</code> and <code>--dam-id parent2_id</code> identify the two parents; the historical option names remain.</li><li><code>--pedigree-family-id family_id</code> is optional and qualifies IDs that repeat between families.</li></ul>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree omics REML</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
+  --id omics_id --individual-id subject_id &#92;
+  --formula "BMI ~ Sex + Age + &lt;omics&gt; + (1|subject_id)" &#92;
+  --pedigree pedigree.csv --pedigree-id member_id &#92;
+  --sire-id parent1_id --dam-id parent2_id &#92;
+  --out bmi-pedigree-expression.csv</code></pre></div>
+<p>The pedigree term must use the phenotype matching-column name, <code>(1|subject_id)</code>, not the omics ID or the pedigree file's column name. Blank, NA, 0, <code>.</code>, and -9 parents mean unknown. Pedigree members without phenotypes remain useful ancestors.</p>
+<p>Subject 9009 is absent from this pedigree, so JLinAlg adds it as an unrelated singleton and reports it on screen, in the log, and in the manifest. Repeated observations with the same absent subject ID share one singleton family and random effect.</p>
+<div class="note warning"><strong>Family-qualified IDs</strong>When <code>--pedigree-family-id</code> is used, known phenotype IDs must be written as <code>family_id:member_id</code>, such as <code>F10:1003</code>. Raw <code>1003</code> is a distinct ID and becomes a singleton. Omit the family option when member IDs are already globally unique.</div>
+
+<h2 id="glm">6. GLM and GLMM</h2>
+<p>Use <code>--family binomial</code> for a binary response, <code>poisson</code> for counts, and <code>gamma</code> for positive continuous responses. Gaussian is the default.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Binomial GLM</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
+  --id omics_id --formula "case_status ~ Sex + Age + &lt;omics&gt;" &#92;
+  --family binomial --case-value case --control-value control &#92;
+  --out disease-expression.csv</code></pre></div>
+<p>Without a random effect this is a GLM. Add <code>(1|clinic)</code>, a GRM, or a matching pedigree term for a first-order Laplace, glmer-like GLMM. Use <code>--link</code> only to override a supported family default. Genotype Laplace-GLMM scans are not currently exposed.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree binomial GLMM</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
+  --id omics_id --individual-id subject_id &#92;
+  --formula "case_status ~ Sex + Age + &lt;omics&gt; + (1|subject_id)" &#92;
+  --family binomial --case-value case --control-value control &#92;
+  --pedigree pedigree.csv --pedigree-id member_id &#92;
+  --sire-id parent1_id --dam-id parent2_id &#92;
+  --out disease-pedigree-expression.csv</code></pre></div>
+
+<h2 id="cox">7. Cox survival analysis</h2>
+<p>The phenotype needs follow-up time and an event flag. In <code>Surv(time,event)</code>, event zero is censored and one is observed.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Right-censored Cox</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno survival.csv --id sample_id &#92;
+  --formula "Surv(followup,event) ~ Sex + Age" &#92;
+  --model cox --ties efron --out survival-cox.csv</code></pre></div>
+<p>Add a GRM and <code>--individual-id</code> for Gaussian kinship frailty. Streamed omics Cox, start-stop data, formula frailty, and pedigree-correlated Cox remain Java-API features.</p>
+
+<h2 id="penalized">8. Ridge, lasso, and elastic net</h2>
+<p>Penalized regression consumes a numeric observation-by-column CSV/TSV. Predictors are standardized and an intercept is fitted by default.</p>
+<div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Regularized Gaussian models</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar penalized-regression --input predictors.csv &#92;
+  --response y --predictors x1,x2,x3 --model ridge &#92;
+  --lambda-grid 10,3,1,0.3,0.1 --cv-folds 5 --out ridge.tsv
+
+java -jar jlinalg-&lt;version&gt;.jar penalized-regression --input predictors.csv &#92;
+  --response y --predictors x1,x2,x3 --model lasso &#92;
+  --lambda-grid 1,0.3,0.1,0.03,0.01 --cv-folds 5 --out lasso.tsv
+
+java -jar jlinalg-&lt;version&gt;.jar penalized-regression --input predictors.csv &#92;
+  --response y --predictors x1,x2,x3 --model elastic-net --alpha 0.5 &#92;
+  --lambda-grid 1,0.3,0.1,0.03,0.01 --cv-folds 5 --out elastic-net.tsv</code></pre></div>
+<p>Ridge fixes alpha to 0, lasso fixes it to 1, and elastic net uses the supplied alpha. Use <code>--no-standardize</code> and <code>--no-intercept</code> deliberately. Classical p-values are not emitted for penalized coefficients because penalty selection and post-selection inference are separate tasks.</p>
+
+<h2 id="next">Continue from association to causal follow-up</h2>
+<div class="next-links"><a href="cli-mr-tutorial.html"><small>Next</small><strong>CLI Mendelian randomization &rarr;</strong></a><a href="command-line.html"><small>Reference</small><strong>All command options &rarr;</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#phenotype">Phenotype OLS/REML</a><a href="#omics">Numeric omics</a><a href="#common-gwas">Common GWAS</a><a href="#rare-gwas">Rare GWAS</a><a href="#pedigree">Pedigree</a><a href="#glm">GLM and GLMM</a><a href="#cox">Cox</a><a href="#penalized">Penalized</a></aside></div>
+</main><site-footer root="../"></site-footer></body>
+</html>
