@@ -209,7 +209,8 @@ Tell JLinAlg what each pedigree column means:
 - `--pedigree-id member_id`: the individual represented by this row.
 - `--sire-id parent1_id`: parent 1; the historical option name is retained.
 - `--dam-id parent2_id`: parent 2.
-- `--pedigree-family-id family_id`: optional family qualifier.
+- `--pedigree-family-id family_id`: optional duplicate-ID disambiguator; it
+  does not define the ancestry groups.
 - `--individual-id subject_id`: phenotype column matched to pedigree members.
 
 The formula pedigree term must use the phenotype matching-column name,
@@ -231,12 +232,19 @@ unrelated singleton and reports this on screen, in the log, and in the
 manifest. Repeated phenotype rows with the same absent subject ID share one
 singleton family and random effect.
 
-Use `--pedigree-family-id` only if member IDs repeat between families. When
-it is used, known phenotype IDs must be qualified as
-`family_id:member_id`, for example `F10:1003`. Do not supply raw `1003`
-for a known qualified member; that is a different ID and becomes a singleton.
-The pedigree term uses Henderson's additive relationship precision. Another
-term such as `(1|clinic)` remains an independent random intercept.
+Use `--pedigree-family-id` to disambiguate member IDs that repeat between
+families. A globally unique member can be matched as raw `1003`, and exact
+`family_id:member_id` values such as `F10:1003` are also accepted. If raw
+`1003` occurs in more than one family it is ambiguous, so the phenotype must
+use the qualified value; JLinAlg fails rather than guessing. Parent-child links
+define relatedness, not the family label itself. A globally unique raw parent
+reference can connect pedigree rows even when their family labels differ.
+
+Subjects truly absent from the pedigree remain unrelated singleton founders,
+but at least one aligned subject must match the source pedigree. A zero-match
+run fails rather than silently fitting an all-singleton pedigree. The pedigree
+term uses Henderson's additive relationship precision. Another term such as
+`(1|clinic)` remains an independent random intercept.
 
 ## 6. GLM and GLMM
 

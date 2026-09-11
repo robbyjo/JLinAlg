@@ -88,6 +88,8 @@ final class AnalysisRunner {
     private int pedigreeSingletonsAdded;
     private int pedigreeSingletonObservations;
     private int pedigreeMembers;
+    private int pedigreeFileObservationsMatched;
+    private int pedigreeAliasesResolved;
 
     AnalysisRunner(CliOptions options, FormulaPlan plan, RunLog log,
             PrintStream output) {
@@ -987,12 +989,21 @@ final class AnalysisRunner {
         if (options.pedigree == null) return null;
         String matchingColumn = options.individualId == null
             ? options.idColumn : options.individualId;
-        List<String> observationIds = matchingColumn.equals(options.idColumn)
+        List<String> suppliedObservationIds =
+            matchingColumn.equals(options.idColumn)
             ? prepared.ids()
             : phenotype.alignedValues(prepared.ids(), matchingColumn);
         PedigreeReader.Loaded fileValue = PedigreeReader.read(
             options.pedigree, options.pedigreeId, options.sireId,
             options.damId, options.pedigreeFamilyId);
+        List<String> observationIds = new ArrayList<>(
+            suppliedObservationIds.size());
+        for (String supplied : suppliedObservationIds) {
+            String resolved = fileValue.resolveObservationId(supplied);
+            observationIds.add(resolved);
+            if (!resolved.equals(supplied.trim()))
+                pedigreeAliasesResolved++;
+        }
         List<PedigreeIndividual> individuals =
             new ArrayList<>(fileValue.individuals());
         Set<String> pedigreeIds = new LinkedHashSet<>();
@@ -1000,12 +1011,19 @@ final class AnalysisRunner {
             pedigreeIds.add(individual.id());
         Set<String> singletonIds = new LinkedHashSet<>();
         for (String id : observationIds) {
-            if (!pedigreeIds.contains(id)) {
+            if (pedigreeIds.contains(id)) {
+                pedigreeFileObservationsMatched++;
+            } else {
                 pedigreeSingletonObservations++;
                 if (singletonIds.add(id))
                     individuals.add(PedigreeIndividual.founder(id));
             }
         }
+        if (!observationIds.isEmpty()
+                && pedigreeFileObservationsMatched == 0)
+            throw new IllegalArgumentException(
+                "no phenotype observations match pedigree members; check "
+                    + "--individual-id and pedigree ID qualification");
         pedigreeFileMembers = fileValue.individuals().size();
         pedigreeSingletonsAdded = singletonIds.size();
         pedigreeMembers = individuals.size();
@@ -1015,6 +1033,10 @@ final class AnalysisRunner {
                 fileValue.inbreedingCoefficients(), individuals.size()));
         info("pedigree=" + options.pedigree.toAbsolutePath());
         info("pedigree_file_members=" + pedigreeFileMembers);
+        info("pedigree_file_observations_matched="
+            + pedigreeFileObservationsMatched);
+        info("pedigree_unqualified_aliases_resolved="
+            + pedigreeAliasesResolved);
         info("pedigree_singletons_added=" + pedigreeSingletonsAdded);
         info("pedigree_singleton_observations="
             + pedigreeSingletonObservations);
@@ -1169,6 +1191,12 @@ final class AnalysisRunner {
                     ? options.idColumn : options.individualId)
             .put("pedigree_file_members", options.pedigree == null ? null
                 : pedigreeFileMembers)
+            .put("pedigree_file_observations_matched",
+                options.pedigree == null ? null
+                    : pedigreeFileObservationsMatched)
+            .put("pedigree_unqualified_aliases_resolved",
+                options.pedigree == null ? null
+                    : pedigreeAliasesResolved)
             .put("pedigree_singletons_added", options.pedigree == null ? null
                 : pedigreeSingletonsAdded)
             .put("pedigree_singleton_observations",

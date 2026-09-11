@@ -1,3 +1,19 @@
+# JLinAlg 0.3.5 (unreleased)
+
+## Pedigree identity and hierarchy
+
+- Family columns now disambiguate duplicate member IDs without partitioning
+  the ancestry graph. Globally unique raw observation and parent IDs resolve
+  automatically across family labels, while exact `family:individual` IDs
+  remain accepted and ambiguous raw IDs fail with a qualification request.
+- Parent-child links recursively define the full pedigree hierarchy, including
+  shared ancestors and consanguineous matings. A direct R `pedigreemm` 0.3.5
+  fixture now verifies the additive relationship matrix, inbreeding
+  coefficients, and Henderson sparse inverse through a cousin-mating example.
+- Runs with zero aligned source-pedigree matches now fail rather than silently
+  constructing an all-singleton model. Logs and manifests distinguish matched
+  source observations, automatically resolved aliases, and true singletons.
+
 # JLinAlg 0.3.4
 
 ## High-core adaptive omics scheduling

@@ -59,8 +59,8 @@ F10,1003,1001,1002</code></pre>
   --pedigree pedigree.csv --pedigree-id member_id &#92;
   --sire-id parent1_id --dam-id parent2_id &#92;
   --out mediation-pedigree.tsv</code></pre></div>
-<p>Blank, NA, 0, <code>.</code>, and -9 parent values mean unknown. If the family column is used, known analysis IDs must be qualified as <code>family_id:member_id</code>, such as <code>F10:1003</code>; omit it when IDs are globally unique.</p>
-<p>Subject 9009 is absent from the pedigree, so it becomes a reported unrelated singleton. Repeated rows with the same absent ID share one founder and random effect. Add ordinary effects such as <code>--group clinic</code> alongside pedigree relatedness when needed.</p>
+<p>Blank, NA, 0, <code>.</code>, and -9 parent values mean unknown. <code>--pedigree-family-id</code> disambiguates member IDs that repeat between families; it does not define relatedness. Globally unique analysis IDs resolve from their raw value automatically, exact <code>family_id:member_id</code> values such as <code>F10:1003</code> are also accepted, and an ambiguous raw ID fails until qualified. Recursive parent links construct the ancestry graph, so a unique raw parent may resolve across family labels.</p>
+<p>Subject 9009 is truly absent from the pedigree, so it becomes a reported unrelated singleton. Repeated rows with the same absent ID share one founder and random effect. At least one aligned subject must match a source pedigree member; zero matches fail instead of producing an all-singleton model. Add ordinary effects such as <code>--group clinic</code> alongside pedigree relatedness when needed.</p>
 
 <h2 id="outputs">6. Outputs and interpretation</h2>
 <p><code>--out mediation-effects.csv</code> writes the five-row result and <code>mediation-effects.csv.log</code>. The log records model type, variables, covariates/groups, input and retained rows, pedigree singleton counts, confidence, backend, and convergence. Output suffix controls CSV versus TSV; existing files require <code>--overwrite</code>.</p>

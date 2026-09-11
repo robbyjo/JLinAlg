@@ -13,14 +13,29 @@ java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --omics expression.csv --id Sa
 The matching pedigree term uses Henderson's sparse additive relationship
 inverse. IDs present in the phenotype but absent from the pedigree become
 reported singleton families; repeated rows with the same absent ID share one
-founder. The Gaussian command uses exact per-feature REML and the non-Gaussian
-command uses first-order Laplace refits. PQL, adaptive quadrature, and
-zero-inflated fits in later sections are Java APIs.
-Use `--pedigree-family-id pedno` only when member IDs repeat between pedigree
-families; the phenotype matching column must then contain exact
-`pedno:sabreid` keys. A batch such as `Levy_Set` belongs in a separate
-`(1|Levy_Set)` term and is not a pedigree-family column unless it truly
-identifies pedigree families.
+founder. At least one aligned phenotype ID must match a source pedigree member;
+zero matches fail rather than producing an all-singleton fit. The Gaussian
+command uses exact per-feature REML and the non-Gaussian command uses
+first-order Laplace refits. PQL, adaptive quadrature, and zero-inflated fits in
+later sections are Java APIs.
+
+Use `--pedigree-family-id pedno` to disambiguate member IDs that repeat between
+pedigree families. Globally unique raw phenotype IDs resolve automatically,
+and exact `pedno:sabreid` values remain accepted. A duplicated raw ID is
+ambiguous and must be qualified. Family labels do not create relatedness:
+parent-child links define the ancestry graph, and a unique raw parent reference
+can connect rows carrying different family labels. If a parent raw ID repeats,
+the unique same-family row is used; qualify the parent as `family:individual`
+to select a repeated parent in another namespace. A batch such as `Levy_Set`
+belongs in a separate `(1|Levy_Set)` term and is not a pedigree-family column.
+
+Hierarchy construction follows the `pedigreemm` numerator-relationship
+contract recursively across parents, grandparents, and all earlier shared
+ancestors. This includes valid consanguineous matings: for example, the child
+of first cousins receives the inbreeding implied by their common ancestors.
+The resulting additive relationship matrix `A`, inbreeding coefficients, and
+Henderson sparse `A^-1` are covered by a direct `pedigreemm` 0.3.5 reference
+fixture. A shared ancestor is valid; a directed ancestry cycle is not.
 
 ## Build and validate a pedigree
 

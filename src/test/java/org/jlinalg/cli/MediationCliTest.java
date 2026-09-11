@@ -113,9 +113,10 @@ class MediationCliTest {
         }
         Files.writeString(input, data);
         StringBuilder pedigreeData =
-            new StringBuilder("member\tsire\tdam\n");
+            new StringBuilder("family\tmember\tsire\tdam\n");
         for (int subject = 0; subject < 19; subject++) {
-            pedigreeData.append("S").append(subject).append("\t0\t0\n");
+            pedigreeData.append("F").append(subject).append("\tS")
+                .append(subject).append("\t0\t0\n");
         }
         Files.writeString(pedigree, pedigreeData);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -127,6 +128,7 @@ class MediationCliTest {
             "--covariates", "age", "--individual-id", "subject",
             "--pedigree", pedigree.toString(), "--pedigree-id", "member",
             "--sire-id", "sire", "--dam-id", "dam",
+            "--pedigree-family-id", "family",
             "--backend", "cpu", "--out", output.toString()
         }, console, console);
 
@@ -135,7 +137,41 @@ class MediationCliTest {
             "Pedigree singletons: 1 families across 4 observations"));
         String log = Files.readString(Path.of(output + ".log"));
         assertTrue(log.contains("model=pedigree-reml"));
+        assertTrue(log.contains("pedigree_file_members=19"));
+        assertTrue(log.contains(
+            "pedigree_file_observations_matched=76"));
+        assertTrue(log.contains(
+            "pedigree_unqualified_aliases_resolved=76"));
         assertTrue(log.contains("pedigree_singletons_added=1"));
         assertTrue(log.contains("pedigree_singleton_observations=4"));
+    }
+
+    @Test
+    void pedigreeMediationRejectsAnAllSingletonIdMismatch()
+            throws Exception {
+        Path input = temporaryDirectory.resolve("mismatched-mediation.tsv");
+        Path pedigree = temporaryDirectory.resolve("mismatched-pedigree.tsv");
+        Path output = temporaryDirectory.resolve("mismatched-effects.tsv");
+        Files.writeString(input,
+            "Y\tX\tM\tsubject\n"
+            + "1\t0\t0.5\tU1\n2\t1\t1.2\tU2\n3\t2\t2.1\tU3\n");
+        Files.writeString(pedigree,
+            "family\tmember\tsire\tdam\nF1\tP1\t0\t0\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "mediation", "--input", input.toString(),
+            "--outcome", "Y", "--treatment", "X", "--mediator", "M",
+            "--individual-id", "subject", "--pedigree", pedigree.toString(),
+            "--pedigree-id", "member", "--sire-id", "sire",
+            "--dam-id", "dam", "--pedigree-family-id", "family",
+            "--out", output.toString()
+        }, console, console);
+
+        assertEquals(2, status);
+        assertTrue(bytes.toString().contains(
+            "no input observations match pedigree members; check "
+                + "--individual-id and pedigree ID qualification"));
     }
 }

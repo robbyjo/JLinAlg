@@ -83,7 +83,7 @@ OM9005,9009,26.2,M,44,1</code></pre>
 F10,1001,0,0
 F10,1002,0,0
 F10,1003,1001,1002</code></pre>
-<ul><li><code>--individual-id subject_id</code> chooses the phenotype-to-pedigree key.</li><li><code>--pedigree-id member_id</code> identifies the member row.</li><li><code>--sire-id parent1_id</code> and <code>--dam-id parent2_id</code> identify the two parents; the historical option names remain.</li><li><code>--pedigree-family-id family_id</code> is optional and qualifies IDs that repeat between families.</li></ul>
+<ul><li><code>--individual-id subject_id</code> chooses the phenotype-to-pedigree key.</li><li><code>--pedigree-id member_id</code> identifies the member row.</li><li><code>--sire-id parent1_id</code> and <code>--dam-id parent2_id</code> identify the two parents; the historical option names remain.</li><li><code>--pedigree-family-id family_id</code> optionally disambiguates IDs that repeat between families; it does not define ancestry groups.</li></ul>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Pedigree omics REML</span></div><pre><code>java -jar jlinalg-&lt;version&gt;.jar --pheno phenotype.csv --omics expression.csv &#92;
   --id omics_id --individual-id subject_id &#92;
   --formula "BMI ~ Sex + Age + &lt;omics&gt; + (1|subject_id)" &#92;
@@ -91,8 +91,8 @@ F10,1003,1001,1002</code></pre>
   --sire-id parent1_id --dam-id parent2_id &#92;
   --out bmi-pedigree-expression.csv</code></pre></div>
 <p>The pedigree term must use the phenotype matching-column name, <code>(1|subject_id)</code>, not the omics ID or the pedigree file's column name. Blank, NA, 0, <code>.</code>, and -9 parents mean unknown. Pedigree members without phenotypes remain useful ancestors.</p>
-<p>Subject 9009 is absent from this pedigree, so JLinAlg adds it as an unrelated singleton and reports it on screen, in the log, and in the manifest. Repeated observations with the same absent subject ID share one singleton family and random effect.</p>
-<div class="note warning"><strong>Family-qualified IDs</strong>When <code>--pedigree-family-id</code> is used, known phenotype IDs must be written as <code>family_id:member_id</code>, such as <code>F10:1003</code>. Raw <code>1003</code> is a distinct ID and becomes a singleton. Omit the family option when member IDs are already globally unique.</div>
+<p>Subject 9009 is truly absent from this pedigree, so JLinAlg adds it as an unrelated singleton and reports it on screen, in the log, and in the manifest. Repeated observations with the same absent subject ID share one singleton family and random effect. At least one aligned subject must match a source pedigree member; zero matches fail instead of producing an all-singleton model.</p>
+<div class="note warning"><strong>Family disambiguation</strong>A globally unique member matches its raw ID automatically, and the exact <code>family_id:member_id</code> form, such as <code>F10:1003</code>, is also accepted. A raw ID that occurs in multiple families is ambiguous and fails until qualified. Parent links recursively define relatedness rather than the family label: a unique raw parent reference can connect rows carrying different family labels.</div>
 
 <h2 id="glm">6. GLM and GLMM</h2>
 <p>Use <code>--family binomial</code> for a binary response, <code>poisson</code> for counts, and <code>gamma</code> for positive continuous responses. Gaussian is the default.</p>

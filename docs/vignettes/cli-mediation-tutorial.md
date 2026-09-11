@@ -127,11 +127,17 @@ java -jar jlinalg-<version>.jar mediation --input mediation-pedigree.csv `
 pedigree columns. Blank, `NA`, `0`, `.`, and `-9` parent values mean
 unknown.
 
-If `--pedigree-family-id` is present, known subject values must be qualified
-as `family_id:member_id`, for example `F10:1003`. Omit this option when
-member IDs are already globally unique. A phenotype subject absent from the
-pedigree, such as 9009, is added as an unrelated singleton and reported.
-Repeated rows with the same absent subject share one singleton founder.
+`--pedigree-family-id` disambiguates member IDs that repeat between families.
+A globally unique subject can use raw `1003`; exact qualified values such as
+`F10:1003` are also accepted. When raw `1003` occurs in more than one family,
+the unqualified value is ambiguous and the run fails until it is qualified.
+Parent-child links, rather than family labels, define relatedness, and a unique
+raw parent reference can resolve across family labels.
+
+A phenotype subject absent from the pedigree, such as 9009, is added as an
+unrelated singleton and reported. Repeated rows with the same absent subject
+share one singleton founder. At least one aligned subject must match the source
+pedigree; zero matches fail instead of producing an all-singleton model.
 
 Ordinary grouped effects can accompany pedigree relatedness, for example
 `--group clinic`. Pedigree ancestry uses Henderson's sparse additive

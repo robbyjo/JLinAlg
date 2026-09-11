@@ -76,30 +76,46 @@ final class MediationCli {
                 options.damId, options.pedigreeFamilyId);
             List<PedigreeIndividual> members =
                 new ArrayList<>(loaded.individuals());
+            List<String> individualIds = new ArrayList<>(
+                input.individualIds().size());
+            int aliasesResolved = 0;
+            for (String id : input.individualIds()) {
+                String resolved = loaded.resolveObservationId(id);
+                individualIds.add(resolved);
+                if (!resolved.equals(id.trim())) aliasesResolved++;
+            }
             Set<String> known = new HashSet<>();
             for (PedigreeIndividual member : members) known.add(member.id());
             Set<String> singletons = new LinkedHashSet<>();
             int singletonObservations = 0;
-            for (String id : input.individualIds()) {
-                if (!known.contains(id)) {
+            int matchedObservations = 0;
+            for (String id : individualIds) {
+                if (known.contains(id)) {
+                    matchedObservations++;
+                } else {
                     singletonObservations++;
                     if (singletons.add(id)) {
                         members.add(PedigreeIndividual.founder(id));
                     }
                 }
             }
+            if (!individualIds.isEmpty() && matchedObservations == 0)
+                throw new IllegalArgumentException(
+                    "no input observations match pedigree members; check "
+                        + "--individual-id and pedigree ID qualification");
             double[] inbreeding = Arrays.copyOf(
                 loaded.inbreedingCoefficients(), members.size());
             PedigreeRandomEffectTerm pedigree =
                 PedigreeRandomEffectTerm.ofSparse("pedigree",
-                    input.individualIds(), members, inbreeding);
+                    individualIds, members, inbreeding);
             MediationMixedResult result = MediationAnalysis.fitPedigree(
                 input.outcome(), input.treatment(), input.mediator(),
                 input.covariates(), List.of(pedigree),
                 input.randomEffects(), RemlOptions.defaults(),
                 options.confidence, options.backend);
             return Fit.mixed(result, "pedigree-reml",
-                singletons.size(), singletonObservations);
+                loaded.individuals().size(), matchedObservations,
+                aliasesResolved, singletons.size(), singletonObservations);
         }
         if (!input.randomEffects().isEmpty()) {
             MediationMixedResult result = MediationAnalysis.fitMixed(
@@ -147,6 +163,11 @@ final class MediationCli {
             + "analysis_rows=" + input.rows() + "\n"
             + "missing_rows_omitted="
             + (input.originalRows() - input.rows()) + "\n"
+            + "pedigree_file_members=" + fit.pedigreeFileMembers() + "\n"
+            + "pedigree_file_observations_matched="
+            + fit.pedigreeFileObservationsMatched() + "\n"
+            + "pedigree_unqualified_aliases_resolved="
+            + fit.pedigreeAliasesResolved() + "\n"
             + "pedigree_singletons_added=" + fit.singletonFamilies() + "\n"
             + "pedigree_singleton_observations="
             + fit.singletonObservations() + "\n"
@@ -236,18 +257,30 @@ final class MediationCli {
 
     private record Fit(
             String model, List<MediationEffect> effects, boolean converged,
-            int singletonFamilies, int singletonObservations) {
+            int pedigreeFileMembers, int pedigreeFileObservationsMatched,
+            int pedigreeAliasesResolved, int singletonFamilies,
+            int singletonObservations) {
         static Fit ols(MediationResult result) {
             return new Fit("ols", effects(result.aPath(), result.bPath(),
                 result.indirectEffect(), result.directEffect(),
-                result.totalEffect()), true, 0, 0);
+                result.totalEffect()), true, 0, 0, 0, 0, 0);
         }
         static Fit mixed(MediationMixedResult result, String model,
                 int singletonFamilies, int singletonObservations) {
+            return mixed(result, model, 0, 0, 0, singletonFamilies,
+                singletonObservations);
+        }
+        static Fit mixed(MediationMixedResult result, String model,
+                int pedigreeFileMembers,
+                int pedigreeFileObservationsMatched,
+                int pedigreeAliasesResolved, int singletonFamilies,
+                int singletonObservations) {
             return new Fit(model, effects(result.aPath(), result.bPath(),
                 result.indirectEffect(), result.directEffect(),
                 result.totalEffect()), result.converged(),
-                singletonFamilies, singletonObservations);
+                pedigreeFileMembers, pedigreeFileObservationsMatched,
+                pedigreeAliasesResolved, singletonFamilies,
+                singletonObservations);
         }
         private static List<MediationEffect> effects(
                 MediationEffect... values) {

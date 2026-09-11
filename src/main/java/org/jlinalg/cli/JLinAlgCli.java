@@ -183,10 +183,11 @@ public final class JLinAlgCli {
               --pedigree-id COLUMN        Pedigree individual ID column
               --sire-id COLUMN            Pedigree sire/parent-1 ID column
               --dam-id COLUMN             Pedigree dam/parent-2 ID column
-              --pedigree-family-id COLUMN Optional family qualifier column
+              --pedigree-family-id COLUMN Disambiguates duplicate member IDs;
+                                           unique raw IDs and exact family:id
+                                           values match, ambiguous raw IDs fail
                                            Absent IDs become unrelated
-                                           singleton families; repeated IDs
-                                           stay in the same family
+                                           singletons; zero file matches fail
               --variance-components auto|refit|null-model
                                            auto uses per-feature refits for
                                            numeric mixed scans and a null model

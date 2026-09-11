@@ -140,15 +140,27 @@ contain the corresponding random intercept, for example
 sparse additive relationship inverse, retaining unobserved pedigree members;
 it is the `pedigreemm`-style animal effect rather than an ordinary IID random
 intercept. Unknown parents may be blank, `NA`, `0`, `.`, or `-9`.
-`--pedigree-family-id` qualifies pedigree identifiers as `family:individual`;
-the phenotype matching column must then contain the same qualified IDs for
-known members. After sample alignment, phenotype pedigree IDs absent from the
-file are retained as unrelated, noninbred singleton families. Repeated rows
-sharing one missing individual ID remain grouped under one singleton founder.
-The console, log, and manifest report file members, singleton families and
-observations, and total pedigree members.
-An unqualified phenotype ID remains a distinct singleton when family
-qualification is enabled; it is not guessed to be a qualified member.
+`--pedigree-family-id` disambiguates member IDs that repeat between families;
+it does not define relatedness. Ancestry links in the parent columns define the
+relationship graph, and a globally unique raw parent ID can resolve to its row
+even when that row has a different family label. Globally unique phenotype IDs
+are matched by their raw value automatically, while an exact
+`family:individual` value is also accepted. A raw ID that occurs in more than
+one family is ambiguous and must be supplied as `family:individual`.
+For a duplicated parent ID, JLinAlg uses the unique parent row in the child's
+family; an explicit `family:individual` parent value can name a parent in a
+different family namespace.
+After sample alignment, phenotype pedigree IDs absent from the file are
+retained as unrelated, noninbred singleton families. Repeated rows sharing one
+missing individual ID remain grouped under one singleton founder. A pedigree
+run with zero matches to source pedigree members fails instead of silently
+constructing an all-singleton model. The console, log, and manifest report file
+members, singleton families and observations, and total pedigree members.
+The recursive parent graph and sparse precision follow the same numerator
+relationship construction as `pedigreemm::getA()`, `inbreeding()`, and
+`getAInv()`. Shared ancestors are retained across every generation, so valid
+consanguineous matings contribute the corresponding inbreeding; only directed
+ancestry cycles are rejected.
 
 For mixed scans, `--variance-components auto` is the default. It resolves to
 `refit` for numeric omics and phenotype-only LMM/GLMM fits. Genotype LMM

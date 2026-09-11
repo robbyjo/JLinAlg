@@ -36,7 +36,9 @@ absent from the pedigree file are added as unrelated, noninbred singleton
 families. Repeated observations sharing one missing individual ID map to the
 same singleton founder; different missing IDs remain unrelated. The screen,
 log, and manifest report singleton-family and singleton-observation counts.
-This retains observations without inventing parentage.
+This retains observations without inventing parentage. At least one aligned
+phenotype ID must resolve to a source pedigree member; a zero-match run fails
+rather than replacing the requested pedigree with an all-singleton model.
 
 ## Inspect routing without fitting
 
@@ -101,12 +103,14 @@ repeated rows with the same ID share one founder/random effect.
 Blank, <code>NA</code>, <code>0</code>, <code>.</code>, and <code>-9</code>
 parent IDs mean unknown.
 
-## Family-qualified pedigree IDs
+## Family-disambiguated pedigree IDs
 
-Use <code>--pedigree-family-id family</code> only when individual IDs repeat
-between families. JLinAlg qualifies file members and parents as
-<code>family:individual</code>. Known phenotype members must use that exact
-key:
+Use <code>--pedigree-family-id family</code> to disambiguate individual IDs that
+repeat between families. A globally unique member still matches its raw ID,
+and the exact <code>family:individual</code> form is accepted as an alias. If a
+raw member ID occurs in more than one family, however, an unqualified
+phenotype value is ambiguous and the run fails with a request to use the exact
+qualified key:
 
 ~~~text
 SampleName,pedigree_key,BMI,Age
@@ -121,9 +125,13 @@ java -jar jlinalg-0.3.4.jar --pheno phenotype.csv --id SampleName --individual-i
 
 <code>F01:1001</code> maps to the qualified pedigree member.
 <code>SINGLETON_3</code>, which has no family/pedigree row, becomes a singleton.
-Do not use raw <code>1001</code> for a known qualified member: it is a distinct
-ID and will be treated as a singleton rather than guessed to mean
-<code>F01:1001</code>.
+Raw <code>1001</code> also maps when it occurs only once in the pedigree. If both
+<code>F01:1001</code> and <code>F02:1001</code> exist, use the qualified value.
+
+Family labels are namespaces, not relationship groups. Parent-child links
+construct the ancestry graph. A unique raw parent reference can therefore
+connect a child to a parent whose row has another family label; conversely,
+sharing a family label alone does not make two founders related.
 
 ## Pedigree plus an ordinary grouping effect
 

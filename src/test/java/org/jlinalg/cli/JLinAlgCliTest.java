@@ -439,14 +439,18 @@ class JLinAlgCliTest {
         for (int animal = 1; animal <= 11; animal++)
             for (int repeat = 0; repeat < 3; repeat++)
                 observations.append('O').append(animal).append('_').append(repeat)
-                    .append('\t').append(animal).append('\t')
+                    .append('\t').append(animal == 1
+                        ? "F1:1" : Integer.toString(animal))
+                    .append('\t')
                     .append(1.0 + animal * 0.18 + repeat * 0.11
                         + ((animal * 7 + repeat * 3) % 5 - 2) * 0.07)
                     .append('\t').append(repeat - 1).append('\n');
-        StringBuilder ancestry = new StringBuilder("animal\tsire\tdam\n");
-        ancestry.append("1\t0\t0\n2\t0\t0\n");
+        StringBuilder ancestry =
+            new StringBuilder("family\tanimal\tsire\tdam\n");
+        ancestry.append("F1\t1\t0\t0\nF2\t2\t0\t0\n");
         for (int animal = 3; animal <= 10; animal++)
-            ancestry.append(animal).append('\t')
+            ancestry.append('F').append(animal).append('\t')
+                .append(animal).append('\t')
                 .append(Math.max(1, animal - 2)).append('\t')
                 .append(Math.max(2, animal - 1)).append('\n');
         Files.writeString(phenotype, observations);
@@ -460,7 +464,8 @@ class JLinAlgCliTest {
             "--formula", "y ~ x + (1|animal)",
             "--pedigree", pedigree.toString(),
             "--pedigree-id", "animal", "--sire-id", "sire",
-            "--dam-id", "dam", "--backend", "cpu",
+            "--dam-id", "dam", "--pedigree-family-id", "family",
+            "--backend", "cpu",
             "--out", output.toString()
         }, console, console);
 
@@ -471,6 +476,8 @@ class JLinAlgCliTest {
                 + "matching column=animal)"));
         String log = Files.readString(Path.of(output + ".log"));
         assertTrue(log.contains("pedigree_file_members=10"));
+        assertTrue(log.contains("pedigree_file_observations_matched=30"));
+        assertTrue(log.contains("pedigree_unqualified_aliases_resolved=27"));
         assertTrue(log.contains("pedigree_singletons_added=1"));
         assertTrue(log.contains("pedigree_singleton_observations=3"));
         assertTrue(log.contains("pedigree_members=11"));
@@ -480,6 +487,10 @@ class JLinAlgCliTest {
         assertTrue(manifest.contains(
             "\"pedigree_file_members\": \"10\""));
         assertTrue(manifest.contains(
+            "\"pedigree_file_observations_matched\": \"30\""));
+        assertTrue(manifest.contains(
+            "\"pedigree_unqualified_aliases_resolved\": \"27\""));
+        assertTrue(manifest.contains(
             "\"pedigree_singletons_added\": \"1\""));
         assertTrue(manifest.contains(
             "\"pedigree_singleton_observations\": \"3\""));
@@ -487,6 +498,35 @@ class JLinAlgCliTest {
             "\"pedigree_members\": \"11\""));
         assertTrue(manifest.contains(
             "\"pedigree_precision\": \"sparse_additive_relationship_inverse\""));
+    }
+
+    @Test
+    void pedigreeCliRejectsAnAllSingletonIdMismatch() throws Exception {
+        Path phenotype = temporaryDirectory.resolve("mismatched-pheno.tsv");
+        Path pedigree = temporaryDirectory.resolve("mismatched-pedigree.tsv");
+        Path output = temporaryDirectory.resolve("mismatched-results.tsv");
+        Files.writeString(phenotype,
+            "observation\tanimal\ty\tx\n"
+            + "O1\tU1\t1\t0\nO2\tU2\t2\t1\nO3\tU3\t4\t2\n");
+        Files.writeString(pedigree,
+            "family\tanimal\tsire\tdam\nF1\tP1\t0\t0\n");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream console = new PrintStream(bytes);
+
+        int status = JLinAlgCli.run(new String[] {
+            "--pheno", phenotype.toString(), "--id", "observation",
+            "--individual-id", "animal",
+            "--formula", "y ~ x + (1|animal)",
+            "--pedigree", pedigree.toString(),
+            "--pedigree-id", "animal", "--sire-id", "sire",
+            "--dam-id", "dam", "--pedigree-family-id", "family",
+            "--out", output.toString(), "--dry-run"
+        }, console, console);
+
+        assertEquals(1, status);
+        assertTrue(bytes.toString().contains(
+            "no phenotype observations match pedigree members; check "
+                + "--individual-id and pedigree ID qualification"));
     }
 
     @Test
