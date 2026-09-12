@@ -51,21 +51,26 @@ public final class SparseMetaAnalysis {
 
     private static double estimateTau(Engine engine,double[] y,double[] x,
             MetaAnalysisOptions options,Fit zero){
-        int n=y.length,p=1;double mean=Arrays.stream(y).average().orElseThrow(),upper=0;
-        for(double value:y)upper+=(value-mean)*(value-mean);
-        upper=Math.max(1e-8,upper/(n-1));
+        int n=y.length,p=1;double mean=Arrays.stream(y).average().orElseThrow(),sumSquares=0;
+        for(double value:y)sumSquares+=(value-mean)*(value-mean);
+        // Optimize a dimensionless variance multiplier. An absolute variance
+        // floor or stopping tolerance changes the fit when effect units change.
+        double scale=sumSquares/(n-1);
+        if(scale==0)return 0;
+        if(!Double.isFinite(scale))throw new ArithmeticException("effect variance exceeds numerical range");
+        double upper=1;
         if(options.tauSquaredEstimator()==TauSquaredEstimator.PAULE_MANDEL){
             if(zero.q()<=n-p)return 0;
-            while(engine.fit(y,x,p,upper).q()>n-p){upper*=4;if(!Double.isFinite(upper))throw new ArithmeticException("cannot bracket sparse heterogeneity");}
+            while(engine.fit(y,x,p,scale*upper).q()>n-p){upper*=4;if(!Double.isFinite(upper))throw new ArithmeticException("cannot bracket sparse heterogeneity");}
             double lower=0;
             for(int i=0;i<options.maximumIterations();i++){
                 double middle=(lower+upper)/2;
-                if(engine.fit(y,x,p,middle).q()>n-p)lower=middle;else upper=middle;
-                if(upper-lower<=options.tolerance()*Math.max(1,upper))return (lower+upper)/2;
+                if(engine.fit(y,x,p,scale*middle).q()>n-p)lower=middle;else upper=middle;
+                if(upper-lower<=options.tolerance()*Math.max(1,upper))return scale*((lower+upper)/2);
             }
             throw new ArithmeticException("sparse Paule-Mandel did not converge");
         }
-        DoubleUnaryOperator objective=t->-engine.fit(y,x,p,t).reml();
+        DoubleUnaryOperator objective=t->-engine.fit(y,x,p,scale*t).reml();
         double before=objective.applyAsDouble(0),current=objective.applyAsDouble(upper);
         while(current<before){before=current;upper*=4;if(!Double.isFinite(upper))throw new ArithmeticException("cannot bracket sparse REML");current=objective.applyAsDouble(upper);}
         double lower=0,ratio=(Math.sqrt(5)-1)/2;
@@ -75,10 +80,29 @@ public final class SparseMetaAnalysis {
             else{lower=a;a=b;fa=fb;b=lower+ratio*(upper-lower);fb=objective.applyAsDouble(b);}
             if(upper-lower<=options.tolerance()*Math.max(1,upper)){
                 double candidate=(lower+upper)/2;
-                return objective.applyAsDouble(0)<=objective.applyAsDouble(candidate)?0:candidate;
+                candidate=refineReml(objective,candidate);
+                return objective.applyAsDouble(0)<=objective.applyAsDouble(candidate)?0:scale*candidate;
             }
         }
         throw new ArithmeticException("sparse REML did not converge");
+    }
+
+    private static double refineReml(DoubleUnaryOperator objective,double candidate){
+        // Objective comparisons flatten at roughly sqrt(machine epsilon) near
+        // the optimum. A local fourth-order score estimate resolves that plateau
+        // without dense inverse/trace calculations in this sparse fitter.
+        double h=Math.min(candidate/2,Math.pow(Math.ulp(1.0),.2)*(1+candidate));
+        if(!(h>0))return candidate;
+        double center=objective.applyAsDouble(candidate);
+        double below=objective.applyAsDouble(candidate-h),above=objective.applyAsDouble(candidate+h);
+        double halfBelow=objective.applyAsDouble(candidate-h/2),halfAbove=objective.applyAsDouble(candidate+h/2);
+        double score=(8*(halfAbove-halfBelow)-(above-below))/(6*h);
+        double curvature=((above-center)+(below-center))/(h*h);
+        double step=score/curvature;
+        if(!(curvature>0)||!Double.isFinite(step)||Math.abs(step)>h)return candidate;
+        double refined=candidate-step;
+        return objective.applyAsDouble(refined)<=center+16*Math.ulp(Math.max(1,Math.abs(center)))
+            ?refined:candidate;
     }
 
     private record Fit(double[] beta,double[] bread,double[] wx,double q,

@@ -188,21 +188,32 @@ public final class MultivariableMendelianRandomization {
                 || backendPolicy == null)
             throw new IllegalArgumentException("one exposure sampling covariance matrix and a backend are required per instrument");
         double[][][] covariance = new double[variants][exposures][exposures];
+        double[][] correlations = new double[variants][exposures * exposures];
         for (int variant = 0; variant < variants; variant++) {
             double[][] supplied = exposureSamplingCovariances.get(variant);
             if (supplied == null || supplied.length != exposures)
                 throw new IllegalArgumentException("exposure sampling covariance dimensions are invalid");
-            for (int a = 0; a < exposures; a++) {
+            // Validate every row before inspecting transposed entries.
+            for (int a = 0; a < exposures; a++)
                 if (supplied[a] == null || supplied[a].length != exposures)
                     throw new IllegalArgumentException("exposure sampling covariance dimensions are invalid");
+            double[] errors = instruments.get(variant).exposureStandardErrors();
+            for (int a = 0; a < exposures; a++) {
                 for (int b = 0; b < exposures; b++) {
                     double value = supplied[a][b];
-                    if (!Double.isFinite(value) || Math.abs(value - supplied[b][a]) > 1e-12 * Math.max(1.0, Math.abs(value)))
+                    // Work in correlation units so validation is independent
+                    // of exposure units, including very small covariances.
+                    double large = Math.max(errors[a], errors[b]);
+                    double small = Math.min(errors[a], errors[b]);
+                    double standardized = value / large / small;
+                    double reverse = supplied[b][a] / large / small;
+                    if (!Double.isFinite(standardized) || !Double.isFinite(reverse)
+                            || Math.abs(standardized - reverse) > 1e-12 * Math.max(1.0, Math.abs(standardized)))
                         throw new IllegalArgumentException("exposure sampling covariance must be finite and symmetric");
-                    covariance[variant][a][b] = value;
+                    covariance[variant][a][b] = .5*value + .5*supplied[b][a];
+                    correlations[variant][a * exposures + b] = .5*standardized + .5*reverse;
                 }
-                double expected = instruments.get(variant).exposureStandardErrors()[a];
-                if (Math.abs(supplied[a][a] - expected * expected) > 1e-8 * Math.max(1.0, supplied[a][a]))
+                if (Math.abs(correlations[variant][a * exposures + a] - 1) > 1e-8)
                     throw new IllegalArgumentException("exposure covariance diagonal must match reported standard errors");
             }
         }
@@ -211,6 +222,10 @@ public final class MultivariableMendelianRandomization {
         if (degrees < 1) throw new IllegalArgumentException("conditional strength has no residual degrees of freedom");
         try (BackendContext context = BackendContext.select(backendPolicy)) {
             ComputeBackend backend = context.backend();
+            for (double[] correlation : correlations)
+                for (double eigenvalue : backend.dsyev(correlation, exposures).eigenvalues())
+                    if (!Double.isFinite(eigenvalue) || eigenvalue < -1e-12 * exposures)
+                        throw new IllegalArgumentException("exposure sampling covariance must be positive semidefinite");
             for (int target = 0; target < exposures; target++) {
                 int predictors = exposures - 1;
                 double[] gamma = new double[predictors];
@@ -256,6 +271,8 @@ public final class MultivariableMendelianRandomization {
                             variance += gamma[ia] * gamma[ib++] * covariance[variant][a][b];
                         ia++;
                     }
+                    if (!(variance > 0) || !Double.isFinite(variance))
+                        throw new IllegalArgumentException("conditional exposure residual variance is not positive");
                     statistic += residual * residual / variance;
                 }
                 q[target] = statistic;

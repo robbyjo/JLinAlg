@@ -11,6 +11,42 @@ import org.jlinalg.mixed.SparsePrecisionMatrix;
 import org.junit.jupiter.api.Test;
 
 class MetaAdvancedTest {
+    @Test void sparseHeterogeneityIsInvariantToEffectUnits() {
+        for(var estimator:List.of(TauSquaredEstimator.REML,TauSquaredEstimator.PAULE_MANDEL))
+            for(double unit:new double[]{1e-100,1e-6,1,1e6,1e100}) {
+                var studies=new java.util.ArrayList<MetaStudy>();
+                double[] precision=new double[5];
+                for(int i=0;i<5;i++) {
+                    studies.add(new MetaStudy("s"+i,(i-2)*unit,.1*unit));
+                    precision[i]=100/(unit*unit);
+                }
+                var result=SparseMetaAnalysis.fit(studies,new SparsePrecisionMatrix(5,
+                    new int[]{0,1,2,3,4,5},new int[]{0,1,2,3,4},precision),
+                    MetaAnalysisOptions.builder().tauSquaredEstimator(estimator).build(),BackendPolicy.CPU);
+                // Equal sampling variances: REML and PM both give s_y^2 - s_e^2.
+                assertEquals(2.49,result.tauSquared()/(unit*unit),2e-6,estimator+" unit="+unit);
+                assertEquals(Math.sqrt(.5),result.standardError()/unit,3e-7);
+                assertEquals(0,result.pooledEffectSize()/unit,2e-14);
+            }
+    }
+
+    @Test void sparseHeterogeneityRetainsTheZeroBoundaryInDifferentUnits() {
+        for(var estimator:List.of(TauSquaredEstimator.REML,TauSquaredEstimator.PAULE_MANDEL))
+            for(double unit:new double[]{1e-6,1,1e6})
+                for(double spread:new double[]{0,.01}) {
+                    var studies=new java.util.ArrayList<MetaStudy>();
+                    double[] precision=new double[5];
+                    for(int i=0;i<5;i++) {
+                        studies.add(new MetaStudy("s"+i,(2+(i-2)*spread)*unit,.1*unit));
+                        precision[i]=100/(unit*unit);
+                    }
+                    var result=SparseMetaAnalysis.fit(studies,new SparsePrecisionMatrix(5,
+                        new int[]{0,1,2,3,4,5},new int[]{0,1,2,3,4},precision),
+                        MetaAnalysisOptions.builder().tauSquaredEstimator(estimator).build(),BackendPolicy.CPU);
+                    assertEquals(0,result.tauSquared());
+                    assertEquals(2,result.pooledEffectSize()/unit,2e-14);
+                }
+    }
     private static final List<MetaStudy> STUDIES = List.of(
         new MetaStudy("a", 0.2, 0.1), new MetaStudy("b", 0.5, 0.2),
         new MetaStudy("c", 0.1, 0.15), new MetaStudy("d", 0.7, 0.25));

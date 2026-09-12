@@ -17,12 +17,8 @@ public final class MixedModelProfile {
             DoubleUnaryOperator profiledLogLikelihood, double estimate,
             double maximumLogLikelihood, double confidenceLevel,
             double lowerBound, double upperBound, int gridSize) {
-        if (profiledLogLikelihood == null || !Double.isFinite(estimate)
-                || !Double.isFinite(maximumLogLikelihood) || !(confidenceLevel > 0 && confidenceLevel < 1)
-                || !Double.isFinite(lowerBound) || !Double.isFinite(upperBound)
-                || !(lowerBound <= estimate) || !(upperBound >= estimate)
-                || !(lowerBound < upperBound) || gridSize < 8)
-            throw new IllegalArgumentException("invalid profile-likelihood interval inputs");
+        validate(profiledLogLikelihood, estimate, maximumLogLikelihood,
+            confidenceLevel, lowerBound, upperBound, gridSize);
         return interval(profiledLogLikelihood,estimate,maximumLogLikelihood,
             confidenceLevel,lowerBound,upperBound,gridSize,
             0.5 * ChiSquare.quantile(confidenceLevel, 1.0, true, false));
@@ -36,11 +32,24 @@ public final class MixedModelProfile {
             DoubleUnaryOperator profiledLogLikelihood, double estimate,
             double maximumLogLikelihood, double confidenceLevel,
             double lowerBound, double upperBound, int gridSize) {
+        validate(profiledLogLikelihood, estimate, maximumLogLikelihood,
+            confidenceLevel, lowerBound, upperBound, gridSize);
         if (!(confidenceLevel > .5))
             throw new IllegalArgumentException("boundary profile confidence must exceed one half");
         return interval(profiledLogLikelihood,estimate,maximumLogLikelihood,
             confidenceLevel,lowerBound,upperBound,gridSize,
             0.5 * ChiSquare.quantile(2*confidenceLevel-1,1,true,false));
+    }
+
+    private static void validate(DoubleUnaryOperator profiledLogLikelihood,
+            double estimate, double maximumLogLikelihood, double confidenceLevel,
+            double lowerBound, double upperBound, int gridSize) {
+        if (profiledLogLikelihood == null || !Double.isFinite(estimate)
+                || !Double.isFinite(maximumLogLikelihood) || !(confidenceLevel > 0 && confidenceLevel < 1)
+                || !Double.isFinite(lowerBound) || !Double.isFinite(upperBound)
+                || !(lowerBound <= estimate) || !(upperBound >= estimate)
+                || !(lowerBound < upperBound) || gridSize < 8)
+            throw new IllegalArgumentException("invalid profile-likelihood interval inputs");
     }
 
     private static ProfileLikelihoodInterval interval(

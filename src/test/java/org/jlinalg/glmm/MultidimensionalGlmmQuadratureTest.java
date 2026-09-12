@@ -14,6 +14,35 @@ import org.jlinalg.pedigree.PedigreeRandomEffectTerm;
 import org.junit.jupiter.api.Test;
 
 final class MultidimensionalGlmmQuadratureTest {
+    @Test void initialTensorGridMustFitBudgetBeforeFitOrEvaluation() {
+        double[] y={0,1,0,1};double[][] x=intercepts(4);
+        var effects=List.of(RandomEffectTerm.randomIntercept("g",List.of("a","a","b","b")));
+        for(long budget:new long[]{1,24}) {
+            var options=new MultidimensionalQuadratureOptions(5,25,budget,1e-7,200,1e-6,1e-8,1e4,20);
+            var failure=assertThrows(IllegalArgumentException.class,()->
+                MultidimensionalGlmmQuadrature.evaluate(y,x,effects,null,GlmFamilies.binomial(),
+                    new double[]{0},new double[]{1},options,BackendPolicy.CPU));
+            assertTrue(failure.getMessage().contains("maximumTotalNodes"));
+            assertThrows(IllegalArgumentException.class,()->MultidimensionalGlmmQuadrature.fit(
+                y,x,effects,null,GlmFamilies.binomial(),options,BackendPolicy.CPU));
+        }
+        var exactBudget=new MultidimensionalQuadratureOptions(5,25,25,1e-7,200,1e-6,1e-8,1e4,20);
+        var result=MultidimensionalGlmmQuadrature.evaluate(y,x,effects,null,GlmFamilies.binomial(),
+            new double[]{0},new double[]{1},exactBudget,BackendPolicy.CPU);
+        assertEquals(25,result.nodes());assertEquals(5,result.order());
+        assertTrue(Double.isFinite(result.logLikelihood()));
+        assertFalse(result.converged()); // no budget remains for error estimation
+    }
+
+    @Test void overflowingTensorCountIsRejectedEvenWithMaximumLongBudget() {
+        int n=30;double[] y=new double[n];double[][] x=intercepts(n);
+        var groups=new java.util.ArrayList<String>();
+        for(int i=0;i<n;i++){groups.add("g"+i);y[i]=i%2;}
+        var effects=List.of(RandomEffectTerm.randomIntercept("g",groups));
+        var options=new MultidimensionalQuadratureOptions(5,25,Long.MAX_VALUE,1e-7,200,1e-6,1e-8,1e4,20);
+        assertThrows(IllegalArgumentException.class,()->MultidimensionalGlmmQuadrature.evaluate(
+            y,x,effects,null,GlmFamilies.binomial(),new double[]{0},new double[]{1},options,BackendPolicy.CPU));
+    }
     @Test void disjointTwoDimensionalIntegralFactorizesToScalarAghq(){
         double[] y={0,1,0,1,1,1,0,1};double[][] x=intercepts(y.length);
         double[] first=new double[y.length],second=new double[y.length];

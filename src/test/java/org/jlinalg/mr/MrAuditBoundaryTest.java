@@ -8,6 +8,46 @@ import org.jlinalg.compute.BackendPolicy;
 import org.junit.jupiter.api.Test;
 
 class MrAuditBoundaryTest {
+    @Test void conditionalStrengthRejectsIndefiniteCovarianceRegardlessOfUnits() {
+        for(double unit:new double[]{1e-100,1e-6,1,1e6,1e100}) {
+            double v=unit*unit;
+            var failure=assertThrows(IllegalArgumentException.class,()->conditionalStrength(
+                unit,new double[][]{{v,2*v},{2*v,v}}));
+            assertTrue(failure.getMessage().contains("positive semidefinite"));
+            assertThrows(IllegalArgumentException.class,()->conditionalStrength(
+                unit,new double[][]{{v,0},{0,1.1*v}}));
+            assertThrows(IllegalArgumentException.class,()->conditionalStrength(
+                unit,new double[][]{{v,.1*v},{.2*v,v}}));
+        }
+    }
+
+    @Test void conditionalStrengthChecksAllRowsBeforeSymmetry() {
+        for(double[][] covariance:new double[][][]{null,new double[1][1],
+                new double[][]{{1,0},null},new double[][]{{1,0},{1}},
+                new double[][]{{1,Double.NaN},{0,1}},new double[][]{{1,0},{Double.POSITIVE_INFINITY,1}}})
+            assertThrows(IllegalArgumentException.class,()->conditionalStrength(1,covariance));
+    }
+
+    @Test void conditionalStrengthAcceptsPositiveSemidefiniteCovariance() {
+        // Orthogonal exposure associations give gamma=0 and F=2/3, even with
+        // perfectly correlated sampling errors. Only PSD is required here.
+        for(double unit:new double[]{1e-100,1e-6,1,1e6,1e100})
+            for(double rho:new double[]{-1,-.5,0,.5,1}) {
+                double v=unit*unit;
+                var result=conditionalStrength(unit,new double[][]{{v,rho*v},{rho*v,v}});
+                assertArrayEquals(new double[]{2.0/3,2.0/3},result.fStatistics(),2e-14);
+            }
+    }
+
+    private static ConditionalStrengthResult conditionalStrength(double unit,double[][] covariance) {
+        double[][] effects={{unit,0},{-unit,0},{0,unit},{0,-unit}};
+        var instruments=new ArrayList<MultivariableInstrument>();
+        for(int i=0;i<effects.length;i++)instruments.add(new MultivariableInstrument(
+            "v"+i,effects[i],new double[]{unit,unit},1,1));
+        return MultivariableMendelianRandomization.conditionalStrength(instruments,List.of("a","b"),
+            Collections.nCopies(effects.length,covariance),BackendPolicy.CPU);
+    }
+
     @Test void ivwReconstructionDoesNotOverflowAFiniteEffectOrStandardError() {
         var values=List.of(instrument(0,1e-200,1,1e200,1e200),instrument(1,1e-200,1,1,1));
         var fit=MendelianRandomization.ivw(values,false,.95);

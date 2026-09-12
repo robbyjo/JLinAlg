@@ -207,39 +207,58 @@ final class QuadraticFormDistribution {
         if (q == 0) return 1;
         if (!Double.isFinite(q)) return 0;
         double mean = Arrays.stream(lambda).sum();
-        double variance = 2 * Arrays.stream(lambda).map(x -> x*x).sum();
-        if (Math.abs(q - mean) <= 1e-7 * Math.sqrt(variance)) {
-            double sumSquares = variance / 2;
-            double degrees = mean * mean / sumSquares;
-            return ChiSquare.cumulative(q / (sumSquares / mean), degrees,
-                false, false);
-        }
         double upper = .5 / Arrays.stream(lambda).max().orElseThrow();
         double left = q < mean ? -1 : 0;
         while (q < mean && cgfPrime(left, lambda) > q) left *= 2;
         double right = q < mean ? 0 : Math.nextDown(upper);
         double t = 0;
-        for (int iteration = 0; iteration < 160; iteration++) {
+        for (int iteration = 0; q != mean && iteration < 160; iteration++) {
             t = left + (right-left)/2;
-            double derivative = cgfPrime(t, lambda);
-            if (derivative < q) left = t; else right = t;
-            if (right-left <= 2e-14 * Math.max(1, Math.abs(t))) break;
+            // Compare K'(t)-K'(0) to q-mean without subtracting two
+            // nearly equal CGF derivatives at the mean.
+            double shift = 0;
+            for (double value : lambda) shift += 2*t*value*value/(1-2*t*value);
+            boolean below = Math.abs(t) <= .25*upper
+                ? shift < q-mean : cgfPrime(t, lambda) < q;
+            if (below) left = t; else right = t;
+            if (right-left <= 2e-14 * Math.abs(t) || t == 0) break;
         }
-        t = left + (right-left)/2;
-        double k = 0, second = 0;
+        t = q == mean ? 0 : left + (right-left)/2;
+        double deviance = 0, second = 0;
         for (double value : lambda) {
-            double denominator = 1 - 2*t*value;
-            k -= .5*Math.log(denominator);
+            double x = 2*t*value, denominator = 1-x;
+            // At the saddle, 2*(t*K'(t)-K(t)) has this form.
+            deviance += x/denominator + Math.log1p(-x);
             second += 2*value*value/(denominator*denominator);
         }
-        double w = Math.copySign(Math.sqrt(Math.max(0, 2*(t*q-k))), t);
-        double u = t*Math.sqrt(second);
-        if (w == 0 || u == 0 || !Double.isFinite(w) || !Double.isFinite(u))
-            return ChiSquare.cumulative(q / (variance/(2*mean)),
-                2*mean*mean/variance, false, false);
+        double w, correction;
+        if (Math.abs(t) <= .125 / Arrays.stream(lambda).max().orElseThrow()) {
+            // A=2*(t*K'(t)-K(t))/t^2 and B=(K''(t)-A)/t.
+            // Their convergent series avoid both cancellation in the deviance
+            // and the singular subtraction 1/w-1/u. At t=0 this gives the
+            // analytic LR limit kappa3/(6*kappa2^(3/2)), continuously.
+            double a = 0, b = 0;
+            for (double value : lambda) {
+                double x = 2*t*value, power = 1;
+                for (int j = 0; j < 40; j++) {
+                    a += 4*value*value*(j+1.0)/(j+2)*power;
+                    b += 4*value*value*value*(j+1.0)*(j+2)/(j+3)*power;
+                    power *= x;
+                }
+            }
+            double rootA = Math.sqrt(a), rootSecond = Math.sqrt(second);
+            w = t*rootA;
+            correction = b/(rootA*rootSecond*(rootA+rootSecond));
+        } else {
+            w = Math.copySign(Math.sqrt(deviance), t);
+            correction = 1/w - 1/(t*Math.sqrt(second));
+        }
         double upperNormal = Normal.cumulative(w, 0, 1, false, false);
         double density = Math.exp(-.5*w*w)/Math.sqrt(2*Math.PI);
-        return upperNormal - density*(1/w-1/u);
+        double result = upperNormal - density*correction;
+        if (!Double.isFinite(result) || result < 0 || result > 1)
+            throw new ArithmeticException("saddlepoint tail is outside the probability range");
+        return result;
     }
 
     private static double cgfPrime(double t, double[] lambda) {

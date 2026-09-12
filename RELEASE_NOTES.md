@@ -1,3 +1,24 @@
+# Unreleased
+
+## Statistical correctness fixes
+
+- Stabilized the Lugannani–Rice kernel-tail fallback at and around the mean,
+  including quantile inversion. It remains an explicitly labeled approximation;
+  invalid numerical probabilities now fail instead of being clamped.
+- Made sparse REML and Paule–Mandel heterogeneity optimization independent of
+  effect units and refined REML convergence near a flat numerical optimum.
+- Enforced the initial multidimensional quadrature node budget before allocating
+  dense random-effect matrices or fitting, including node-count overflow.
+- Added scale-aware shape, symmetry, diagonal, and positive-semidefinite checks
+  for conditional MR exposure covariances. Valid singular covariance matrices
+  remain supported when conditional residual variances are positive.
+- Applied the ordinary profile-likelihood input checks to boundary profiles,
+  with boundary confidence levels restricted to `(0.5, 1)`.
+
+Regression validation: 667 tests, 664 passed, zero failures, and three optional
+native CHOLMOD tests skipped; website and Javadoc checks passed. Analytic
+equal-variance meta-analysis and independent R integration checks were also run.
+
 # JLinAlg 0.3.5
 
 ## Executable mediation and fine-mapping workflows

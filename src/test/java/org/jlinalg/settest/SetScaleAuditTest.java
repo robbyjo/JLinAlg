@@ -6,6 +6,35 @@ import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.pipeline.*;
 import org.junit.jupiter.api.Test;
 class SetScaleAuditTest {
+    @Test void saddlepointIsContinuousAndMonotoneAcrossTheMean() {
+        double[] spectrum={1,.2,1e-20};
+        double meanLimit=.5-(8*(1+.008))/(6*Math.pow(2*(1+.04),1.5)*Math.sqrt(2*Math.PI));
+        assertEquals(meanLimit,QuadraticFormDistribution.survival(1.2,spectrum).pValue(),2e-15);
+        double previous=1;
+        for(double delta:new double[]{-1e-3,-1e-5,-1e-6,-2e-7,-1e-7,0,1e-7,2e-7,1e-6,1e-5,1e-3}) {
+            double q=1.2+delta;
+            var tail=QuadraticFormDistribution.survival(q,spectrum);
+            assertEquals("lugannani-rice-saddlepoint",tail.method());
+            assertTrue(tail.pValue()<previous,"tail must decrease at q="+q);
+            previous=tail.pValue();
+            assertEquals(meanLimit,tail.pValue(),.3*Math.abs(delta)+2e-15);
+            // Independent R angular integration for the limiting rank-two
+            // spectrum gives 0.3311685451284979 at the mean. LR is approximate.
+            assertEquals(.3311685451284979,tail.pValue(),.011);
+            for(double unit:new double[]{1e-100,1e100})
+                assertEquals(tail.pValue(),QuadraticFormDistribution.survival(q*unit,
+                    new double[]{unit,.2*unit,1e-20*unit}).pValue(),2e-14);
+        }
+        // Includes both the series/direct LR transition and both sides of the mean.
+        previous=1;
+        for(int i=1;i<=400;i++) {
+            double p=QuadraticFormDistribution.survival(i*.01,spectrum).pValue();
+            assertTrue(p<previous);previous=p;
+        }
+        for(double p:new double[]{.31,.32,meanLimit,.33,.34,.7})
+            assertEquals(p,QuadraticFormDistribution.survival(
+                QuadraticFormDistribution.critical(spectrum,p),spectrum).pValue(),2e-12);
+    }
     @Test void higherRankTailsMatchPositiveRSeriesAndRespectStochasticBounds() throws Exception {
         try(var reader=new java.io.BufferedReader(new java.io.InputStreamReader(
                 getClass().getResourceAsStream("/pipeline-audit/rank-three-reference.tsv"),java.nio.charset.StandardCharsets.UTF_8))) {

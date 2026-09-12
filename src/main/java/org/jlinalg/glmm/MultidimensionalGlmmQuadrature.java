@@ -135,10 +135,17 @@ public final class MultidimensionalGlmmQuadrature {
             for(int term=0;term<terms;term++){
                 RandomEffectTerm value=effects.get(term);
                 if(value==null||value.observations()!=n||!names.add(value.name()))throw new IllegalArgumentException("random terms must match rows and have unique names");
+                if(value.coefficients()>Integer.MAX_VALUE-columns)
+                    throw new IllegalArgumentException("random-effect dimension exceeds numerical range");
                 starts[term]=columns;columns+=value.coefficients();
             }
             starts[terms]=columns;q=columns;
             if(q<2)throw new IllegalArgumentException("use GlmmQuadrature for a scalar random intercept");
+            // Reject before allocating dense random-effect designs/precisions
+            // or entering the optimizer, not only when refining the grid.
+            long initialNodes=power(options.initialOrder(),q);
+            if(initialNodes<0||initialNodes>options.maximumTotalNodes())
+                throw new IllegalArgumentException("initial quadrature grid exceeds maximumTotalNodes");
             z=new double[n][q];
             for(int term=0;term<terms;term++){
                 double[] design=effects.get(term).design();int width=effects.get(term).coefficients();
@@ -172,7 +179,7 @@ public final class MultidimensionalGlmmQuadrature {
             int order=options.initialOrder();long nodes=power(order,q);double previous=integrate(eta,precision,logDet,mode,order),error=Double.POSITIVE_INFINITY;int stable=0;
             while(order<options.maximumOrder()){
                 int next=Math.min(options.maximumOrder(),order+Math.max(2,order/2));long nextNodes=power(next,q);
-                if(nextNodes>options.maximumTotalNodes())break;
+                if(nextNodes<0||nextNodes>options.maximumTotalNodes())break;
                 double value=integrate(eta,precision,logDet,mode,next);error=Math.abs(value-previous);stable=error<=options.quadratureTolerance()?stable+1:0;
                 previous=value;order=next;nodes=nextNodes;if(stable>=2)break;
             }
@@ -239,7 +246,8 @@ public final class MultidimensionalGlmmQuadrature {
             int n=matrix.dimension();double[] result=new double[n*n],values=matrix.values();int[] starts=matrix.rowStarts(),columns=matrix.columnIndices();
             for(int i=0;i<n;i++)for(int k=starts[i];k<starts[i+1];k++)result[i*n+columns[k]]=values[k];return result;
         }
-        private static long power(int base,int exponent){long result=1;for(int i=0;i<exponent;i++){if(result>Long.MAX_VALUE/base)return Long.MAX_VALUE;result*=base;}return result;}
+        // A negative sentinel distinguishes overflow from an exact user budget.
+        private static long power(int base,int exponent){long result=1;for(int i=0;i<exponent;i++){if(result>Long.MAX_VALUE/base)return -1;result*=base;}return result;}
     }
     private record Mode(double[] value,double[] hessian){ }
     private record Derivatives(double[] score,double[] hessian){ }
