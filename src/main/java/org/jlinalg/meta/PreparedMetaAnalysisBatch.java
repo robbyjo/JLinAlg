@@ -26,17 +26,34 @@ public final class PreparedMetaAnalysisBatch {
     private final double[] variances;
     private final int analyses;
     private final int studies;
+    private final int[] cohortCounts;
+    private final int minimumStudies;
 
     /** Validates and copies row-major effects and sampling standard errors. */
     public PreparedMetaAnalysisBatch(
             double[] effects, double[] standardErrors,
             int analyses, int studies) {
+        this(effects, standardErrors, analyses, studies, 2, false);
+    }
+
+    /**
+     * Prepares rows with missing cohorts, represented by paired NaNs. Rows with
+     * fewer than minimumStudies complete pairs return NaN results. A single
+     * complete cohort passes through with normal inference and NaN heterogeneity.
+     */
+    public PreparedMetaAnalysisBatch(double[] effects, double[] standardErrors,
+            int analyses, int studies, int minimumStudies) {
+        this(effects, standardErrors, analyses, studies, minimumStudies, true);
+    }
+
+    private PreparedMetaAnalysisBatch(double[] effects, double[] standardErrors,
+            int analyses, int studies, int minimumStudies, boolean missingAllowed) {
         Objects.requireNonNull(effects, "effects");
         Objects.requireNonNull(standardErrors, "standardErrors");
         if (analyses < 1)
             throw new IllegalArgumentException("analyses must be positive");
-        if (studies < 2)
-            throw new IllegalArgumentException("at least two studies are required");
+        if (studies < (missingAllowed ? 1 : 2) || minimumStudies < 1)
+            throw new IllegalArgumentException("invalid study count or minimum studies");
         int length;
         try {
             length = Math.multiplyExact(analyses, studies);
@@ -48,15 +65,24 @@ public final class PreparedMetaAnalysisBatch {
                 "row-major inputs must have analyses * studies values");
         this.effects = effects.clone();
         this.variances = new double[length];
+        this.cohortCounts = new int[analyses];
+        this.minimumStudies = minimumStudies;
         for (int index = 0; index < length; index++) {
             double effect = this.effects[index];
             double standardError = standardErrors[index];
+            if (missingAllowed && Double.isNaN(effect) && Double.isNaN(standardError)) {
+                variances[index] = Double.NaN;
+                continue;
+            }
             if (!Double.isFinite(effect))
                 throw new IllegalArgumentException("effect sizes must be finite");
             if (!(standardError > 0.0) || !Double.isFinite(standardError))
                 throw new IllegalArgumentException(
                     "sampling standard errors must be finite and positive");
             variances[index] = standardError * standardError;
+            if (!(variances[index] > 0) || !Double.isFinite(variances[index]))
+                throw new IllegalArgumentException("sampling variance exceeds numerical range");
+            cohortCounts[index / studies]++;
         }
         this.analyses = analyses;
         this.studies = studies;
@@ -64,6 +90,18 @@ public final class PreparedMetaAnalysisBatch {
 
     public int analyses() { return analyses; }
     public int studies() { return studies; }
+    public int[] cohortCounts() { return cohortCounts.clone(); }
+
+    /** Cohort order is the input column order: +, -, 0, or ? for missing. */
+    public String direction(int analysis) {
+        java.util.Objects.checkIndex(analysis, analyses);
+        StringBuilder result = new StringBuilder(studies);
+        for (int j = 0; j < studies; j++) {
+            double value = effects[analysis * studies + j];
+            result.append(Double.isNaN(value) ? '?' : value > 0 ? '+' : value < 0 ? '-' : '0');
+        }
+        return result.toString();
+    }
 
     /** Fits with one deterministic worker thread. */
     public MetaAnalysisBatchResult fit(MetaAnalysisOptions options) {
@@ -81,10 +119,8 @@ public final class PreparedMetaAnalysisBatch {
             throw new IllegalArgumentException("parallelism must be positive");
         Output output = new Output(analyses,
             options.method() == MetaAnalysisMethod.RANDOM_EFFECT);
-        double degreesOfFreedom = studies - 1.0;
-        double critical = MetaAnalysis.critical(options, degreesOfFreedom);
         if (parallelism == 1 || analyses <= PARALLEL_CHUNK_SIZE) {
-            fitRange(0, analyses, options, critical, degreesOfFreedom, output);
+            fitRange(0, analyses, options, output);
         } else {
             int chunks = (analyses + PARALLEL_CHUNK_SIZE - 1)
                 / PARALLEL_CHUNK_SIZE;
@@ -95,8 +131,7 @@ public final class PreparedMetaAnalysisBatch {
                         int from = chunk * PARALLEL_CHUNK_SIZE;
                         int to = Math.min(analyses,
                             from + PARALLEL_CHUNK_SIZE);
-                        fitRange(from, to, options, critical,
-                            degreesOfFreedom, output);
+                        fitRange(from, to, options, output);
                     })).get();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
@@ -116,15 +151,38 @@ public final class PreparedMetaAnalysisBatch {
 
     private void fitRange(
             int from, int to, MetaAnalysisOptions options,
-            double critical, double degreesOfFreedom, Output output) {
+            Output output) {
         for (int analysis = from; analysis < to; analysis++)
-            fitOne(analysis, options, critical, degreesOfFreedom, output);
+            fitOne(analysis, options, output);
     }
 
     private void fitOne(
             int analysis, MetaAnalysisOptions options,
-            double critical, double degreesOfFreedom, Output output) {
+            Output output) {
         int offset = analysis * studies;
+        int count = cohortCounts[analysis];
+        if (count < minimumStudies || count == 0) {
+            output.missing(analysis);
+            return;
+        }
+        if (count == 1) {
+            output.missing(analysis);
+            int index = offset;
+            while (Double.isNaN(variances[index])) index++;
+            double beta = effects[index], se = Math.sqrt(variances[index]);
+            Probability p = probability(beta / se, 0, MetaInferenceMethod.NORMAL);
+            double critical = Normal.quantile(.5 + options.confidenceLevel()/2, 0, 1, true, false);
+            output.pooledEffectSizes[analysis] = beta;
+            output.standardErrors[analysis] = se;
+            output.statistics[analysis] = beta / se;
+            output.pValues[analysis] = p.pValue();
+            output.negativeLog10PValues[analysis] = p.negativeLog10PValue();
+            output.confidenceLower[analysis] = beta - critical*se;
+            output.confidenceUpper[analysis] = beta + critical*se;
+            return;
+        }
+        double degreesOfFreedom = count - 1.0;
+        double critical = MetaAnalysis.critical(options, degreesOfFreedom);
         Sums fixed = sums(offset, 0.0);
         double q = fixed.q();
         double tauSquared = estimateTauSquared(offset, fixed, options);
@@ -175,23 +233,27 @@ public final class PreparedMetaAnalysisBatch {
     private double dersimonianLaird(int offset, Sums fixed) {
         double sumSquaredWeight = 0.0;
         for (int study = 0; study < studies; study++) {
+            if (Double.isNaN(variances[offset + study])) continue;
             double weight = 1.0 / variances[offset + study];
             sumSquaredWeight += weight * weight;
         }
         double denominator = fixed.sumWeight()
             - sumSquaredWeight / fixed.sumWeight();
         return denominator > 0.0
-            ? Math.max(0.0, (fixed.q() - (studies - 1.0)) / denominator)
+            ? Math.max(0.0, (fixed.q() - (cohortCounts[offset / studies] - 1.0)) / denominator)
             : 0.0;
     }
 
     private double pauleMandel(
             int offset, Sums fixed, MetaAnalysisOptions options) {
-        double target = studies - 1.0;
+        double target = cohortCounts[offset / studies] - 1.0;
         if (fixed.q() <= target) return 0.0;
         double upper = startingUpper(offset);
-        while (sums(offset, upper).q() > target && upper < 1e12)
+        double unit = upper;
+        while (sums(offset, upper).q() > target) {
             upper *= 4.0;
+            if (!Double.isFinite(upper)) throw new ArithmeticException("cannot bracket batch heterogeneity");
+        }
         double lower = 0.0;
         for (int iteration = 0;
                 iteration < options.maximumIterations(); iteration++) {
@@ -199,19 +261,21 @@ public final class PreparedMetaAnalysisBatch {
             if (sums(offset, middle).q() > target) lower = middle;
             else upper = middle;
             if (upper - lower <= options.tolerance()
-                    * Math.max(1.0, upper)) break;
+                    * Math.max(unit, upper)) return 0.5 * (lower + upper);
         }
-        return 0.5 * (lower + upper);
+        throw new ArithmeticException("batch Paule-Mandel did not converge");
     }
 
     private double reml(int offset, MetaAnalysisOptions options) {
         double upper = startingUpper(offset);
+        double unit = upper;
         double atZero = restrictedObjective(offset, 0.0);
         double previous = atZero;
         double atUpper = restrictedObjective(offset, upper);
-        while (atUpper < previous && upper < 1e12) {
+        while (atUpper < previous) {
             previous = atUpper;
             upper *= 4.0;
+            if (!Double.isFinite(upper)) throw new ArithmeticException("cannot bracket batch REML");
             atUpper = restrictedObjective(offset, upper);
         }
         double left = 0.0;
@@ -220,6 +284,7 @@ public final class PreparedMetaAnalysisBatch {
         double second = left + GOLDEN_RATIO * (right - left);
         double firstValue = restrictedObjective(offset, first);
         double secondValue = restrictedObjective(offset, second);
+        boolean converged = false;
         for (int iteration = 0;
                 iteration < options.maximumIterations(); iteration++) {
             if (firstValue < secondValue) {
@@ -236,8 +301,9 @@ public final class PreparedMetaAnalysisBatch {
                 secondValue = restrictedObjective(offset, second);
             }
             if (right - left <= options.tolerance()
-                    * Math.max(1.0, right)) break;
+                    * Math.max(unit, right)) { converged = true; break; }
         }
+        if (!converged) throw new ArithmeticException("batch REML did not converge");
         double candidate = 0.5 * (left + right);
         return atZero <= restrictedObjective(offset, candidate)
             ? 0.0 : candidate;
@@ -247,24 +313,33 @@ public final class PreparedMetaAnalysisBatch {
         double sumLogVariance = 0.0;
         for (int study = 0; study < studies; study++) {
             int index = offset + study;
+            if (Double.isNaN(variances[index])) continue;
             sumLogVariance += Math.log(variances[index] + tauSquared);
         }
         Sums values = sums(offset, tauSquared);
         return sumLogVariance + Math.log(values.sumWeight()) + values.q()
-            + (studies - 1.0) * LOG_TWO_PI;
+            + (cohortCounts[offset / studies] - 1.0) * LOG_TWO_PI;
     }
 
     private double startingUpper(int offset) {
         double mean = 0.0;
         for (int study = 0; study < studies; study++)
-            mean += effects[offset + study];
-        mean /= studies;
+            if (!Double.isNaN(variances[offset + study])) mean += effects[offset + study];
+        mean /= cohortCounts[offset / studies];
         double variance = 0.0;
         for (int study = 0; study < studies; study++) {
+            if (Double.isNaN(variances[offset + study])) continue;
             double difference = effects[offset + study] - mean;
             variance += difference * difference;
         }
-        return Math.max(1e-8, variance / (studies - 1.0));
+        // Sampling variance supplies a unit-aware bracket even for constant effects.
+        double sampling = Double.POSITIVE_INFINITY;
+        for (int study = 0; study < studies; study++)
+            if (!Double.isNaN(variances[offset + study])) sampling = Math.min(sampling, variances[offset + study]);
+        double upper = Math.max(sampling, variance / (cohortCounts[offset / studies] - 1.0));
+        if (!(upper > 0) || !Double.isFinite(upper))
+            throw new ArithmeticException("heterogeneity scale exceeds numerical range");
+        return upper;
     }
 
     private Sums sums(int offset, double tauSquared) {
@@ -272,6 +347,7 @@ public final class PreparedMetaAnalysisBatch {
         double sumWeightedEffect = 0.0;
         for (int study = 0; study < studies; study++) {
             int index = offset + study;
+            if (Double.isNaN(variances[index])) continue;
             double weight = 1.0 / (variances[index] + tauSquared);
             double effect = effects[index];
             sumWeight += weight;
@@ -281,6 +357,7 @@ public final class PreparedMetaAnalysisBatch {
         double q = 0.0;
         for (int study = 0; study < studies; study++) {
             int index = offset + study;
+            if (Double.isNaN(variances[index])) continue;
             double weight = 1.0 / (variances[index] + tauSquared);
             double residual = effects[index] - mean;
             q += weight * residual * residual;
@@ -346,6 +423,13 @@ public final class PreparedMetaAnalysisBatch {
                 negativeLog10PValues, confidenceLower, confidenceUpper,
                 predictionLower, predictionUpper, cochranQ, cochranQPValues,
                 tauSquared, iSquared, hSquared);
+        }
+
+        void missing(int row) {
+            for (double[] column : new double[][]{pooledEffectSizes, standardErrors,
+                    statistics, pValues, negativeLog10PValues, confidenceLower, confidenceUpper,
+                    predictionLower, predictionUpper, cochranQ, cochranQPValues, tauSquared,
+                    iSquared, hSquared}) column[row] = Double.NaN;
         }
     }
 }

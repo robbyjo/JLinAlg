@@ -1084,6 +1084,13 @@ statistics and p-values, intervals, Cochran Q, tau-squared, I-squared, and
 H-squared. See [the four-cohort TOPMed profile](docs/topmed-meta-analysis-performance.md)
 for the Java/R benchmark and reproduction commands.
 
+Source builds now expose `meta-analysis` and `meta-regression` CLI commands
+for separate cohort files. They join feature IDs, emit cohort directions such
+as `++--?-`, and accept `--min-cohorts` (default `1`). The ordinary CLI uses
+primitive array batches with missing cohorts; meta-regression also has an
+array overload. See the [runnable CLI tutorial](docs/vignettes/cli-meta-analysis-tutorial.md)
+and [allocation/time measurements](docs/meta-cli-validation.md).
+
 `MetaRegression` accepts one or more numeric moderator columns, optionally adds
 an intercept, and uses the same fixed/random heterogeneity estimators. It
 returns named coefficient effect sizes, SE/statistic/p-values (including log10

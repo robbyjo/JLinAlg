@@ -5,6 +5,30 @@ for each independent study. Transform ratio measures to a suitable additive
 scale, such as log odds ratios, before fitting and back-transform only for
 presentation.
 
+## CLI and array workflows
+
+For file-based omics workflows, use the [meta-analysis CLI tutorial](cli-meta-analysis-tutorial.md).
+It accepts separate, unsorted cohort files, records direction strings, and
+supports minimum complete-cohort counts for pooling and meta-regression.
+
+The missing-aware array API avoids per-study object construction:
+
+```java
+PreparedMetaAnalysisBatch batch = MetaAnalysis.prepareBatch(
+    rowMajorEffects, rowMajorStandardErrors, features, cohorts, 1);
+// Use paired Double.NaN values for missing cohorts. The last argument is the minimum.
+MetaAnalysisBatchResult result = batch.fit(MetaAnalysisOptions.randomEffects(), 4);
+System.out.println(batch.direction(0)); // for example, ++--?-
+int[] availableCohorts = batch.cohortCounts();
+```
+
+Below-minimum rows have NaN result columns; single-cohort rows pass through
+with normal inference and NaN heterogeneity. The four-argument preparation
+API continues to require complete data with at least two studies.
+`MetaRegression.fit(effects, standardErrors, moderators, moderatorNames,
+includeIntercept, options, backendPolicy)` accepts primitive complete-case
+arrays. See [validation and allocation measurements](../meta-cli-validation.md).
+
 ## Define the studies
 
 ```java

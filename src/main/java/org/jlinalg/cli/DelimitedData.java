@@ -69,7 +69,7 @@ final class DelimitedData {
         return index;
     }
 
-    private static List<String> parse(
+    static List<String> parse(
             String line, char delimiter, long lineNumber, Path path)
             throws IOException {
         List<String> result = new ArrayList<>();

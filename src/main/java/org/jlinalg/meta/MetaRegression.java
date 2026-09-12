@@ -33,8 +33,32 @@ public final class MetaRegression {
             MetaAnalysisOptions options,
             BackendPolicy backendPolicy) {
         MetaMath.Data data = MetaMath.data(studies);
+        return fit(data, moderators, moderatorNames, includeIntercept, options, backendPolicy);
+    }
+
+    /** Fits complete-case primitive arrays without constructing per-study objects. */
+    public static MetaRegressionResult fit(double[] effects, double[] standardErrors,
+            double[][] moderators, List<String> moderatorNames, boolean includeIntercept,
+            MetaAnalysisOptions options, BackendPolicy backendPolicy) {
+        if (effects == null || standardErrors == null || effects.length != standardErrors.length
+                || effects.length < 2) throw new IllegalArgumentException("matching effect and SE arrays are required");
+        double[] variances = new double[effects.length];
+        for (int i = 0; i < effects.length; i++) {
+            variances[i] = standardErrors[i]*standardErrors[i];
+            if (!Double.isFinite(effects[i]) || !(standardErrors[i] > 0)
+                    || !(variances[i] > 0) || !Double.isFinite(variances[i]))
+                throw new IllegalArgumentException("effects and positive sampling variances must be finite");
+        }
+        return fit(new MetaMath.Data(effects.clone(), variances), moderators, moderatorNames,
+            includeIntercept, options, backendPolicy);
+    }
+
+    private static MetaRegressionResult fit(MetaMath.Data data, double[][] moderators,
+            List<String> moderatorNames, boolean includeIntercept,
+            MetaAnalysisOptions options, BackendPolicy backendPolicy) {
+        int rows = data.effects().length;
         if (moderators == null || moderatorNames == null || options == null
-                || backendPolicy == null || moderators.length != studies.size())
+                || backendPolicy == null || moderators.length != rows)
             throw new IllegalArgumentException(
                 "moderators, names, options, and backend policy are required");
         int moderatorCount = moderators.length == 0 || moderators[0] == null
@@ -42,13 +66,13 @@ public final class MetaRegression {
         if (moderatorCount < 1 || moderatorNames.size() != moderatorCount)
             throw new IllegalArgumentException(
                 "one name is required for each moderator column");
-        double[] moderatorData = MatrixOps.rowMajor(moderators, studies.size());
+        double[] moderatorData = MatrixOps.rowMajor(moderators, rows);
         int columns = moderatorCount + (includeIntercept ? 1 : 0);
-        if (studies.size() <= columns)
+        if (rows <= columns)
             throw new IllegalArgumentException(
                 "meta-regression needs more studies than coefficients");
-        double[] design = new double[studies.size() * columns];
-        for (int row = 0; row < studies.size(); row++) {
+        double[] design = new double[rows * columns];
+        for (int row = 0; row < rows; row++) {
             int offset = 0;
             if (includeIntercept) design[row * columns + offset++] = 1.0;
             System.arraycopy(moderatorData, row * moderatorCount,
@@ -69,7 +93,7 @@ public final class MetaRegression {
                 data, design, columns, tauSquared, context.backend());
             MetaMath.Fit fixed = MetaMath.fit(
                 data, design, columns, 0.0, context.backend());
-            double degrees = studies.size() - columns;
+            double degrees = rows - columns;
             double scale = MetaAnalysis.inferenceScale(
                 options, fitted.qe(), degrees);
             double[] covariance = fitted.covariance().clone();
@@ -93,7 +117,7 @@ public final class MetaRegression {
                 : 0.0;
             double hSquared = Math.max(1.0, fixed.qe() / degrees);
 
-            double[] intercept = new double[studies.size()];
+            double[] intercept = new double[rows];
             java.util.Arrays.fill(intercept, 1.0);
             double nullTau = MetaMath.estimateTauSquared(
                 data, intercept, 1, options, context.backend());

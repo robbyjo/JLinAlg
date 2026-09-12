@@ -105,31 +105,36 @@ final class MetaMath {
         double target = data.effects().length - columns;
         if (fit(data, design, columns, 0.0, backend).qe() <= target) return 0.0;
         double upper = startingUpper(data);
-        while (fit(data, design, columns, upper, backend).qe() > target
-                && upper < 1e12) upper *= 4.0;
+        double unit = upper;
+        while (fit(data, design, columns, upper, backend).qe() > target) {
+            upper *= 4.0;
+            if (!Double.isFinite(upper)) throw new ArithmeticException("cannot bracket heterogeneity");
+        }
         double lower = 0.0;
         for (int iteration = 0; iteration < options.maximumIterations(); iteration++) {
             double middle = 0.5 * (lower + upper);
             if (fit(data, design, columns, middle, backend).qe() > target)
                 lower = middle;
             else upper = middle;
-            if (upper - lower <= options.tolerance() * Math.max(1.0, upper))
-                break;
+            if (upper - lower <= options.tolerance() * Math.max(unit, upper))
+                return 0.5 * (lower + upper);
         }
-        return 0.5 * (lower + upper);
+        throw new ArithmeticException("Paule-Mandel did not converge");
     }
 
     private static double reml(
             Data data, double[] design, int columns,
             MetaAnalysisOptions options, ComputeBackend backend) {
         double upper = startingUpper(data);
+        double unit = upper;
         double previous = fit(data, design, columns, 0.0, backend)
             .restrictedObjective();
         double atUpper = fit(data, design, columns, upper, backend)
             .restrictedObjective();
-        while (atUpper < previous && upper < 1e12) {
+        while (atUpper < previous) {
             previous = atUpper;
             upper *= 4.0;
+            if (!Double.isFinite(upper)) throw new ArithmeticException("cannot bracket REML");
             atUpper = fit(data, design, columns, upper, backend)
                 .restrictedObjective();
         }
@@ -142,6 +147,7 @@ final class MetaMath {
             .restrictedObjective();
         double secondValue = fit(data, design, columns, second, backend)
             .restrictedObjective();
+        boolean converged = false;
         for (int iteration = 0; iteration < options.maximumIterations(); iteration++) {
             if (firstValue < secondValue) {
                 right = second; second = first; secondValue = firstValue;
@@ -154,9 +160,11 @@ final class MetaMath {
                 secondValue = fit(data, design, columns, second, backend)
                     .restrictedObjective();
             }
-            if (right - left <= options.tolerance() * Math.max(1.0, right))
-                break;
+            if (right - left <= options.tolerance() * Math.max(unit, right)) {
+                converged = true; break;
+            }
         }
+        if (!converged) throw new ArithmeticException("REML did not converge");
         double candidate = 0.5 * (left + right);
         double atZero = fit(data, design, columns, 0.0, backend)
             .restrictedObjective();
@@ -170,7 +178,11 @@ final class MetaMath {
         mean /= data.effects().length;
         double variance = 0.0;
         for (double value : data.effects()) variance += (value - mean) * (value - mean);
-        return Math.max(1e-8, variance / Math.max(1, data.effects().length - 1));
+        double sampling = java.util.Arrays.stream(data.variances()).min().orElseThrow();
+        double upper = Math.max(sampling, variance / Math.max(1, data.effects().length - 1));
+        if (!(upper > 0) || !Double.isFinite(upper))
+            throw new ArithmeticException("heterogeneity scale exceeds numerical range");
+        return upper;
     }
 
     private static double[] crossProduct(

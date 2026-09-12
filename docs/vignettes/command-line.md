@@ -12,6 +12,11 @@ file-to-result tutorials cover [mediation](cli-mediation-tutorial.md),
 [SuSiE](cli-susie-tutorial.md), and
 [multi-signal colocalization](cli-colocalization-tutorial.md).
 
+Source builds after v0.3.5 also provide `meta-analysis` and `meta-regression`
+for separate cohort summary files. See the [meta-analysis tutorial](cli-meta-analysis-tutorial.md)
+for cohort directions, missing values, and minimum-cohort controls. These two
+new commands are not in the previously published v0.3.5 release asset.
+
 ## Understand the three ID layers
 
 | Option | Meaning |

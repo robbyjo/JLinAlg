@@ -31,6 +31,12 @@ public final class MetaAnalysis {
             effects, standardErrors, analyses, studies);
     }
 
+    /** Prepares a batch with paired NaNs for missing cohorts and a minimum count. */
+    public static PreparedMetaAnalysisBatch prepareBatch(double[] effects,
+            double[] standardErrors, int analyses, int studies, int minimumStudies) {
+        return new PreparedMetaAnalysisBatch(effects, standardErrors, analyses, studies, minimumStudies);
+    }
+
     public static MetaAnalysisResult fit(
             List<MetaStudy> studies, MetaAnalysisOptions options,
             BackendPolicy backendPolicy) {

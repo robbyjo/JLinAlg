@@ -24,6 +24,10 @@ public final class JLinAlgCli {
 
     static int run(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && (arguments[0].equals("meta-analysis")
+                || arguments[0].equals("meta-regression")))
+            return MetaCli.run(arguments[0], Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("ld-db"))
             return LdDatabaseCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
@@ -133,6 +137,11 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar meta-analysis
+                --cohort NAME=FILE [--cohort NAME=FILE ...] --model fixed|random --out FILE
+              java -jar jlinalg-<version>.jar meta-regression
+                --cohort NAME=FILE [--cohort NAME=FILE ...] --moderator-file FILE
+                --moderators COLUMN[,COLUMN...] --out FILE
               java -jar jlinalg-<version>.jar --pheno FILE --id COLUMN
                 --formula "y ~ covariates + <omics>" [--omics FILE] --out FILE
               java -jar jlinalg-<version>.jar ld-db list

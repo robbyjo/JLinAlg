@@ -1,5 +1,19 @@
 # Unreleased
 
+## Meta-analysis CLI and array workflows
+
+- Added `meta-analysis` and `meta-regression` commands for separate cohort
+  TSV/CSV files (including gzip), matched by feature ID with external sorting.
+- Fixed/random effects support REML, DL, and PM, numeric moderators, coefficient
+  inference controls, cohort direction strings, and `--min-cohorts` (default 1).
+  Single-cohort pooling passes through explicitly; insufficient or rank-deficient
+  regression rows are marked as unestimable.
+- Extended primitive-array batches to support missing cohorts, directions, and
+  minimum counts; added primitive-array meta-regression. Heterogeneity stopping
+  rules respect effect units and fail explicitly on iteration exhaustion.
+- Added independent R/metafor CLI fixtures, runnable six-cohort examples, and a
+  reproducible synthetic allocation/time comparison with the study-list API.
+
 ## Statistical correctness fixes
 
 - Stabilized the Lugannani–Rice kernel-tail fallback at and around the mean,
