@@ -689,7 +689,8 @@ tasks.register('benchmarkTopmedMetaAnalysis', JavaExec) {
     benchmarkGeneticAudit: 'org.jlinalg.genetics.GeneticAuditBenchmark',
     benchmarkPipelineOlsAudit: 'org.jlinalg.association.PipelineOlsAuditBenchmark',
     benchmarkPipelineBhAudit: 'org.jlinalg.cli.PipelineBhAuditBenchmark',
-    benchmarkPipelineKernelAudit: 'org.jlinalg.settest.PipelineKernelAuditBenchmark'
+    benchmarkPipelineKernelAudit: 'org.jlinalg.settest.PipelineKernelAuditBenchmark',
+    benchmarkRareMetaEngineering: 'org.jlinalg.cli.RareMetaEngineeringBenchmark'
 ].each { taskName, className ->
     tasks.register(taskName, JavaExec) {
         group = 'verification'

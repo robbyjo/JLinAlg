@@ -3,17 +3,16 @@
 JLinAlg separates participant-level summary generation from the choice of
 association test. `rare-score` exports one cohort's variant scores and their
 covariances. `rare-meta` combines independent cohorts and performs the explicitly
-selected single-variant, burden, SKAT, or SKAT-O tests. Cohort group-test p-values
+selected single-variant, burden, SKAT, SKAT-O, variable-threshold, or heterogeneous-effect tests. Cohort group-test p-values
 alone are insufficient input for this score-based workflow.
 
-The initial scope is quantitative traits, diploid additive biallelic variants,
-and independent cohorts on a compatible phenotype scale. The built-in exporter
-fits an unrelated-sample Gaussian model. RAREMETALWORKER/rvtests summaries from
-appropriately adjusted related-sample quantitative-trait models can be imported;
-this does not adjust for relatives or overlapping participants *between* cohorts.
-Binary-trait rare-case calibration, conditional analysis, multiallelic covariance,
-variable-threshold tests, and heterogeneous-effect kernel meta-analysis are future
-extensions. These commands do not implement Raremetal2's `--useExact` method.
+The scope is quantitative traits, diploid additive biallelic variants, and
+independent cohorts on a compatible phenotype scale. The built-in exporter fits
+an unrelated Gaussian model or a related-sample Gaussian REML model with `--grm`.
+RAREMETALWORKER/rvtests quantitative-trait summaries can also be imported. This
+does not adjust for relatives or overlapping participants **between** cohorts.
+Binary-trait rare-case calibration, multiallelic covariance, and Raremetal2's
+`--useExact` method remain outside the supported scope.
 
 ## Choose the question and test
 
@@ -23,6 +22,10 @@ extensions. These commands do not implement Raremetal2's `--useExact` method.
 | `burden` | Association of a specified weighted allele burden; often powerful when many effects have the same direction | Burden beta, SE, signed Z, p, log p, directions |
 | `skat` | Set association allowing mixed effect directions and many non-associated variants | Quadratic Q, p, log p, numerical calibration |
 | `skat-o` | Adaptive combination of burden and SKAT, accounting for the search over combinations | Minimum component p, adjusted p, rho/component diagnostics, calibration and simulation budget |
+
+| `vt` | Adaptive MAF-threshold burden search, calibrated under correlated Gaussian scores | Selected MAF and descriptive burden beta/SE/p; separate adjusted p, Monte Carlo SE and budget |
+| `het-skat`, `het-skat-o` | Variant effects may differ between independent cohorts | Heterogeneous Q or adjusted omnibus p; separate number of cohort-by-variant effect dimensions |
+| `burden-fixed`, `burden-random` | Common or normally distributed cohort burden effects with a comparable burden definition | Beta, SE, normal p; Cochran Q/p, I-squared, and REML tau-squared for the random model |
 
 No test is uniformly most powerful. Choose the primary test, windows/masks, MAF
 threshold, weights, and multiplicity correction before inspecting association
@@ -55,7 +58,7 @@ java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/coh
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights beta --maf 0.5 --simulations 100000 --seed 1234 --out build/rare-demo/skato
 ```
 
-Each selected test creates `PREFIX.TEST.tsv`. `PREFIX.log` records settings,
+Each selected test creates `PREFIX.TEST.tsv`; `PREFIX.qc.tsv` records group coverage and exclusions. `PREFIX.log` records settings,
 cohort order, input paths, UTC start/end timestamps, status, and readable elapsed
 time. Existing files are never overwritten. `--cohort-results` adds cohort rows
 with `scope=A`, `scope=B`, etc., alongside `scope=meta`; otherwise only meta rows
@@ -132,8 +135,11 @@ uses complete phenotype/covariate cases, fits an intercept plus optional numeric
 Scores and information use original phenotype units and null residual variance
 `RSS/(N-p)`. This estimator choice is recorded; it is not a claim that every
 RAREMETALWORKER model or transformation produces identical summaries. No inverse
-normal transformation is silently applied. HWE is not computed and is recorded
-as `NA`; use `--hwe 0` for these outputs. For fractional DS inputs, use RAREMETAL's
+normal transformation is silently applied. HWE uses an exact two-sided test for
+hard calls before imputation; fractional dosages or no calls produce `NA`.
+A positive `--hwe` cutoff excludes rows with unavailable HWE. HWE in related or
+ancestrally mixed samples is descriptive and its usual population interpretation
+requires care; it is not adjusted by the GRM. For fractional DS inputs, use RAREMETAL's
 `--dosage` option if consuming the exported files in that external program.
 
 The exporter writes BGZF and tabix indices with the historical RMW column order.
@@ -216,9 +222,142 @@ Neither option establishes exact finite-sample phenotype calibration. Rank-one
 SKAT-O reduces to a one-degree-of-freedom test without simulation.
 
 See [validation and timing](rare-meta-validation.md) for the tested scope,
-RAREMETAL version, independent R fixtures, and measured performance. Leave-one-out
-and conditional analysis remain future diagnostics; neither is needed to recover
-single-variant scores from these summary files.
+RAREMETAL version, independent R fixtures, and measured performance.
+Neither leave-out diagnostics nor conditioning is needed to recover the original
+single-variant scores: they are already in the input files.
+
+## Advanced tests, conditioning, and diagnostics
+
+After generating the two cohort files in the complete example, these commands
+run directly from the repository root. Use a fresh output prefix on each run.
+
+```shell
+java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden,skat,skat-o,vt,het-skat,het-skat-o,burden-fixed,burden-random --weights equal --maf 0.5 --simulations 100000 --cohort-results --leave-variant-out --leave-cohort-out --threads 2 --cache-mb 16 --out build/rare-demo/advanced
+java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/conditional-groups.txt --condition examples/rare-meta/conditions.txt --test burden,skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/conditional
+java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/deterministic
+java --class-path build/cli/jlinalg-0.3.5.jar examples/rare-meta/AdvancedRareMetaExample.java
+```
+
+The [Java example](../examples/rare-meta/AdvancedRareMetaExample.java) demonstrates
+all model building blocks, including `SummaryScoreModels.condition`, `subset`,
+`heterogeneous`, and `variableThreshold`, plus existing `MetaAnalysis` APIs.
+
+### Conditional summary analysis
+
+Both group and condition files have `GROUP_ID CHROM:POS:REF:ALT ...` lines.
+The example tests variant 1 given variant 2; a singleton target group therefore
+provides a conditional single-variant score test through `--test burden` with
+equal weights. Target and conditioning positions must be disjoint and lie on
+one chromosome. Groups absent from the condition file remain unconditional;
+unknown condition group IDs are errors. The single-site streaming command
+rejects `--condition` to avoid implying that its unconditional output is adjusted.
+
+Within **each cohort**, compute `Uc = Ut - Vtc Vcc^-1 Uc0` and
+`Vc = Vtt - Vtc Vcc^-1 Vct`, then pool the adjusted blocks. The implementation
+uses a symmetric eigensolve, rejects conditioning eigenvalues at or below
+`1e-10` of the largest, and validates the joint and adjusted covariance.
+These are one-step conditional score estimates based on the supplied null model,
+not an alternative-model participant-level refit. Omission uses a principal
+submatrix and is a different operation.
+
+All target/condition and condition/condition covariance pairs must be available;
+extend the export covariance window accordingly. The default missing-conditioning
+policy is an error. `--condition-missing exclude` excludes that entire cohort
+from the group's scores and reports it in the QC manifest. The initial MAF/weight
+definition still uses the original available cohort AFs; the informative cohort
+minimum excludes unavailable conditioning cohorts. Condition variants are not
+subject to the target rare-MAF filter, but must pass cohort QC and have information.
+
+### Leave-out influence diagnostics
+
+`--leave-variant-out` and `--leave-cohort-out` add rows to each requested group-test
+table with `scope=leave_variant:CHROM:POS:REF:ALT` or `scope=leave_cohort:NAME`.
+The original MAFs, weights, total-N weight truncation, and complete-case cohort
+null models remain fixed. The original minimum-cohort filter defines the mask;
+it is not reapplied after omission. Variants losing all information are dropped
+and the result reports the remaining variant/cohort counts. Removing the only
+variant or informative cohort produces an explicit unavailable-result row.
+Every reduced SKAT-O or VT search is recalibrated using its reduced covariance.
+These are exploratory influence checks, not conditional or causal attribution.
+They are available for group tests, including singleton groups, rather than the
+streaming `single` command.
+
+### Variable thresholds and heterogeneous effects
+
+VT searches the distinct pooled MAFs within the retained mask up to `--maf`, using
+the chosen fixed linear weights (equal by default). It maximizes absolute burden Z
+and uses joint Gaussian score draws to calibrate the correlated threshold search.
+The selected burden beta/SE/p are descriptive after selection; use `adjusted_p`
+for the threshold search and correct across features separately. `mc_se` reports
+simulation uncertainty and the minimum resolution is `1/(simulations+1)`.
+One informative threshold reduces to an ordinary normal burden test.
+
+Homogeneous SKAT uses `sum_j (w_j sum_c U_cj)^2`. Heterogeneous SKAT instead uses
+`sum_c sum_j (w_j U_cj)^2`, with block-diagonal covariance across independent
+cohorts. Heterogeneous SKAT-O combines that kernel with the **pooled burden** and
+calibrates the rho search. Thus opposite cohort effects can cancel in the pooled
+burden while remaining visible to the heterogeneous kernel. `n_variants` counts
+distinct retained variants; `n_effect_dimensions` counts informative cohort-by-
+variant entries. These kernel models do not estimate a signed window beta or
+shrinkage effects from their p-values.
+
+`burden-fixed` and `burden-random` use cohort burden beta/SE only for cohorts with
+the complete original mask and positive burden information. Incomplete-mask
+cohorts are excluded from these scalar fits, marked `?` in their direction string,
+and identifiable through the QC manifest. Random effects use REML tau-squared
+and normal inference; with one eligible cohort, heterogeneity is unavailable and
+the cohort estimate passes through with `single_cohort` status. These choices
+do not make different phenotype units comparable. The Java `MetaAnalysis` and
+`MetaRegression` APIs support additional explicitly chosen inference/model options.
+
+### Deterministic rare-tail SKAT-O
+
+`--skato-calibration deterministic` conditions on the Gaussian burden coordinate
+and integrates the resulting **noncentral** quadratic-form tails. It avoids the
+moment approximation and finite simulation resolution. Positive gamma-series
+truncation is bounded by `1e-10 * minimum_component_p`; scaled adaptive quadrature
+targets absolute error `1e-6 * minimum_component_p`. Quadrature error is an
+estimate, not an interval-arithmetic guarantee. These limits are fixed and
+identified in the calibration label. Supported min-p is at least `1e-250`.
+
+An unresolved spectrum, series, quadrature, or component tail fails explicitly;
+this mode never silently substitutes the saddlepoint or moment approximation.
+Ill-conditioned or large noncentral problems may exceed its 8,192-term budget.
+Independent rank-two polar and rank-three convolution references validate tested
+moderate and rare tails; this does not establish universal numerical accuracy or
+exact finite-sample calibration for sparse or non-Gaussian phenotypes.
+
+### Related-sample export, QC, and memory
+
+```shell
+java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --grm examples/rare-meta/cohort-a.grm.tsv --cov-window 100 --out build/rare-demo/a-related
+```
+
+`--grm` accepts a labeled dense matrix or GCTA binary prefix, as described in
+the [GRM tutorial](grm-cli.md). IDs are aligned to the fixed complete-case
+VCF/phenotype sample. The model is `Var(y)=tau*K + sigma2*I`, fitted by REML;
+nonconvergence is an error. Exported `U=G'Py`, `V=G'PG` retain original trait
+units and disk covariance remains `V/N`. The log records fitted variance components.
+Missing dosages are mean imputed and HWE is computed before imputation. Dense
+REML retains an N-by-N projection, so this exporter is not a sparse biobank solver.
+
+`PREFIX.qc.tsv` records requested target and conditioning variants per cohort,
+retention, exclusion reason, sample count, pooled MAF, original information,
+effect orientation, conditioning status, call rate, and HWE p. It does not assert
+that overlapping groups or their samples are independent. For conditioned tests,
+the manifest's information is the **original** cohort diagonal; test results use
+the adjusted block. A single-site-only run produces a header-only group manifest.
+
+`--threads` defaults to 1 and caps concurrent groups; output stays in input order.
+Shared file readers serialize regional I/O while numerical tests run concurrently.
+`--cache-mb` defaults to 16 per cohort, bounds estimated cached payload bytes, and
+0 disables it. This is not a total heap limit. Active dense blocks require
+approximately O(threads * cohorts * variants^2) storage plus eigensolver workspaces;
+the heterogeneous kernel dimension is the sum of cohort-specific variant counts.
+`--max-variants` caps target-plus-condition and heterogeneous dimensions. The
+group output buffer is bounded by concurrent groups, but requesting all leave-out
+rows adds memory and substantial computation. Indexed BGZF/tabix inputs are
+recommended; unindexed files are rescanned on cache misses.
 
 ## References
 

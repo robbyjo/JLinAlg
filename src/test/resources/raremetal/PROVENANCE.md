@@ -22,3 +22,13 @@ why a zero Davies return or cancellation-prone Imhof tail is not an accuracy
 oracle: the independent survival integral remains positive near 1.06e-22.
 SKAT-O's moment-based R output and correlated Gaussian simulation are compared
 only at resolvable moderate probabilities, not claimed identical algorithms.
+
+`advanced-reference.R` generates `advanced-skato.tsv`, `advanced-vt.txt`,
+`noncentral-tail.tsv`, and `noncentral-mixture.tsv` using base R 4.6.1. These are
+original synthetic fixtures, not copied study data. SKAT-O uses direct polar
+integration for rank two and an independent chi-square convolution for rank
+three. The smallest adjusted fixture p is about 9.01633e-21. The noncentral
+rank-one reference uses the exact sum of normal tails because R's noncentral
+`pchisq` loses relative accuracy in some tested upper tails. The unequal
+noncentral mixture reference integrates normal coordinates directly. Neither
+reference implements the Java conditional positive-gamma-series algorithm.

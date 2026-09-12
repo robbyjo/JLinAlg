@@ -11,7 +11,7 @@ import htsjdk.tribble.readers.TabixReader;
 /** Biallelic RAREMETALWORKER/rvtests summary reader. Indexed files support
  * bounded regional access; unindexed files are rescanned without retaining a
  * genome-wide matrix. Covariances are restored to the score-information scale.
- * This class is not thread safe; open one instance per concurrent reader.
+ * Regional reads are synchronized; independent numerical work can run in parallel.
  */
 public final class RareMetalStudy implements AutoCloseable {
     private final Path scores, covariance;
@@ -22,6 +22,21 @@ public final class RareMetalStudy implements AutoCloseable {
     private String genomeBuild;
     private boolean scoreScale;
     private double minimumCallRate,minimumHwe;
+    private long cacheLimit,cacheSize;
+    private final LinkedHashMap<String,CacheEntry> cache=new LinkedHashMap<>(16,.75f,true);
+    private record CacheEntry(Object value,long bytes) { }
+    /** Bound estimated retained payload bytes; zero disables caching. */
+    public synchronized RareMetalStudy cacheBytes(long bytes) {
+        if(bytes<0)throw new IllegalArgumentException("negative cache budget");
+        cacheLimit=bytes;cache.clear();cacheSize=0;return this;
+    }
+    private void remember(String key,Object value,long bytes) {
+        if(bytes>cacheLimit||cacheLimit==0)return;
+        while(!cache.isEmpty()&&cacheSize+bytes>cacheLimit) {
+            var first=cache.entrySet().iterator();var entry=first.next();cacheSize-=entry.getValue().bytes;first.remove();
+        }
+        cache.put(key,new CacheEntry(value,bytes));cacheSize+=bytes;
+    }
 
     public RareMetalStudy(Path scores,Path covariance,double minimumCallRate,double minimumHwe) throws IOException {
         this.scores=scores; this.covariance=covariance;
@@ -63,17 +78,30 @@ public final class RareMetalStudy implements AutoCloseable {
     public Cursor cursor() throws IOException {return new Cursor(open(scores));}
 
     /** At most one biallelic record per position; ambiguous multiallelic rows fail. */
-    public Map<Long,Score> region(String chromosome,long start,long end) throws IOException {
+    public synchronized Map<Long,Score> region(String chromosome,long start,long end) throws IOException {
+        String key="scores:"+chromosome+":"+start+":"+end;
+        CacheEntry cached=cache.get(key);
+        if(cached!=null) {
+            @SuppressWarnings("unchecked") Map<Long,Score> value=(Map<Long,Score>)cached.value;
+            return value;
+        }
         Map<Long,Score> result=new HashMap<>();
         lines(scores,scoreIndex,scoreChromosomes,chromosome,start,end,line->{
             Score value=parse(line);
             if(result.put(value.position(),value)!=null) throw new IOException("duplicate/multiallelic score position: "+value.id());
         });
-        return result;
+        Map<Long,Score> immutable=Map.copyOf(result);
+        long bytes=128+2L*key.length();
+        for(Score value:result.values())bytes+=256+2L*(value.chromosome().length()+value.reference().length()+value.alternate().length());
+        remember(key,immutable,bytes);
+        return immutable;
     }
 
     /** Covariance block in the order of supplied, informative score records. */
-    public double[] covariance(List<Score> records) throws IOException {
+    public synchronized double[] covariance(List<Score> records) throws IOException {
+        String key="cov:"+records.stream().map(s->s.id()+":"+s.variance()).collect(java.util.stream.Collectors.joining(";"));
+        CacheEntry cached=cache.get(key);
+        if(cached!=null)return ((double[])cached.value).clone();
         int n=records.size(); double[] matrix=new double[Math.multiplyExact(n,n)];
         if(n==0)return matrix;
         for(int i=0;i<n;i++) matrix[i*n+i]=records.get(i).variance();
@@ -117,6 +145,8 @@ public final class RareMetalStudy implements AutoCloseable {
         });
         for(int i=0;i<n;i++) for(int j=i;j<n;j++) if(!found[i*n+j])
             throw new IOException("missing covariance for "+records.get(i).id()+" / "+records.get(j).id()+"; covariance window may be too short");
+        long bytes=8L*matrix.length+128+2L*key.length();
+        if(cacheLimit>0&&bytes<=cacheLimit)remember(key,matrix.clone(),bytes);
         return matrix;
     }
 
@@ -148,7 +178,7 @@ public final class RareMetalStudy implements AutoCloseable {
             if(position<1||position>Integer.MAX_VALUE)throw new IllegalArgumentException("position outside supported genomic range");
             if(Double.isFinite(root)&&!Double.isFinite(root*root))throw new IllegalArgumentException("score variance overflow");
             return new Score(chromosome(text(f,"CHROM")),position,ref,alt,n,af,
-                status.equals("ok")?u:Double.NaN,status.equals("ok")?root*root:Double.NaN,status);
+                status.equals("ok")?u:Double.NaN,status.equals("ok")?root*root:Double.NaN,status,number(f,"CALL_RATE"),number(f,"HWE_PVALUE"));
         } catch(RuntimeException e){throw new IOException("invalid score row in "+scores+": "+e.getMessage(),e);}
     }
     private String text(String[] f,String name){return f[header.get(name)];}
@@ -202,7 +232,11 @@ public final class RareMetalStudy implements AutoCloseable {
     public static int comparePosition(Score a,Score b){int c=compareChromosome(a.chromosome,b.chromosome);return c!=0?c:Long.compare(a.position,b.position);}
     public static int compareChromosome(String a,String b){int x=rank(a),y=rank(b);return x!=y?Integer.compare(x,y):a.equals(b)?0:a.compareTo(b);}
     private static int rank(String c){try{return Integer.parseInt(c);}catch(NumberFormatException e){return c.equals("X")?1000:c.equals("Y")?1001:c.equals("MT")||c.equals("M")?1002:1003;}}
-    public record Score(String chromosome,long position,String reference,String alternate,double samples,double frequency,double score,double variance,String status) {
+    public record Score(String chromosome,long position,String reference,String alternate,double samples,double frequency,double score,double variance,String status,double callRate,double hwePValue) {
+        /** Source-compatible construction for programmatically supplied summaries. */
+        public Score(String chromosome,long position,String reference,String alternate,double samples,double frequency,double score,double variance,String status) {
+            this(chromosome,position,reference,alternate,samples,frequency,score,variance,status,Double.NaN,Double.NaN);
+        }
         public String id(){return chromosome+":"+position+":"+reference+":"+alternate;}
         public boolean informative(){return status.equals("ok");}
         public int orientation(String ref,String alt){

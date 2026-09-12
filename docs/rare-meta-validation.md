@@ -1,10 +1,10 @@
 # Rare-variant meta-analysis validation
 
-Validated on 2026-09-12. This report covers the initial independent-cohort,
-quantitative-trait score workflow described in the
+Validated on 2026-09-12. This report covers the independent-cohort,
+quantitative-trait score workflow and its conditional, adaptive, heterogeneous,
+diagnostic, and related-sample export extensions described in the
 [tutorial](rare-variant-meta-analysis.md). It does not establish parity for every
-RAREMETALWORKER model, Raremetal2's exact method, binary traits, conditional
-analysis, or heterogeneous-effect meta-analysis.
+RAREMETALWORKER model, Raremetal2's exact method, or binary traits.
 
 ## Reference and automated checks
 
@@ -53,8 +53,8 @@ adjusted result on three moderate-probability cases, within absolute tolerance
 0.015. These are different calibration algorithms, so this is a compatibility
 check rather than an equality assertion. Default simulation resolution is
 `1/(simulations+1)`; its default 10,000 draws cannot resolve genome-wide rare
-tails. The explicit analytic option is a moment approximation. Deterministic
-rare-tail calibration with independent error control remains on the TODO list.
+tails. The explicit analytic option is a moment approximation. The new
+`deterministic` option is validated separately below.
 
 Run the complete Java, website, documentation, and executable checks with:
 
@@ -62,9 +62,102 @@ Run the complete Java, website, documentation, and executable checks with:
 .\gradlew.bat check javadoc executableJar --console=plain
 ```
 
-The final run passed: 695 tests discovered, 692 passed, three optional native
-CHOLMOD tests skipped, and no failures or errors. Website validation, Javadoc,
-and executable JAR generation also passed.
+The original delivery passed its complete check, including website validation,
+Javadoc, and executable JAR generation. Expanded validation is described below.
+The expanded full run passed **709 tests: 706 passed, three optional native
+CHOLMOD skips, zero failures/errors**. Website validation, Javadoc and executable
+JAR generation passed. Fresh-output smoke runs also passed both cohort exports,
+GRM export, all eight group-test choices with diagnostics, conditional and
+deterministic analyses, and both runnable Java examples.
+
+## Advanced methods and rare tails
+
+`SummaryScoreModelsTest` compares conditional blocks with hand-calculated Schur
+complements, rejects singular conditioning information and overlapping indices,
+and checks a heterogeneous kernel with opposing cohort effects against an exact
+chi-square(4) tail. Homogeneous pooling cancels those scores; the heterogeneous
+statistic remains 18, as required by the different alternative.
+
+Deterministic SKAT-O is checked against independent **direct polar integration**
+in rank two and **chi-square convolution** in rank three. Neither reference uses
+the implemented conditional noncentral gamma series or SKAT-O moment matching.
+
+| Reference case | Minimum component p | Adjusted p |
+|---|---:|---:|
+| Rank 2, moderate | 0.185783307519 | 0.237945171622 |
+| Rank 2, rare | 6.33021672719e-13 | 1.18564655285e-12 |
+| Rank 2, equal covariance eigenvalues | 2.98872556428e-15 | 5.76925343349e-15 |
+| Rank 2, correlated | 0.0586077885131 | 0.0626214859604 |
+| Rank 3, moderate | 0.111610225095 | 0.176157013373 |
+| Rank 3, rare | 4.18301232668e-21 | 9.01632670699e-21 |
+
+The test requires component relative error <=1e-7 and adjusted relative error
+<=3e-6. The implementation targets quadrature error `1e-6 * min-p`, estimates
+quadrature error, and bounds positive-series truncation by `1e-10 * min-p`.
+It fails explicitly on unresolved spectra, series, or integrals; it does not
+replace them with saddlepoint or moment tails. These are algorithmic error
+controls, not interval-arithmetic rounding guarantees. The tested cases do not
+establish universal convergence, finite-sample calibration, or performance for
+large ill-conditioned groups. Supported min-p is >=1e-250 and the noncentral
+series is capped at 8,192 terms.
+
+Additional noncentral mixture tests use an exact normal-tail identity for rank
+one and independent normal convolution for unequal eigenvalues. The normal
+identity was needed to adjudicate cancellation in R's noncentral `pchisq` upper
+tail rather than treating R as an oracle. VT is checked against an independently
+integrated correlated Gaussian maximum, within five Monte Carlo standard errors;
+its output separates selected effects from search-adjusted p-values. A single
+threshold reduces exactly to the burden test, and zero-information thresholds
+produce an explicit unavailable result.
+
+Regenerate the new base-R-only fixtures with:
+
+```powershell
+& 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/raremetal/advanced-reference.R
+```
+
+`RareMetaAdvancedCliTest` exercises all new test names, both leave-out modes,
+empty reductions, fixed/random burden pass-through, cohort output, QC column
+counts, conditional allele flips on both covariance axes, missing-condition
+policies, unknown condition groups, and missing cross-covariance. Serial/no-cache
+and two-worker/cached runs must produce byte-identical test and QC tables.
+
+`RareScoreRelatedTest` checks a balanced six-pair random-intercept model against
+closed-form ANOVA REML: residual variance `0.86/6`, genetic variance
+`3.5 - residual/2`, and independently calculated block inverses for U and V.
+Exported scores and covariance must agree to relative/absolute tolerance 2e-6.
+It exercises reordered GRM and phenotype IDs, BGZF/tabix round trips, exact HWE,
+and fractional-dosage HWE exclusion. The HWE probability comparison uses relative
+rather than absolute tolerance, preventing artificial rare-tail p-value floors.
+
+## Dense-block engineering benchmark
+
+Run `gradlew benchmarkRareMetaEngineering --console=plain`. The original synthetic
+fixture has four independent cohorts, six groups sharing each dense covariance
+block, and 128 or 256 variants per group. Every timed run must produce identical
+burden, SKAT, and QC output. It compares one worker with cache disabled, one with
+a 16 MiB-per-cohort cache, and two workers with that cache. Results are retained
+in a fresh `build/rare-engineering-*/timings.csv` directory. This is an in-process
+CLI benchmark with file I/O, repeated numerical validation, and output writing;
+it excludes JVM startup and makes no cross-program speed claim.
+
+Median elapsed seconds over three runs on Windows Java 25:
+
+| Variants per group | 1 worker, no cache | 1 worker, 16 MiB cache | 2 workers, 16 MiB cache | Cached worker speed ratio |
+|---|---:|---:|---:|---:|
+| 128 | 4.6447 | 4.5425 | 2.3731 | 1.91x |
+| 256 | 51.7352 | 51.0581 | 26.3398 | 1.94x |
+
+The [recorded timings](../src/benchmark/resources/raremetal/engineering-timings-2026-09-12.csv)
+include every repeat. They use plain unindexed synthetic files and repeated
+identical regions to exercise cache reuse, not a claim about every BGZF workload.
+The larger block remains expensive because eigendecomposition is CPU-bound.
+
+Numerical work dominates these blocks. Cache reuse avoids repeated reads but
+does not remove matrix decompositions. Two workers parallelize numerical group
+work while shared readers serialize regional I/O. Large heterogeneous kernels
+and exhaustive leave-out SKAT-O diagnostics can cost substantially more; the
+benchmark does not measure those workloads or imply a genome-scale heap bound.
 
 ## Native executable comparison and timing
 

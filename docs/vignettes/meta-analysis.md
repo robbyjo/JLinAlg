@@ -8,6 +8,9 @@ presentation.
 For rare-variant score/covariance pooling, see the worked
 [rare-variant Java example](../rare-variant-meta-analysis.md#java-score-summary-example)
 and [rare-variant CLI example](../rare-variant-meta-analysis.md#a-complete-small-example).
+The [advanced rare-variant tutorial](../rare-variant-meta-analysis.md#advanced-tests-conditioning-and-diagnostics)
+covers conditional scores, leave-out diagnostics, variable thresholds, heterogeneous
+kernels, fixed/random cohort burdens, deterministic SKAT-O, and GRM-adjusted export.
 Those workflows provide single-variant, equal/weighted burden, SKAT, and SKAT-O
 tests. A cohort's SKAT or SKAT-O p-value alone is insufficient input.
 

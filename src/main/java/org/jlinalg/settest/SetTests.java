@@ -184,7 +184,12 @@ public final class SetTests {
         double adjusted;
         int simulations;
         long seed;
-        if (options.skatOCalibration() == SkatOCalibration.ANALYTIC) {
+        if (options.skatOCalibration() == SkatOCalibration.DETERMINISTIC) {
+            adjusted = SkatODeterministicDistribution.adjustedPValue(
+                minimumP, rhoGrid, components, baseState, backend);
+            simulations = 0;
+            seed = 0L;
+        } else if (options.skatOCalibration() == SkatOCalibration.ANALYTIC) {
             adjusted = SkatOAnalyticDistribution.adjustedPValue(
                 minimumP, rhoGrid, components, baseState, backend);
             simulations = 0;
