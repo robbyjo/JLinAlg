@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment."><title>Genetically predicted TWAS and PWAS · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Genetically predicted TWAS and PWAS</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Genetically predicted TWAS and PWAS</h1><p>Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Source-build feature. These commands test genetically predicted molecular
+abundance using GWAS statistics and molecular prediction weights. The existing
+numeric-omics association scan remains the workflow for measured expression,
+methylation or protein abundance.</p>
+<h2 id="prepare-four-aligned-inputs">Prepare four aligned inputs</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Required columns / layout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GWAS</td>
+<td><code>variant ea oa z</code></td>
+</tr>
+<tr>
+<td>Weights</td>
+<td><code>model variant ea oa weight</code></td>
+</tr>
+<tr>
+<td>Reference</td>
+<td><code>variant ea oa sd</code></td>
+</tr>
+<tr>
+<td>LD</td>
+<td>Square labeled variant correlation matrix, first column containing row IDs</td>
+</tr>
+</tbody>
+</table>
+<p><code>weight</code> is the coefficient per raw effect-allele dosage from a molecular
+prediction model. <code>sd</code> is the genotype standard deviation from the reference
+population. A model may be a gene/tissue, protein, or another genetically
+predicted molecular feature. The reference table determines LD orientation.
+GWAS z statistics and prediction coefficients are independently aligned to it.
+Exact allele swaps reverse signs. No strand complement is guessed; resolve
+palindromic/strand-ambiguous variants and genome-build differences upstream.</p>
+<p>The model table can contain multiple models. Each model/variant key is unique;
+all its variants must exist in reference LD. Every reference variant must have
+GWAS statistics. Missing model coverage is an error, so the test does not
+silently change the molecular predictor. Use a reference/LD subset appropriate
+for the requested locus. Matrix labels are reordered by ID, not by row position.</p>
+<h2 id="run-the-example">Run the example</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar twas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --joint true --out build/xwas/twas.tsv
+java -jar build/cli/jlinalg-0.3.5.jar pwas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --out build/xwas/pwas.tsv
+</code></pre></div>
+<p>The shared synthetic example uses two molecular predictors. Its second GWAS
+variant is deliberately allele-reversed to exercise alignment. Use your protein
+prediction weights for an actual PWAS; the statistical calculation is shared.</p>
+<p>For model coefficients w and genotype SDs s, let a = w × s. The test is
+<code>Z = a' z / sqrt(a' R a)</code>, where R is reference LD. <code>a' R a</code> is the variance of
+the raw molecular predictor. The first example model has variance 0.05966 and
+Z approximately 3.15246 (p = 0.00161903). Scaling every model weight by a positive constant leaves
+Z unchanged; reversing every sign reverses Z and preserves its two-sided p-value.</p>
+<p><code>OUT</code> reports model ID, weight-row count, Z, unadjusted two-sided p-value, natural log
+p-value, and predicted variance. <code>OUT.metadata.tsv</code> states weight and LD scale.
+The p-value is an association test for the genetically predicted component; it
+does not establish a causal molecular effect. Continue with the existing
+<a href="colocalization.html">colocalization</a> and <a href="mendelian-randomization.html">MR</a> workflows.</p>
+<h2 id="joint-tissue-or-model-test">Joint tissue or model test</h2>
+<p><code>--joint true</code> adds <code>OUT.joint.tsv</code>. All models in this invocation form one
+prespecified joint family. The command computes their LD-induced correlation
+C and the omnibus statistic <code>Z' C^-1 Z</code>, with degrees of freedom equal to the
+number of linearly independent supplied models. This version requires C to be
+positive definite and rejects redundant or numerically ill-conditioned models.
+It does not implement S-MultiXcan's rank truncation, model selection or tissue QC.
+Split unrelated genes into separate invocations when the scientific question
+is a joint test across tissues for one gene.</p>
+<h2 id="train-or-import-weights">Train or import weights</h2>
+<p>Use <a href="prediction-scores.html">score-train</a> on a molecular training cohort, with
+genotype feature columns, expression/protein as the outcome, and <code>--alleles</code>.
+The resulting model file can be supplied directly as <code>--weights</code>: intercept,
+lambda and training metadata columns are ignored by the summary test.
+Fit genotype preprocessing inside training folds and validate molecular
+prediction outside training. Training expression is quantitative.</p>
+<p>External prediction weights can be converted to the same table. Native
+PredictDB SQLite and FUSION R-object adapters are not included. Verify that
+converted coefficients use raw dosages, the documented allele, and compatible
+ancestry/reference LD. Training coefficients on standardized genotypes requires
+conversion back to raw dosage units before import.</p>
+<h2 id="java-api-and-validation">Java API and validation</h2>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>PredictedOmics.Association result = PredictedOmics.test(
+    alignedGwasZ, rawDosageWeights, genotypeSd, ldCorrelation);
+PredictedOmics.JointAssociation joint = PredictedOmics.joint(
+    alignedGwasZ, modelByVariantWeights, genotypeSd, ldCorrelation);
+</code></pre></div>
+<p>Import <code>org.jlinalg.xwas.PredictedOmics</code>. LD is row-major. Singular PSD LD is
+allowed for a single model if its variance is numerically supported. Invalid
+correlations, absent alleles and zero predicted variance fail explicitly.
+Dense reference validation is O(variants cubed), so use locus-sized matrices.</p>
+<p>Reference: <a href="https://github.com/hakyimlab/MetaXcan">MetaXcan framework</a>.
+The <a href="../xwas-followup-validation.html">validation report</a> distinguishes independent
+formula checks from package-wide compatibility claims.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#prepare-four-aligned-inputs">Prepare four aligned inputs</a><a href="#run-the-example">Run the example</a><a href="#joint-tissue-or-model-test">Joint tissue or model test</a><a href="#train-or-import-weights">Train or import weights</a><a href="#java-api-and-validation">Java API and validation</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

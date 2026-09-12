@@ -212,6 +212,11 @@ tasks.register('checkWebsite') {
         }
 
         List<String> requiredPages = [
+            'xwas-followup-validation.html',
+            'vignettes/ldsc.html',
+            'vignettes/predicted-omics.html',
+            'vignettes/genomic-factor.html',
+            'vignettes/prediction-scores.html',
             'index.html',
             'verification.html',
             'vignettes/index.html',
@@ -252,6 +257,10 @@ tasks.register('checkWebsite') {
         }
 
         List<String> cliExamplePages = [
+            'vignettes/ldsc.html',
+            'vignettes/predicted-omics.html',
+            'vignettes/genomic-factor.html',
+            'vignettes/prediction-scores.html',
             'vignettes/grm.html',
             'vignettes/command-line.html',
             'vignettes/cli-association-tutorial.html',
@@ -318,6 +327,15 @@ tasks.register('checkWebsite') {
 
 tasks.named('check') {
     dependsOn tasks.named('checkWebsite')
+}
+
+tasks.register('benchmarkXwasFollowup', JavaExec) {
+    group = 'verification'
+    description = 'Times reproducible synthetic LDSC, molecular, factor and score workloads.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.XwasFollowupBenchmark'
+    jvmArgs '-Xms64m', '-Xmx1g'
 }
 
 tasks.register('executableJar', Jar) {

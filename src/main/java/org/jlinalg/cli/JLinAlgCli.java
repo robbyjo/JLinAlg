@@ -32,6 +32,10 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && java.util.Set.of("ldsc", "twas", "pwas", "genomic-factor").contains(arguments[0]))
+            return SummaryXwasCli.run(arguments[0], Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && java.util.Set.of("score-train", "score-apply").contains(arguments[0]))
+            return ScoreCli.run(arguments[0], Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("grm"))
             return GrmCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("rare-score"))
@@ -195,6 +199,12 @@ public final class JLinAlgCli {
                 --model ridge|lasso|elastic-net
 
             Core options:
+              New source-build workflows (use COMMAND --help):
+                ldsc                       Heritability and genetic correlation
+                twas / pwas                Genetically predicted molecular tests
+                genomic-factor             Genetic factor and conditional SNP tests
+                score-train / score-apply   Train, apply, and evaluate prediction scores
+
               --omics FILE                 CSV/TSV, VCF, BCF, or BGEN matrix
               --pheno FILE                 Observation-by-variable CSV/TSV
               --id COLUMN                  Phenotype sample-ID column; omics

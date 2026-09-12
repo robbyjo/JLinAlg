@@ -21,6 +21,10 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 
 | Vignette | Features covered |
 | --- | --- |
+| [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (source build) |
+| [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (source build) |
+| [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (source build) |
+| [Prediction scores](prediction-scores.md) | Gaussian ridge/elastic-net training, imported polygenic weights and independent-cohort evaluation (source build) |
 | [GRM tutorial and Java vignette](../grm-cli.md) | worked dosage matrix, filtering, VCF input, Java/CLI construction, interpretation, and mixed-model reuse ([website](https://robbyjo.github.io/JLinAlg/vignettes/grm.html); source build) |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
 | [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |

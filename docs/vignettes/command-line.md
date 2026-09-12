@@ -1,5 +1,12 @@
 # Command-line-only workflows
 
+Current source builds additionally provide [LDSC](ldsc.md),
+[genetically predicted TWAS/PWAS](predicted-omics.md),
+[genetic factors and common-factor GWAS](genomic-factor.md), and
+[prediction score training/application](prediction-scores.md).
+Use `ldsc`, `twas`, `pwas`, `genomic-factor`, `score-train`, or `score-apply`
+with `--help` for their independent table-based schemas.
+
 Every workflow here is invoked through the executable JAR; no Java API code or
 dataframe runtime is required. Start a new general association
 file/formula/pedigree with <code>--dry-run</code>. The commands and options on

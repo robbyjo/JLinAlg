@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Train portable scores and evaluate frozen predictions in an independent cohort."><title>Prediction scores · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Prediction scores</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Prediction scores</h1><p>Train portable scores and evaluate frozen predictions in an independent cohort.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Source-build feature. Train a Gaussian ridge/elastic-net score, save portable
+weights, and apply frozen weights to a separate cohort. Imported genetic
+weights can be used without training in JLinAlg. Score training can also learn
+genotype-to-expression/protein weights for <a href="predicted-omics.html">TWAS/PWAS</a>.</p>
+<h2 id="train-a-score">Train a score</h2>
+<p>The input is a CSV/TSV with sample rows and named numeric feature columns. Each
+sample ID is unique. Explicitly list the predictors, excluding the outcome and
+ID. All features and outcomes must be finite and complete.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-train --input examples/xwas/train.tsv --features x1,x2 --outcome y --lambdas 1,0.1,0.01 --alpha 0 --folds 5 --seed 42 --out build/xwas/score.tsv
+</code></pre></div>
+<p>Alpha 0 fits ridge, alpha 1 fits lasso, and values between them fit elastic net.
+A single lambda is prespecified; multiple descending lambdas use shuffled,
+seeded K-fold CV confined to the training table. Selection minimizes CV squared
+error. Predictor standardization is fitted within each fold, followed by a
+full-training fit at the selected lambda. The output coefficients and intercept
+are converted back to the original input scale.</p>
+<p>All feature selection, batch correction, imputation and other preprocessing
+performed outside this command must also respect training/validation boundaries.
+The CV splitter assumes independent observations; use externally designed
+training/tuning partitions and a prespecified lambda for related subjects,
+repeated measurements or temporal data. Gaussian training is for quantitative
+outcomes; it is not penalized logistic absolute-risk modeling.</p>
+<h2 id="save-and-reuse-the-model">Save and reuse the model</h2>
+<p><code>OUT</code> is a weights table with <code>model variant ea oa weight intercept lambda alpha
+training_mean</code>. Here <code>variant</code> means feature ID, including non-genetic omics
+features. Non-genetic features have dot placeholders for both alleles.
+<code>OUT.training-ids.tsv</code> retains training sample IDs for overlap checks;
+<code>OUT.metadata.tsv</code> records selection, seed, penalty and sample/feature counts.
+Keep these sidecars with the model when moving it.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/test.tsv --weights build/xwas/score.tsv --outcome y --out build/xwas/predictions.tsv
+</code></pre></div>
+<p>Application joins model feature names to table columns, preserving sample order.
+It never estimates new feature means, retunes penalties or refits predictions.
+Unknown extra input columns are ignored; missing model features, missing numeric
+values or multiple models in one weight file reject.</p>
+<p><code>OUT</code> contains sample and score. <code>OUT.evaluation.tsv</code> is written when <code>--outcome</code>
+is supplied. Quantitative metrics are:</p>
+<ul>
+<li>RMSE of the frozen predictions.</li>
+<li>Predictive R2: <code>1 - SSE_score / SSE_baseline</code>. By default the baseline predicts
+  the training outcome mean. Negative values are retained.</li>
+<li>Descriptive calibration intercept and slope from regressing held-out outcome
+  on frozen score. These do not replace predictions or change reported RMSE/R2.</li>
+</ul>
+<p>For incremental prediction beyond covariates, fit a baseline model in the
+training cohort, carry its frozen predictions into a test-table column, and
+pass <code>--baseline COLUMN</code>. The R2 then measures reduction in held-out squared
+error relative to that baseline. Compare baseline and augmented models on the
+same prespecified test cohort. Do not use in-sample baseline predictions.</p>
+<p>Evaluation rejects overlapping IDs when the training sidecar is available.
+Trained JLinAlg model evaluation requires its sidecar (or <code>--training-ids FILE</code>).
+External weight files may lack IDs; independence then remains the caller's
+responsibility. Different IDs do not detect relatives or cohort-level overlap.</p>
+<h2 id="apply-genetic-weights">Apply genetic weights</h2>
+<p>For training on genotypes, add <code>--alleles FILE</code>, a table with <code>variant ea oa</code>.
+Every genotype feature must be an effect-allele dosage in [0,2]. The same
+training workflow can predict a quantitative phenotype or a molecular trait.</p>
+<p>Imported genetic weights need <code>variant ea oa weight</code> columns, optionally
+<code>model</code> and <code>intercept</code>. Use exactly one model per file. Preselect/clump variants
+or train LD-aware weights upstream as appropriate; the existing <code>clump</code> command
+can prepare variant selections. The scorer itself does not perform LD pruning.</p>
+<p>At application, <code>--alleles</code> describes the target table's dosage allele:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/target-dosages.tsv --weights examples/xwas/polygenic-weights.tsv --alleles examples/xwas/target-alleles.tsv --outcome case_status --family binary --out build/xwas/polygenic.tsv
+</code></pre></div>
+<p>An allele swap uses <code>2 - dosage</code>, preserving the constant term needed for raw
+genetic scores. No strand complements are inferred. Resolve genome build and
+ambiguous variants upstream. The current genotype contract is diploid.</p>
+<p>Binary evaluation reports rank AUC with half credit for ties. It leaves RMSE,
+predictive R2 and linear calibration fields NaN because a raw polygenic score
+is not necessarily an absolute-risk probability. Both cases and controls must
+be present. For quantitative external weights without a training mean, supply
+a frozen <code>--baseline</code> prediction column.</p>
+<h2 id="java-api-and-boundaries">Java API and boundaries</h2>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>PredictionScores.Model model = PredictionScores.train(
+    trainingOutcome, trainingFeatures, descendingLambdas, alpha, folds, seed);
+double[] predictions = model.predict(testFeatures);
+PredictionScores.Evaluation metrics = PredictionScores.evaluate(
+    testOutcome, predictions, frozenBaseline, false);
+</code></pre></div>
+<p>Import <code>org.jlinalg.xwas.PredictionScores</code>. CLI and Java training use the existing
+validated penalized-regression implementation. Dense participant matrices are
+held in memory. The new workflow does not implement LDpred/PRS-CS, native PGS
+Catalog downloads, genome-wide genotype streaming, grouped CV, logistic score
+training or absolute-risk calibration. External weights and phenotype units
+must be suitable for the target ancestry and assay.</p>
+<p>See <a href="../xwas-followup-validation.html">validation</a>. For broader polygenic workflow
+context, see <a href="https://github.com/choishingwan/PRSice">PRSice</a>; this implementation
+does not claim its full feature set.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#train-a-score">Train a score</a><a href="#save-and-reuse-the-model">Save and reuse the model</a><a href="#apply-genetic-weights">Apply genetic weights</a><a href="#java-api-and-boundaries">Java API and boundaries</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

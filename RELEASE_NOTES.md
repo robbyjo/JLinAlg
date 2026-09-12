@@ -1,5 +1,20 @@
 # Unreleased
 
+## xWAS genetic architecture, molecular prediction and scores
+
+- Added `ldsc` for unpartitioned observed-scale heritability, genetic covariance
+  and correlation with free intercepts, shared block-jackknife uncertainty,
+  and reusable S/V matrix exports.
+- Added allele-aware `twas` / `pwas` summary association from raw-dosage model
+  weights and reference LD, with optional full-rank joint model inference.
+- Added `genomic-factor` for a full-WLS single genetic factor and optional SNP
+  GLS effects/heterogeneity conditional on fitted loadings.
+- Added `score-train` / `score-apply` for Gaussian penalized training, portable
+  coefficients, genetic dosage alignment, and held-out score evaluation.
+- Added independent R fixtures, executable examples, CLI regression checks,
+  and four web/Markdown vignettes. Recorded the remaining five analysis
+  families in TODO.md. See [validation and limitations](docs/xwas-followup-validation.md).
+
 ## Rare-variant model metadata and Raremetal2 assessment
 
 - Added version-1 quantitative score metadata, `rare-score --trait-id` and

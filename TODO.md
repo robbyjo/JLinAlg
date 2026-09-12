@@ -7,6 +7,41 @@ recorded in the [advanced-method validation report](docs/advanced-validation.md)
 the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), and the
 [release notes](RELEASE_NOTES.md).
 
+## xWAS analysis additions
+
+The first four follow-up workflows (unpartitioned LDSC, genetically predicted
+TWAS/PWAS, a single genetic factor with conditional SNP tests, and prediction
+score training/application/evaluation) are implemented in the source build.
+See [xWAS workflow validation and scope](docs/xwas-followup-validation.md).
+
+- [ ] **Empirical-Bayes differential analysis.** Add cross-feature variance
+  moderation, count-library normalization and dispersion shrinkage, with
+  separate limma/voom and negative-binomial estimator contracts. Validate
+  against limma and DESeq2/edgeR plus independent likelihood fixtures.
+- [ ] **Latent-confounder and batch-effect estimation.** Add SVA/RUV-style
+  nuisance-factor estimation and ComBat-style batch adjustment. Preserve the
+  biological design, detect confounded batch/design matrices, and fit/freeze
+  preprocessing within training folds for prediction workflows.
+- [ ] **Region-level EWAS analysis.** Add coordinate-aware aggregation of
+  neighboring CpGs and calibrated region-level significance, with explicit
+  spatial dependence, probe coverage and genome-build handling.
+- [ ] **Adaptive and hierarchical multiple testing.** Add IHW and a defined
+  gene/tissue/phenotype hierarchy with validated error control. Require
+  weighting covariates independent of null p-values and retain the complete
+  prespecified hypothesis family, including failure accounting.
+- [ ] **Multiple-imputation inference.** Add chained-equations imputation,
+  reproducible streams, Rubin pooling and pooled degrees of freedom, with
+  model-compatible categorical/continuous imputers and diagnostics. Keep
+  missing-data uncertainty distinct from deterministic mean imputation.
+
+Further extensions of the new workflows remain explicit scope boundaries:
+partitioned/two-step/liability-scale LDSC and native summary munging; native
+PredictDB/FUSION model adapters and rank-truncated multi-tissue inference;
+multiple genomic factors, robust DWLS and propagation of measurement-model
+uncertainty into SNP effects; LD-aware Bayesian PRS, logistic score training,
+grouped CV and absolute-risk calibration. Current methods do not claim full
+parity with LDSC, MetaXcan, GenomicSEM, or PRS software suites.
+
 ## Zelig-inspired additions — high priority
 
 - [ ] **Unified predictions and contrasts.** Add a common API for expected

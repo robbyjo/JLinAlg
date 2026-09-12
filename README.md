@@ -62,6 +62,13 @@ The [estimator extension guide](docs/estimator-extensions.md) covers mixed and
 ordinal SEM, DWLS/WLSMV, multigroup invariance, ARIMA regression and historical
 smoothing, mixed-type kernels, quantile inference, and non-tensor integration.
 
+The current source also adds [LDSC](docs/vignettes/ldsc.md),
+[genetically predicted TWAS/PWAS](docs/vignettes/predicted-omics.md),
+[genetic-factor GWAS](docs/vignettes/genomic-factor.md), and
+[prediction score training and evaluation](docs/vignettes/prediction-scores.md),
+each with CLI commands and worked examples. See their
+[validation and supported scope](docs/xwas-followup-validation.md).
+
 ## License
 
 [GNU General Public License, version 2 or later](LICENSE) (`GPL-2.0-or-later`).

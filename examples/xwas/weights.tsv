@@ -1,0 +1,6 @@
+model	variant	ea	oa	weight
+gene_tissue1	v1	A	C	0.4
+gene_tissue1	v2	A	C	-0.2
+gene_tissue1	v3	A	C	0.1
+gene_tissue2	v1	A	C	0.1
+gene_tissue2	v2	A	C	0.3
