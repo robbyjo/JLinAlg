@@ -46,6 +46,7 @@ AssociationEstimate hit = scan.estimate(0);</code></pre></div><p>Fast OLS uses F
 
 AssociationBatchResult scores =
     prepared.scan(dosages, markerNames, execution);</code></pre></div><div class="note"><strong>Screening estimate</strong>The beta is a one-step null-model score estimate. Exactly refit selected variants when final reporting requires the alternative-model MLE.</div>
+<p>For a complete genotype-to-matrix workflow, see the <a href="grm.html">GRM construction tutorial and Java vignette</a>.</p>
 <h2 id="grm">Model cryptic relatedness</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Accelerated genomic relationship matrix</span></div><pre><code>GenomicRelationshipMatrix grm =
     GenomicRelationshipMatrix.fromVariants(
         relationshipVariants, analysisSampleIds,

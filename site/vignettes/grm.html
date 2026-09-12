@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Build and interpret a genomic relationship matrix with JLinAlg: worked dosage and VCF examples, filtering, Java API, and mixed-model reuse."><title>GRM construction tutorial · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>GRM construction</span></div><h1>Build a genomic relationship matrix.</h1><p>Follow a small genotype table through filtering, standardization, labeled output, and mixed-model analysis. Use the CLI or the streaming Java API.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<h2 id="purpose">What a GRM represents</h2>
+<p>A genomic relationship matrix has one row and column per sample. It summarizes similarity in centered, standardized additive genotypes. An LD matrix instead indexes variants. A Gaussian mixed model can use <code>Var(y) = sigma_g² K + sigma_e² I</code>, with variance scales estimated by the model. Constructing <code>K</code> does not itself test association or estimate heritability.</p>
+<div class="note"><strong>Source-build feature</strong>The <code>grm</code> constructor command is newer than the published v0.3.5 release asset. These examples use a JAR built from current source. All example data are synthetic.</div>
+<h2 id="build">1. Build the executable</h2>
+<p>Use JDK 17 or newer. Run commands from the repository root; the first build needs network access for verified dependencies.</p>
+<div class="code-window"><div class="code-bar"><span>Linux / macOS</span></div><pre><code>./gradlew executableJar</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>Windows PowerShell</span></div><pre><code>.\gradlew.bat executableJar</code></pre></div>
+<p>The executable is <code>build/cli/jlinalg-0.3.5.jar</code>. CPU use requires no accelerator runtime.</p>
+<h2 id="input">2. Inspect the dosage table</h2>
+<p>The supplied <a href="https://github.com/robbyjo/JLinAlg/blob/main/examples/grm/dosages.tsv">examples/grm/dosages.tsv</a> has variants in rows and samples in columns. Values count alternate alleles; <code>NA</code> is missing, not a reference call.</p>
+<div class="result-table"><table><thead><tr><th>Variant</th><th>a</th><th>b</th><th>c</th><th>d</th></tr></thead><tbody>
+<tr><td>v1</td><td>0</td><td>1</td><td>2</td><td>NA</td></tr>
+<tr><td>v2</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>monomorphic</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>low_call_rate</td><td>NA</td><td>NA</td><td>NA</td><td>1</td></tr>
+<tr><td>v5</td><td>0</td><td>0</td><td>0</td><td>2</td></tr>
+</tbody></table></div>
+<h2 id="construct">3. Construct and inspect the GRM</h2>
+<p>This teaching example deliberately permits a call rate of 0.5 and MAF of zero to illustrate a retained missing call. These are not proposed production QC thresholds. Choose a fresh output path for every run.</p>
+<div class="code-window"><div class="code-bar"><span>Construct from dosage TSV</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes examples/grm/dosages.tsv --maf 0 --call-rate 0.5 --block-size 2 --backend cpu --out build/grm-tutorial/toy.tsv</code></pre></div>
+<p><code>toy.tsv.log</code> reports <strong>5 considered, 3 used, 2 excluded</strong>. The monomorphic variant has no allele variance; the low-call-rate variant has only one of four samples called. At v1, the called mean dosage is 1, so sample d is imputed to 1 and contributes a standardized dosage of zero.</p>
+<p>The labeled output matrix, rounded here to six decimals:</p>
+<div class="result-table"><table><thead><tr><th>Sample</th><th>a</th><th>b</th><th>c</th><th>d</th></tr></thead><tbody>
+<tr><th>a</th><td>1.111111</td><td>0.444444</td><td>-0.666667</td><td>-0.888889</td></tr>
+<tr><th>b</th><td>0.444444</td><td>0.444444</td><td>0.000000</td><td>-0.888889</td></tr>
+<tr><th>c</th><td>-0.666667</td><td>0.000000</td><td>1.111111</td><td>-0.444444</td></tr>
+<tr><th>d</th><td>-0.888889</td><td>-0.888889</td><td>-0.444444</td><td>2.222222</td></tr>
+</tbody></table></div>
+<h3>Understand the scaling</h3>
+<p>For each retained variant, estimate allele frequency <code>p</code> from called dosages. Standardize with <code>z_i = (g_i − 2p) / sqrt(2p(1−p))</code>, setting missing standardized values to zero. Then <code>K = sum(z z′) / retained_variants</code>. All sample pairs share this denominator.</p>
+<p><code>K(a,b)=4/9</code>; the corresponding kinship coefficient is half that, <code>2/9</code>. Negative off-diagonal values can arise from centering and should not be clipped to zero. Diagonals need not equal one. This tiny example cannot establish pedigree categories or population relatedness cutoffs.</p>
+<p>Rows sum to zero because each dosage column was centered on these samples. Singularity of this constructed matrix is expected; a mixed model also includes its residual covariance component. External tools using pairwise-observed denominators or other normalization need not give the same matrix.</p>
+<h2 id="filters">4. Compare filtering choices</h2>
+<div class="code-window"><div class="code-bar"><span>Require 95% called samples</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes examples/grm/dosages.tsv --maf 0 --call-rate 0.95 --block-size 2 --backend cpu --out build/grm-tutorial/strict.tsv</code></pre></div>
+<p>Now v1 is excluded too: <strong>2 variants remain</strong>. The first diagonal and <code>K(a,b)</code> both become <code>2/3</code>. Changing filters changes the marker set and therefore the estimator. Changing only <code>--block-size</code> preserves the estimator up to floating-point summation differences.</p>
+<h2 id="model">5. Build from VCF and fit a mixed model</h2>
+<p>A second checked-in fixture provides six samples, a VCF, and aligned phenotype IDs:</p>
+<div class="code-window"><div class="code-bar"><span>Genotypes → GRM → Gaussian mixed model</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes examples/rare-meta/cohort-a.vcf --maf 0.01 --call-rate 0.95 --block-size 256 --backend cpu --out build/grm-demo/cohort.tsv
+java -jar build/cli/jlinalg-0.3.5.jar --pheno examples/rare-meta/cohort-a.tsv --id sample --formula "trait ~ 1" --grm build/grm-demo/cohort.tsv --backend cpu --out build/grm-demo/model.tsv</code></pre></div>
+<p>The <code>grm</code> subcommand creates the matrix; the <code>--grm</code> analysis option consumes it. The example tests file interoperability, not meaningful relatedness estimation. For real data, prespecify quality-controlled, LD-pruned diploid variants and sample selection. The command does not automatically prune LD, adjust ancestry, or construct leave-one-chromosome-out matrices.</p>
+<p>Rows and columns retain source sample IDs. The analysis aligns phenotype IDs to them. For repeated observations, use <code>--individual-id COLUMN</code> to name the phenotype column containing the GRM individual ID. See <a href="command-line.html#grm">GRM-adjusted scans</a> and <a href="mixed-models.html">mixed-model inference</a>.</p>
+<h2 id="java">Java vignette</h2>
+<p>The complete <a href="https://github.com/robbyjo/JLinAlg/blob/main/examples/grm/GrmExample.java">GrmExample.java</a> reproduces the four-sample matrix and prints counts, relationships, and kinship.</p>
+<div class="code-window"><div class="code-bar"><span>Run with a JDK</span></div><pre><code>java --class-path build/cli/jlinalg-0.3.5.jar examples/grm/GrmExample.java</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>Streaming Java API</span></div><pre><code>var source = VariantSources.open(Path.of("examples/grm/dosages.tsv"));
+var grm = GenomicRelationshipMatrix.fromSource(source,
+    new GenomicRelationshipOptions(0, 0.5), BackendPolicy.CPU, 2);
+System.out.println(grm.variantsUsed()); // 3
+System.out.println(grm.relationship("a", "b")); // 4/9
+System.out.println(grm.kinshipCoefficient("a", "b")); // 2/9
+var component = grm.varianceComponent("genetic");</code></pre></div>
+<p>Supply <code>component</code> to a Java mixed-model fit. For repeated or reordered phenotype rows, use <code>grm.varianceComponent("genetic", observationSampleIds)</code>. Unknown sample IDs fail explicitly. The file and array builders share the same filters and normalization.</p>
+<h2 id="options">Inputs, options, and memory</h2>
+<p>Input formats follow their suffix: VCF, VCF.gz/VCF.bgz, BCF, BGEN layout 2, and plain dosage CSV/TSV. All source samples are included. For BGEN without embedded IDs, supply <code>--bgen-samples cohort.sample</code> using an Oxford sample file or one ID per line. Supply biallelic diploid data for this estimator; ploidy corrections are not inferred.</p>
+<div class="result-table"><table><thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>--genotypes</td><td>required</td><td>Source genotype file</td></tr>
+<tr><td>--out</td><td>required</td><td>Labeled .tsv or .csv matrix</td></tr>
+<tr><td>--maf</td><td>0.01</td><td>Minimum minor allele frequency, [0,0.5)</td></tr>
+<tr><td>--call-rate</td><td>0.95</td><td>Minimum called fraction, (0,1]</td></tr>
+<tr><td>--block-size</td><td>256</td><td>Source variants read per block</td></tr>
+<tr><td>--backend</td><td>cpu</td><td>Compute policy; explicit accelerators must be available</td></tr>
+<tr><td>--bgen-samples</td><td>none</td><td>External BGEN sample IDs</td></tr>
+</tbody></table></div>
+<p>Genotype memory scales with block size, but the matrix remains dense. One matrix requires <code>8 × N × N</code> bytes, plus construction copies and block workspace. For 10,000 samples, one matrix alone is about 0.8 GB; this is not a peak-memory estimate. Smaller blocks do not remove quadratic storage or output size.</p>
+<h2 id="checks">Checks and troubleshooting</h2>
+<p><code>OUT.log</code> records UTC start/end, human-readable elapsed time, filters, sample and variant counts, normalization, and backend. Existing results or logs are protected. Failed construction does not publish a partial matrix.</p>
+<div class="result-table"><table><thead><tr><th>Symptom</th><th>What to check</th></tr></thead><tbody>
+<tr><td>Unknown grm command</td><td>Build current source; the old v0.3.5 release predates it.</td></tr>
+<tr><td>No variants remain</td><td>MAF, call rate, monomorphic rows, missingness, and dosage scale.</td></tr>
+<tr><td>Output exists</td><td>Choose a fresh result and log path.</td></tr>
+<tr><td>Sample matching fails</td><td>Exact source/phenotype IDs and --individual-id mapping.</td></tr>
+<tr><td>Heap or array limit</td><td>Dense sample-matrix requirements, not just genotype block size.</td></tr>
+<tr><td>External matrix differs</td><td>Sample/marker sets, frequencies, imputation, denominator, and ploidy.</td></tr>
+</tbody></table></div>
+<p>Record sample/marker selection, LD pruning, filtering, normalization, missingness, and the run log with the analysis. The toy matrix is checked against analytic fractions; the VCF-to-mixed-model path has regression coverage. See <a href="../verification.html">numerical validation</a> and the <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/grm-cli.md">complete source guide</a>. This example does not establish a GRM speedup.</p>
+<div class="next-links"><a href="association.html"><small>Related workflow</small><strong>Association scans</strong></a><a href="mixed-models.html"><small>Next step</small><strong>Fit a mixed model →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#purpose">What a GRM represents</a><a href="#build">1. Build</a><a href="#input">2. Inspect genotypes</a><a href="#construct">3. Construct and interpret</a><a href="#filters">4. Compare filters</a><a href="#model">5. Use in a model</a><a href="#java">Java vignette</a><a href="#options">Options and memory</a><a href="#checks">Checks and troubleshooting</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

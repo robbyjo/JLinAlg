@@ -215,6 +215,7 @@ tasks.register('checkWebsite') {
             'index.html',
             'verification.html',
             'vignettes/index.html',
+            'vignettes/grm.html',
             'vignettes/command-line.html',
             'vignettes/cli-association-tutorial.html',
             'vignettes/cli-mediation-tutorial.html',
@@ -251,6 +252,7 @@ tasks.register('checkWebsite') {
         }
 
         List<String> cliExamplePages = [
+            'vignettes/grm.html',
             'vignettes/command-line.html',
             'vignettes/cli-association-tutorial.html',
             'vignettes/cli-mediation-tutorial.html',

@@ -43,7 +43,7 @@ with a companion run log. Choose a fresh output path for another run.
 
 Visit the **[JLinAlg website](https://robbyjo.github.io/JLinAlg/)** for the
 complete feature guide, **[tutorials and vignettes](https://robbyjo.github.io/JLinAlg/vignettes/)**,
-and Java/CLI examples, including [GRM construction](docs/grm-cli.md).
+and Java/CLI examples, including [GRM construction](https://robbyjo.github.io/JLinAlg/vignettes/grm.html).
 
 ## Numerical accuracy and performance
 
