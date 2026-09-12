@@ -1,5 +1,15 @@
 # Unreleased
 
+## GRM construction CLI and simpler getting started
+
+- Added `grm --genotypes FILE --out matrix.tsv` for VCF/BCF, BGEN, and dosage
+  tables, with MAF/call-rate filters, bounded genotype blocks, backend selection,
+  labeled CSV/TSV output compatible with `--grm`, and timestamped run logs.
+- Added `GenomicRelationshipMatrix.fromSource`, sharing the existing array
+  estimator's normalization. Dense sample-matrix storage remains quadratic.
+- Simplified the README to requirements, build/run instructions, website links,
+  numerical evidence, and license; detailed runtime setup is in the documentation.
+
 ## Rare-variant score summaries and meta-analysis
 
 - Added `rare-score` for unrelated-sample quantitative-trait Gaussian scores,

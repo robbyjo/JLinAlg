@@ -32,6 +32,8 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && arguments[0].equals("grm"))
+            return GrmCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("rare-score"))
             return RareScoreCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("rare-meta"))
@@ -149,6 +151,8 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar grm --genotypes cohort.vcf.gz
+                --out cohort-grm.tsv [--maf 0.01] [--call-rate 0.95]
               java -jar jlinalg-<version>.jar rare-score --vcf cohort.vcf.gz
                 --pheno phenotype.tsv --id sample --response trait
                 --genome-build GRCh38 --out PREFIX

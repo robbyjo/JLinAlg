@@ -44,6 +44,9 @@
 <p>Raw <code>1001</code> resolves when it occurs only once; if both <code>F01:1001</code> and <code>F02:1001</code> exist, use the qualified value. Family labels are namespaces, not relationship groups. Recursive parent-child links define the ancestry graph, and a unique raw parent can connect rows carrying different family labels. An ID with no source pedigree row is retained as a singleton only after the run has established at least one source match.</p>
 
 <h2 id="grm">GRM-adjusted scans</h2>
+<p>Current source builds can construct a matrix first with <code>grm</code>. Build with <code>./gradlew executableJar</code>, then pass the output to <code>--grm</code>:</p>
+<pre><code>java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes cohort.vcf.gz --maf 0.01 --call-rate 0.95 --out cohort-grm.tsv</code></pre>
+<p>The command supports genotype blocks from VCF/BCF, BGEN, and dosage tables. The GRM itself is dense. See the <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/grm-cli.md">GRM construction tutorial</a> for a complete runnable example, filters, normalization, memory limits, and logging. This constructor command is not in the previously published v0.3.5 release asset.</p>
 <div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Labeled or GCTA GRM</span></div><pre><code>java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id IID --formula "BMI ~ Sex + Age + &lt;omics&gt;" --grm cohort --out bmi-expression-grm.tsv</code></pre></div>
 <p><code>--grm</code> accepts a labeled square CSV/TSV or a GCTA prefix backed by <code>.grm.bin</code> and <code>.grm.id</code>. Numeric features get per-feature REML refits. A GRM and pedigree cannot be combined in one CLI model.</p>
 

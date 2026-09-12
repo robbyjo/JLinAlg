@@ -17,6 +17,9 @@ for separate cohort summary files. See the [meta-analysis tutorial](cli-meta-ana
 for cohort directions, missing values, and minimum-cohort controls. These two
 new commands are not in the previously published v0.3.5 release asset.
 
+Source builds also provide [`grm` construction](../grm-cli.md) from genotype
+files and [rare-variant meta-analysis](../rare-variant-meta-analysis.md).
+
 ## Understand the three ID layers
 
 | Option | Meaning |
@@ -174,6 +177,16 @@ Only the term matching <code>--individual-id</code> receives pedigree
 precision. <code>(1|batch)</code> is an independent random intercept.
 
 ## GRM-adjusted numeric scan
+
+To construct the input matrix first, use the source-build `grm` command:
+
+```shell
+java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes cohort.vcf.gz --maf 0.01 --call-rate 0.95 --out cohort-grm.tsv
+```
+
+Pass `--grm cohort-grm.tsv` to the analysis command. See the
+[construction tutorial](../grm-cli.md) for a runnable small example, input
+formats, normalization, and dense-memory requirements.
 
 ~~~powershell
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id IID --formula "BMI ~ Sex + Age + <omics>" --grm cohort --out bmi-expression-grm.tsv

@@ -16,11 +16,12 @@ Run the complete verification suite before adapting an example:
 The v0.3.5 executable includes the `mediation`, `susie`, and `coloc` CLI
 subcommands, association preflight and variant-filter updates, and recursive
 pedigree identity resolution. Examples that name `jlinalg-0.3.5.jar` are
-release-compatible, except the explicitly marked unreleased rare-variant
-meta-analysis tutorial, which requires building the current source.
+release-compatible except the explicitly marked source-build additions,
+including cohort meta-analysis, rare-variant workflows, and GRM construction.
 
 | Vignette | Features covered |
 | --- | --- |
+| [GRM construction from the CLI](../grm-cli.md) | streamed genotypes, MAF/call-rate filters, labeled GRM output, and mixed-model reuse (source build) |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
 | [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |
 | [CLI-only Mendelian-randomization tutorial](cli-mr-tutorial.md) | public or custom GWAS inputs, canonical columns, LD-panel installation, clumping, harmonization, estimation, and outputs |

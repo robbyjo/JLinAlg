@@ -123,6 +123,10 @@ whole job. Inspect `failures()` before writing final results.
 
 ## P3D/EMMAX-style mixed-model scan
 
+For file-based GRM construction, the source-build [`grm` CLI](../grm-cli.md)
+streams genotype blocks and writes a matrix accepted by `--grm`. The Java
+equivalent is `GenomicRelationshipMatrix.fromSource(source, options, backend, blockSize)`.
+
 When frozen null-model variance components are acceptable, prepare the REML
 projection once:
 

@@ -4,6 +4,7 @@
  */
 package org.jlinalg.genetics;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,8 +14,12 @@ import jdistlib.accelerator.MatrixTranspose;
 import org.jlinalg.compute.BackendContext;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.compute.BackendProvenance;
+import jdistlib.accelerator.ComputeBackend;
 import org.jlinalg.internal.MatrixOps;
 import org.jlinalg.pipeline.VariantRecord;
+import org.jlinalg.pipeline.VariantSource;
+import org.jlinalg.pipeline.VariantBlock;
+import org.jlinalg.pipeline.VariantBlockReader;
 import org.jlinalg.reml.VarianceComponent;
 
 /**
@@ -49,7 +54,7 @@ public final class GenomicRelationshipMatrix {
         sampleIndex = index(this.sampleIds);
         int samples = this.sampleIds.size();
         if (relationship == null
-                || relationship.length != samples * samples)
+                || relationship.length != (long) samples * samples)
             throw new IllegalArgumentException(
                 "relationship matrix dimensions are invalid");
         this.relationship = MatrixOps.finiteCopy(
@@ -77,6 +82,45 @@ public final class GenomicRelationshipMatrix {
             throw new IllegalArgumentException(
                 "variant dosages, sample IDs, options, and backend are required");
         int samples = sampleIds.size();
+        index(sampleIds);
+        double[] matrix = new double[Math.multiplyExact(samples, samples)];
+        try (BackendContext context = BackendContext.select(backendPolicy)) {
+            int used = accumulate(variantDosages, samples, options, context.backend(), matrix);
+            return finish(sampleIds, matrix, variantDosages.length, used, context.provenance());
+        }
+    }
+
+    /**
+     * Builds from bounded genotype blocks in source sample order. The GRM remains
+     * dense (quadratic in sample count); genotype memory scales with block size.
+     * Uses the same filters, mean imputation, and standardization as the array API.
+     */
+    public static GenomicRelationshipMatrix fromSource(VariantSource source,
+            GenomicRelationshipOptions options, BackendPolicy backendPolicy,
+            int blockSize) throws IOException {
+        if (source == null || options == null || backendPolicy == null || blockSize < 1)
+            throw new IllegalArgumentException("source, filters, backend, and positive block size required");
+        List<String> ids = source.metadata().sampleIds();
+        if (ids.isEmpty()) throw new IllegalArgumentException("sample IDs are required");
+        index(ids);
+        int samples = ids.size(), considered = 0, used = 0;
+        double[] matrix = new double[Math.multiplyExact(samples, samples)];
+        try (BackendContext context = BackendContext.select(backendPolicy);
+                VariantBlockReader reader = source.open()) {
+            for (VariantBlock block; (block = reader.read(blockSize)) != null;) {
+                double[][] dosage = new double[block.variants().size()][];
+                for (int j = 0; j < dosage.length; j++)
+                    dosage[j] = block.variants().get(j).dosages();
+                considered = Math.addExact(considered, dosage.length);
+                used = Math.addExact(used,
+                    accumulate(dosage, samples, options, context.backend(), matrix));
+            }
+            return finish(ids, matrix, considered, used, context.provenance());
+        }
+    }
+
+    private static int accumulate(double[][] variantDosages, int samples,
+            GenomicRelationshipOptions options, ComputeBackend backend, double[] matrix) {
         List<double[]> standardized = new ArrayList<>();
         for (double[] dosage : variantDosages) {
             if (dosage == null || dosage.length != samples)
@@ -109,24 +153,24 @@ public final class GenomicRelationshipMatrix {
                     ? 0 : (dosage[sample] - mean) / scale;
             standardized.add(values);
         }
-        if (standardized.isEmpty())
-            throw new IllegalArgumentException(
-                "no variants remain for GRM construction");
+        if (standardized.isEmpty()) return 0;
         int variants = standardized.size();
-        double[] sampleByVariant = new double[samples * variants];
+        double[] sampleByVariant = new double[Math.multiplyExact(samples, variants)];
         for (int variant = 0; variant < variants; variant++)
             for (int sample = 0; sample < samples; sample++)
                 sampleByVariant[sample * variants + variant] =
                     standardized.get(variant)[sample];
-        double[] matrix = new double[samples * samples];
-        BackendProvenance provenance;
-        try (BackendContext context = BackendContext.select(backendPolicy)) {
-            context.backend().dgemm(
-                MatrixTranspose.NONE, MatrixTranspose.TRANSPOSE,
-                samples, samples, variants, 1.0 / variants,
-                sampleByVariant, sampleByVariant, 0, matrix);
-            provenance = context.provenance();
-        }
+        backend.dgemm(MatrixTranspose.NONE, MatrixTranspose.TRANSPOSE,
+            samples, samples, variants, 1,
+            sampleByVariant, sampleByVariant, 1, matrix);
+        return variants;
+    }
+
+    private static GenomicRelationshipMatrix finish(List<String> sampleIds,
+            double[] matrix, int considered, int used, BackendProvenance provenance) {
+        if (used == 0) throw new IllegalArgumentException("no variants remain for GRM construction");
+        int samples = sampleIds.size();
+        for (int i = 0; i < matrix.length; i++) matrix[i] /= used;
         for (int row = 0; row < samples; row++)
             for (int column = 0; column < row; column++) {
                 double value = 0.5 * (matrix[row * samples + column]
@@ -135,7 +179,7 @@ public final class GenomicRelationshipMatrix {
                 matrix[column * samples + row] = value;
             }
         return new GenomicRelationshipMatrix(sampleIds, matrix,
-            variantDosages.length, variants, provenance);
+            considered, used, provenance);
     }
 
     /** Convenience overload for already aligned pipeline variant records. */

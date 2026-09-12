@@ -12,6 +12,11 @@ and three optional CHOLMOD-native tests were skipped because the native
 library was not staged in that portable build. Separate native benchmark and
 parity runs are documented for CHOLMOD.
 
+That release count is historical. Later validation is recorded in the
+[advanced numerical audit](advanced-validation.md) and
+[rare-variant score report](rare-meta-validation.md); use their dated scopes
+and approximation limits when interpreting the newer methods below.
+
 ## Accuracy matrix
 
 | Component family | Independent or contract reference | What is checked |
@@ -27,6 +32,8 @@ parity runs are documented for CHOLMOD.
 | Association and set tests | scalar/batch parity and GMMAT | OLS/GLM/REML scans, Burden, SKAT, SKAT-O |
 | Mendelian randomization | `MendelianRandomization` and base-R equations | IVW/Egger/median, heterogeneity, LD, xWAS screening |
 | Meta-analysis | base-R matrix/profile calculations | fixed/random estimates, heterogeneity, meta-regression |
+| Rare-variant score meta-analysis | RAREMETAL 4.15.1, R SKAT/CompQuadForm, independent spherical integration | single-site and burden estimates, SKAT probabilities, moderate-probability SKAT-O comparisons; [scope and limits](rare-meta-validation.md) |
+| GRM construction | analytic standardized dosage outer products and existing genetic R fixtures | missing calls, filtering, unequal genotype blocks, labeled round trips, and reuse by the mixed-model CLI; [workflow](grm-cli.md) |
 | Time series | R `stats::arima` and deterministic identities | ARIMA likelihood, forecasts, selection, diagnostics |
 | SuSiE and colocalization | `susieR` and `coloc` | PIP, coefficients, ELBO, credible sets, H0-H4 posteriors |
 | Structural equation models | `lavaan` 0.7-2 | paths, variances/covariances, SEs, likelihood and fit indices |
@@ -61,6 +68,12 @@ each source document.
 | Ten-window BMI SKAT-O suite | R `GMMAT` | 42.220 s | 7.899 s | 5.35x |
 | SuSiE, 574 by 1,001 | `susieR` | 0.340 s | 0.0704391 s | 4.83x |
 | SEM, 4,680 rows and 36 parameters | `lavaan` | 0.0700000 s | 0.0081623 s | 8.58x |
+| 20,000 single-variant score meta-analyses | RAREMETAL 4.15.1 | 0.85 s | 0.346 s | 2.46x |
+
+The single-variant score row compares Windows Java with Ubuntu WSL native
+RAREMETAL, which also writes plots. It includes Java startup and excludes WSL
+launch; see the [complete timing protocol](rare-meta-validation.md). It does
+not establish speed for large groups or GRM construction.
 
 These ratios are not interchangeable: some time complete scans, others one
 fit, and each excludes only the preparation described in its source. The
