@@ -1,0 +1,3 @@
+cohort	scores	covariance
+A	../../build/rare-demo/a.score.txt.gz	../../build/rare-demo/a.cov.txt.gz
+B	../../build/rare-demo/b.score.txt.gz	../../build/rare-demo/b.cov.txt.gz

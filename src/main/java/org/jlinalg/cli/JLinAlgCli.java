@@ -32,6 +32,10 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && arguments[0].equals("rare-score"))
+            return RareScoreCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("rare-meta"))
+            return RareMetaCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && (arguments[0].equals("meta-analysis")
                 || arguments[0].equals("meta-regression")))
             return MetaCli.run(arguments[0], Arrays.copyOfRange(
@@ -145,6 +149,11 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar rare-score --vcf cohort.vcf.gz
+                --pheno phenotype.tsv --id sample --response trait
+                --genome-build GRCh38 --out PREFIX
+              java -jar jlinalg-<version>.jar rare-meta --cohorts manifest.tsv
+                --genome-build GRCh38 --test single|burden|skat|skat-o --out PREFIX
               java -jar jlinalg-<version>.jar meta-analysis
                 --cohort NAME=FILE [--cohort NAME=FILE ...] --model fixed|random --out FILE
               java -jar jlinalg-<version>.jar meta-regression

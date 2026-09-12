@@ -163,14 +163,21 @@ public final class SetTests {
     private static SkatOResult skatO(
             PreparedVariantSet prepared, SetTestScoreState baseState,
             SetTestOptions options, ComputeBackend backend) {
+        return skatO(prepared.id(), prepared.requestedVariants(),
+            prepared.includedVariants(), prepared.excludedVariants(), baseState,
+            options, backend);
+    }
+
+    static SkatOResult skatO(String id, int requested, int included,
+            List<VariantFilterResult> excluded, SetTestScoreState baseState,
+            SetTestOptions options, ComputeBackend backend) {
         double[] rhoGrid = options.skatORhoGrid();
         List<SkatOResult.Component> components = new ArrayList<>(rhoGrid.length);
         double minimumP = 1;
         for (double rho : rhoGrid) {
-            SetTestResult result = kernelResult(prepared.id(),
-                "skat-o[rho=" + rho + "]", prepared.requestedVariants(),
-                prepared.includedVariants(), transform(baseState, rho),
-                prepared.excludedVariants(), backend);
+            SetTestResult result = kernelResult(id,
+                "skat-o[rho=" + rho + "]", requested,
+                included, transform(baseState, rho), excluded, backend);
             components.add(new SkatOResult.Component(rho, result));
             minimumP = Math.min(minimumP, result.pValue());
         }
@@ -188,10 +195,10 @@ public final class SetTests {
             simulations = options.skatOSimulations();
             seed = options.randomSeed();
         }
-        return new SkatOResult(prepared.id(), prepared.requestedVariants(),
-            prepared.includedVariants(), components, minimumP, adjusted,
+        return new SkatOResult(id, requested,
+            included, components, minimumP, adjusted,
             Math.log10(adjusted), simulations, seed,
-            prepared.excludedVariants());
+            excluded);
     }
 
     private static double simulatedAdjustedPValue(
@@ -201,38 +208,41 @@ public final class SetTests {
             ComputeBackend backend) {
         double[] critical = new double[components.size()];
         for (int index = 0; index < critical.length; index++)
-            critical[index] = QuadraticFormDistribution.critical(
-                components.get(index).result().eigenvalues(), minimumP);
+            critical[index] = components.get(index).result().eigenvalues().length == 0
+                ? Double.POSITIVE_INFINITY : QuadraticFormDistribution.critical(
+                    components.get(index).result().eigenvalues(), minimumP);
         Random random = new Random(options.randomSeed());
         ScoreSampler sampler = new ScoreSampler(
             baseState.informationView(), baseState.variants(), backend);
         int extreme = 0;
-        double[] simulated = sampler.sample(
-            random, options.skatOSimulations(), backend);
-        for (int simulation = 0;
-                simulation < options.skatOSimulations(); simulation++) {
-            double squaredSum = 0;
-            double sum = 0;
-            for (int variant = 0; variant < baseState.variants(); variant++) {
-                double score = simulated[
-                    variant * options.skatOSimulations() + simulation];
-                squaredSum += score * score;
-                sum += score;
+        // Bound memory independently of the requested Monte Carlo budget.
+        for (int offset = 0; offset < options.skatOSimulations();) {
+            int samples = Math.min(4096, options.skatOSimulations() - offset);
+            double[] simulated = sampler.sample(random, samples, backend);
+            for (int simulation = 0; simulation < samples; simulation++) {
+                double squaredSum = 0;
+                double sum = 0;
+                for (int variant = 0; variant < baseState.variants(); variant++) {
+                    double score = simulated[variant * samples + simulation];
+                    squaredSum += score * score;
+                    sum += score;
+                }
+                boolean exceeds = false;
+                for (int component = 0; component < rhoGrid.length
+                        && !exceeds; component++) {
+                    double rho = rhoGrid[component];
+                    double statistic = (1 - rho) * squaredSum
+                        + rho * sum * sum;
+                    exceeds = statistic >= critical[component];
+                }
+                if (exceeds) extreme++;
             }
-            boolean exceeds = false;
-            for (int component = 0; component < rhoGrid.length
-                    && !exceeds; component++) {
-                double rho = rhoGrid[component];
-                double statistic = (1 - rho) * squaredSum
-                    + rho * sum * sum;
-                exceeds = statistic >= critical[component];
-            }
-            if (exceeds) extreme++;
+            offset += samples;
         }
         return (extreme + 1.0) / (options.skatOSimulations() + 1.0);
     }
 
-    private static SetTestResult kernelResult(
+    static SetTestResult kernelResult(
             String setId, String method, int requested,
             int included, SetTestScoreState scoreState,
             List<VariantFilterResult> excluded, ComputeBackend backend) {
@@ -241,6 +251,9 @@ public final class SetTests {
             statistic += score * score;
         double[] eigenvalues = eigenvalues(
             scoreState.informationView(), scoreState.variants(), backend);
+        if(eigenvalues.length==0 && statistic==0)
+            return new SetTestResult(setId,method,requested,included,0,Double.NaN,Double.NaN,
+                Double.NaN,1,0,"degenerate-zero-kernel",eigenvalues,excluded);
         QuadraticFormDistribution.Tail tail =
             QuadraticFormDistribution.survival(statistic, eigenvalues);
         return new SetTestResult(setId, method, requested, included,

@@ -1,5 +1,21 @@
 # Unreleased
 
+## Rare-variant score summaries and meta-analysis
+
+- Added `rare-score` for unrelated-sample quantitative-trait Gaussian scores,
+  original-unit score covariance, and BGZF/tabix export from aligned VCF/BCF data.
+- Added `rare-meta` for independent cohort single-variant score pooling,
+  equal/weighted burden, SKAT, and SKAT-O, with explicit test selection,
+  test-specific files, optional cohort results, group files or sliding windows,
+  cohort-count filters, allele alignment, and input/covariance checks.
+- Added primitive-array `ScoreMetaAnalysis` and summary-only `SummarySetTests`
+  APIs. SKAT-O simulation now uses bounded memory, with an exact rank-one
+  reduction in the summary API and explicit approximation/Monte Carlo limits.
+- Validated reference single-variant, burden, weighted burden, and SKAT results
+  against RAREMETAL 4.15.1 fixtures; added independent R integration checks.
+  See [tutorial](docs/rare-variant-meta-analysis.md) and
+  [validation/timing evidence](docs/rare-meta-validation.md) for scope and limits.
+
 ## CLI run timing
 
 - CLI logs now record UTC `started` and `finished` timestamps, numeric

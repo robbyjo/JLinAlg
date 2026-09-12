@@ -1,5 +1,10 @@
 # JLinAlg
 
+Rare-variant cohort summary export and score-based meta-analysis are available
+in the current source build through `rare-score` and `rare-meta` (unreleased). See the
+[rare-variant tutorial](docs/rare-variant-meta-analysis.md) for single-variant,
+equal/weighted burden, SKAT, SKAT-O, sliding windows, and test-specific output.
+
 **[Explore the project website](https://robbyjo.github.io/JLinAlg/)** for the
 complete feature map and browser-friendly worked vignettes.
 

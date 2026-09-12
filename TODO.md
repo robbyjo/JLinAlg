@@ -1,6 +1,6 @@
 # Development TODO
 
-Last reviewed: 2026-09-10.
+Last reviewed: 2026-09-12.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
@@ -58,6 +58,63 @@ the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), and the
   survey-design variance estimates. Validate against the R `survey` package.
   Reference: [survey GLM documentation](https://github.com/cran/survey/blob/master/man/svyglm.Rd).
 
+## Rare-variant meta-analysis — remaining engineering and calibration
+
+Implemented workflows and validation are documented in the
+[rare-variant tutorial](docs/rare-variant-meta-analysis.md) and
+[validation report](docs/rare-meta-validation.md).
+
+- [ ] **Large-group and parallel performance.** Add bounded regional caches,
+  configurable group concurrency, and benchmarks for large covariance blocks.
+  The current CLI streams single variants and processes one indexed group at a
+  time with explicit group-size limits; its published timing covers single-site
+  meta-analysis only.
+- [ ] **Rare-tail SKAT-O inference.** Add independently validated deterministic
+  tail calibration beyond the opt-in moment approximation, with explicit error
+  control at genome-wide significance levels. The current default Gaussian
+  score-null simulation has finite Monte Carlo resolution; rank-one sets have
+  an analytic reduction.
+- [ ] **Richer cohort QC and export models.** Add HWE QC for called genotypes,
+  detailed per-group variant-exclusion/sample-coverage manifests, and participant
+  score export from related-sample models. Retain explicit score/phenotype units,
+  missing-data semantics, and covariance normalization. The current exporter
+  supports unrelated-sample Gaussian null models; the importer supports RMW and
+  rvtests quantitative-trait score summaries.
+
+## Rare-variant meta-analysis — follow-up methods and diagnostics
+
+- [ ] **Optional leave-one-variant-out and leave-one-cohort-out diagnostics.**
+  Recompute group tests after removing each variant or cohort, using retained
+  scores/covariances without refitting the unchanged null model. Hold remaining
+  variant weights and the analysis sample definition fixed for influence
+  comparisons; document any alternative reweighting policy. Report omitted
+  element, remaining coverage, and test-specific results; include burden beta/SE
+  only for burden tests or an explicitly requested companion burden analysis.
+  Recalibrate each reduced SKAT/SKAT-O test rather than subtracting p-values.
+  Single-variant scores come directly from the input, not from changes in group
+  p-values. Treat influence rankings as exploratory, not conditional association
+  or causal attribution; handle empty and untestable reduced sets explicitly.
+- [ ] **Conditional summary-statistic analysis.** Use score/covariance block
+  adjustment to condition a variant or group on specified variants, with stable
+  solves, rank checks, cohort-specific missingness rules, and required cross-block
+  covariance coverage. Distinguish conditioning from simply omitting a variant.
+- [ ] **Variable-threshold tests.** Add adaptive MAF-threshold burden tests with
+  correlation-aware search calibration. Keep selected-threshold effect estimates
+  distinct from selection-adjusted inference.
+- [ ] **Raremetal2 extensions and additional trait models.** Assess multiallelic
+  formats, `--useExact` treatment of unbalanced studies, and missing conditional
+  variants separately. Define binary-trait/rare-case calibration and supported
+  null-model metadata before extending the quantitative-trait implementation.
+  Old covariance files without allele identifiers cannot fully resolve
+  multiallelic group tests.
+- [ ] **Heterogeneity and richer effect models.** Specify and validate
+  heterogeneous-effect kernel meta-analysis separately from scalar random-effects
+  meta-analysis. Cohort burden beta/SE can feed existing fixed/random-effects or
+  meta-regression APIs only with comparable burden definitions and units. Any
+  kernel variance-component, joint variant-effect, or shrinkage estimation must
+  expose its own model and uncertainty rather than reinterpret a SKAT p-value.
+  Reference: [MetaSKAT framework](https://pmc.ncbi.nlm.nih.gov/articles/PMC3710762/).
+
 ## Validation for new methods
 
 Use checked-in fixtures from the underlying R estimators, independent
@@ -65,31 +122,6 @@ likelihood/derivative/covariance checks, and reproducible workload-specific
 benchmarks. Zelig often wraps other packages and must not be the sole numerical
 reference. Document estimator assumptions, convergence failures, and supported
 scope; scenario contrasts require additional assumptions for causal interpretation.
-
-## Completed audit tranche — 2026-09-10
-
-- Sparse-precision meta-analysis now estimates independent heterogeneity by
-  REML or Paule-Mandel without materializing the sampling covariance;
-  multilevel covariance supports compound-symmetry and AR(1) families plus
-  nuisance-refitted standard-deviation profiles.
-- Sparse mixed models now provide joint multi-DF Kenward-Roger tests,
-  one-boundary mixture profile intervals, selected-pair correlation profiles
-  in larger blocks, original-coordinate full within-group PEV blocks, and
-  joint unstructured-plus-pedigree covariance optimization. Formula pedigree
-  mapping and complete-case alignment are also implemented.
-- Multivariable MR now accepts known outcome and per-instrument cross-exposure
-  covariance for generalized estimation and true conditional-strength
-  diagnostics.
-- Low-dimensional binomial-logit and Poisson-log GLMMs now support bounded
-  tensor adaptive quadrature for crossed and sparse-precision/pedigree random
-  effects.
-- Sparse ZIP/ZINB fitting now performs deterministic multi-start outer
-  optimization, reports the stationary modes found, and certifies selection
-  of the best reproducible stationary solution among those starts.
-- Positive-mixture tails now use a labeled saddlepoint fallback when the
-  bounded gamma series cannot certify a result. SKAT-O defaults to an exact
-  Gaussian-score-null parametric simulation; analytic moment matching remains
-  an explicit option.
 
 ## Remaining extensions and limits
 

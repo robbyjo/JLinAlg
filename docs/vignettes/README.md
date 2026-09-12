@@ -16,7 +16,8 @@ Run the complete verification suite before adapting an example:
 The v0.3.5 executable includes the `mediation`, `susie`, and `coloc` CLI
 subcommands, association preflight and variant-filter updates, and recursive
 pedigree identity resolution. Examples that name `jlinalg-0.3.5.jar` are
-release-compatible.
+release-compatible, except the explicitly marked unreleased rare-variant
+meta-analysis tutorial, which requires building the current source.
 
 | Vignette | Features covered |
 | --- | --- |
@@ -46,6 +47,7 @@ release-compatible.
 | [xWAS MR CLI and benchmark](../xwas-mr-cli-performance.md) | long-format CLI, output schema, reproducible R validation, timing protocol and measured speedup |
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
 | [Meta-analysis](meta-analysis.md) | fixed/random pooling, heterogeneity estimators, Knapp-Hartung, prediction intervals, meta-regression |
+| [Rare-variant cohort summaries and meta-analysis](../rare-variant-meta-analysis.md) | participant score export, RAREMETAL/rvtests import, single variants, equal/weighted burden, SKAT, SKAT-O, and calibration limits (unreleased) |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
 | [Multi-signal colocalization](colocalization.md) | alignment, priors, posterior-overlap trimming, H0-H4, shared-variant posterior, diagnostics, and MR/xWAS follow-up |
