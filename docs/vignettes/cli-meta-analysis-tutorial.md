@@ -5,6 +5,12 @@ with `./gradlew executableJar` (`.\gradlew.bat executableJar` on Windows).
 The examples below use the resulting `build/cli/jlinalg-0.3.5.jar`, rather than
 the previously published v0.3.5 release asset.
 
+For a complete expression-effects example using both files and primitive arrays,
+see [omics meta-analysis in the main vignette](meta-analysis.md#omics-example-expression-effects-across-cohorts).
+For rare-variant scores and covariance, use the separate `rare-meta` command:
+[rare-variant CLI workflow](../rare-variant-meta-analysis.md#a-complete-small-example)
+or [rare-variant Java workflow](../rare-variant-meta-analysis.md#java-score-summary-example).
+
 ## Inputs and cohort order
 
 Supply one TSV or CSV per independent cohort. Gzip-compressed `.tsv.gz` and

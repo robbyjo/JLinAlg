@@ -69,6 +69,56 @@ The burden file has `weights`, `direction`, `beta`, `se`, `z`, and `p_value`;
 the SKAT file replaces signed-effect fields with `q` and `calibration`;
 SKAT-O reports `minimum_component_p`, `adjusted_p`, and `component_rho_p`.
 
+## Java score-summary example
+
+The runnable [RareMetaExample.java](../examples/rare-meta/RareMetaExample.java)
+performs single-variant, equal-weight burden, weighted burden, SKAT, and SKAT-O
+meta-analysis using primitive arrays. With a JDK and the source-built JAR:
+
+```shell
+java --class-path build/cli/jlinalg-0.3.5.jar examples/rare-meta/RareMetaExample.java
+```
+
+Its two synthetic independent cohorts have scores for the same two variants.
+Scores must already share allele orientation and trait units. Covariances here
+are on the score-information scale, with one row-major matrix per cohort:
+
+```java
+import org.jlinalg.settest.*;
+
+double[][] scores = {{2, -3}, {4, 1}};
+double[][] covariance = {{4, 1, 1, 9}, {16, 2, 2, 4}};
+var pooled = ScoreMetaAnalysis.pool(scores, covariance, 1);
+if (pooled == null) throw new IllegalStateException("No eligible variants");
+var state = pooled.state();
+double[] u = state.scores(), v = state.information();
+var first = SummarySetTests.singleVariant("v1", u[0], v[0]);
+var burden = SummarySetTests.burden("GENE1", state, new double[]{1, 1});
+var weightedBurden = SummarySetTests.burden("GENE1", state, new double[]{1, 2});
+var skat = SummarySetTests.skat("GENE1", state, new double[]{1, 2});
+var skato = SummarySetTests.skatO("GENE1", state, new double[]{1, 2},
+    SetTestOptions.defaults());
+```
+
+The pooled scores are `(6, -2)` and covariance is `[[20,3],[3,13]]`. Equal
+burden beta is `4/39` with SE `1/sqrt(39)`. The weights `(1,2)` are illustrative
+linear coefficients, not automatically estimated MAF weights; select weights and
+variant masks before testing. SKAT squares those coefficients in its kernel.
+The full example prints both single-variant results and directions, burden
+beta/SE/p, SKAT Q/p, and SKAT-O adjusted p with its simulation budget and seed.
+The default SKAT-O calibration has the same resolution limits as the CLI.
+
+Represent unavailable variants with `Double.NaN` scores; corresponding covariance
+entries are ignored. The final `pool` argument is the minimum informative cohort
+count per variant. `pooled.indices()` maps retained variants to input columns;
+subset weights in that order if variants were filtered. The arrays contain
+unweighted, nuisance-adjusted scores, not per-cohort burden/SKAT p-values.
+Use `RareMetalStudy` for indexed file reads and covariance rescaling; `rare-meta`
+also handles file-level allele alignment, masks, and MAF weight construction.
+
+For gene/probe effects with beta and SE, see the
+[omics Java and CLI meta-analysis example](vignettes/meta-analysis.md#omics-example-expression-effects-across-cohorts).
+
 ## Cohort preparation and interoperability
 
 The manifest is TSV with `cohort`, `scores`, and optional `covariance` columns.

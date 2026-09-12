@@ -5,6 +5,81 @@ for each independent study. Transform ratio measures to a suitable additive
 scale, such as log odds ratios, before fitting and back-transform only for
 presentation.
 
+For rare-variant score/covariance pooling, see the worked
+[rare-variant Java example](../rare-variant-meta-analysis.md#java-score-summary-example)
+and [rare-variant CLI example](../rare-variant-meta-analysis.md#a-complete-small-example).
+Those workflows provide single-variant, equal/weighted burden, SKAT, and SKAT-O
+tests. A cohort's SKAT or SKAT-O p-value alone is insufficient input.
+
+## Omics example: expression effects across cohorts
+
+The runnable [omics example files](../../examples/meta-analysis/omics) represent
+three independent cohorts reporting a log2 expression fold change and its SE
+for the same case-versus-control contrast. These are synthetic estimates, not
+participant-level expression values. Each file has `feature_id`, `beta`, and
+`se` columns; gene order differs across files, and only cohort A measured gene C.
+
+| Feature | A beta (SE) | B beta (SE) | C beta (SE) |
+|---|---|---|---|
+| `gene_A` | 0.20 (0.10) | 0.50 (0.20) | 0.10 (0.15) |
+| `gene_B` | -0.30 (0.20) | -0.10 (0.10) | -0.20 (0.15) |
+| `gene_C` | 0.40 (0.10) | missing | missing |
+
+Use matching gene identifiers, effect units, and contrast definitions across
+cohorts. The same workflow accepts probe, protein, or SNP effects; for SNPs,
+harmonize effect alleles before using ordinary inverse-variance meta-analysis.
+Correlated features can be analyzed individually, but overlapping cohort samples
+violate the independent-study model. Account for testing many features downstream.
+
+### Run the omics CLI
+
+Build from current source with `./gradlew executableJar` (Windows:
+`.\gradlew.bat executableJar`). These commands use the resulting JAR and are
+not available in the previously published v0.3.5 release asset. Run from the
+repository root, using fresh output paths:
+
+```shell
+java -jar build/cli/jlinalg-0.3.5.jar meta-analysis --cohort A=examples/meta-analysis/omics/cohort-a.tsv --cohort B=examples/meta-analysis/omics/cohort-b.tsv --cohort C=examples/meta-analysis/omics/cohort-c.tsv --model fixed --min-cohorts 2 --out build/omics-meta/fixed.tsv
+java -jar build/cli/jlinalg-0.3.5.jar meta-analysis --cohort A=examples/meta-analysis/omics/cohort-a.tsv --cohort B=examples/meta-analysis/omics/cohort-b.tsv --cohort C=examples/meta-analysis/omics/cohort-c.tsv --model random --tau-estimator reml --min-cohorts 2 --out build/omics-meta/random.tsv
+```
+
+Gene A has direction `+++`, gene B `---`, and gene C `+??`. Gene C remains in
+the table with `below_min_cohorts` and `NA` estimates. The default minimum is 1;
+with that default, gene C passes through with its supplied beta/SE and
+`single_cohort` status, with no heterogeneity estimate. Inspect the pooled effect,
+SE, p-value, confidence interval, tau-squared, and Q alongside cohort coverage.
+Each output has a `.log` sidecar with settings, timestamps, and elapsed time.
+
+For this fixture, both models give gene A beta `0.2180327869` and gene B beta
+`-0.1557377049`, each with SE `0.0768221280`. REML estimates tau-squared as zero
+for these two genes, so their fixed/random beta and SE agree. The model choice
+can change estimates and uncertainty when between-cohort variance is positive.
+
+### Run the same omics data in Java
+
+The complete [OmicsMetaExample.java](../../examples/meta-analysis/omics/OmicsMetaExample.java)
+uses feature-major primitive arrays and the same minimum of two cohorts:
+
+```java
+double[] beta = {.2, .5, .1, -.3, -.1, -.2, .4, Double.NaN, Double.NaN};
+double[] se = {.1, .2, .15, .2, .1, .15, .1, Double.NaN, Double.NaN};
+var batch = MetaAnalysis.prepareBatch(beta, se, 3, 3, 2);
+var fixed = batch.fit(MetaAnalysisOptions.fixedEffect(), 1);
+var random = batch.fit(MetaAnalysisOptions.randomEffects(), 1);
+System.out.println(batch.direction(2)); // +??; result arrays contain NaN for gene_C
+```
+
+Run the full example with a JDK and the built executable as its classpath:
+
+```shell
+java --class-path build/cli/jlinalg-0.3.5.jar examples/meta-analysis/omics/OmicsMetaExample.java
+```
+
+The Java example prints fixed/random beta and SE for each gene, cohort counts,
+and directions. It avoids creating a `List<MetaStudy>` for each feature. See
+[CLI sorting, batching, and meta-regression](cli-meta-analysis-tutorial.md) for
+larger files and numeric cohort moderators.
+
 ## CLI and array workflows
 
 For file-based omics workflows, use the [meta-analysis CLI tutorial](cli-meta-analysis-tutorial.md).

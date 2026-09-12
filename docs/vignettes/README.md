@@ -46,7 +46,7 @@ meta-analysis tutorial, which requires building the current source.
 | [Parallel xWAS MR](xwas-mr-pipeline.md) | reusable clumped instruments, phenotype families, bounded parallel exposure-outcome scans, all-pairs BH/FDR, scale-safe thresholds, and two-stage diagnostics |
 | [xWAS MR CLI and benchmark](../xwas-mr-cli-performance.md) | long-format CLI, output schema, reproducible R validation, timing protocol and measured speedup |
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
-| [Meta-analysis](meta-analysis.md) | fixed/random pooling, heterogeneity estimators, Knapp-Hartung, prediction intervals, meta-regression |
+| [Meta-analysis](meta-analysis.md) | omics Java/CLI examples, fixed/random pooling, heterogeneity, meta-regression, and links to rare-variant workflows |
 | [Rare-variant cohort summaries and meta-analysis](../rare-variant-meta-analysis.md) | participant score export, RAREMETAL/rvtests import, single variants, equal/weighted burden, SKAT, SKAT-O, and calibration limits (unreleased) |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
