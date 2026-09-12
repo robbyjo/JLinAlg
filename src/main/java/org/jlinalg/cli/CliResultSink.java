@@ -40,11 +40,18 @@ final class CliResultSink
     private final AnnotationLookup annotation;
     private final int[] caseControlGroups;
     private final ExternalBh output;
+    private final ConditionalGwasExport scoreExport;
+    private List<String> scoreFields=List.of();
 
     CliResultSink(
             Path path, boolean overwrite, boolean genotype,
             String statisticType, AnnotationLookup annotation,
             int[] caseControlGroups) throws IOException {
+        this(path,overwrite,genotype,statisticType,annotation,caseControlGroups,null);
+    }
+    CliResultSink(Path path,boolean overwrite,boolean genotype,String statisticType,
+            AnnotationLookup annotation,int[] caseControlGroups,ConditionalGwasExport scoreExport) throws IOException {
+        this.scoreExport=scoreExport;
         this.genotype = genotype;
         this.statisticType = statisticType;
         this.annotation = annotation;
@@ -55,6 +62,7 @@ final class CliResultSink
             genotype ? GENOTYPE_HEADER : OMICS_HEADER);
         for (String column : annotation.columns())
             header.add("annot_" + column);
+        if(scoreExport!=null)header.addAll(ConditionalGwasExport.COLUMNS);
         output.writeHeader(header);
     }
 
@@ -62,6 +70,7 @@ final class CliResultSink
     public void acceptEstimate(AssociationPipelineEstimate estimate)
             throws IOException {
         VariantRecord variant = estimate.variant();
+        scoreFields=scoreExport==null?List.of():scoreExport.summarize(variant);
         VariantStatistics qc = estimate.variantStatistics();
         Hwe hwe = hwe(variant);
         writeGenotype("ok", variant.id(), variant.chromosome(),
@@ -150,6 +159,10 @@ final class CliResultSink
         fields.add(filterReason);
         fields.add(failureReason);
         fields.addAll(List.of(annotation.values(id)));
+        if(scoreExport!=null) {
+            fields.addAll(scoreFields.isEmpty()?java.util.Collections.nCopies(ConditionalGwasExport.COLUMNS.size(),""):scoreFields);
+            scoreFields=List.of();
+        }
         output.write(fields, pValue);
     }
 

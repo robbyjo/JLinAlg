@@ -149,6 +149,13 @@ final class AnalysisRunner {
         GrmContext grm = grm(phenotype, prepared);
         PedigreeContext pedigree = pedigree(phenotype, prepared);
         String model = resolveModel();
+        if(model.equals("cox") && !plan.isCox())
+            throw new IllegalArgumentException("Cox genotype scans require a Surv(time,event) or Surv(start,stop,event) response");
+        if((model.equals("cox") || options.conditionalGwasSummary) && options.individualId!=null) {
+            List<String> individualIds=phenotype.alignedValues(prepared.ids(),options.individualId);
+            if(new java.util.HashSet<>(individualIds).size()!=individualIds.size())
+                throw new IllegalArgumentException("model-based score export/Cox scans require distinct individuals; repeated individuals need cluster-aware inference");
+        }
         CompiledFormula fixed;
         CompiledMixedFormula mixed = null;
         if (plan.hasRandomEffects()) {
@@ -157,10 +164,37 @@ final class AnalysisRunner {
             fixed = mixed.fixed();
         } else {
             fixed = Formula.compile(
-                plan.withoutOmics(), prepared.modelTable());
+                plan.isCox()?plan.survival().stop()+"~"+plan.withoutOmics().substring(plan.withoutOmics().indexOf('~')+1)
+                    :plan.withoutOmics(), prepared.modelTable());
         }
         double[][] covariates = matrix(
             fixed.design(), fixed.rows(), fixed.columns());
+        List<String> nullCovariateNames=new ArrayList<>(fixed.coefficientNames());
+        if(model.equals("cox")) {
+            // Encode factors with ordinary reference contrasts before removing
+            // the unidentifiable Cox intercept. Compiling ~0+factor would keep
+            // every level and introduce a constant linear combination.
+            int intercept=nullCovariateNames.indexOf("(Intercept)");
+            if(intercept>=0) {
+                double[][] withoutIntercept=new double[fixed.rows()][fixed.columns()-1];
+                for(int i=0;i<fixed.rows();i++)for(int j=0,k=0;j<fixed.columns();j++)
+                    if(j!=intercept)withoutIntercept[i][k++]=covariates[i][j];
+                covariates=withoutIntercept;nullCovariateNames.remove(intercept);
+            }
+        }
+        if(options.conditionalGwasSummary && (!genotype || plan.hasRandomEffects() || grm!=null || pedigree!=null
+                || !(model.equals("ols") || model.equals("cox") || model.equals("glm") && Set.of("binomial","poisson","gaussian").contains(options.family))))
+            throw new IllegalArgumentException("--conditional-gwas-summary supports unrelated genotype OLS, Gaussian/binomial/Poisson GLM, and model-based Cox scans; mixed/robust models need separate score exporters");
+        if(model.equals("cox") && (!genotype || grm!=null || plan.hasRandomEffects()))
+            throw new IllegalArgumentException("Cox omics scans currently require unrelated genotype data");
+        if(genotype && (model.equals("cox") || (model.equals("glm") || model.equals("glmm")) && !options.family.equals("gaussian"))) {
+            String notice=options.conditionalGwasSummary
+                ?"Conditional-GWAS export enabled: scores and within-block covariance are local to the fitted null; nonlinear refits for new conditioning sets and rare-event calibration are not supplied by these columns."
+                :"If MR conditional GWAS is planned, the current standard output is insufficient for this outcome model. Use --conditional-gwas-summary with --score-genome-build to export model-specific scores, covariance and metadata; new nonlinear conditioning sets require cohort-side refitting.";
+            if(!options.conditionalGwasSummary && (model.equals("glmm") || model.equals("glm") && !Set.of("binomial","poisson").contains(options.family)))
+                notice="If MR conditional GWAS is planned, the current standard output is insufficient for this outcome model. A matching cohort-side score/covariance exporter is required; --conditional-gwas-summary does not yet support this mixed/quasi/noncanonical model.";
+            output.println(notice);warning(notice);
+        }
         int blockSize = AdaptiveBlockSizer.choose(prepared.ids().size(),
             options.blockSize, options.threads);
         int associationChunkSize = AdaptiveBlockSizer.chunkSize(blockSize);
@@ -204,6 +238,15 @@ final class AnalysisRunner {
             throw new IllegalArgumentException(
                 "partial output lacks resumable block metadata; "
                     + "use --overwrite to restart");
+        List<String> conditioningKeys=List.of();
+        if(options.conditionalGwasSummary) {
+            var conditioned=ConditionalGwasExport.conditioning(variantSource,prepared.ids(),options.conditionOn,covariates);
+            covariates=conditioned.covariates();conditioningKeys=conditioned.keys();
+            variantSource=ConditionalGwasExport.omitConditioning(variantSource,conditioningKeys);
+            info("conditioning_variants="+conditioningKeys);
+            output.println("Conditional-GWAS summaries: "+options.scoreCovariancePath()+" and "+options.scoreManifestPath());
+            info("conditional_gwas_summary=true covariance="+options.scoreCovariancePath()+" metadata="+options.scoreManifestPath());
+        }
         AssociationEngineOptions engine = new AssociationEngineOptions(
             options.threads, associationChunkSize,
             options.backend, AssociationFailurePolicy.RECORD_NAN,
@@ -218,10 +261,40 @@ final class AnalysisRunner {
             .build();
         AssociationPipelineOptions pipeline =
             new AssociationPipelineOptions(blockSize, filters);
+        org.jlinalg.survival.FastCoxAssociation cox=null;int eventCount=-1;
+        if(model.equals("cox")) {
+            if(covariates[0].length==0)throw new IllegalArgumentException("Cox genotype scans currently require at least one varying null covariate or conditioning variant");
+            if(fixed.weights()!=null)throw new IllegalArgumentException("Cox genotype scans do not support formula weights");
+            FormulaPlan.Survival survival=plan.survival();
+            double[] stop=fixed.response(),start=survival.start()==null?new double[stop.length]
+                :Formula.compile(survival.start()+"~1",prepared.modelTable()).response();
+            double[] event=Formula.compile(survival.event()+"~1",prepared.modelTable()).response();
+            boolean[] observed=new boolean[event.length];eventCount=0;
+            for(int i=0;i<event.length;i++) {
+                if(event[i]!=0 && event[i]!=1)throw new IllegalArgumentException("Cox events must be coded 0/1");
+                observed[i]=event[i]==1;if(observed[i])eventCount++;
+            }
+            cox=org.jlinalg.survival.FastCoxAssociation.prepare(new CoxSurvivalData(start,stop,observed,null),covariates,
+                fixed.offset(),CoxOptions.defaults().withTies(CoxTies.valueOf(options.ties.toUpperCase(Locale.ROOT))),engine);
+        }
+        ConditionalGwasExport scoreExport=null;
+        if(options.conditionalGwasSummary) {
+            List<String> names=new ArrayList<>(nullCovariateNames);names.addAll(conditioningKeys);
+            if(model.equals("cox"))scoreExport=new ConditionalGwasExport(options,cox::score,fixed.response(),false,eventCount,
+                "cox","cox-partial-likelihood",Double.NaN,names,conditioningKeys,null);
+            else {
+                if(options.family.equals("binomial") && fixed.weights()!=null && Arrays.stream(fixed.weights()).anyMatch(w->w!=1))
+                    throw new IllegalArgumentException("binary score export requires unit trial weights; grouped-binomial summaries need a different count schema");
+                var glm=org.jlinalg.association.FastGlmAssociation.prepare(fixed.response(),covariates,
+                    model.equals("ols")?GlmFamilies.gaussian():family(options.family),fixed.weights(),fixed.offset(),GlmOptions.defaults(),engine);
+                scoreExport=new ConditionalGwasExport(options,glm::score,fixed.response(),options.family.equals("binomial"),-1,
+                    model,glm.nullModel().family(),glm.nullModel().dispersion(),names,conditioningKeys,prepared.binaryMapping());
+            }
+        }
         Counts counts;
-        try (CliResultSink sink = new CliResultSink(options.output,
+        try (ConditionalGwasExport summaries=scoreExport;CliResultSink sink = new CliResultSink(options.output,
                 options.overwrite, genotype, resolvedStatisticType,
-                annotation, genotype ? prepared.caseControlGroups() : null)) {
+                annotation, genotype ? prepared.caseControlGroups() : null,summaries)) {
             counts = switch (model) {
                 case "ols" -> scanOls(variantSource, numericSource, genotype,
                     prepared.ids(), fixed, covariates, transform, blockSize,
@@ -235,10 +308,12 @@ final class AnalysisRunner {
                 case "glmm" -> scanGlmm(variantSource, numericSource, genotype,
                     prepared.ids(), fixed, mixed, grm, pedigree, covariates,
                     transform, blockSize, engine, sink);
+                case "cox" -> Counts.of(StreamingAssociationPipeline.fastCoxTo(variantSource,prepared.ids(),cox,engine,pipeline,sink));
                 default -> throw new IllegalArgumentException(
                     "omics model is not yet supported: " + model);
             };
             sink.finish();
+            if(summaries!=null)summaries.finish();
             info("fdr_tests=" + sink.adjustedTests());
         }
         info("source_features=" + counts.source());
@@ -1226,6 +1301,8 @@ final class AnalysisRunner {
             .put("tested_features", counts.tested())
             .put("failed_features", counts.failed())
             .put("output", options.output.toAbsolutePath())
+            .put("conditional_gwas_summary",options.conditionalGwasSummary)
+            .put("score_manifest",options.conditionalGwasSummary?options.scoreManifestPath():null)
             .write(options.manifestPath());
     }
 

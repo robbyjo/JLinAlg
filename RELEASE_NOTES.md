@@ -1,5 +1,23 @@
 # Unreleased
 
+## Conditional GWAS aggregate exports and local refits
+
+- Added `--conditional-gwas-summary` with required `--score-genome-build` to
+  genotype Gaussian, binary logistic, Poisson and model-based Cox scans. It
+  appends efficient scores, variances, counts, one-step estimates and explicit
+  normal-only calibration status, and writes linked covariance/metadata files.
+- Added `--condition-on` for cohort-side null refitting with requested lead
+  genotypes, without exporting participant records. `--score-block-size` bounds
+  covariance blocks; unavailable cross-block covariance is never assumed zero.
+- Added streaming Cox genotype scans with offsets, reference-coded categorical
+  covariates, right censoring/left truncation and Efron/Breslow ties. Related,
+  repeated-subject and other unsupported covariance models fail explicitly.
+- Non-Gaussian genotype scans print and log the conditional-GWAS limitation;
+  the ordinary output schema is unchanged unless the switch is used. Existing
+  `mr-estimate` remains the Gaussian summary approximation. Rare-event tail
+  calibration and a new summary-only importer remain separate extensions.
+- See the [schema, CLI workflow and independent R validation](docs/conditional-gwas-summary.md).
+
 ## Quantile covariance, missing ordinal SEM, and diffuse ARIMA inference
 
 - Added `QuantileRegressionInference` for exact quantile fits with supplied

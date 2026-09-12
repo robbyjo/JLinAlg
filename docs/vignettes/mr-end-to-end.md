@@ -1,5 +1,10 @@
 # End-to-end Mendelian randomization
 
+For cohort-side logistic, Poisson or Cox analysis, the current source build
+offers [aggregate conditional-GWAS exports and local null refits](../conditional-gwas-summary.md).
+These model-specific scores and covariance are a separate schema. They are not
+automatically imported by the existing Gaussian `mr-estimate` conditional path.
+
 This vignette joins JLinAlg's command-line data preparation to its Java MR
 API. It covers instrument discovery or custom QTL input, ancestry-matched LD
 clumping, harmonization, estimation, diagnostics, plotting, bidirectional MR,

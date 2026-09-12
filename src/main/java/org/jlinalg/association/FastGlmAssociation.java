@@ -33,6 +33,7 @@ public final class FastGlmAssociation {
     private final double[] squareRootWorkingWeights;
     private final double dispersion;
     private final GlmResult nullModel;
+    private final boolean clampedWorkingWeights;
 
     private FastGlmAssociation(
             int observations,
@@ -42,7 +43,7 @@ public final class FastGlmAssociation {
             double[] workingResidual,
             double[] squareRootWorkingWeights,
             double dispersion,
-            GlmResult nullModel) {
+            GlmResult nullModel,boolean clampedWorkingWeights) {
         this.observations = observations;
         this.covariateCount = covariateCount;
         this.weightedCovariates = weightedCovariates;
@@ -51,6 +52,7 @@ public final class FastGlmAssociation {
         this.squareRootWorkingWeights = squareRootWorkingWeights;
         this.dispersion = dispersion;
         this.nullModel = nullModel;
+        this.clampedWorkingWeights=clampedWorkingWeights;
     }
 
     /** Fits the shared-covariate null model and caches its efficient-score metric. */
@@ -95,6 +97,7 @@ public final class FastGlmAssociation {
         double[] eta = nullModel.linearPredictor();
         double[] squareRootWorkingWeights = new double[rows];
         double[] workingResidual = new double[rows];
+        boolean clamped=false;
         for (int row = 0; row < rows; row++) {
             double derivative = family.meanDerivative(eta[row]);
             double variance = family.variance(means[row]);
@@ -102,8 +105,10 @@ public final class FastGlmAssociation {
                     || !Double.isFinite(variance) || !(variance > 0.0))
                 throw new IllegalArgumentException(
                     "family produced invalid null-model score weights");
+            double rawWeight=weights[row] * derivative * derivative / variance;
+            clamped|=rawWeight<MINIMUM_WORKING_WEIGHT || rawWeight>MAXIMUM_WORKING_WEIGHT;
             double workingWeight = clamp(
-                weights[row] * derivative * derivative / variance,
+                rawWeight,
                 MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
             squareRootWorkingWeights[row] = Math.sqrt(workingWeight);
             workingResidual[row] = squareRootWorkingWeights[row]
@@ -120,7 +125,7 @@ public final class FastGlmAssociation {
             informationInverse[index] /= dispersion;
         return new FastGlmAssociation(rows, columns, weightedCovariates,
             informationInverse, workingResidual, squareRootWorkingWeights,
-            dispersion, nullModel);
+            dispersion, nullModel,clamped);
     }
 
     /** Scans an observation-by-predictor matrix in prepared score blocks. */
@@ -222,6 +227,36 @@ public final class FastGlmAssociation {
 
     /** The fitted covariate-only GLM used by every marker score test. */
     public GlmResult nullModel() { return nullModel; }
+
+    /** Efficient, unstandardized score vector and full model-based information.
+     * Input is variant-major, finite, and already sample-aligned/imputed.
+     * Dispersion is held at its fitted null value. This is a local score model,
+     * not a reconstruction of a nonlinear likelihood away from this null. */
+    public org.jlinalg.settest.SetTestScoreState score(double[][] variants) {
+        if(clampedWorkingWeights)throw new IllegalArgumentException("score export refuses a numerically clamped GLM working metric");
+        if(variants==null || variants.length==0)throw new IllegalArgumentException("variant rows required");
+        int m=variants.length,p=covariateCount;
+        double[][] residualized=new double[m][observations];double[] u=new double[m],v=new double[m*m];
+        for(int j=0;j<m;j++) {
+            if(variants[j]==null || variants[j].length!=observations)throw new IllegalArgumentException("variant sample alignment differs from null");
+            double[] cross=new double[p],beta=new double[p];
+            for(int i=0;i<observations;i++) {
+                if(!Double.isFinite(variants[j][i]))throw new IllegalArgumentException("finite imputed variants required");
+                residualized[j][i]=variants[j][i]*squareRootWorkingWeights[i];
+                for(int c=0;c<p;c++)cross[c]+=weightedCovariates[i*p+c]*residualized[j][i];
+            }
+            for(int c=0;c<p;c++)for(int d=0;d<p;d++)beta[c]+=informationInverse[c*p+d]*cross[d];
+            for(int i=0;i<observations;i++) {
+                for(int c=0;c<p;c++)residualized[j][i]-=weightedCovariates[i*p+c]*beta[c];
+                u[j]+=residualized[j][i]*workingResidual[i]/dispersion;
+            }
+            for(int k=0;k<=j;k++) {
+                double sum=0;for(int i=0;i<observations;i++)sum+=residualized[j][i]*residualized[k][i]/dispersion;
+                v[j*m+k]=v[k*m+j]=sum;
+            }
+        }
+        return new org.jlinalg.settest.SetTestScoreState(u,v,m);
+    }
 
     private PreparedBlock prepareBlock(
             double[] predictors, int total, int first, int count,

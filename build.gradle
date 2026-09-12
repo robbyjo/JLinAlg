@@ -680,6 +680,18 @@ tasks.register('benchmarkTopmedMetaAnalysis', JavaExec) {
     }.getOrElse([])
 }
 
+tasks.register('benchmarkConditionalScoreExport', JavaExec) {
+    group = 'verification'
+    description = 'Runs R-checked end-to-end conditional score export timings.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.cli.ConditionalScoreExportBenchmark'
+    jvmArgs '-Xms64m', '-Xmx1g'
+    systemProperties System.properties.findAll { key, ignored ->
+        key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
 // v0.3.0 audit workloads, paired with independent reference regression tests.
 // Run sequentially for meaningful local timings.
 [

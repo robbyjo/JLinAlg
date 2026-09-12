@@ -79,19 +79,46 @@ benchmarks. Zelig often wraps other packages and must not be the sole numerical
 reference. Document estimator assumptions, convergence failures, and supported
 scope; scenario contrasts require additional assumptions for causal interpretation.
 
-## Remaining extensions and limits
+## Conditional GWAS — further scope
+
+The opt-in Gaussian/logistic/Poisson/Cox aggregate export and cohort-side
+conditioning refits are implemented; see the
+[summary schema and validation](docs/conditional-gwas-summary.md).
+
+- [ ] **Model-specific tail calibration.** Add validated binary rare-case and
+  survival calibration, with the required score cumulants/risk-set information.
+  Current exports explicitly provide normal tails and no calibrated p-value.
+- [ ] **Summary-only score import and conditioning.** Add an importer for the
+  new schema with allele alignment, null-model compatibility, full matrix
+  coverage and rank checks. Missing cross-block covariance must remain unknown.
+  Keep local Schur-complement inference separate from nonlinear null refits;
+  the existing `mr-estimate` Gaussian summary interface is unchanged.
+- [ ] **Additional cohort score models.** Add dedicated mixed, cluster-robust,
+  stratified/repeated-subject Cox, grouped-binomial and other outcome exporters.
+  Define cross-cohort overlap handling before pooling dependent study scores.
+
+## Remaining estimator extensions
+
+- [ ] **SEM.** DWLS/WLSMV, mixed continuous/ordinal responses, general MAR
+  ordinal missingness, multigroup invariance, ordinal modification indices,
+  and FIML robust scaled fit statistics.
+- [ ] **Time series.** General regression terms and historical state smoothing.
+- [ ] **Nonparametric inference.** Mixed-type/multidimensional kernels and
+  automatic inference-valid bandwidth selection; dependent observations and
+  response mass points require separate quantile inference methods.
+- [ ] **Non-tensor random-effect integration.** Add a non-tensor integration
+  method before expanding quadrature to higher-dimensional structures.
+
+## Interpretation and numerical limits
 
 These boundaries are explicit; this release does not claim complete parity
 with every feature of lavaan, metafor, lme4, or the other R packages.
 
-- SEM: DWLS/WLSMV, mixed continuous/ordinal responses, general MAR ordinal
-  missingness, multigroup invariance,
-  ordinal modification indices, and FIML robust scaled fit statistics.
-- Time series: general regression terms and
-  historical state smoothing.
-- MR conditional GWAS remains the documented Gaussian score model; other
-  outcome likelihoods require individual-level data or additional sufficient
-  statistics rather than reinterpretation of the available summary inputs.
+- The legacy MR conditional-GWAS interface assumes its documented Gaussian
+  score model. Cohort model-specific scores/covariance support local inference;
+  they do not reconstruct a complete nonlinear likelihood away from the null.
+  New nonlinear conditioning sets require cohort-side refits or a richer
+  likelihood evaluation protocol.
 - Multidimensional quadrature is deliberately tensor-node bounded and supports
   binomial-logit and Poisson-log likelihoods. Higher-dimensional structures
   should use sparse Laplace/PQL unless a non-tensor integration method is added.
@@ -105,11 +132,9 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
   not a general nonlinear random-parameter likelihood.
 - Selective inference: unknown-noise or response-selected penalties, dependent
   sample splits, and non-Gaussian selection require different inferential methods.
-- Quantile/nonparametric regression: mixed-type/multidimensional kernels and
-  automatic inference-valid bandwidth selection remain distinct extensions.
-  Exact quantile covariance now supports supplied conditional densities or an
-  iid residual kernel with caller-set bandwidth; dependent observations and
-  response mass points need other inferential methods.
+- Exact quantile covariance uses supplied conditional densities or an iid
+  residual kernel with caller-set bandwidth. This does not establish automatic
+  bandwidth validity or inference for dependent rows/response mass points.
 - Kernel set tests: the saddlepoint positive-mixture fallback is approximate,
   as is opt-in analytic SKAT-O. Default parametric SKAT-O simulation is exact
   for its Gaussian score-null model up to Monte Carlo error, not an exact

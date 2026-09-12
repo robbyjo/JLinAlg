@@ -31,6 +31,17 @@ import org.jlinalg.ols.OlsOptions;
 public final class StreamingAssociationPipeline {
     private StreamingAssociationPipeline() { }
 
+    /** Streams model-based Cox score tests through a prepared cohort null. */
+    public static AssociationPipelineSummary fastCoxTo(VariantSource source,List<String> ids,
+            org.jlinalg.survival.FastCoxAssociation model,AssociationEngineOptions engine,
+            AssociationPipelineOptions pipeline,AssociationPipelineSink sink) throws IOException {
+        if(source==null || ids==null || model==null || engine==null || pipeline==null || sink==null
+                || ids.size()!=model.observations())
+            throw new IllegalArgumentException("Cox source, aligned sample IDs, prepared null, options, and sink are required");
+        return scanTo(source,ids,pipeline,(variants,names)->BlockResult.of(model.scan(
+            variants,names,engine,org.jlinalg.survival.CoxScoreVariance.MODEL_BASED)),sink);
+    }
+
     public static AssociationPipelineResult fastOls(
             VariantSource source,
             List<String> analysisSampleIds,

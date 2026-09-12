@@ -209,6 +209,13 @@ positive continuous outcomes. Genotype Laplace GLMM scans are not exposed.
 
 ## Genotype GWAS and P3D LMM
 
+The current source build adds `--conditional-gwas-summary` with
+`--score-genome-build` for Gaussian, logistic, Poisson and model-based Cox
+genotype scans. It writes aggregate scores, bounded covariance blocks and
+coding/model metadata. Add `--condition-on` to refit the cohort null with lead
+variants. See the [conditional-GWAS workflow](../conditional-gwas-summary.md)
+for complete commands, column definitions and calibration/coverage limits.
+
 ~~~powershell
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.tsv
 ~~~

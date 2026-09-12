@@ -59,6 +59,13 @@ variants; every other threshold must be selected by the analysis.
 
 ## Bounded-memory GWAS
 
+The CLI now offers [conditional-GWAS aggregate exports](conditional-gwas-summary.md)
+for Gaussian, logistic, Poisson and model-based Cox genotype scans through
+`--conditional-gwas-summary --score-genome-build GRCh38`. This includes
+model-specific U/V, within-block covariance, counts and null metadata, plus
+optional cohort-side refitting with `--condition-on`. The linked guide defines
+the normal-tail calibration and matrix-coverage limits.
+
 For an unrelated quantitative trait, the fastest implemented path factors the
 shared covariates once and residualizes genotype blocks:
 

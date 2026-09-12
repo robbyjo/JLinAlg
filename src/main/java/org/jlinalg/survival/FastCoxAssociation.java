@@ -163,6 +163,39 @@ public final class FastCoxAssociation {
     public BackendProvenance backend() { return nullModel.backend(); }
     public int observations() { return observations; }
 
+    /** Full efficient score/information at the fitted Cox null, variant-major
+     * finite inputs. Model-based covariance only; no cluster/relatedness or
+     * rare-event tail correction is implied. Covariate score is projected out. */
+    public org.jlinalg.settest.SetTestScoreState score(double[][] variants) {
+        if(variants==null || variants.length==0)throw new IllegalArgumentException("variant rows required");
+        if(clusterIds!=null || scoreCorrelation!=null)throw new IllegalArgumentException("full score export currently requires model-based Cox variance");
+        int m=variants.length,p=covariateCount,k=p+m;
+        double[] design=new double[observations*k],coefficients=new double[k];
+        System.arraycopy(nullModel.beta(),0,coefficients,0,p);
+        for(int i=0;i<observations;i++)System.arraycopy(covariates,i*p,design,i*k,p);
+        for(int j=0;j<m;j++) {
+            if(variants[j]==null || variants[j].length!=observations)throw new IllegalArgumentException("variant sample alignment differs from null");
+            for(int i=0;i<observations;i++) {
+                if(!Double.isFinite(variants[j][i]))throw new IllegalArgumentException("finite imputed variants required");
+                design[i*k+p+j]=variants[j][i];
+            }
+        }
+        var evaluation=CoxPartialLikelihood.evaluate(survival,design,k,coefficients,offset,
+            coxOptions.ties(),rightCensoredPlan,countingProcessPlan);
+        double[] inverse=nullModel.covariance(),information=evaluation.information(),scores=evaluation.score();
+        double[] u=new double[m],v=new double[m*m];double[][] projection=new double[m][p];
+        for(int j=0;j<m;j++) {
+            for(int c=0;c<p;c++)for(int d=0;d<p;d++)projection[j][c]+=information[(p+j)*k+d]*inverse[d*p+c];
+            u[j]=scores[p+j];for(int c=0;c<p;c++)u[j]-=projection[j][c]*scores[c];
+            for(int h=0;h<=j;h++) {
+                double value=information[(p+j)*k+p+h];
+                for(int c=0;c<p;c++)value-=projection[j][c]*information[c*k+p+h];
+                v[j*m+h]=v[h*m+j]=value;
+            }
+        }
+        return new org.jlinalg.settest.SetTestScoreState(u,v,m);
+    }
+
     private void evaluateBlock(double[] predictors, int total, int first,
             int count, List<String> names, AssociationEngineOptions options,
             CoxScoreVariance variance, double[] beta, double[] standardErrors,

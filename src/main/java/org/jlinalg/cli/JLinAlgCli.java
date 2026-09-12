@@ -223,6 +223,10 @@ public final class JLinAlgCli {
                                            numeric mixed scans and a null model
                                            only for genotype LMM scans
               --ties efron|breslow         Cox tied-event method
+              --conditional-gwas-summary  Add efficient-score columns, covariance blocks and null metadata
+              --score-genome-build NAME   Required reference build for score export
+              --score-block-size N        Complete covariance per block (default 64, maximum 512)
+              --condition-on IDS          Comma-separated variant IDs or CHR:POS:REF:ALT; refit null locally
               --df auto|satterth|kr
               --out FILE                   .csv writes CSV; other suffixes
                                            write TSV. Log defaults to FILE.log

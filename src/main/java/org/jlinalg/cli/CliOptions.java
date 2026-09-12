@@ -60,12 +60,24 @@ final class CliOptions {
     boolean noLog;
     boolean help;
     boolean version;
+    boolean conditionalGwasSummary;
+    int scoreBlockSize = 64;
+    boolean explicitScoreBlockSize;
+    String scoreGenomeBuild;
+    final List<String> conditionOn = new ArrayList<>();
 
     static CliOptions parse(String[] arguments) {
         CliOptions result = new CliOptions();
         for (int index = 0; index < arguments.length; index++) {
             String option = arguments[index];
             switch (option) {
+                case "--conditional-gwas-summary" -> result.conditionalGwasSummary = true;
+                case "--score-block-size" -> {
+                    result.scoreBlockSize = integer(arguments, ++index, option);
+                    result.explicitScoreBlockSize = true;
+                }
+                case "--score-genome-build" -> result.scoreGenomeBuild = value(arguments, ++index, option);
+                case "--condition-on" -> addList(result.conditionOn, value(arguments, ++index, option));
                 case "--help", "-h" -> result.help = true;
                 case "--version" -> result.version = true;
                 case "--resume" -> result.resume = true;
@@ -178,6 +190,17 @@ final class CliOptions {
             throw new IllegalArgumentException(
                 "--variance-components must be auto, null-model, or refit");
         validateFamilyAndLink();
+        if(conditionalGwasSummary) {
+            if(omics==null || scoreGenomeBuild==null || scoreGenomeBuild.isBlank())
+                throw new IllegalArgumentException("--conditional-gwas-summary requires genotype --omics and --score-genome-build");
+            if(resume)throw new IllegalArgumentException("conditional score export does not support --resume");
+            if(scoreBlockSize>512)throw new IllegalArgumentException("--score-block-size must be at most 512");
+            if(conditionOn.size()>512)throw new IllegalArgumentException("--condition-on supports at most 512 variants");
+            if(model.equals("ols") && !family.equals("gaussian"))throw new IllegalArgumentException("OLS score export requires --family gaussian");
+        } else if(!conditionOn.isEmpty() || scoreGenomeBuild!=null || explicitScoreBlockSize)
+            throw new IllegalArgumentException("score export controls require --conditional-gwas-summary");
+        if(new java.util.HashSet<>(conditionOn).size()!=conditionOn.size())
+            throw new IllegalArgumentException("--condition-on variants must be distinct");
         if (!hweSamples.equals("all"))
             throw new IllegalArgumentException(
                 "--hwe-samples currently supports only its default, all");
@@ -217,6 +240,8 @@ final class CliOptions {
     Path manifestPath() {
         return Path.of(output.toString() + ".manifest.json");
     }
+    Path scoreCovariancePath() { return Path.of(output + ".score-cov.tsv"); }
+    Path scoreManifestPath() { return Path.of(output + ".score-manifest.json"); }
 
     private static Path path(String value) { return Path.of(value); }
     private static String lower(String value) {

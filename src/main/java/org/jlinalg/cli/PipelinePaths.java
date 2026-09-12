@@ -39,6 +39,11 @@ final class PipelinePaths {
         List<Path> outputs = new ArrayList<>(List.of(options.output,
             Path.of(options.output + ".partial"), options.manifestPath()));
         if (!options.noLog) outputs.add(options.logPath());
+        if(options.conditionalGwasSummary) {
+            outputs.add(options.scoreCovariancePath());outputs.add(options.scoreManifestPath());
+            outputs.add(Path.of(options.scoreCovariancePath()+".partial"));
+            outputs.add(Path.of(options.scoreManifestPath()+".partial"));
+        }
         try {
             for (int index=0; index<outputs.size(); index++) {
                 Path output = outputs.get(index);
