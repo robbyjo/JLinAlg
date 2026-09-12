@@ -10,6 +10,10 @@ strengthens association preflight and filter validation, and corrects pedigree
 identity mapping so family labels disambiguate IDs without breaking recursive
 ancestry.
 Omics transforms deliberately run after phenotype complete-case filtering.
+
+Source-build CLI logs include UTC start/finish timestamps and human-readable
+elapsed runtime. See [run logging](docs/vignettes/command-line.md#run-timestamps-and-elapsed-time)
+for log locations and options.
 Version 0.3.0 provides ordinary least squares (OLS), generalized
 linear models (GLMs), dense Gaussian restricted maximum likelihood (REML),
 pedigree animal-model REML, penalized-quasi-likelihood generalized linear

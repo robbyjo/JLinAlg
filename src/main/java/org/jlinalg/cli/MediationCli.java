@@ -44,25 +44,28 @@ final class MediationCli {
             Path log = options.log == null
                 ? Path.of(options.output + ".log") : options.log;
             prepareOutputs(options, log);
-            Input input = Input.read(options);
-            Fit fit = fit(input, options);
-            write(options.output,
-                effects(fit, delimiter(options.output)), options.overwrite);
-            write(log, runLog(input, fit, options), options.overwrite);
-            output.println("Analysis samples: " + input.rows()
-                + " (input=" + input.originalRows()
-                + ", missing omitted="
-                + (input.originalRows() - input.rows()) + ")");
-            if (fit.singletonFamilies() > 0) {
-                output.println("Pedigree singletons: "
-                    + fit.singletonFamilies() + " families across "
-                    + fit.singletonObservations() + " observations");
+            try (RunLog journal = RunLog.openPlain(log, false)) {
+                Input input = Input.read(options);
+                Fit fit = fit(input, options);
+                write(options.output,
+                    effects(fit, delimiter(options.output)), options.overwrite);
+                journal.metadata(runLog(input, fit, options));
+                output.println("Analysis samples: " + input.rows()
+                    + " (input=" + input.originalRows()
+                    + ", missing omitted="
+                    + (input.originalRows() - input.rows()) + ")");
+                if (fit.singletonFamilies() > 0) {
+                    output.println("Pedigree singletons: "
+                        + fit.singletonFamilies() + " families across "
+                        + fit.singletonObservations() + " observations");
+                }
+                output.println("Mediation model: " + fit.model()
+                    + "; converged: " + fit.converged());
+                output.println("Wrote " + options.output);
+                output.println("Wrote " + log);
+                journal.complete("complete");
+                return 0;
             }
-            output.println("Mediation model: " + fit.model()
-                + "; converged: " + fit.converged());
-            output.println("Wrote " + options.output);
-            output.println("Wrote " + log);
-            return 0;
         } catch (IOException | IllegalArgumentException exception) {
             error.println("jlinalg: " + exception.getMessage());
             return 2;

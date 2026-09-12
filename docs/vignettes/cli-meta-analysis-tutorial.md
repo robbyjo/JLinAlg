@@ -108,6 +108,11 @@ cohort order. Existing result/log files are rejected. Choose a fresh path for
 another run. The complete result is moved into place only after all rows
 succeed; temporary sort files are then removed.
 
+The log is opened and flushed at the start of execution. It records UTC
+`started`/`finished`, numeric `elapsed_ms`, a readable `elapsed` duration,
+and completion status. A failed run retains its timing log even when no result
+is published; use a fresh output path when retrying.
+
 `--sort-chunk-rows 100000` limits the number of cohort rows sorted in memory
 at once. Merges open at most 32 runs per pass. `--block-rows 4096` bounds the
 feature batch; use smaller values under memory pressure. Scratch disk space

@@ -44,6 +44,7 @@ class FineMappingCliTest {
         });
 
         assertEquals(0, status);
+        RunLogTest.assertTiming(Path.of(output + ".log"), "complete");
         DelimitedData variants = DelimitedData.read(output);
         assertEquals(5, variants.rows().size());
         assertTrue(variants.header().contains("pip"));

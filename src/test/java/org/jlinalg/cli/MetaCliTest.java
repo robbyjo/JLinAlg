@@ -79,6 +79,7 @@ class MetaCliTest {
         assertEquals("NA",row(output,"single","pooled").get("tau_squared"));
         assertEquals("0?????",row(output,"z","pooled").get("direction"));
         assertTrue(Files.readString(Path.of(output+".log")).contains("cohort_order=c1,c2,c3,c4,c5,c6"));
+        RunLogTest.assertTiming(Path.of(output+".log"),"complete");
         assertEquals("a",DelimitedData.read(output).rows().get(0)[0]);
         Path filtered=directory.resolve("filtered.tsv");
         assertEquals(0,run(command("meta-analysis",filtered,inputs,"--min-cohorts","2").toArray(String[]::new)),error);
@@ -109,6 +110,7 @@ class MetaCliTest {
         assertEquals(.3004978,Double.parseDouble(row(output,"a","(Intercept)").get("beta")),1e-7);
         assertEquals(.09178625,Double.parseDouble(row(output,"a","dose").get("beta")),1e-7);
         assertEquals("insufficient_cohorts",row(output,"few","NA").get("status"));
+        RunLogTest.assertTiming(Path.of(output+".log"),"complete");
         Path constant=file("constant.tsv","cohort\tdose\nc1\t1\nc2\t1\nc3\t1\nc4\t1\n");
         Path deficient=directory.resolve("rank.tsv");
         assertEquals(0,run(command("meta-regression",deficient,inputs,"--moderator-file",constant.toString(),
@@ -133,10 +135,12 @@ class MetaCliTest {
         assertEquals("f000",rows.get(0)[0]);assertEquals("f069",rows.get(69)[0]);
     }
     @Test void rejectsDuplicateIdsBadNumbersAndExistingOutputsWithoutPublishingPartialResults() throws Exception {
+        int badRun=0;
         for(String rows:List.of("a\t.1\t.2\nb\t.2\t.2\na\t.3\t.2\n","a\t.1\t0\n","a\toops\t.1\n")) {
-            Path input=file("bad.tsv","feature_id\tbeta\tse\n"+rows),output=directory.resolve("bad-out.tsv");
+            Path input=file("bad.tsv","feature_id\tbeta\tse\n"+rows),output=directory.resolve("bad-out-"+(badRun++)+".tsv");
             assertEquals(2,run(command("meta-analysis",output,List.of(input)).toArray(String[]::new)));
-            assertFalse(Files.exists(output));assertFalse(Files.exists(Path.of(output+".log")));
+            assertFalse(Files.exists(output));
+            RunLogTest.assertTiming(Path.of(output+".log"),"failed");
             try(var files=Files.list(directory)) { assertFalse(files.anyMatch(p->p.getFileName().toString().startsWith(".jlinalg-meta-"))); }
         }
         Path input=file("valid.tsv","feature_id\tbeta\tse\na\t.1\t.2\n"),output=file("existing.tsv","preserve me");

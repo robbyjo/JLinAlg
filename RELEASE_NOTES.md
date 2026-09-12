@@ -1,5 +1,16 @@
 # Unreleased
 
+## CLI run timing
+
+- CLI logs now record UTC `started` and `finished` timestamps, numeric
+  `elapsed_ms`, and a readable `elapsed` duration such as `2 h 3 min 4.125 s`.
+  Elapsed time uses a monotonic clock, independent of wall-clock corrections.
+- Meta-analysis, mediation, SuSiE, and colocalization flush their start log
+  before computation and retain timing/status on handled failures.
+- Other executable subcommands now get a run log beside `--out`/`--output`,
+  or a unique log in `logs/` for console-only runs. They support `--log` and
+  `--no-log`; help/version requests do not create logs.
+
 ## Meta-analysis CLI and array workflows
 
 - Added `meta-analysis` and `meta-regression` commands for separate cohort

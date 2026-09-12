@@ -58,6 +58,38 @@ Logs default to <code>OUT.log</code>; manifests default to
 <code>OUT.manifest.json</code>. A <code>.csv</code> output is comma-separated;
 <code>.tsv</code> and other suffixes are tab-separated.
 
+## Run timestamps and elapsed time
+
+Source builds now include these fields in CLI logs:
+
+```text
+started=2026-09-12T14:00:00Z
+finished=2026-09-12T16:03:04.125Z
+elapsed_ms=7384125
+elapsed=2 h 3 min 4.125 s
+status=complete
+```
+
+Timestamps are UTC; elapsed time uses a monotonic clock. Durations include
+milliseconds, and days for runs lasting at least 24 hours. The start record is
+flushed before computation. Once execution has begun, handled failures retain
+the log with a finish timestamp, elapsed time, and `status=failed`. Each appended
+run has its own run ID and timing block.
+
+The general association CLI retains its timestamped lab-notebook format;
+meta-analysis, meta-regression, mediation, SuSiE, and colocalization retain
+their command-specific metadata plus these timing fields. Existing explicit
+log paths and the general CLI's `--no-log` option continue to work.
+
+`ld-db`, `mr-instruments`, `clump`, `mr-xwas`, `mr-estimate`,
+`beta-regression`, and `penalized-regression` now also write run logs when
+invoked through the executable. Their defaults are `OUT.log` when an
+`--out`/`--output` is supplied, or a unique `logs/jlinalg-COMMAND-*.log`
+otherwise. Use `--log FILE` to choose a path or `--no-log` to opt out.
+The log location is printed to stderr, preserving machine-readable stdout.
+Their existing logs are protected unless `--overwrite` is requested, in which
+case another timing block is appended. Help/version requests do not create logs.
+
 ## Phenotype-only OLS
 
 ~~~powershell

@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -19,18 +18,28 @@ import java.util.UUID;
 /** Human-readable, timestamped lab-notebook log. */
 final class RunLog implements AutoCloseable {
     private final BufferedWriter writer;
-    private final OffsetDateTime started;
+    private final RunTiming timing = new RunTiming();
     private final String runId;
+    private final boolean plain;
+    private boolean completed;
 
-    private RunLog(BufferedWriter writer) throws IOException {
+    private RunLog(BufferedWriter writer, boolean plain) throws IOException {
         this.writer = writer;
-        started = OffsetDateTime.now();
+        this.plain = plain;
         runId = UUID.randomUUID().toString();
         line("INFO", "run_id=" + runId);
-        line("INFO", "started=" + timestamp(started));
+        line("INFO", "started=" + timing.started());
     }
 
     static RunLog open(Path path, boolean append) throws IOException {
+        return open(path, append, false);
+    }
+
+    static RunLog openPlain(Path path, boolean append) throws IOException {
+        return open(path, append, true);
+    }
+
+    private static RunLog open(Path path, boolean append, boolean plain) throws IOException {
         Path absolute = path.toAbsolutePath().normalize();
         Path parent = absolute.getParent();
         if (parent != null) Files.createDirectories(parent);
@@ -38,7 +47,8 @@ final class RunLog implements AutoCloseable {
             StandardCharsets.UTF_8, StandardOpenOption.CREATE,
             append ? StandardOpenOption.APPEND
                 : StandardOpenOption.TRUNCATE_EXISTING);
-        return new RunLog(writer);
+        try { return new RunLog(writer, plain); }
+        catch (IOException failure) { writer.close(); throw failure; }
     }
 
     void info(String message) throws IOException { line("INFO", message); }
@@ -46,17 +56,34 @@ final class RunLog implements AutoCloseable {
     void error(String message) throws IOException { line("ERROR", message); }
     String runId() { return runId; }
 
-    void complete(String status) throws IOException {
-        OffsetDateTime ended = OffsetDateTime.now();
-        line("INFO", "finished=" + timestamp(ended));
-        line("INFO", "elapsed_ms="
-            + Duration.between(started, ended).toMillis());
-        line("INFO", "status=" + status);
+    void metadata(String text) throws IOException {
+        writer.write(text);
+        if (!text.endsWith("\n")) writer.newLine();
+        writer.flush();
     }
 
-    @Override public void close() throws IOException { writer.close(); }
+    void complete(String status) throws IOException {
+        if (completed) return;
+        RunTiming.End end = timing.finish();
+        line("INFO", "finished=" + end.finished());
+        line("INFO", "elapsed_ms=" + end.elapsedMillis());
+        line("INFO", "elapsed=" + end.elapsed());
+        line("INFO", "status=" + status);
+        completed = true;
+    }
+
+    @Override public void close() throws IOException {
+        try { if (!completed) complete("failed"); }
+        finally { writer.close(); }
+    }
 
     private void line(String level, String message) throws IOException {
+        if (plain) {
+            writer.write(level.equals("INFO") ? message : level.toLowerCase(java.util.Locale.ROOT) + "=" + message);
+            writer.newLine();
+            writer.flush();
+            return;
+        }
         writer.write(timestamp(OffsetDateTime.now()));
         writer.write(" [");
         writer.write(level);

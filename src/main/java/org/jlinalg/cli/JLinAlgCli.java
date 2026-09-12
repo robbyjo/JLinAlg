@@ -24,6 +24,14 @@ public final class JLinAlgCli {
 
     static int run(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && CliRunLogging.accepts(arguments[0]))
+            return CliRunLogging.run(arguments, errorOutput,
+                forwarded -> dispatch(forwarded, output, errorOutput));
+        return dispatch(arguments, output, errorOutput);
+    }
+
+    private static int dispatch(String[] arguments, PrintStream output,
+            PrintStream errorOutput) {
         if (arguments.length > 0 && (arguments[0].equals("meta-analysis")
                 || arguments[0].equals("meta-regression")))
             return MetaCli.run(arguments[0], Arrays.copyOfRange(
@@ -217,6 +225,9 @@ public final class JLinAlgCli {
               --checkpoint-every N
               --log FILE
               --no-log
+                                         Logs include UTC start/finish and
+                                         readable elapsed runtime. Other
+                                         subcommands use OUT.log or logs/.
               --dry-run                  Print the resolved general analysis
                                          plan and stop before model fitting
               --explain                  Print that plan, then continue fitting

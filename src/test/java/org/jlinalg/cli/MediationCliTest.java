@@ -84,6 +84,7 @@ class MediationCliTest {
         });
 
         assertEquals(0, status);
+        RunLogTest.assertTiming(Path.of(output + ".log"), "complete");
         assertEquals(6, Files.readAllLines(output).size());
         assertTrue(Files.readString(Path.of(output + ".log"))
             .contains("model=grouped-reml"));

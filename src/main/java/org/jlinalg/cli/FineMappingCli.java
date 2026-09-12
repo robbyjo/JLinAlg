@@ -70,41 +70,44 @@ final class FineMappingCli {
         prepareOutputs(options.overwrite,
             List.of(options.output, effectsOutput, log),
             List.of(options.summary, options.ld));
-        SummaryInput summary = readSummary(options);
-        double[][] ld = readLd(options.ld, summary.variantNames());
-        SusieOptions fitOptions = new SusieOptions(options.effects,
-            options.maximumIterations, options.tolerance,
-            options.priorVariance, options.estimateResidualVariance,
-            options.coverage, options.minimumPurity);
-        SusieResult result = Susie.fitSummary(summary.zScores(), ld,
-            options.sampleSize, summary.variantNames(), fitOptions,
-            options.backend);
-        write(options.output, variantTable(result, delimiter(options.output)),
-            options.overwrite);
-        write(effectsOutput, effectTable(result, delimiter(effectsOutput)),
-            options.overwrite);
-        String logText = "command=susie\n"
-            + "summary=" + options.summary.toAbsolutePath() + "\n"
-            + "ld=" + options.ld.toAbsolutePath() + "\n"
-            + "variants=" + result.variableNames().size() + "\n"
-            + "sample_size=" + (long) options.sampleSize + "\n"
-            + "effects=" + result.effects() + "\n"
-            + "credible_sets=" + result.credibleSets().size() + "\n"
-            + "iterations=" + result.iterations() + "\n"
-            + "converged=" + result.converged() + "\n"
-            + "objective=" + result.objective() + "\n"
-            + "residual_variance=" + result.residualVariance() + "\n"
-            + "requested_backend=" + result.backend().requested() + "\n"
-            + "selected_backend=" + result.backend().selectedBackend() + "\n"
-            + "output=" + options.output.toAbsolutePath() + "\n"
-            + "effects_output=" + effectsOutput.toAbsolutePath() + "\n";
-        write(log, logText, options.overwrite);
-        console.println("SuSiE variants: " + result.variableNames().size()
-            + "; credible sets: " + result.credibleSets().size()
-            + "; converged: " + result.converged());
-        console.println("SuSiE output: " + options.output);
-        console.println("Colocalization input: " + effectsOutput);
-        console.println("Log: " + log);
+        try (RunLog journal = RunLog.openPlain(log, false)) {
+            SummaryInput summary = readSummary(options);
+            double[][] ld = readLd(options.ld, summary.variantNames());
+            SusieOptions fitOptions = new SusieOptions(options.effects,
+                options.maximumIterations, options.tolerance,
+                options.priorVariance, options.estimateResidualVariance,
+                options.coverage, options.minimumPurity);
+            SusieResult result = Susie.fitSummary(summary.zScores(), ld,
+                options.sampleSize, summary.variantNames(), fitOptions,
+                options.backend);
+            write(options.output, variantTable(result, delimiter(options.output)),
+                options.overwrite);
+            write(effectsOutput, effectTable(result, delimiter(effectsOutput)),
+                options.overwrite);
+            String logText = "command=susie\n"
+                + "summary=" + options.summary.toAbsolutePath() + "\n"
+                + "ld=" + options.ld.toAbsolutePath() + "\n"
+                + "variants=" + result.variableNames().size() + "\n"
+                + "sample_size=" + (long) options.sampleSize + "\n"
+                + "effects=" + result.effects() + "\n"
+                + "credible_sets=" + result.credibleSets().size() + "\n"
+                + "iterations=" + result.iterations() + "\n"
+                + "converged=" + result.converged() + "\n"
+                + "objective=" + result.objective() + "\n"
+                + "residual_variance=" + result.residualVariance() + "\n"
+                + "requested_backend=" + result.backend().requested() + "\n"
+                + "selected_backend=" + result.backend().selectedBackend() + "\n"
+                + "output=" + options.output.toAbsolutePath() + "\n"
+                + "effects_output=" + effectsOutput.toAbsolutePath() + "\n";
+            journal.metadata(logText);
+            console.println("SuSiE variants: " + result.variableNames().size()
+                + "; credible sets: " + result.credibleSets().size()
+                + "; converged: " + result.converged());
+            console.println("SuSiE output: " + options.output);
+            console.println("Colocalization input: " + effectsOutput);
+            console.println("Log: " + log);
+            journal.complete("complete");
+        }
     }
 
     private static void runColoc(ColocCliOptions options, PrintStream console)
@@ -116,45 +119,48 @@ final class FineMappingCli {
         prepareOutputs(options.overwrite,
             List.of(options.output, variantOutput, log),
             List.of(options.trait1, options.trait2));
-        ColocSusieInput trait1 = readColocInput(options.trait1);
-        ColocSusieInput trait2 = readColocInput(options.trait2);
-        ColocOptions colocOptions = new ColocOptions(
-            options.trait1Prior, options.trait2Prior, options.sharedPrior,
-            options.minimumOverlap, options.trim, null, null);
-        ColocSusieResult result = ColocSusie.analyze(
-            trait1, trait2, colocOptions);
-        if (result.commonVariants().isEmpty()) {
-            throw new IllegalArgumentException(
-                "trait inputs share no variant identifiers");
+        try (RunLog journal = RunLog.openPlain(log, false)) {
+            ColocSusieInput trait1 = readColocInput(options.trait1);
+            ColocSusieInput trait2 = readColocInput(options.trait2);
+            ColocOptions colocOptions = new ColocOptions(
+                options.trait1Prior, options.trait2Prior, options.sharedPrior,
+                options.minimumOverlap, options.trim, null, null);
+            ColocSusieResult result = ColocSusie.analyze(
+                trait1, trait2, colocOptions);
+            if (result.commonVariants().isEmpty()) {
+                throw new IllegalArgumentException(
+                    "trait inputs share no variant identifiers");
+            }
+            write(options.output, colocTable(result, delimiter(options.output)),
+                options.overwrite);
+            write(variantOutput,
+                sharedVariantTable(result, delimiter(variantOutput)),
+                options.overwrite);
+            String logText = "command=coloc\n"
+                + "trait1=" + options.trait1.toAbsolutePath() + "\n"
+                + "trait2=" + options.trait2.toAbsolutePath() + "\n"
+                + "trait1_signals=" + trait1.signals() + "\n"
+                + "trait2_signals=" + trait2.signals() + "\n"
+                + "common_variants=" + result.commonVariants().size() + "\n"
+                + "retained_signal_pairs=" + result.signalPairs().size() + "\n"
+                + "skipped_signal_pairs=" + result.skippedSignalPairs() + "\n"
+                + "trait1_prior=" + options.trait1Prior + "\n"
+                + "trait2_prior=" + options.trait2Prior + "\n"
+                + "shared_prior=" + options.sharedPrior + "\n"
+                + "minimum_posterior_overlap=" + options.minimumOverlap + "\n"
+                + "trim_by_posterior=" + options.trim + "\n"
+                + "output=" + options.output.toAbsolutePath() + "\n"
+                + "variant_output=" + variantOutput.toAbsolutePath() + "\n";
+            journal.metadata(logText);
+            console.println("Colocalization common variants: "
+                + result.commonVariants().size() + "; retained signal pairs: "
+                + result.signalPairs().size() + "; skipped: "
+                + result.skippedSignalPairs());
+            console.println("Colocalization output: " + options.output);
+            console.println("Shared-variant output: " + variantOutput);
+            console.println("Log: " + log);
+            journal.complete("complete");
         }
-        write(options.output, colocTable(result, delimiter(options.output)),
-            options.overwrite);
-        write(variantOutput,
-            sharedVariantTable(result, delimiter(variantOutput)),
-            options.overwrite);
-        String logText = "command=coloc\n"
-            + "trait1=" + options.trait1.toAbsolutePath() + "\n"
-            + "trait2=" + options.trait2.toAbsolutePath() + "\n"
-            + "trait1_signals=" + trait1.signals() + "\n"
-            + "trait2_signals=" + trait2.signals() + "\n"
-            + "common_variants=" + result.commonVariants().size() + "\n"
-            + "retained_signal_pairs=" + result.signalPairs().size() + "\n"
-            + "skipped_signal_pairs=" + result.skippedSignalPairs() + "\n"
-            + "trait1_prior=" + options.trait1Prior + "\n"
-            + "trait2_prior=" + options.trait2Prior + "\n"
-            + "shared_prior=" + options.sharedPrior + "\n"
-            + "minimum_posterior_overlap=" + options.minimumOverlap + "\n"
-            + "trim_by_posterior=" + options.trim + "\n"
-            + "output=" + options.output.toAbsolutePath() + "\n"
-            + "variant_output=" + variantOutput.toAbsolutePath() + "\n";
-        write(log, logText, options.overwrite);
-        console.println("Colocalization common variants: "
-            + result.commonVariants().size() + "; retained signal pairs: "
-            + result.signalPairs().size() + "; skipped: "
-            + result.skippedSignalPairs());
-        console.println("Colocalization output: " + options.output);
-        console.println("Shared-variant output: " + variantOutput);
-        console.println("Log: " + log);
     }
 
     private static SummaryInput readSummary(SusieCliOptions options)

@@ -36,6 +36,13 @@ final class MetaCli {
         for(int i=0;i<cohortPaths.size();i++) for(int j=0;j<i;j++)
             if(Files.isSameFile(cohortPaths.get(i),cohortPaths.get(j)))
                 throw new IllegalArgumentException("the same input file cannot represent two independent cohorts");
+        try (RunLog journal=RunLog.openPlain(log,false)) {
+            execute(o,console,output,log,journal);
+            journal.complete("complete");
+        }
+    }
+
+    private static void execute(Options o,PrintStream console,Path output,Path log,RunLog journal) throws IOException {
         double[][] moderators=o.regression?moderators(o):null;
         Path scratch=Files.createTempDirectory(output.getParent(),".jlinalg-meta-");
         List<MetaCohortSource> sources=new ArrayList<>();
@@ -45,7 +52,7 @@ final class MetaCli {
                 console.println("Preparing cohort "+cohort.getKey()+": "+cohort.getValue());
                 sources.add(new MetaCohortSource(cohort.getValue(),o.idColumn,o.effectColumn,o.seColumn,scratch,o.sortRows));
             }
-            Path result=scratch.resolve("result"),manifest=scratch.resolve("log");
+            Path result=scratch.resolve("result");
             char delimiter=MetaCohortSource.delimiter(output);
             try(BufferedWriter writer=Files.newBufferedWriter(result)) {
                 writer.write(HEADER.replace('\t',delimiter)); writer.newLine();
@@ -92,9 +99,8 @@ final class MetaCli {
             if(o.regression) metadata.append("moderators=").append(o.moderatorFile.toAbsolutePath())
                 .append("\nmoderator_columns=").append(String.join(",",o.moderatorNames))
                 .append("\nintercept=").append(o.intercept).append('\n');
-            Files.writeString(manifest,metadata);
+            journal.metadata(metadata.toString());
             Files.move(result,output); // no overwrite; publish only after every row succeeds
-            Files.move(manifest,log);
             console.println("Meta-analysis features: "+totals[0]+"; fitted/pass-through: "+totals[1]+"; excluded: "+totals[2]);
             console.println("Output: "+output+"; cohort order and settings: "+log);
         } finally {
