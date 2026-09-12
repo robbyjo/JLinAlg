@@ -141,9 +141,12 @@ public final class MultidimensionalGlmmQuadrature {
             }
             starts[terms]=columns;q=columns;
             if(q<2)throw new IllegalArgumentException("use GlmmQuadrature for a scalar random intercept");
+            if(options.integrationMethod()==MultidimensionalQuadratureOptions.IntegrationMethod.SHIFTED_HALTON&&q>256)
+                throw new IllegalArgumentException("dense non-tensor integration is limited to 256 random coefficients; use sparse Laplace for larger structures");
             // Reject before allocating dense random-effect designs/precisions
             // or entering the optimizer, not only when refining the grid.
-            long initialNodes=power(options.initialOrder(),q);
+            long initialNodes=options.integrationMethod()==MultidimensionalQuadratureOptions.IntegrationMethod.SHIFTED_HALTON
+                ?8L*options.initialOrder():power(options.initialOrder(),q);
             if(initialNodes<0||initialNodes>options.maximumTotalNodes())
                 throw new IllegalArgumentException("initial quadrature grid exceeds maximumTotalNodes");
             z=new double[n][q];
@@ -176,6 +179,8 @@ public final class MultidimensionalGlmmQuadrature {
             double[] eta=new double[n];
             for(int i=0;i<n;i++)for(int j=0;j<p;j++){if(!Double.isFinite(beta[j]))throw new IllegalArgumentException("nonfinite coefficient");eta[i]+=x[i][j]*beta[j];}
             Mode mode=mode(eta,precision);if(mode==null)return new MultidimensionalQuadratureEvaluation(Double.NEGATIVE_INFINITY,0,0,Double.POSITIVE_INFINITY,false,new double[q]);
+            if(options.integrationMethod()==MultidimensionalQuadratureOptions.IntegrationMethod.SHIFTED_HALTON)
+                return nonTensor(eta,precision,logDet,mode);
             int order=options.initialOrder();long nodes=power(order,q);double previous=integrate(eta,precision,logDet,mode,order),error=Double.POSITIVE_INFINITY;int stable=0;
             while(order<options.maximumOrder()){
                 int next=Math.min(options.maximumOrder(),order+Math.max(2,order/2));long nextNodes=power(next,q);
@@ -184,6 +189,27 @@ public final class MultidimensionalGlmmQuadrature {
                 previous=value;order=next;nodes=nextNodes;if(stable>=2)break;
             }
             return new MultidimensionalQuadratureEvaluation(previous,order,nodes,error,stable>=2&&Double.isFinite(previous),mode.value());
+        }
+        private MultidimensionalQuadratureEvaluation nonTensor(double[] eta,double[] precision,
+                double logDet,Mode mode) {
+            double[] inverse=backend.dpotrf(mode.hessian(),q).solve(MatrixOps.identity(q),q);
+            double[] factor=lower(inverse,q);
+            double[] priorFactor=lower(backend.dpotrf(precision.clone(),q).solve(MatrixOps.identity(q),q),q);
+            double normalizer=.5*(logDet+backend.dpotrf(inverse.clone(),q).logDeterminant());
+            int points=options.initialOrder(),stable=0;double previous=Double.NaN,error=Double.POSITIVE_INFINITY;
+            ShiftedHalton.Estimate estimate;
+            while(true) {
+                estimate=ShiftedHalton.integrate(q,points,mode.value(),factor,
+                    b->kernel(eta,b,precision),normalizer,priorFactor,precision,logDet);
+                error=Double.isFinite(previous)?Math.max(estimate.error(),Math.abs(estimate.logIntegral()-previous)):Double.POSITIVE_INFINITY;
+                stable=error<=options.quadratureTolerance()?stable+1:0;
+                if(stable>=2||points>=options.maximumOrder())break;
+                int next=(int)Math.min(options.maximumOrder(),2L*points);
+                if(8L*next>options.maximumTotalNodes())break;
+                previous=estimate.logIntegral();points=next;
+            }
+            return new MultidimensionalQuadratureEvaluation(estimate.logIntegral(),points,
+                8L*points,error,stable>=2&&Double.isFinite(estimate.logIntegral()),mode.value());
         }
         private Mode mode(double[] eta,double[] precision){
             double[] b=new double[q];
@@ -194,7 +220,11 @@ public final class MultidimensionalGlmmQuadrature {
                     return new Mode(b,d.hessian());
                 double before=kernel(eta,b,precision),scale=1;boolean accepted=false;
                 while(scale>1e-8){double[] candidate=b.clone();for(int i=0;i<q;i++)candidate[i]+=scale*step[i];double value=kernel(eta,candidate,precision);
-                    if(value>=before){b=candidate;accepted=true;break;}scale*=.5;}
+                    // Near the mode, a full Newton correction can improve the
+                    // score while the summed log kernel rounds down by ulps.
+                    // Permit only roundoff-sized loss for tiny corrections;
+                    // the unchanged displacement certificate is checked next.
+                    if(value>=before||(norm<1e-6&&value>=before-8*Math.ulp(before))){b=candidate;accepted=true;break;}scale*=.5;}
                 if(!accepted)return null;
             }
             return null;

@@ -169,11 +169,11 @@ does not contain empirical fourth moments.
 
 Complete-data robust results include a Satorra-Bentler mean scaling correction
 from the projected empirical moment covariance; clustering uses cluster sums
-in the same projection. **FIML robust covariance is implemented, but FIML
-robust scaled fit tests are not:** `scalingFactor`, corrected chi-square and
-its p-value are `NaN` for that combination. Neither this API nor its results
-claim lavaan's MLR/Yuan-Bentler, MLMV, or finite-cluster corrections. Classical
-FIML fit tests remain available on the underlying fit.
+in the same projection. FIML now uses an observed-information mean-scaling
+projection with centered case scores. Unresolved/nonpositive scaling suppresses
+the corrected statistic. This is not advertised as lavaan's default MLR/Mplus
+Yuan-Bentler, MLMV, or finite-cluster corrections. See the
+[new estimator contracts and independent R checks](../estimator-extensions.md).
 
 Product delta inference accepts two or more paths and contracts the entire
 parameter covariance with the product gradient. Repeated labels and zero
@@ -227,9 +227,12 @@ artifacts from dense-matrix cancellation.
 multivariate ordinal full likelihood. The result does not fabricate ML AIC,
 global chi-square, or WLSMV corrections. `fit` supports complete all-ordinal
 data, including binary indicators and observed ordinal paths.
-Mixed continuous/ordinal rows, general MAR ordinal missingness, DWLS/WLSMV, ordinal
-modification indices, and composite likelihood-ratio calibration are not
-implemented. Empty marginal categories must be collapsed explicitly.
+The separate `SemMixed`, `SemDwls`, and `SemMultigroup` APIs add mixed responses,
+joint MAR likelihood, DWLS/WLSMV, ordinal likelihood modification indices and
+multigroup invariance. See [estimator extensions](../estimator-extensions.md)
+for their dimension limits, moment-covariance schema, and examples. These do
+not provide composite likelihood-ratio calibration for PML.
+Empty marginal categories must be collapsed explicitly.
 Correlations with magnitude at least `.9999` and cell probabilities lost to
 floating-point underflow or integration-error failures are rejected rather than
 clipped and reported as successful fits. Near-boundary or rare-category problems

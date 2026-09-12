@@ -699,6 +699,7 @@ tasks.register('benchmarkConditionalScoreExport', JavaExec) {
     benchmarkDistributionalAudit: 'org.jlinalg.benchmark.DistributionalAuditBenchmark',
     benchmarkRemainingMixedAudit: 'org.jlinalg.benchmark.RemainingMixedBenchmark',
     benchmarkRemainingModelsAudit: 'org.jlinalg.benchmark.RemainingModelsAuditBenchmark',
+    benchmarkEstimatorExtensions: 'org.jlinalg.benchmark.EstimatorExtensionsBenchmark',
     benchmarkGeneticAudit: 'org.jlinalg.genetics.GeneticAuditBenchmark',
     benchmarkPipelineOlsAudit: 'org.jlinalg.association.PipelineOlsAuditBenchmark',
     benchmarkPipelineBhAudit: 'org.jlinalg.cli.PipelineBhAuditBenchmark',

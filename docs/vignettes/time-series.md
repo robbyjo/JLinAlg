@@ -241,8 +241,11 @@ rows and symmetric covariance updates give `O(n (r+b)^2)` filtering work.
 Stationary initialization uses state-sized matrix doubling. High orders and
 long seasonal periods can still be expensive or ill-conditioned; this is a
 covariance filter, not a square-root filter. The diffuse pivot tolerance is
-`1e-9` in unit diffuse-state coordinates. Unrestricted regression terms and
-smoothing of missing historical values are not exposed by this API.
+`1e-9` in unit diffuse-state coordinates. The separate `ArimaRegression` API
+adds arbitrary design columns using the same innovations, and `ArimaSmoothing`
+provides bounded dense historical state conditioning, including diffuse levels.
+See [API examples and validation](../estimator-extensions.md); the smoother's
+1024-date limit is separate from the scalable filtering path.
 
 ### Diffuse coefficient inference
 

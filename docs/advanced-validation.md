@@ -140,13 +140,17 @@ is included in the benchmark figures.
 ## Remaining scope
 
 See [TODO.md](../TODO.md) for the explicit remaining extensions. Important
-limits include ordinal DWLS/mixed-response/general-MAR/multigroup SEM; sparse meta models
-beyond a known precision plus independent heterogeneity; higher-order mixed
-variance-boundary intersections; general time-series regressors and smoothing; non-Gaussian
-conditional-GWAS summary models; tensor growth in multidimensional AGQ;
+limits include ordinal joint integration beyond four observed ordinal responses
+per row, multigroup WLSMV, scalable historical backward smoothing, sparse meta
+models beyond a known precision plus independent heterogeneity, higher-order
+mixed variance-boundary intersections, and model-specific conditional-GWAS tail
+calibration; tensor growth in multidimensional AGQ;
 single-mode conditional Laplace integration for zero-inflated fits;
-unknown-noise or response-tuned polyhedral inference; and automatic inference-valid
-quantile bandwidth selection/mixed-type kernel models.
+unknown-noise or response-tuned polyhedral inference; and conditional quantile
+inference at response mass points. The [estimator extension report](estimator-extensions.md)
+documents DWLS/WLSMV, mixed MAR likelihood, multigroup invariance, ordinal
+modification indices, FIML scaling, ARIMA regression/smoothing, mixed kernels,
+automatic bandwidths, cluster/HAC quantile methods and non-tensor integration.
 The [September 12 extension report](feasible-extensions-validation.md) validates
 available-pair missing ordinal PML, diffuse coefficient covariance, and exact
 quantile covariance with explicit density assumptions.

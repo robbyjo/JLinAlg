@@ -58,6 +58,10 @@ See the [accuracy and performance tables](docs/verification-and-performance.md),
 [rare-variant benchmark details](docs/rare-meta-validation.md) for methods,
 measurement conditions, and limitations.
 
+The [estimator extension guide](docs/estimator-extensions.md) covers mixed and
+ordinal SEM, DWLS/WLSMV, multigroup invariance, ARIMA regression and historical
+smoothing, mixed-type kernels, quantile inference, and non-tensor integration.
+
 ## License
 
 [GNU General Public License, version 2 or later](LICENSE) (`GPL-2.0-or-later`).

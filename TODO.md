@@ -112,15 +112,22 @@ conditioning refits are implemented; see the
 
 ## Remaining estimator extensions
 
-- [ ] **SEM.** DWLS/WLSMV, mixed continuous/ordinal responses, general MAR
-  ordinal missingness, multigroup invariance, ordinal modification indices,
-  and FIML robust scaled fit statistics.
-- [ ] **Time series.** General regression terms and historical state smoothing.
-- [ ] **Nonparametric inference.** Mixed-type/multidimensional kernels and
-  automatic inference-valid bandwidth selection; dependent observations and
-  response mass points require separate quantile inference methods.
-- [ ] **Non-tensor random-effect integration.** Add a non-tensor integration
-  method before expanding quadrature to higher-dimensional structures.
+Implemented methods and their tested scope are documented in the
+[estimator extension report](docs/estimator-extensions.md).
+
+- [ ] **SEM scalability and additional test variants.** Extend joint ordinal
+  integration beyond four observed ordinal responses per row; add multigroup
+  WLSMV, DWLS-specific modification indices, robust nested-model comparisons,
+  and robust CFI/TLI. Current multigroup and ordinal modification tests use the
+  joint likelihood, with explicit equality constraints and MAR marginalization.
+- [ ] **Scalable historical smoothing.** Replace the bounded dense conditioning
+  smoother with exact diffuse backward recursions for long series. Add joint
+  dynamic/regression parameter uncertainty to ARIMA regression predictions.
+- [ ] **Discrete conditional quantile inference.** Extend beyond the iid
+  marginal order-statistic interval to regression coefficients for responses
+  with mass points. Cluster/HAC density-based regression inference still assumes
+  continuous responses. Automatic bandwidths do not promise finite-sample or
+  simultaneous coverage.
 
 ## Interpretation and numerical limits
 
@@ -132,9 +139,10 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
   they do not reconstruct a complete nonlinear likelihood away from the null.
   New nonlinear conditioning sets require cohort-side refits or a richer
   likelihood evaluation protocol.
-- Multidimensional quadrature is deliberately tensor-node bounded and supports
-  binomial-logit and Poisson-log likelihoods. Higher-dimensional structures
-  should use sparse Laplace/PQL unless a non-tensor integration method is added.
+- Multidimensional integration supports binomial-logit and Poisson-log models.
+  Tensor Hermite remains node bounded. The optional defensive randomized-QMC
+  method uses empirical error estimates and bounded dense precision operations;
+  it is not certified integration or a replacement for large sparse methods.
 - Zero-inflated deterministic multi-start certification is relative to the
   configured starts, not a mathematical global optimum over the parameter
   continuum. The random-effect integral remains a single-mode Laplace
@@ -145,9 +153,10 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
   not a general nonlinear random-parameter likelihood.
 - Selective inference: unknown-noise or response-selected penalties, dependent
   sample splits, and non-Gaussian selection require different inferential methods.
-- Exact quantile covariance uses supplied conditional densities or an iid
-  residual kernel with caller-set bandwidth. This does not establish automatic
-  bandwidth validity or inference for dependent rows/response mass points.
+- Exact quantile regression has iid residual-density, supplied-density,
+  cluster, and HAC inference paths with distinct regularity assumptions.
+  Response mass points use a separate marginal interval API; conditional
+  quantile-regression inference at mass points remains open.
 - Kernel set tests: the saddlepoint positive-mixture fallback is approximate,
   as is opt-in analytic SKAT-O. Default parametric SKAT-O simulation is exact
   for its Gaussian score-null model up to Monte Carlo error, not an exact

@@ -8,6 +8,12 @@ import jdistlib.Normal;
 /** Innovations form with an exact (finite + kappa * diffuse) covariance split.
  * All covariance workspaces are state-sized, never observation-sized. */
 final class ArimaStateSpace {
+    int stateSize() { return size; }
+    int stationarySize() { return stationary; }
+    double[] transitionMatrix() { return transition.clone(); }
+    double[] noiseMatrix() { return noise.clone(); }
+    double[] observationVector() { return observation.clone(); }
+    double[] initialCovariance() { return initial.clone(); }
     private final int size;
     private final double[] transition, noise, observation, initial;
     private final int[][] nonzero;

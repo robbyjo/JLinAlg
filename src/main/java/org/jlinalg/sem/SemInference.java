@@ -33,6 +33,7 @@ public final class SemInference {
     public static RobustResult robust(SemFitResult fit) { return robust(fit,null); }
     /** CR0 cluster sandwich. Cluster IDs follow the informative rows retained by the fit. */
     public static RobustResult robust(SemFitResult fit,int[] clusters) {
+        if(!fit.converged()||!fit.informationAvailable())throw new IllegalArgumentException("robust inference requires a converged identified SEM fit");
         RamFit.State s=fit.state();
         if(s.data()==null)throw new IllegalArgumentException("case data are required for robust inference");
         int n=s.observations(),k=s.point().length;
@@ -46,7 +47,10 @@ public final class SemInference {
             :RamFit.expectedInformation(d,s.patterns());
         double[] bread=RamFit.informationInverse(information,k);
         double[] raw=sandwich(RamFit.scores(d,s.data()),ids,bread);
-        double scaling=s.missing()?Double.NaN:scaling(s,d,ids,bread,fit.degreesOfFreedom());
+        double scaling;
+        try{scaling=scaling(s,d,ids,bread,fit.degreesOfFreedom());}
+        catch(IllegalArgumentException unavailable){scaling=Double.NaN;}
+        if(!(scaling>0)||!Double.isFinite(scaling))scaling=Double.NaN;
         double chi=fit.chiSquare()/scaling;
         return new RobustResult(RamFit.naturalCovariance(raw,s.model(),s.point()),scaling,chi,
             fit.degreesOfFreedom(),fit.degreesOfFreedom()>0?jdistlib.ChiSquare.cumulative(chi,fit.degreesOfFreedom(),false,false):Double.NaN,groups);
@@ -54,9 +58,9 @@ public final class SemInference {
 
     private static double scaling(RamFit.State s,RamFit.Distribution d,int[] ids,double[] bread,int df) {
         if(df<=0)return Double.NaN;
-        int p=d.mean().length,k=s.point().length,q=p*(p+1)/2+(s.model().hasMeanStructure()?p:0);
+        int p=d.mean().length,k=s.point().length,q=p*(p+1)/2+((s.model().hasMeanStructure()||s.missing())?p:0);
         double[][] dm=new double[q][p],dc=new double[q][p*p];double[][] jacobian=new double[q][k];int h=0;
-        if(s.model().hasMeanStructure())for(int i=0;i<p;i++,h++) {
+        if(s.model().hasMeanStructure()||s.missing())for(int i=0;i<p;i++,h++) {
             dm[h][i]=1;for(int a=0;a<k;a++)jacobian[h][a]=d.dMean()[a][i];
         }
         for(int i=0;i<p;i++)for(int j=0;j<=i;j++,h++) {
@@ -64,7 +68,19 @@ public final class SemInference {
             for(int a=0;a<k;a++)jacobian[h][a]=d.dCovariance()[a][i*p+j];
         }
         RamFit.Distribution saturated=new RamFit.Distribution(d.mean(),d.covariance(),dm,dc);
-        double[] u=RamFit.informationInverse(RamFit.expectedInformation(saturated,s.patterns()),q);
+        // Under MAR, pattern membership can depend on observed responses.
+        // Use the observed H1 information, including all saturated means, in
+        // the LR curvature projection. Expected complete-data information is
+        // not an appropriate replacement for this missing-data curvature.
+        double[] h1=s.missing()?RamFit.hessian(point->{
+            double[] mean=d.mean().clone(),cov=d.covariance().clone();
+            for(int a=0;a<point.length;a++) {
+                for(int i=0;i<p;i++)mean[i]+=dm[a][i]*point[a];
+                for(int i=0;i<p*p;i++)cov[i]+=dc[a][i]*point[a];
+            }
+            return RamFit.evaluate(new RamFit.Distribution(mean,cov,dm,dc),s.patterns(),s.observations());
+        },new double[q],s.observations()):RamFit.expectedInformation(saturated,s.patterns());
+        double[] u=RamFit.informationInverse(h1,q);
         for(int i=0;i<q;i++)for(int j=0;j<q;j++)for(int a=0;a<k;a++)for(int b=0;b<k;b++)
             u[i*q+j]-=jacobian[i][a]*bread[a*k+b]*jacobian[j][b];
         double[][] scores=RamFit.scores(saturated,s.data());double[] mean=new double[q];

@@ -1,5 +1,10 @@
 # Quantile, missing ordinal, and diffuse ARIMA extensions
 
+This report records the earlier bounded APIs. Subsequent estimator work adds
+mixed MAR likelihood, DWLS/WLSMV, multigroup invariance, ARIMA regressors and
+historical smoothing, automatic bandwidths, dependent-quantile methods and
+non-tensor integration; see the [current extension report](estimator-extensions.md).
+
 Validated 2026-09-12. This first batch implements three bounded extensions from
 the open-method inventory. Larger estimator changes remain in [TODO](../TODO.md);
 no global-optimality, bandwidth-validity, or finite-sample calibration limit is
