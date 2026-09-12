@@ -185,7 +185,9 @@ Gaussian pattern FIML, ordinal probit pairwise likelihood, case/cluster
 sandwich corrections, continuous-model modification indices, and indirect
 delta-method inference. See the [current SEM vignette](sem.md) and
 [advanced-method validation](../advanced-validation.md) for executable examples
-and R comparisons. Ordinal PML is not DWLS/WLSMV; missing/mixed ordinal models,
+and R comparisons. Available-pair missing ordinal PML under MCAR is now
+available through `SemOrdinal.fitPairwiseMissing`. Ordinal PML is not DWLS/WLSMV;
+mixed continuous/ordinal models, general MAR ordinal missingness,
 multigroup invariance, ordinal modification indices, and robust scaled FIML
 fit statistics remain open. The [TOPMed report](../topmed-sem-performance.md)
 records the historical observed-variable benchmark, not these newer workloads.

@@ -1,5 +1,22 @@
 # Unreleased
 
+## Quantile covariance, missing ordinal SEM, and diffuse ARIMA inference
+
+- Added `QuantileRegressionInference` for exact quantile fits with supplied
+  conditional-density sandwich covariance or a pooled iid Gaussian residual
+  kernel at a caller-set bandwidth. Inference requires continuous responses,
+  independent observations, regular densities, and a converged exact fit.
+- Added `SemOrdinal.fitPairwiseMissing` with explicit `-1` missing categories,
+  available-pair likelihood and case/cluster covariance. This requires MCAR or
+  a justified pair-specific mechanism; general MAR ordinal FIML is not implied.
+  Ordinal nonconvergence now suppresses covariance and all parameter inference.
+- Added diffuse ARIMA coefficient covariance and standard errors, including
+  joint drift/dynamic cross-covariance and seasonal drift units. Unresolved
+  information, transform-bound solutions, and nonconvergence suppress inference.
+- Independent R fixtures, analytic checks, and reproduction commands are in
+  [the validation report](docs/feasible-extensions-validation.md). Other estimator
+  extensions and mathematical limits remain tracked in [TODO](TODO.md).
+
 ## GRM construction CLI and simpler getting started
 
 - Added `grm --genotypes FILE --out matrix.tsv` for VCF/BCF, BGEN, and dosage

@@ -430,6 +430,7 @@ tasks.register('benchmarkMediation', JavaExec) {
 }
 
 [
+    benchmarkFeasibleExtensions: 'FeasibleExtensionsBenchmark',
     benchmarkSemJoint: 'SemJointBenchmark',
     benchmarkMetaParity: 'MetaParityBenchmark',
     benchmarkSparseMixedParity: 'SparseMixedParityBenchmark',

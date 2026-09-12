@@ -4,6 +4,8 @@ package org.jlinalg.timeseries;
 
 import java.util.Arrays;
 import jdistlib.math.MultivariableFunction;
+import org.jlinalg.compute.BackendContext;
+import org.jlinalg.compute.BackendPolicy;
 
 /** Exact diffuse Gaussian likelihood for integrated (including seasonal) ARIMA. */
 public final class DiffuseArima {
@@ -68,9 +70,71 @@ public final class DiffuseArima {
             count, optimized.evaluations(), optimized.converged(), optimized.converged()
                 ? "exact diffuse likelihood optimized" : "optimizer stopped before convergence",
             likelihood.state());
-        return new Result(result, diffuse, count, true);
+        double[] covariance=coefficientCovariance(values,order,seasonal,difference,
+            controls.includeDrift(),driftDivisor,optimized,likelihood);
+        return new Result(result, diffuse, count, true, covariance);
     }
 
+    private static double[] coefficientCovariance(double[] values,ArimaOrder order,
+            SeasonalArimaOrder seasonal,double[] difference,boolean drift,double divisor,
+            BoundedOptimizer.Result optimized,ArimaStateSpace.Evaluation likelihood) {
+        int dynamic=optimized.parameters().length,k=dynamic+(drift?1:0);
+        double[] unavailable=new double[k*k];Arrays.fill(unavailable,Double.NaN);
+        if(!optimized.converged())return unavailable;
+        for(double parameter:optimized.parameters())if(Math.abs(parameter)>=3.8-1e-4)return unavailable;
+        double[] point=Arrays.copyOf(optimized.parameters(),k),centered=values.clone();
+        double scale=Math.sqrt(likelihood.variance());
+        // Fit profiles drift for speed. Inference uses the joint drift/dynamic
+        // information, profiling only innovation variance, retaining cross terms.
+        // A centered, noise-scaled drift coordinate makes finite differences
+        // insensitive to the units and magnitude of the fitted drift.
+        if(drift)for(int t=0;t<centered.length;t++)centered[t]-=likelihood.fittedSlope()*(t+1.0);
+        MultivariableFunction joint=x->{
+            try {
+                ArimaMath.Coefficients c=ArimaMath.decode(x,order,seasonal,false,false);
+                double nll=new ArimaStateSpace(c.effectiveAr(),c.effectiveMa(),difference)
+                    .filter(centered,0,drift?x[dynamic]*scale/divisor:0,false).negativeLogLikelihood();
+                return Double.isFinite(nll)?nll:Double.NaN;
+            } catch(IllegalArgumentException exception){return Double.NaN;}
+        };
+        try(var context=BackendContext.select(BackendPolicy.CPU)) {
+            double[] raw=ExactArma.inverseHessian(point,joint,context.backend());
+            double[] covariance=ExactArma.deltaCovariance(point,raw,order,seasonal,drift,context.backend());
+            if(drift)for(int i=0;i<k;i++) {
+                covariance[i*k+dynamic]*=scale;covariance[dynamic*k+i]*=scale;
+            }
+            for(int i=0;i<k;i++)if(!(covariance[i*k+i]>0))return unavailable;
+            for(double value:covariance)if(!Double.isFinite(value))return unavailable;
+            return covariance;
+        }
+    }
+
+    /** Covariance order: AR, MA, seasonal AR, seasonal MA, then drift location
+     * when fitted. Drift location is the mean of the differenced process;
+     * for seasonal differencing it is period times the slope per time step.
+     * Innovation variance is profiled out. These are observed-information,
+     * asymptotic Gaussian-likelihood errors, not robust errors or forecast bands. */
     public record Result(ArimaResult fit, int diffuseStateCount, int likelihoodObservations,
-                         boolean diffuseLikelihood) { }
+                         boolean diffuseLikelihood,double[] coefficientCovariance) {
+        public Result { coefficientCovariance=coefficientCovariance.clone(); }
+        /** Compatibility constructor for results without computed information. */
+        public Result(ArimaResult fit,int diffuseStateCount,int likelihoodObservations,boolean diffuseLikelihood) {
+            this(fit,diffuseStateCount,likelihoodObservations,diffuseLikelihood,unavailable(fit));
+        }
+        private static double[] unavailable(ArimaResult fit) {
+            int k=fit.autoregressive().length+fit.movingAverage().length
+                +fit.seasonalAutoregressive().length+fit.seasonalMovingAverage().length+(fit.drift()?1:0);
+            double[] result=new double[k*k];Arrays.fill(result,Double.NaN);return result;
+        }
+        public double[] coefficientCovariance(){return coefficientCovariance.clone();}
+        public double[] standardErrors() {
+            int k=(int)Math.sqrt(coefficientCovariance.length);double[] result=new double[k];
+            for(int i=0;i<k;i++)result[i]=Math.sqrt(coefficientCovariance[i*k+i]);return result;
+        }
+        /** False for nonconvergence, a transform-bound solution, or information
+         * that is singular or unresolved across two differentiation step sizes. */
+        public boolean coefficientInferenceAvailable() {
+            return fit.converged() && Arrays.stream(coefficientCovariance).allMatch(Double::isFinite);
+        }
+    }
 }

@@ -61,6 +61,35 @@ remain separate from the exact LP. Neither API implements every nonparametric
 or inferential feature of `quantreg`/`quantreg.nonpar`.
 See [exact LP accuracy and paired R timing](../../src/benchmark/resources/exact-quantile-benchmark/exact-quantile-results.md).
 
+### Covariance for exact quantile fits
+
+```java
+// f_i is the conditional response density at the fitted quantile, in 1/y units.
+var inference = QuantileRegressionInference.fitExact(y, design, 0.5, densities);
+double[] covariance = inference.coefficientCovariance(); // row-major
+double[] standardErrors = inference.standardErrors();
+// Alternative for iid errors only, with a caller-set response-unit bandwidth:
+var iid = QuantileRegressionInference.fitExactIidKernel(y, design, 0.5, 0.4);
+```
+
+For A = X' diag(f_i) X the supplied-density covariance is
+`tau*(1-tau) * A^-1 * X'X * A^-1`. Densities may vary across observations;
+they must be positive, finite, and either known or consistently estimated.
+Predictor and density scaling plus pivoted QR avoid an unscaled normal-equation
+inverse; observation influence outer products form the covariance.
+The iid alternative estimates the common residual density at zero with a pooled
+Gaussian kernel. It is not a heteroskedastic conditional-density estimator.
+
+Both paths require a converged exact fit, n > p, independent observations,
+a correctly specified linear conditional quantile, and regular continuous
+response densities. They do not provide valid mass-point or clustered-response
+inference. These are asymptotic errors, not finite-sample exact inference or
+Student-t errors. Bandwidth selection is intentionally separate: a positive
+fixed bandwidth alone does not ensure valid inference; the usual shrinking
+bandwidth and density regularity conditions are still needed. Singular designs,
+failed fits, invalid densities, and numerically unresolved covariance are rejected.
+See [R and analytic validation](../feasible-extensions-validation.md).
+
 ## Nonparametric regression and supersmoothing
 
 `KernelRegression` provides one-dimensional Gaussian Nadaraya--Watson

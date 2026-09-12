@@ -1,0 +1,3 @@
+R version 4.6.1 (2026-06-24 ucrt)
+lavaan 0.7.2
+quantreg 6.1

@@ -18,7 +18,40 @@ public final class SemOrdinal {
     }
     /** Complete ordinal rows, coded 0..categoryCounts[j]-1. */
     public static Result fit(int[][] data,int[] categoryCounts,SemModel model,SemOptions options,int[] clusters) {
-        Engine engine=new Engine(data,categoryCounts,model);
+        return fitInternal(data,categoryCounts,model,options,clusters,false);
+    }
+
+    /** Available-pair PML, with -1 denoting missing categories.
+     * Consistency requires MCAR (or a justified pair-specific observation mechanism);
+     * this is not ordinal FIML for general MAR data. Rows with fewer than two
+     * observed responses contribute nothing and are removed. Cluster IDs, when
+     * supplied, follow the original rows. Every variable pair needs coverage. */
+    public static Result fitPairwiseMissing(int[][] data,int[] categoryCounts,SemModel model,
+            SemOptions options,int[] clusters) {
+        if(data==null || categoryCounts==null || model==null
+                || (clusters!=null && clusters.length!=data.length))
+            throw new IllegalArgumentException("ordinal data, categories, model and matching cluster IDs required");
+        List<int[]> rows=new ArrayList<>();List<Integer> ids=new ArrayList<>();
+        for(int r=0;r<data.length;r++) {
+            int[] row=data[r];int seen=0;
+            if(row==null || row.length!=categoryCounts.length)
+                throw new IllegalArgumentException("invalid ordinal row");
+            for(int j=0;j<row.length;j++) {
+                if(row[j]<-1 || row[j]>=categoryCounts[j])throw new IllegalArgumentException("ordinal category outside range; only -1 denotes missing");
+                if(row[j]>=0)seen++;
+            }
+            if(seen>=2){rows.add(row);ids.add(clusters==null?r:clusters[r]);}
+        }
+        return fitInternal(rows.toArray(int[][]::new),categoryCounts,model,options,
+            ids.stream().mapToInt(Integer::intValue).toArray(),true);
+    }
+    public static Result fitPairwiseMissing(int[][] data,int[] categoryCounts,SemModel model) {
+        return fitPairwiseMissing(data,categoryCounts,model,SemOptions.defaults(),null);
+    }
+
+    private static Result fitInternal(int[][] data,int[] categoryCounts,SemModel model,
+            SemOptions options,int[] clusters,boolean missing) {
+        Engine engine=new Engine(data,categoryCounts,model,missing);
         if(options==null)throw new IllegalArgumentException("ordinal options required");
         int n=data.length,k=engine.start.length,ram=model.freeParameterCount();
         int[] ids=clusters==null?java.util.stream.IntStream.range(0,n).toArray():clusters.clone();
@@ -26,7 +59,7 @@ public final class SemOrdinal {
         SemOptimizer.Optimum optimum=SemOptimizer.minimize(engine::at,engine.start,options.maximumEvaluations(),options.tolerance());
         double[] x=optimum.point();Evaluation evaluated=engine.evaluate(x,true);
         double[] bread=SemInformation.unavailable(k);
-        if(engine.identified(x))try { bread=RamFit.informationInverse(RamFit.hessian(engine::at,x,n),k); }
+        if(optimum.converged() && engine.identified(x))try { bread=RamFit.informationInverse(RamFit.hessian(engine::at,x,n),k); }
         catch(IllegalArgumentException unavailable) { /* Preserve the likelihood; all inference stays unavailable. */ }
         double[] raw=SemInference.sandwich(evaluated.scores,ids,bread),jac=new double[k*k];
         double[] values=x.clone();
@@ -64,9 +97,9 @@ public final class SemOrdinal {
     private static final class Engine {
         final int[][] data;final int[] categories,offset;final SemModel model;final double[] start;
         final List<Pair> pairs=new ArrayList<>();
-        Engine(int[][] rows,int[] counts,SemModel specification) {
+        Engine(int[][] rows,int[] counts,SemModel specification,boolean missing) {
             if(rows==null || rows.length<3 || counts==null || specification==null || specification.hasMeanStructure())
-                throw new IllegalArgumentException("ordinal SEM needs complete categories and a model without intercepts (thresholds determine location)");
+                throw new IllegalArgumentException("ordinal SEM needs at least three informative rows and a model without intercepts (thresholds determine location)");
             model=specification;categories=counts.clone();int p=model.variables().size();
             if(counts.length!=p)throw new IllegalArgumentException("ordinal categories must match observed variables");
             for(int j=0;j<p;j++) {
@@ -79,19 +112,25 @@ public final class SemOrdinal {
             for(int j=0;j<p;j++){marginal[j]=new int[counts[j]];offset[j]=k;k+=counts[j]-1;}
             if(model.freeParameterCount()>p*(p-1)/2)
                 throw new IllegalArgumentException("ordinal model has more free structural parameters than correlations; it is unidentified");
-            for(int[] row:data)for(int j=0;j<p;j++){if(row[j]<0||row[j]>=counts[j])throw new IllegalArgumentException("ordinal category outside range");marginal[j][row[j]]++;}
+            for(int[] row:data)for(int j=0;j<p;j++) {
+                if(missing && row[j]==-1)continue;
+                if(row[j]<0||row[j]>=counts[j])throw new IllegalArgumentException("ordinal category outside range");
+                marginal[j][row[j]]++;
+            }
             start=Arrays.copyOf(RamFit.initial(model),k);double[] covariance=RamFit.distribution(model,RamFit.initial(model)).covariance();
             for(int j=0;j<p;j++) {
                 int cumulative=0;double previous=0;
                 for(int c=0;c<counts[j];c++) {
                     if(marginal[j][c]==0)throw new IllegalArgumentException("empty marginal ordinal category; collapse or remove it explicitly");
                     cumulative+=marginal[j][c];if(c==counts[j]-1)break;
-                    double threshold=Math.sqrt(covariance[j*p+j])*Normal.quantile((double)cumulative/data.length,0,1,true,false);
+                    double threshold=Math.sqrt(covariance[j*p+j])*Normal.quantile((double)cumulative/Arrays.stream(marginal[j]).sum(),0,1,true,false);
                     start[offset[j]+c]=c==0?threshold:Math.log(threshold-previous);previous=threshold;
                 }
             }
             for(int i=0;i<p;i++)for(int j=0;j<i;j++) {
-                int[][] table=new int[counts[i]][counts[j]];for(int[] row:data)table[row[i]][row[j]]++;
+                int[][] table=new int[counts[i]][counts[j]];int covered=0;
+                for(int[] row:data)if(row[i]>=0 && row[j]>=0){table[row[i]][row[j]]++;covered++;}
+                if(covered<2)throw new IllegalArgumentException("each ordinal pair needs at least two jointly observed rows");
                 pairs.add(new Pair(i,j,table));
             }
         }
@@ -146,7 +185,8 @@ public final class SemOrdinal {
                     for(int h=0;h<k;h++){dp[h]/=prob;gradient[h]-=weight*dp[h];}
                     if(caseScores)cellScores[a][b]=dp;
                 }
-                if(caseScores)for(int r=0;r<n;r++)for(int h=0;h<k;h++)scores[r][h]+=cellScores[data[r][i]][data[r][j]][h];
+                if(caseScores)for(int r=0;r<n;r++)if(data[r][i]>=0 && data[r][j]>=0)
+                    for(int h=0;h<k;h++)scores[r][h]+=cellScores[data[r][i]][data[r][j]][h];
             }
             return new Evaluation(new SemOptimizer.Value(value,gradient),scores);
         }

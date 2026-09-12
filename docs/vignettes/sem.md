@@ -225,15 +225,36 @@ artifacts from dense-matrix cancellation.
 
 `pairwiseLogLikelihood()` is explicitly a composite likelihood, not the
 multivariate ordinal full likelihood. The result does not fabricate ML AIC,
-global chi-square, or WLSMV corrections. This implementation supports complete
-all-ordinal data, including binary indicators and observed ordinal paths.
-Mixed continuous/ordinal rows, missing ordinal data, DWLS/WLSMV, ordinal
+global chi-square, or WLSMV corrections. `fit` supports complete all-ordinal
+data, including binary indicators and observed ordinal paths.
+Mixed continuous/ordinal rows, general MAR ordinal missingness, DWLS/WLSMV, ordinal
 modification indices, and composite likelihood-ratio calibration are not
 implemented. Empty marginal categories must be collapsed explicitly.
 Correlations with magnitude at least `.9999` and cell probabilities lost to
 floating-point underflow or integration-error failures are rejected rather than
 clipped and reported as successful fits. Near-boundary or rare-category problems
 may not converge.
+
+### Missing ordinal responses
+
+```java
+// Missing categories are -1; observed categories remain 0..categoryCount-1.
+var ordinal = SemOrdinal.fitPairwiseMissing(data, categoryCounts, model);
+// Optional cluster IDs follow the original input rows.
+var clustered = SemOrdinal.fitPairwiseMissing(
+    data, categoryCounts, model, SemOptions.defaults(), clusterIds);
+```
+
+Each pair contributes only where both responses are observed. Rows with fewer
+than two observed responses contribute no pairs and are removed; `observations()`
+counts retained rows. Every pair needs at least two jointly observed rows,
+and every declared category must occur among the retained observations.
+This is available-pair PML: consistency requires MCAR, or a separately justified
+pair-specific observation mechanism. It is not an ordinal FIML method for
+arbitrary MAR missingness. Threshold and structural scores from the same case
+are combined before forming the case/cluster sandwich. Nonconvergence suppresses
+the entire covariance and all SEs/p-values in both ordinal fitting APIs.
+See [independent validation](../feasible-extensions-validation.md).
 
 ## Numerical validation and timing
 

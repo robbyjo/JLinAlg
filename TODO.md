@@ -84,9 +84,10 @@ scope; scenario contrasts require additional assumptions for causal interpretati
 These boundaries are explicit; this release does not claim complete parity
 with every feature of lavaan, metafor, lme4, or the other R packages.
 
-- SEM: DWLS/WLSMV, mixed/missing ordinal responses, multigroup invariance,
+- SEM: DWLS/WLSMV, mixed continuous/ordinal responses, general MAR ordinal
+  missingness, multigroup invariance,
   ordinal modification indices, and FIML robust scaled fit statistics.
-- Time series: diffuse coefficient covariance, general regression terms, and
+- Time series: general regression terms and
   historical state smoothing.
 - MR conditional GWAS remains the documented Gaussian score model; other
   outcome likelihoods require individual-level data or additional sufficient
@@ -104,9 +105,11 @@ with every feature of lavaan, metafor, lme4, or the other R packages.
   not a general nonlinear random-parameter likelihood.
 - Selective inference: unknown-noise or response-selected penalties, dependent
   sample splits, and non-Gaussian selection require different inferential methods.
-- Quantile/nonparametric regression: quantile inferential covariance,
-  mixed-type/multidimensional kernels, and automatic inference-valid bandwidth
-  selection remain distinct extensions; exact nonsmoothed quantile fitting is implemented.
+- Quantile/nonparametric regression: mixed-type/multidimensional kernels and
+  automatic inference-valid bandwidth selection remain distinct extensions.
+  Exact quantile covariance now supports supplied conditional densities or an
+  iid residual kernel with caller-set bandwidth; dependent observations and
+  response mass points need other inferential methods.
 - Kernel set tests: the saddlepoint positive-mixture fallback is approximate,
   as is opt-in analytic SKAT-O. Default parametric SKAT-O simulation is exact
   for its Gaussian score-null model up to Monte Carlo error, not an exact

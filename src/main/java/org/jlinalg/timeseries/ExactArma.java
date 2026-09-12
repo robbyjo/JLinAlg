@@ -226,7 +226,7 @@ public final class ExactArma {
         return new ObservedSeries(values, series.clone());
     }
 
-    private static double[] inverseHessian(
+    static double[] inverseHessian(
             double[] point, MultivariableFunction objective, ComputeBackend backend) {
         int size = point.length;
         if (size == 0) return new double[0];
@@ -288,7 +288,7 @@ public final class ExactArma {
         return hessian;
     }
 
-    private static double[] deltaCovariance(
+    static double[] deltaCovariance(
             double[] point, double[] rawCovariance, ArimaOrder order,
             SeasonalArimaOrder seasonal, boolean includeMean, ComputeBackend backend) {
         int size = point.length;
@@ -323,6 +323,10 @@ public final class ExactArma {
         position += value.ar().length;
         System.arraycopy(value.ma(), 0, result, position, value.ma().length);
         position += value.ma().length;
+        System.arraycopy(value.seasonalAr(), 0, result, position, value.seasonalAr().length);
+        position += value.seasonalAr().length;
+        System.arraycopy(value.seasonalMa(), 0, result, position, value.seasonalMa().length);
+        position += value.seasonalMa().length;
         if (includeMean) result[position] = value.location();
         return result;
     }

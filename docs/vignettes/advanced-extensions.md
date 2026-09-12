@@ -17,7 +17,9 @@ sandwich corrections, continuous-model efficient modification indices, and
 indirect-effect delta-method inference are available.
 
 Checked-in `lavaan` references cover latent paths, means, FIML, robust ML, and
-ordinal PML. Ordinal PML is not DWLS/WLSMV. Missing/mixed ordinal models,
+ordinal PML. `SemOrdinal.fitPairwiseMissing` adds available-pair ordinal PML
+under MCAR with case/cluster covariance. Ordinal PML is not DWLS/WLSMV.
+Mixed continuous/ordinal models, general MAR ordinal missingness,
 multigroup SEM, ordinal modification indices, and FIML robust scaled fit
 statistics remain unsupported. See [SEM](sem.md) for identification and examples.
 
@@ -58,8 +60,9 @@ covariance. Forecasts propagate the filtered state, not a zero-filled series.
 References compare to `stats::arima`; a bounded-heap test covers 50,000 positions.
 
 R's finite diffuse initialization has a small, documented likelihood difference
-from symbolic exact diffuse initialization. Diffuse coefficient covariance,
-general regression terms, and historical smoothing are not exposed.
+from symbolic exact diffuse initialization. Diffuse coefficient covariance now
+includes joint drift/dynamic uncertainty, with unresolved information suppressed.
+General regression terms and historical smoothing are not exposed.
 See [time series](time-series.md).
 
 ## MR workflow
@@ -110,6 +113,10 @@ nonsmoothed primal-dual LP with optimality certificates. Supersmoothing implemen
 algorithm, including weights, periodicity, fixed spans, and bass control.
 Kernel prediction remains finite far outside the sample, and the partially
 linear API adds Robinson residualization and slope HC3 inference.
+`QuantileRegressionInference` adds asymptotic exact-fit covariance from supplied
+conditional densities or an iid residual kernel at a caller-set bandwidth.
+Automatic inference-valid bandwidth selection remains open. See the
+[new validation report](../feasible-extensions-validation.md).
 See [regression families](regression-families.md) and
 [selection inference](linear-models-and-glms.md).
 

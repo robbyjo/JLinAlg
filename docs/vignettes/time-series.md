@@ -241,10 +241,34 @@ rows and symmetric covariance updates give `O(n (r+b)^2)` filtering work.
 Stationary initialization uses state-sized matrix doubling. High orders and
 long seasonal periods can still be expensive or ill-conditioned; this is a
 covariance filter, not a square-root filter. The diffuse pivot tolerance is
-`1e-9` in unit diffuse-state coordinates. Unrestricted regression terms,
-coefficient covariance/standard errors for `DiffuseArima`, and smoothing of
-missing historical values are not exposed by this API. The stationary
-`ExactArmaResult` covariance/SE API remains available.
+`1e-9` in unit diffuse-state coordinates. Unrestricted regression terms and
+smoothing of missing historical values are not exposed by this API.
+
+### Diffuse coefficient inference
+
+```java
+var result = DiffuseArima.fit(series, order, options);
+if (result.coefficientInferenceAvailable()) {
+    double[] covariance = result.coefficientCovariance(); // row-major
+    double[] standardErrors = result.standardErrors();
+}
+```
+
+Coefficient order is AR, MA, seasonal AR, seasonal MA, then drift location when
+included. Drift location is the mean of the differenced process: with seasonal
+differencing, divide it and its SE by the period to obtain the slope and its SE
+per time step. Covariance profiles out innovation variance but retains joint
+drift/dynamic cross terms, even though optimization profiles the drift itself.
+Reported coefficients use the delta transform from stationary/invertible
+coordinates. Two finite-difference step sizes check information stability;
+singular or unresolved information, transform-bound solutions, and failed
+optimization yield NaN covariance/SEs and `coefficientInferenceAvailable()==false`.
+No ridge is added to manufacture inference. These are asymptotic Gaussian
+likelihood errors, separate from forecast uncertainty and robust covariance.
+Computing the Hessian adds O(k²) filter evaluations for k coefficients, each
+using state-sized covariance storage. `functionEvaluations()` on the embedded
+fit continues to count optimization evaluations only.
+See [independent validation](../feasible-extensions-validation.md).
 
 ## Accuracy and matching-method timings
 
