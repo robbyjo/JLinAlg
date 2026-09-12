@@ -20,7 +20,7 @@ final class RareScoreCli {
             Map<String,String> o=new HashMap<>();
             for(int i=0;i<args.length;i++) {
                 String key=args[i];
-                if(!Set.of("--vcf","--pheno","--id","--response","--covariates","--out","--genome-build","--cov-window","--max-variants","--grm").contains(key)
+                if(!Set.of("--vcf","--pheno","--id","--response","--covariates","--out","--genome-build","--cov-window","--max-variants","--grm","--trait-id","--trait-units").contains(key)
                     ||i+1==args.length||o.put(key,args[++i])!=null)throw new IllegalArgumentException("unknown, duplicate, or incomplete option: "+key);
             }
             for(String key:List.of("--vcf","--pheno","--id","--response","--out","--genome-build"))if(!o.containsKey(key))throw new IllegalArgumentException("required: "+key);
@@ -54,11 +54,12 @@ final class RareScoreCli {
                             y.stream().mapToDouble(Double::doubleValue).toArray(),x.toArray(double[][]::new),
                             List.of(grm.varianceComponent("genetic",aligned),org.jlinalg.reml.VarianceComponent.identity("residual",y.size())),
                             org.jlinalg.reml.RemlOptions.defaults(),BackendPolicy.CPU);
-                        GaussianScoreWriter.write(source,indices.stream().mapToInt(Integer::intValue).toArray(),related,window,maximum,o.get("--genome-build"),s,c);
+                        GaussianScoreWriter.write(source,indices.stream().mapToInt(Integer::intValue).toArray(),related,window,maximum,o.get("--genome-build"),o.getOrDefault("--trait-id",o.get("--response")),o.getOrDefault("--trait-units","original"),s,c);
                         journal.info("related_Gaussian_REML_variance_components="+Arrays.toString(related.nullModel().varianceComponents()));
-                    }else GaussianScoreWriter.write(source,indices.stream().mapToInt(Integer::intValue).toArray(),model,window,maximum,o.get("--genome-build"),s,c);
+                    }else GaussianScoreWriter.write(source,indices.stream().mapToInt(Integer::intValue).toArray(),model,window,maximum,o.get("--genome-build"),o.getOrDefault("--trait-id",o.get("--response")),o.getOrDefault("--trait-units","original"),s,c);
                     journal.metadata("command=rare-score\nmodel=Gaussian; intercept and numeric covariates; optional GRM REML\ntrait_units=original\nvariance_estimator=RSS/(N-p) unrelated; REML with GRM\n"
                         +"analyzed_samples="+y.size()+"\ncovariance_window="+window+"\nmissing_dosages=mean imputed\nhwe=exact hard calls; fractional dosages NA\n"
+                        +"model_metadata=version-1 quantitative; asymptotic-normal\ntrait_id="+o.getOrDefault("--trait-id",o.get("--response"))+"\ndeclared_trait_units="+o.getOrDefault("--trait-units","original")+"\n"
                         +"genome_build="+o.get("--genome-build")+"\nvcf="+o.get("--vcf")+"\npheno="+o.get("--pheno")+"\nresponse="+o.get("--response")+"\ncovariates="+o.getOrDefault("--covariates","")+"\ngrm="+o.getOrDefault("--grm","none")+"\n");
                     Files.move(s,score);Files.move(Path.of(s+".tbi"),Path.of(score+".tbi"));Files.move(c,cov);Files.move(Path.of(c+".tbi"),Path.of(cov+".tbi"));
                 }finally {
@@ -74,9 +75,12 @@ final class RareScoreCli {
         Usage: jlinalg rare-score --vcf cohort.vcf.gz --pheno phenotype.tsv --id sample
           --response trait [--covariates age,sex,pc1] --genome-build GRCh38 --out PREFIX
           [--cov-window 1000000] [--max-variants 2000] [--grm grm.tsv]
+          [--trait-id ID] [--trait-units UNITS]
         Fits one Gaussian null model with an intercept and numeric covariates.
         Scope: quantitative trait, diploid additive biallelic dosages; optional GRM REML for related samples.
         Produces RAREMETAL-compatible BGZF score/covariance files and tabix indices.
+        Trait ID defaults to the response column; units default to original (no conversion).
+        Exports version-1 quantitative model metadata for rare-meta --model-metadata strict.
         Scores use original phenotype units; variance is RSS/(N-p) or GRM-based REML.
         Complete phenotype/covariate cases are aligned by ID; missing genotypes are mean imputed.
         Covariance is saved for forward pairs up to cov-window base pairs apart.

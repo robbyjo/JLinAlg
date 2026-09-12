@@ -13,6 +13,8 @@ RAREMETALWORKER/rvtests quantitative-trait summaries can also be imported. This
 does not adjust for relatives or overlapping participants **between** cohorts.
 Binary-trait rare-case calibration, multiallelic covariance, and Raremetal2's
 `--useExact` method remain outside the supported scope.
+The [Raremetal2 assessment and trait-model contract](raremetal2-trait-models.md)
+documents the required extensions and the implemented metadata compatibility checks.
 
 ## Choose the question and test
 
@@ -149,6 +151,16 @@ divided by `AnalyzedSamples` on disk, as required by RMW/rvtests format, and are
 multiplied back on import. Diagonal covariance is checked against `SQRT_V_STAT^2`.
 The reader also accepts a `##CovarianceScale=score` header for JLinAlg-only,
 unscaled covariance files; do not send that extension directly to RAREMETAL.
+
+`rare-score` now writes version-1 quantitative model metadata into both files.
+Use `--trait-id height --trait-units cm` to declare shared identity/units; defaults
+are the response-column name and `original`. These options do not transform the
+phenotype. `rare-meta --model-metadata strict` requires complete declarations in
+each supplied file. Default `legacy` mode permits missing historical fields and
+logs the assumptions. Both modes reject declared unsupported models/calibrations,
+conflicting trait identities/units/transforms, mismatched score/covariance
+metadata, and unsupported declared covariance column layouts. Matching metadata
+cannot establish correct cohort provenance or independence.
 
 Per-variant scores and covariance alone do not encode all modeling decisions.
 Agree on phenotype units/transforms, covariates, allele normalization, reference

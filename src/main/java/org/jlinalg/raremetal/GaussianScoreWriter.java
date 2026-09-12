@@ -21,27 +21,40 @@ public final class GaussianScoreWriter {
     private GaussianScoreWriter() { }
     public static void write(VariantSource source,int[] sampleOrder,LinearSetTestNullModel model,
             long window,int maximumVariants,String genomeBuild,Path scoreFile,Path covarianceFile)throws IOException {
+        write(source,sampleOrder,model,window,maximumVariants,genomeBuild,null,"original",scoreFile,covarianceFile);
+    }
+    /** Export a declared trait identity and units for strict model compatibility checks.
+     * Units describe the supplied phenotype; no transformation or conversion occurs. */
+    public static void write(VariantSource source,int[] sampleOrder,LinearSetTestNullModel model,
+            long window,int maximumVariants,String genomeBuild,String traitId,String traitUnits,Path scoreFile,Path covarianceFile)throws IOException {
         double variance=model.residualVariance();
         if(!(variance>0)||!Double.isFinite(variance))throw new IllegalArgumentException("positive null residual variance required");
         double[] py=model.responseResiduals();for(int i=0;i<py.length;i++)py[i]/=variance;
         write(source,sampleOrder,model.observations(),py,g->{
             double[] pg=model.residualize(new double[][]{g})[0];
             for(int i=0;i<pg.length;i++)pg[i]/=variance;return pg;
-        },variance,"unrelated-Gaussian",window,maximumVariants,genomeBuild,scoreFile,covarianceFile);
+        },variance,"unrelated-Gaussian",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
     }
     /** Export related-sample scores using the fitted REML projection P.
      * U=G'Py and V=G'PG; trait units remain original, disk covariance is V/N. */
     public static void write(VariantSource source,int[] sampleOrder,org.jlinalg.gwas.RemlAssociationScanner model,
             long window,int maximumVariants,String genomeBuild,Path scoreFile,Path covarianceFile)throws IOException {
+        write(source,sampleOrder,model,window,maximumVariants,genomeBuild,null,"original",scoreFile,covarianceFile);
+    }
+    /** Export Gaussian REML scores with a declared trait identity and units. */
+    public static void write(VariantSource source,int[] sampleOrder,org.jlinalg.gwas.RemlAssociationScanner model,
+            long window,int maximumVariants,String genomeBuild,String traitId,String traitUnits,Path scoreFile,Path covarianceFile)throws IOException {
         write(source,sampleOrder,model.observations(),model.projectedResponse(),g->model.project(g,1),
-            Double.NaN,"related-Gaussian-REML",window,maximumVariants,genomeBuild,scoreFile,covarianceFile);
+            Double.NaN,"related-Gaussian-REML",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
     }
     private static void write(VariantSource source,int[] sampleOrder,int n,double[] residual,
             java.util.function.UnaryOperator<double[]> projection,double variance,String nullModel,
-            long window,int maximumVariants,String genomeBuild,Path scoreFile,Path covarianceFile)throws IOException {
+            long window,int maximumVariants,String genomeBuild,String traitId,String traitUnits,Path scoreFile,Path covarianceFile)throws IOException {
         if(window<1||maximumVariants<1||genomeBuild==null||genomeBuild.isBlank())throw new IllegalArgumentException("invalid score export options");
+        if(!genomeBuild.equals(genomeBuild.trim())||genomeBuild.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException("genome build must not contain control characters or outer whitespace");
         String header="##ProgramName=JLinAlg (RareMetalWorker-compatible)\n##Version=4.14-format\n##AnalyzedSamples="+n+"\n##GenomeBuild="+genomeBuild
-            +"\n##CovarianceWindow="+window+"\n##ResidualVariance="+variance+"\n##TraitUnits=original\n##NullModel="+nullModel+"\n##MissingDosages=mean-imputed\n##HWE=exact-hard-calls-only\n";
+            +"\n##CovarianceWindow="+window+"\n##ResidualVariance="+variance+"\n"
+            +ScoreModelMetadata.gaussianHeaders(traitId,traitUnits,nullModel)+"##MissingDosages=mean-imputed\n##HWE=exact-hard-calls-only\n";
         try(IndexedWriter scores=new IndexedWriter(scoreFile);IndexedWriter cov=new IndexedWriter(covarianceFile);
                 VariantBlockReader reader=source.open(sampleOrder)) {
             scores.raw(header+"#CHROM\tPOS\tREF\tALT\tN_INFORMATIVE\tFOUNDER_AF\tALL_AF\tINFORMATIVE_ALT_AC\tCALL_RATE\tHWE_PVALUE\tN_REF\tN_HET\tN_ALT\tU_STAT\tSQRT_V_STAT\tALT_EFFSIZE\tPVALUE\n");

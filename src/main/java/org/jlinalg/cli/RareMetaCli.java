@@ -35,17 +35,19 @@ final class RareMetaCli {
                 for(int i=0;i<o.scoreFiles.size();i++) {
                     for(int j=0;j<i;j++) if(Files.isSameFile(o.scoreFiles.get(i),o.scoreFiles.get(j)))
                         throw new IllegalArgumentException("one score file cannot represent two independent cohorts");
-                    studies.add(new RareMetalStudy(o.scoreFiles.get(i),o.covFiles.get(i),o.callRate,o.hwe).cacheBytes(o.cacheBytes));
+                    studies.add(new RareMetalStudy(o.scoreFiles.get(i),o.covFiles.get(i),o.callRate,o.hwe,o.modelMetadata.equals("strict")).cacheBytes(o.cacheBytes));
+                    for(int j=0;j<i;j++)studies.get(j).metadata().requireCompatible(studies.get(i).metadata());
                     String declared=studies.get(i).genomeBuild();
                     if(declared!=null&&!declared.equals(o.build))throw new IOException("cohort genome build differs: "+o.names.get(i));
                 }
                 journal.metadata("command=rare-meta\ngenome_build="+o.build+"\ncohort_order="+String.join(",",o.names)
-                    +"\ntests="+String.join(",",o.tests)+"\nweights="+o.weights+"\nmaf="+o.maf+"\naf_policy="+o.afPolicy
+                    +"\nmodel_metadata_policy="+o.modelMetadata+"\ntests="+String.join(",",o.tests)+"\nweights="+o.weights+"\nmaf="+o.maf+"\naf_policy="+o.afPolicy
                     +"\nmin_cohorts_per_variant="+o.minimum+"\ncohort_results="+o.cohortResults
                     +"\nskato_calibration="+o.calibration+"\nsimulations="+o.simulations+"\nseed="+o.seed
                     +"\nthreads="+o.threads+"\ncache_bytes_per_cohort="+o.cacheBytes+"\ncondition_file="+o.conditionFile+"\ncondition_missing="+o.conditionMissing+"\nleave_variant_out="+o.leaveVariant+"\nleave_cohort_out="+o.leaveCohort+"\nmodel=independent cohorts; quantitative-trait null scores; compatible trait units required\n");
                 for(int i=0;i<studies.size();i++)journal.info("cohort="+o.names.get(i)+" scores="+o.scoreFiles.get(i)
-                    +" covariance="+o.covFiles.get(i)+" samples="+studies.get(i).samples()+" indexed="+studies.get(i).indexed());
+                    +" covariance="+o.covFiles.get(i)+" samples="+studies.get(i).samples()+" indexed="+studies.get(i).indexed()+" model_metadata="+studies.get(i).metadata().status()
+                    +" declarations="+new TreeMap<>(studies.get(i).metadata().declarations()));
                 for(String test:outputs.keySet()) {
                     Path tmp=Files.createTempFile(o.output.getParent(),".rare-meta-",".tsv");temporary.put(test,tmp);
                     BufferedWriter w=Files.newBufferedWriter(tmp);writers.put(test,w);w.write(header(test));w.newLine();
@@ -357,11 +359,13 @@ final class RareMetaCli {
         final List<String> names=new ArrayList<>(),tests=new ArrayList<>();final List<Path> scoreFiles=new ArrayList<>(),covFiles=new ArrayList<>();
         final Map<String,List<Variant>> conditions=new HashMap<>();
         Path conditionFile;String conditionMissing="error";boolean leaveVariant,leaveCohort;int threads=1;long cacheBytes=16L*1024*1024;
-        Path output,groups;String build,weights="default",afPolicy="observed";int minimum=1,maxVariants=2000,simulations=10000;long seed=20260901L,windowSize,windowStep;double maf=.05,callRate=0,hwe=0;boolean cohortResults;SkatOCalibration calibration=SkatOCalibration.PARAMETRIC_SIMULATION;
+        Path output,groups;String modelMetadata="legacy",build,weights="default",afPolicy="observed";int minimum=1,maxVariants=2000,simulations=10000;long seed=20260901L,windowSize,windowStep;double maf=.05,callRate=0,hwe=0;boolean cohortResults;SkatOCalibration calibration=SkatOCalibration.PARAMETRIC_SIMULATION;
         Options(String[] args)throws IOException {
             Map<String,String> map=new HashMap<>();
-            for(int i=0;i<args.length;i++){String key=args[i];if(key.equals("--leave-variant-out")){leaveVariant=true;continue;}if(key.equals("--leave-cohort-out")){leaveCohort=true;continue;}if(key.equals("--cohort-results")){cohortResults=true;continue;}if(!Set.of("--cohorts","--out","--test","--groups","--genome-build","--weights","--af-policy","--min-cohorts","--max-variants","--simulations","--seed","--window-size","--window-step","--maf","--call-rate","--hwe","--skato-calibration","--condition","--condition-missing","--threads","--cache-mb").contains(key)||i+1==args.length||map.put(key,args[++i])!=null)throw new IllegalArgumentException("unknown, duplicate, or incomplete option: "+key);}
+            for(int i=0;i<args.length;i++){String key=args[i];if(key.equals("--leave-variant-out")){leaveVariant=true;continue;}if(key.equals("--leave-cohort-out")){leaveCohort=true;continue;}if(key.equals("--cohort-results")){cohortResults=true;continue;}if(!Set.of("--cohorts","--out","--test","--groups","--genome-build","--weights","--af-policy","--min-cohorts","--max-variants","--simulations","--seed","--window-size","--window-step","--maf","--call-rate","--hwe","--skato-calibration","--condition","--condition-missing","--threads","--cache-mb","--model-metadata").contains(key)||i+1==args.length||map.put(key,args[++i])!=null)throw new IllegalArgumentException("unknown, duplicate, or incomplete option: "+key);}
             for(String key:List.of("--cohorts","--out","--test","--genome-build"))if(!map.containsKey(key))throw new IllegalArgumentException("required option: "+key);
+            modelMetadata=map.getOrDefault("--model-metadata","legacy");
+            if(!Set.of("legacy","strict").contains(modelMetadata))throw new IllegalArgumentException("model-metadata must be legacy or strict");
             output=Path.of(map.get("--out")).toAbsolutePath();build=map.get("--genome-build");
             for(String t:map.get("--test").split(","))if(!Set.of("single","burden","skat","skat-o","vt","het-skat","het-skat-o","burden-fixed","burden-random").contains(t)||tests.contains(t))throw new IllegalArgumentException("invalid or repeated test: "+t);else tests.add(t);
             if(map.containsKey("--groups"))groups=Path.of(map.get("--groups"));
@@ -406,6 +410,7 @@ final class RareMetaCli {
           [--skato-calibration simulation|analytic|deterministic] [--simulations 10000] [--seed 20260901]
           [--leave-variant-out] [--leave-cohort-out] [--threads 1] [--cache-mb 16]
           [--condition group-conditions.txt] [--condition-missing error|exclude]
+          [--model-metadata legacy|strict]
         Conditions: GROUP_ID CHROM:POS:REF:ALT ...; disjoint from targets; complete cross-covariance required.
         Diagnostics retain original weights/MAFs and report omitted identity in scope.
         VT calibrates the correlated threshold search; selected beta/SE are descriptive after selection.
@@ -413,6 +418,9 @@ final class RareMetaCli {
         Deterministic SKAT-O uses conditional Gaussian quadrature (relative tolerance 1e-6); unresolved tails fail.
         Cache budget is per cohort; group results are emitted in input order with bounded concurrency.
         Manifest columns: cohort, scores, covariance (tab separated; paths relative to manifest).
+        Metadata: legacy permits missing declarations and logs assumptions; strict requires version 1.
+        Unsupported trait/null/calibration declarations and conflicting trait identities/units always fail.
+        Quantitative Gaussian scores only; Raremetal2 --useExact and binary rare-case tails are unsupported.
         Score/covariance: RAREMETALWORKER or rvtests; .gz/.tbi recommended.
         Groups: GROUP_ID CHROM:POS:REF:ALT ...; biallelic, one chromosome per group.
         Outputs: PREFIX.TEST.tsv, PREFIX.qc.tsv and PREFIX.log; existing files are never overwritten.

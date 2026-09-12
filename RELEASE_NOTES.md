@@ -1,5 +1,18 @@
 # Unreleased
 
+## Rare-variant model metadata and Raremetal2 assessment
+
+- Added version-1 quantitative score metadata, `rare-score --trait-id` and
+  `--trait-units`, and `rare-meta --model-metadata strict`. Legacy quantitative
+  imports retain logged assumptions; declared unsupported models/calibrations
+  and incompatible cohort or score/covariance metadata fail before results.
+- Validate covariance column headers explicitly, including rejection of
+  unsupported Raremetal2 compressed/allele-aware formats. Quantitative score
+  arithmetic and historical supported RMW/rvtests layouts are unchanged.
+- Completed the [Raremetal2 assessment and trait-model contract](docs/raremetal2-trait-models.md),
+  with a deterministic R rare-case counterexample and separate implementation
+  prerequisites for multiallelic groups, `--useExact`, and additional traits.
+
 ## Conditional GWAS aggregate exports and local refits
 
 - Added `--conditional-gwas-summary` with required `--score-genome-build` to

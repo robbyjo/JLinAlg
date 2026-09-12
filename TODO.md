@@ -65,11 +65,24 @@ leave-out diagnostics are documented in the
 [rare-variant tutorial](docs/rare-variant-meta-analysis.md) and
 [validation report](docs/rare-meta-validation.md).
 
-- [ ] **Raremetal2 extensions and additional trait models.** Assess multiallelic
-  formats and `--useExact` treatment of unbalanced studies separately. Define
-  binary-trait/rare-case calibration and supported null-model metadata before
-  extending the quantitative-trait implementation. Old covariance files without
-  allele identifiers cannot fully resolve multiallelic group tests.
+The Raremetal2 format/method assessment and quantitative model-metadata contract
+are completed in the [trait-model assessment](docs/raremetal2-trait-models.md).
+The remaining implementations are separate:
+
+- [ ] **Allele-aware multiallelic summaries.** Implement producer-specific
+  compressed covariance decoding and allele-aware union/group/conditioning
+  keys, preserving both covariance axes and global row ordering. Validate
+  same-site cross-ALT covariance, missing coverage and indexed/parallel equality.
+  Old position-only covariance cannot resolve multiallelic groups.
+- [ ] **Unbalanced-study exact method.** Specify the pooled estimand and required
+  phenotype moments, residualization and covariance scaling before implementing
+  Raremetal2 `--useExact`. Validate against independent participant-level fits
+  and cross-products; this is separate from binary rare-case calibration.
+- [ ] **Additional rare-meta trait models and calibration.** Implement a richer
+  versioned model protocol and validated binary rare-case/joint group tails,
+  followed by model-specific Poisson/survival support. Reuse the existing
+  conditional-GWAS score infrastructure where appropriate; normal-only exports
+  and cohort p-values do not supply calibrated rare-event group inference.
 
 ## Validation for new methods
 

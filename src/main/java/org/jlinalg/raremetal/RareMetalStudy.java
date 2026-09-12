@@ -21,6 +21,8 @@ public final class RareMetalStudy implements AutoCloseable {
     private int samples;
     private String genomeBuild;
     private boolean scoreScale;
+    private final ScoreModelMetadata metadata;
+    private int covarianceColumns;
     private double minimumCallRate,minimumHwe;
     private long cacheLimit,cacheSize;
     private final LinkedHashMap<String,CacheEntry> cache=new LinkedHashMap<>(16,.75f,true);
@@ -39,17 +41,35 @@ public final class RareMetalStudy implements AutoCloseable {
     }
 
     public RareMetalStudy(Path scores,Path covariance,double minimumCallRate,double minimumHwe) throws IOException {
+        this(scores,covariance,minimumCallRate,minimumHwe,false);
+    }
+    /** Read summaries with optional mandatory version-1 model declarations. */
+    public RareMetalStudy(Path scores,Path covariance,double minimumCallRate,double minimumHwe,boolean requireModelMetadata) throws IOException {
         this.scores=scores; this.covariance=covariance;
         this.minimumCallRate=minimumCallRate; this.minimumHwe=minimumHwe;
         if(minimumCallRate<0 || minimumCallRate>1 || minimumHwe<0 || minimumHwe>1
                 || !Double.isFinite(minimumCallRate) || !Double.isFinite(minimumHwe))
             throw new IllegalArgumentException("QC cutoffs must be in [0,1]");
+        ScoreModelMetadata declaredMetadata=ScoreModelMetadata.read(scores);
+        declaredMetadata.validateQuantitative(requireModelMetadata);
+        scoreScale="score".equals(declaredMetadata.value("CovarianceScale"));
+        if(covariance!=null) {
+            ScoreModelMetadata covMetadata=ScoreModelMetadata.read(covariance);
+            covMetadata.validateQuantitative(requireModelMetadata);
+            declaredMetadata=declaredMetadata.withMissingFrom(covMetadata);
+            if(covMetadata.value("CovarianceScale")!=null)scoreScale="score".equals(covMetadata.value("CovarianceScale"));
+            List<String> columns=covMetadata.columns();
+            if(columns.equals(List.of("CHROM","CURRENT_POS","MARKERS_IN_WINDOW","COV_MATRICES")))covarianceColumns=4;
+            else if(columns.equals(List.of("CHROM","START_POS","END_POS","NUM_MARKER","MARKER_POS","COV")))covarianceColumns=6;
+            else if(!columns.isEmpty())throw new IOException("unsupported covariance header "+columns+"; Raremetal2 compressed EXP and allele-aware layouts require a dedicated decoder");
+            else if(requireModelMetadata)throw new IOException("strict model metadata requires a covariance column header");
+        }
+        metadata=declaredMetadata;
         try(BufferedReader r=open(scores)) {
             String line;
             while((line=r.readLine())!=null) {
                 if(line.startsWith("##AnalyzedSamples=")) samples=Integer.parseInt(line.substring(line.indexOf('=')+1).trim());
                 if(line.startsWith("##GenomeBuild=")) genomeBuild=line.substring(line.indexOf('=')+1).trim();
-                if(line.equals("##CovarianceScale=score")) scoreScale=true;
                 String clean=line.replaceFirst("^#+","");
                 if(clean.startsWith("CHROM")) {
                     String[] names=fields(clean);
@@ -61,6 +81,7 @@ public final class RareMetalStudy implements AutoCloseable {
         for(String required:List.of("CHROM","POS","REF","ALT","N_INFORMATIVE","U_STAT","SQRT_V_STAT"))
             if(!header.containsKey(required)) throw new IOException("missing score column "+required+" in "+scores);
         if(samples<=0) throw new IOException("positive ##AnalyzedSamples is required: "+scores);
+        genomeBuild=metadata.value("GenomeBuild");
         TabixReader s=null,c=null;
         try {
             if(Files.exists(Path.of(scores+".tbi"))) s=new TabixReader(scores.toString());
@@ -70,6 +91,8 @@ public final class RareMetalStudy implements AutoCloseable {
         } catch(IOException|RuntimeException e) { if(s!=null)s.close(); if(c!=null)c.close(); throw e; }
     }
     public int samples(){return samples;}
+    /** Validated model declarations; missing historical fields remain unknown. */
+    public ScoreModelMetadata metadata(){return metadata;}
     /** Declared build, or null for historical files without a build header. */
     public String genomeBuild(){return genomeBuild;}
     public boolean indexed(){return scoreIndex!=null && (covariance==null || covIndex!=null);}
@@ -119,6 +142,7 @@ public final class RareMetalStudy implements AutoCloseable {
         lines(covariance,covIndex,covChromosomes,chromosome,low,high,line->{
             String[] f=fields(line); long position=Long.parseLong(f[1]); Integer i=wanted.get(position);
             if(i==null)return;
+            if(covarianceColumns!=0&&f.length!=covarianceColumns)throw new IOException("covariance row does not match declared columns at "+position);
             if(rows[i])throw new IOException("duplicate covariance row at "+position);
             rows[i]=true;
             // RMW: CHROM CURRENT_POS MARKERS_IN_WINDOW COV_MATRICES.

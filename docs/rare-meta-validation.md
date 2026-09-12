@@ -1,5 +1,37 @@
 # Rare-variant meta-analysis validation
 
+## Model metadata and Raremetal2 boundary validation
+
+Validation command: `./gradlew.bat --no-daemon check javadoc executableJar --console=plain`.
+The 2026-09-12 run completed with 737 tests discovered, 734 passed, three optional
+CHOLMOD skips, and no failures/errors. Javadoc, website checks and executable
+packaging passed. A fresh Gradle process was used because a reused daemon from
+the restricted Windows environment retained temporary-directory access failures.
+
+The [assessment](raremetal2-trait-models.md) pins the inspected Raremetal2 source
+and separates the remaining format, exact-method and trait-calibration work.
+`RareMetaMetadataTest` checks strict and legacy imports, unsupported models and
+calibrations, identity/unit/transform conflicts, score/covariance consistency,
+duplicate declarations, compressed headers and repeated positions. It also
+checks that an undeclared first cohort cannot hide conflicts in later cohorts,
+and that covariance-only declarations participate in compatibility checks.
+
+An independent two-variant fixture has `U=(2,-3)` and `V=((4,1),(1,9))`.
+Per-sample and score-scale storage both restore that matrix to `1e-14` absolute
+tolerance; equal burden has beta `-1/15` and SE `1/sqrt(15)`. Strict and legacy
+CLI runs produce byte-identical single, burden and QC tables. Existing indexed
+RAREMETAL/rvtests, related-Gaussian closed-form, conditional, and parallel tests
+continue to exercise the unchanged quantitative arithmetic.
+
+The deterministic base-R script `src/benchmark/r/rare_binary_calibration_boundary.R`
+was run with R 4.6.1. For one case among 1,000 participants and ten carriers
+including the case, it records normal p `2.4017746075095146e-23` versus conditional
+absolute-score probability `0.01`. This demonstrates why Gaussian score moments
+do not supply rare-case calibration; it is not a new binary estimator. No
+Raremetal2 executable parity or new performance claim is made by this change.
+
+## Quantitative numerical and engineering validation
+
 Validated on 2026-09-12. This report covers the independent-cohort,
 quantitative-trait score workflow and its conditional, adaptive, heterogeneous,
 diagnostic, and related-sample export extensions described in the
