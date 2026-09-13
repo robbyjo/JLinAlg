@@ -1,0 +1,5 @@
+early	early	G01	G02	G03	G04	G05	G06	G07	G08	G09	G10
+spread	spread	G07	G14	G21	G28	G35
+zero	zero	G11	G12
+late	late	G30	G31	G32	G33	G34	G35	G36	G37	G38	G39	G40
+multi	multi	G06	G07	G21	G22

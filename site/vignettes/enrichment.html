@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets."><title>Gene-set enrichment · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Gene-set enrichment</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Gene-set enrichment</h1><p>Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>The source build provides Java APIs and a command-line enrichment workflow with
+an analysis-specific background. It supports ordinary over-representation
+analysis (ORA) and the equivalent-CpG/fractional-count <code>gsameth</code> method for EWAS.
+Database downloads are explicit; analyses use local files and do not contact
+annotation services. Build with <code>./gradlew check executableJar</code> (Windows:
+<code>.\gradlew.bat check executableJar</code>). These features may postdate the latest
+published release JAR.</p>
+<h2 id="a-complete-example">A complete example</h2>
+<p>The repository includes a small synthetic results table, probe annotation and
+GMT collection in <code>examples/enrichment</code>. Run from the repository root:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment Custom --enrichment-db examples/enrichment/sets.gmt --input examples/enrichment/results.csv --input-id probe --universe-selection &quot;status == 'OK' &amp;&amp; n_studies &gt;= 3&quot; --selection &quot;p_value &lt; bonferroni(0.05)&quot; --annot examples/enrichment/annotation.csv --annot-id IlmnID --gene-col genes --annot-cols chromosome --gene-id-type symbol --min-set-size 1 --out build/enrichment-example/ora.tsv
+</code></pre></div>
+<p>The six eligible probes define the feature-level testing family. Bonferroni uses
+<code>0.05 / 6</code>, before mapping to genes. One eligible probe has no gene mapping; it
+still counts toward that threshold. Two probes are selected, mapping to three
+unique genes. Failed or insufficient-cohort probes are excluded from both
+selection and background. The two eligible terms include a zero-hit term.
+The small size filter is for this demonstration; the default is 10–500 genes.</p>
+<p>Four files are written: the results table, <code>.log</code>, <code>.features.tsv</code>, and
+<code>.manifest.properties</code> appended to its filename. Existing outputs are refused.
+The feature audit records each eligible probe, selection status, gene mappings
+and requested annotation columns. The manifest records source/input hashes,
+settings, counts and the correction family. The screen and log announce defaults.</p>
+<h2 id="define-the-universe-before-looking-at-enrichment">Define the universe before looking at enrichment</h2>
+<p>With <code>--selection</code>, <code>--input</code> must be the complete results table for the chosen
+analysis, not just its significant rows. Its eligible IDs define the universe.
+For a meta-analysis, use the actual success/minimum-cohort requirements:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment GO:BP --enrichment-db databases/go-human --input meta.csv --input-id probe_id --universe-selection &quot;status == 'OK' &amp;&amp; n_studies &gt;= 3&quot; --selection &quot;FDR &lt; 0.05&quot; --annot annotation.csv --annot-id probe_id --gene-col gene_symbol --gene-id-type symbol --out go-bp.tsv
+</code></pre></div>
+<p>Adjust column names to the table you actually produced. Eligibility must reflect
+which hypotheses could have been selected in that analysis. Select one phenotype
+and contrast before running enrichment; duplicate eligible feature IDs are an
+error. Rows omitted from a supplied table cannot be recovered automatically.</p>
+<p><code>--input-cols</code> is an alias for the single <code>--input-id</code> column. Annotation joins
+are explicit. <code>--gene-col</code> names a column in <code>--annot</code>, or in the universe table
+when no annotation file is supplied. Multiple genes in a cell are separated by
+literal <code>;</code> by default (<code>--gene-separator</code>). Repeated edges and genes are
+deduplicated. <code>--annot-cols all</code> retains all annotation columns in the audit.</p>
+<p>Map input and database IDs to the <strong>same namespace and species</strong>. The tool does
+not guess aliases or convert symbols, Ensembl IDs, Entrez IDs and CURIEs.
+<code>--strip-gene-version true</code> explicitly strips a terminal <code>.digits</code> from input
+gene IDs. It does not convert namespaces. The database manifest declares its
+namespace, and a conflicting <code>--gene-id-type</code> is rejected. A zero total database
+match is an error; partial mapping losses are reported.</p>
+<p>The gene universe is the union of genes mapped from all eligible probes. Genes
+without membership in this particular collection remain in the universe; they
+are not silently discarded. This is an explicit background convention, which
+can differ from tools that intersect the background with annotated genes. Keep
+the convention fixed across comparisons. Features without any gene mapping are
+reported and omitted from gene-level testing. They still belong to the original
+feature-level selection family.</p>
+<p>If input is already a selected-only list, supply a complete, analysis-eligible
+background explicitly. Headerless files contain one ID per line:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment Custom --enrichment-db sets.gmt --input selected-genes.txt --background tested-genes.txt --out enrichment.tsv
+</code></pre></div>
+<p>Headered tables require <code>--input-id</code> and <code>--background-id</code>, respectively. Selected
+IDs must belong to the eligible background. <code>--selection</code> and <code>--background</code>
+are mutually exclusive. There is no whole-genome default background.</p>
+<h2 id="selection-expressions-and-missing-results">Selection expressions and missing results</h2>
+<p>Quote the whole expression for your shell. Supported expressions include:</p>
+<table>
+<thead>
+<tr>
+<th>Expression</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FDR &lt; 0.05</code></td>
+<td>Use an existing input column; no recomputation of that FDR</td>
+</tr>
+<tr>
+<td><code>p_value &lt; bonferroni(0.05)</code></td>
+<td>Alpha divided by evaluable eligible feature count, before gene mapping</td>
+</tr>
+<tr>
+<td><code>p_value &lt; bonferroni</code></td>
+<td>Same, with alpha 0.05</td>
+</tr>
+<tr>
+<td><code>p_value &lt; bonferroni(0.05, 850000)</code></td>
+<td>Use an explicitly supplied original testing-family size</td>
+</tr>
+<tr>
+<td><code>p_value &lt; 0.01 &amp;&amp; abs(beta) &gt; 0.2</code></td>
+<td>Joint significance and effect-size selection</td>
+</tr>
+<tr>
+<td><code>is_finite(p_value) &amp;&amp; p_value &lt; 0.05</code></td>
+<td>Explicitly guard numeric evaluation</td>
+</tr>
+</tbody>
+</table>
+<p>The language supports parentheses, <code>&amp;&amp;</code>, <code>||</code>, <code>!</code>, comparisons, arithmetic,
+<code>abs()</code>, <code>is_missing()</code> and <code>is_finite()</code>. Column names containing spaces can be
+enclosed in backticks; string values use single or double quotes. It is a small
+parser, not an R, Java or shell interpreter. Names are case-sensitive. Logical
+operators short-circuit; missing comparisons otherwise yield an unknown result.
+Blank, <code>NA</code>, <code>NaN</code>, <code>NULL</code> and <code>.</code> are missing. Invalid numeric text and arithmetic
+such as division by zero fail explicitly.</p>
+<p>By default, an unevaluable eligibility/selection expression is an error.
+<code>--missing-selection exclude</code> excludes unevaluable rows before resolving the
+default Bonferroni count. Prefer an explicit eligibility rule for failed analyses.
+For example, put <code>is_finite(p_value)</code> in <code>--universe-selection</code> if nonfinite tests
+could not have been selected. Putting that guard only in <code>--selection</code> instead
+keeps those rows as eligible, unselected background. This distinction is deliberate.</p>
+<p>The existing input <code>FDR</code> and output enrichment <code>FDR</code> belong to different hypothesis
+families. If the upstream correction family included hypotheses absent from this
+file, supply its original count to <code>bonferroni(alpha, m)</code> or use its adjusted
+column. A permissive selection such as <code>FDR &lt; 0.5</code> is accepted, but should be
+scientifically justified before inspecting the enrichment results.</p>
+<h2 id="statistical-methods">Statistical methods</h2>
+<h3 id="ordinary-ora-the-default">Ordinary ORA: the default</h3>
+<p><code>--enrichment-method ora</code> tests over-representation with the inclusive upper
+hypergeometric tail, equivalent to a one-sided Fisher exact test. For universe
+size N, selected size n, background term size K and overlap k, the table is:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">In term</th>
+<th style="text-align: right;">Outside term</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Selected</td>
+<td style="text-align: right;">k</td>
+<td style="text-align: right;">n − k</td>
+</tr>
+<tr>
+<td>Unselected</td>
+<td style="text-align: right;">K − k</td>
+<td style="text-align: right;">N − K − n + k</td>
+</tr>
+</tbody>
+</table>
+<p>The p-value is <code>P[X &gt;= k]</code> for <code>X ~ Hypergeometric(N, K, n)</code>. This is a competitive
+null: conditional on n, genes in the chosen universe are equally likely to be
+selected. A negative-binomial count model is not the default for this question.
+It models a different sampling process and does not automatically address gene
+selection bias or overlapping terms.</p>
+<p>ORA reports expected overlap <code>n*K/N</code>, fold enrichment <code>k/(n*K/N)</code>, and the
+cross-product odds ratio. Boundary odds ratios can be infinite or undefined;
+undefined values are written as <code>NA</code>, with no pseudocount added. Empty selections
+produce p-values of one. Hypergeometric and FDR calculations preserve log
+probabilities, so a displayed double p-value of zero may still have a finite
+<code>log_p_value</code>.</p>
+<h3 id="ewas-gsameth">EWAS: <code>gsameth</code></h3>
+<p>CpGs do not give every gene the same chance of selection: genes differ in probe
+coverage, and individual probes can map to several genes. For an EWAS, explicitly
+choose <code>--enrichment-method gsameth</code> and provide the normalized, platform-appropriate
+probe-to-gene annotation used for <strong>all eligible CpGs</strong>:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment Custom --enrichment-db examples/enrichment/sets.gmt --enrichment-method gsameth --input examples/enrichment/results.csv --input-id probe --universe-selection &quot;status == 'OK' &amp;&amp; n_studies &gt;= 3&quot; --selection &quot;p_value &lt; bonferroni(0.05)&quot; --annot examples/enrichment/annotation.csv --annot-id IlmnID --gene-col genes --min-set-size 1 --out build/enrichment-example/ewas.tsv
+</code></pre></div>
+<p>The implementation follows missMethyl's <code>equiv.cpg=TRUE</code>, <code>fract.counts=TRUE</code>,
+<code>prior.prob=TRUE</code> path:</p>
+<ol>
+<li>A probe mapped to r unique genes contributes <code>1/r</code> equivalent CpGs to each.</li>
+<li>Selected probes contribute the same fractions, capped at one per gene.</li>
+<li>Genes are ordered by equivalent coverage. A rank-based tricube moving average
+   with span 0.5 estimates selection probability from binary gene selection.
+   Coverage ties use lexicographic gene ID order (R comparison uses <code>LC_COLLATE=C</code>).</li>
+<li>A term's bias odds are its mean fitted probability divided by the outside-term
+   mean. The two-colour Wallenius noncentral hypergeometric distribution tests
+   its weighted overlap. The draw count is the number of selected unique genes.
+   Fractional overlap is truncated to an integer for the inclusive tail, matching
+   the BiasedUrn interface used by the R reference.</li>
+</ol>
+<p>Wallenius probabilities are computed by deterministic successive-sampling dynamic
+programming. This is distinct from Fisher's noncentral hypergeometric distribution.
+There is no sampling, normal approximation or fallback to an ordinary central
+hypergeometric tail when a biased tail fails numerically. Interior underflow fails
+explicitly. The central odds=1 case uses the central distribution directly.
+The default per-term work cap is 100 million state updates; increase it explicitly
+with <code>--wallenius-max-updates</code> if needed. The method can be costly for very large
+selected lists and terms. The smoother is quadratic in the number of genes.</p>
+<p>The <code>*_unweighted</code> effect summaries remain descriptive ordinary gene-count
+summaries; <code>weighted_overlap</code> and <code>selection_odds</code> identify the inputs to the
+biased test. This method adjusts probe-coverage and multi-gene mapping bias.
+It does not eliminate arbitrary CpG/gene correlation, annotation uncertainty or
+all selection-model misspecification. Its estimated probability-weighting null
+does not turn downstream FDR guarantees into unconditional guarantees for every
+EWAS design. Platform mapping and upstream QC remain the analyst's responsibility.</p>
+<p>See the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8186068/">GOmeth/GOregion methods paper</a>
+and <a href="https://github.com/bioc/missMethyl/tree/c5d0a518aaacd98c9f31c4b6ca48239246363ad4">missMethyl source</a>.</p>
+<h3 id="gwas-and-twas-boundaries">GWAS and TWAS boundaries</h3>
+<p>GWAS Catalog enrichment here means <strong>overlap of a supplied gene list with Catalog
+trait-associated gene sets</strong>. The default Catalog membership is the deduplicated
+<strong>union of reported and mapped genes</strong>. It is announced on screen and in the log;
+<code>--catalog-gene-source reported</code> or <code>mapped</code> selects one source explicitly.
+Catalog associations pass <code>p &lt;= 5e-8</code> by default, configurable with
+<code>--catalog-p-threshold</code>. Invalid or missing p-values are rejected and counted.
+Trait identifiers default to mapped ontology IDs (<code>--trait-id-type efo</code>);
+<code>label</code> instead uses reported trait labels. EFO mode retains other mapped
+ontology identifiers too. Raw source files preserve association provenance.</p>
+<p>Union is a transparent inclusion policy, not a causal-gene assignment method.
+SNP-to-gene mapping, LD, gene size and correlated molecular predictors can bias
+ordinary overlap tests. This CLI does not turn GWAS summary statistics into an
+LD-aware competitive pathway test, and it does not claim MAGMA, stratified LDSC,
+CAMERA or phenotype-permutation inference. Likewise, ordinary TWAS gene overlap
+does not adjust correlated prediction models. Use an appropriate upstream
+gene-level analysis and interpret the specific overlap null being tested.</p>
+<h2 id="overlap-hierarchy-and-fdr">Overlap, hierarchy and FDR</h2>
+<p>The default <code>--fdr-type BH</code> applies Benjamini–Hochberg to <strong>every term passing the
+background-only size filters</strong>. Terms with zero selected hits stay in the family
+with p=1. Sizes are measured after intersecting each term with the universe.
+Filtering by observed hit count before correction would change this family and
+is intentionally not provided. <code>GO:BP</code>, <code>GO:MF</code>, <code>GO:CC</code> each define a separate
+requested family; <code>GO</code> tests all three aspects together. Separate invocations
+do not automatically control one combined family across all databases or traits.</p>
+<p>BH has its standard guarantee under independence or suitable positive dependence.
+Overlap alone does not prove that these assumptions hold. <code>--fdr-type BY</code> uses
+the Benjamini–Yekutieli harmonic factor for arbitrary dependence, provided the
+individual null p-values are valid; it is usually more conservative. Both are
+monotone adjustments performed in log space. <code>NONE</code> returns raw p-values in the
+adjusted-value columns and is labeled in the run metadata.</p>
+<p>GO propagation follows <code>is_a</code> and <code>part_of</code> in <code>go-basic.obo</code>, excluding <code>NOT</code>
+annotations and obsolete terms; alternate term IDs are resolved. It does not
+propagate <code>regulates</code>. HPO/Mondo propagation stays within the requested ontology's
+term namespace. Cycles in the applicable hierarchy fail explicitly. GO/HPO/Mondo
+uninformative root IDs are excluded independently of selection. <code>--propagate false</code>
+adds no ancestors, but cannot undo ancestry already present in a source such as
+Reactome's all-level mappings. <code>--evidence EXP,IDA,IPI</code> optionally filters GAF
+evidence; the default retains all positive source evidence codes.</p>
+<p>These are flat term-level FDR procedures. Hierarchy-aware testing, Focused BH,
+DAGGER, <code>elim</code>/<code>weight</code>, and redundancy-aware discovery families are not implemented
+in this version. Showing a few representative significant terms does not inherit
+the same FDR claim for that filtered subset. Retain the full corrected table,
+and describe any later term clustering as interpretation. See the
+<a href="https://stat.ethz.ch/R-manual/R-devel/library/stats/html/p.adjust.html">R BH/BY documentation</a>
+and <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10281705/">Focused BH paper</a>.</p>
+<h2 id="download-and-reuse-annotation-databases">Download and reuse annotation databases</h2>
+<p>Choose a <strong>new directory for each snapshot</strong>. Files are staged, checked, hashed
+with SHA-256 and parsed before installation. A failed download does not publish
+an installed package. Loading a package verifies its source hashes. Retain the
+whole directory and manifest for reproducibility; <code>latest</code> is resolved at download
+time where the provider exposes a release identifier, and otherwise the retrieval
+timestamp, URLs, HTTP metadata and hashes identify the snapshot.</p>
+<table>
+<thead>
+<tr>
+<th>Selector</th>
+<th>Built-in source and default gene IDs</th>
+<th>Access and scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GO</code>, <code>GO:BP</code>, <code>GO:MF</code>, <code>GO:CC</code></td>
+<td>GO release, go-basic OBO + organism GAF; symbols, optionally UniProt</td>
+<td>Public downloads; automatic human/mouse/rat; other taxa through explicit source import</td>
+</tr>
+<tr>
+<td><code>Reactome</code></td>
+<td>All-level pathway mappings and hierarchy; Ensembl, optionally Entrez/UniProt</td>
+<td>Public downloads; filter species; current or explicit release</td>
+</tr>
+<tr>
+<td><code>HPO</code></td>
+<td>HPO release, genes-to-phenotype + hp.obo; Entrez</td>
+<td>Public human phenotype associations, not a disease-gene ontology by themselves</td>
+</tr>
+<tr>
+<td><code>GWASCatalog</code> (alias <code>GWAS</code>)</td>
+<td>Catalog ontology-annotated associations; symbols</td>
+<td>Public gene-trait overlap source; reported/mapped union by default</td>
+</tr>
+<tr>
+<td><code>Monarch:Mondo</code></td>
+<td>Monarch causal gene-to-disease associations + Mondo OBO; CURIEs such as <code>NCBIGene:7157</code></td>
+<td>Public downloads; <code>--monarch-evidence correlated</code> chooses a different source package</td>
+</tr>
+<tr>
+<td><code>OpenTargets</code></td>
+<td>Direct overall target-disease associations and disease labels; Ensembl</td>
+<td>Public release Parquet; default overall score &gt;=0.5; may download over 1 GB</td>
+</tr>
+<tr>
+<td><code>MSigDB:&lt;collection&gt;</code></td>
+<td>User-provided GMT, e.g. <code>MSigDB:H</code></td>
+<td>Free registration/terms apply; obtain the file first, then import; an already accessible source URL can also be used</td>
+</tr>
+<tr>
+<td><code>KEGG</code></td>
+<td>Pathway links and names; Entrez for human/mouse/rat</td>
+<td>Public REST is restricted to academic users; explicit <code>--kegg-academic true</code> or authorized local import</td>
+</tr>
+<tr>
+<td><code>Custom</code></td>
+<td>GMT or headered term-to-gene table</td>
+<td>User-provided file or accessible HTTPS URL</td>
+</tr>
+</tbody>
+</table>
+<p>Other than KEGG, several sources offer public automatic downloads, but <strong>MSigDB
+still requires its registered download workflow</strong>. An ontology file alone (for
+example Mondo or Disease Ontology) does not supply gene memberships. Use an
+association source with that ontology, or import a compatible custom gene set.
+Do not treat disease association evidence as proof of a causal gene. Open Targets
+overall scores combine evidence and the threshold is an explicit analyst choice,
+not a significance test. <code>--association-min-score</code> changes that threshold.</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment GO --download databases/go-human --species human --gene-id-type symbol
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment Reactome --download databases/reactome-human --gene-id-type ensembl
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment HPO --download databases/hpo-human
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment GWASCatalog --download databases/gwas-catalog
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment Monarch:Mondo --download databases/monarch-mondo
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment OpenTargets --download databases/open-targets --association-min-score 0.5
+java -jar build/cli/jlinalg-0.3.5.jar --enrichment MSigDB:H --download databases/msigdb-h --source-file h.symbols.gmt --gene-id-type symbol
+</code></pre></div>
+<p>For an authorized academic KEGG user:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment KEGG --download databases/kegg-human --species human --kegg-academic true
+</code></pre></div>
+<p>KEGG uses a rate-limited REST download; clusterProfiler support does not imply a
+redistributable bundled KEGG database. No annotation database is shipped in the
+JAR. Follow each provider's current terms and citation instructions:
+<a href="https://geneontology.org/docs/download-go-annotations/">GO</a>,
+<a href="https://reactome.org/download-data">Reactome</a>,
+<a href="https://hpo.jax.org/data/annotations">HPO</a>,
+<a href="https://www.ebi.ac.uk/gwas/downloads">GWAS Catalog</a>,
+<a href="https://monarchinitiative.org/downloads">Monarch</a>,
+<a href="https://platform-docs.opentargets.org/licence">Open Targets</a>,
+<a href="https://www.gsea-msigdb.org/gsea/msigdb/index.jsp">MSigDB</a>,
+<a href="https://www.kegg.jp/kegg/rest/">KEGG API</a>.</p>
+<p>Downloaded species/namespace and Monarch evidence source are fixed by the
+package. Install another package to change them. Gene-list-independent parsing
+filters such as Catalog p threshold, Catalog gene source, GO evidence and Open
+Targets score can be changed when analyzing the retained raw source; effective
+settings are recorded. <code>--db-release</code> selects a provider release where supported.
+Older GO archives predating the current GAF naming convention can be imported
+with explicit source/ontology URLs. User source imports default to GMT for <code>.gmt</code>
+or <code>.gmt.gz</code>; otherwise specify the actual <code>--db-format</code> if it is not <code>term2gene</code>.
+For compressed source URLs, use URL paths ending in <code>.gz</code> so decompression can
+be identified. URL redirects are followed; failed transfers have bounded retries.</p>
+<p>For a custom disease-gene table, the required UTF-8 TSV/CSV columns are
+<code>term_id</code> and <code>gene_id</code>, with optional <code>term_name</code>; each row is one membership.
+GMT uses tab-separated term ID, description, then one gene per field. gzip is
+accepted. Input tables support quoted cells, but not embedded physical newlines.</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar --enrichment Custom --download databases/my-disease-sets --source-file disease-genes.tsv --db-format term2gene --gene-id-type entrez
+</code></pre></div>
+<p>Open Targets uses DuckDB JDBC to read local Parquet; its native libraries are
+included in the executable dependency. Other enrichment modes do not load that
+native reader. A supported native platform and writable temporary directory are
+needed for Open Targets. On recent JDKs, <code>--enable-native-access=ALL-UNNAMED</code> before
+<code>-jar</code> suppresses the native-access warning. No R installation is needed at runtime.</p>
+<h2 id="java-api">Java API</h2>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>import java.util.List;
+import java.util.Set;
+import org.jlinalg.enrichment.EnrichmentAnalysis;
+import org.jlinalg.enrichment.GeneSet;
+
+var results = EnrichmentAnalysis.ora(
+    Set.of(&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;), Set.of(&quot;A&quot;, &quot;B&quot;),
+    List.of(new GeneSet(&quot;T1&quot;, &quot;Example&quot;, Set.of(&quot;A&quot;, &quot;C&quot;))),
+    1, 500, EnrichmentAnalysis.Fdr.BH);
+System.out.println(results.get(0).pValue());
+</code></pre></div>
+<p><code>EnrichmentAnalysis.gsameth</code> accepts the complete eligible feature-to-gene mapping,
+selected feature IDs, gene sets, size limits, correction and Wallenius work cap.
+<code>Gsameth.weights</code> exposes equivalent coverage, fractional selected contributions
+and fitted probabilities for inspection. <code>Wallenius.upperTail</code> provides the
+inclusive biased-urn tail independently of database loading. <code>adjustLog</code> exposes
+BH/BY/NONE adjustment in original input order.</p>
+<h2 id="validation-and-limits">Validation and limits</h2>
+<p>Regression tests cover hand-enumerated Fisher/Wallenius probabilities, independent
+R <code>BiasedUrn</code> tails, the actual limma rank smoother, and an end-to-end missMethyl
+<code>gsameth</code> fixture with multi-gene probes. The R comparator uses missMethyl commit
+<code>c5d0a518aaacd98c9f31c4b6ca48239246363ad4</code>, limma 3.68.5 and BiasedUrn 2.0.12;
+only the array-manifest adapter is replaced by explicit fixture mappings.
+The test compares weighted overlap, bias odds, p-values and BH results. These
+fixtures establish agreement for those cases, not universal finite-sample
+calibration or a certified error bound for all biased-urn parameters.
+An additional 90-digit Python Decimal calculation propagates the full count
+distribution and sums its final tail. This checks relative accuracy down to
+<code>2.4468354213672173e-106</code>, including a case where BiasedUrn's returned tail is zero.
+Regenerate it with <code>python tools/generate_enrichment_precision.py</code>.</p>
+<p>CLI tests cover analysis-derived eligibility, missing values, pre-mapping
+Bonferroni counts, annotation joins, zero-hit families, namespace checks,
+source formats, ontology closure/cycles, snapshot integrity and local Parquet.
+Network access is not part of the automated test suite; live provider checks are
+recorded below. Reproduce the offline checks with:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>./gradlew check javadoc executableJar
+</code></pre></div>
+<p>To regenerate the R fixtures, install the pinned reference packages and run
+<code>Rscript tools/generate_enrichment_fixtures.R</code> from the repository root. Inspect
+the generated changes before accepting new reference versions.</p>
+<h3 id="recorded-validation-2026-09-13">Recorded validation: 2026-09-13</h3>
+<p>The full <code>check javadoc</code> gate discovered 788 tests: 785 passed, three optional
+CHOLMOD tests were skipped, and there were no failures or errors. <code>executableJar</code>
+was built separately. The documented ORA and EWAS commands both completed.
+The ORA example returns T1 p=0.05 and BH=0.10; the EWAS example returns weighted
+overlap 2 and p approximately 0.99343 for T1. These tiny examples illustrate
+the behavior and are not a realistic calibration study.</p>
+<table>
+<thead>
+<tr>
+<th>Live downloaded collection</th>
+<th>Snapshot</th>
+<th style="text-align: right;">Usable sets before analysis-specific size filters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GO:BP, human symbols</td>
+<td>GO pipeline 2026-08-05</td>
+<td style="text-align: right;">13,798</td>
+</tr>
+<tr>
+<td>Reactome, human Ensembl</td>
+<td>Current download, retained hashes</td>
+<td style="text-align: right;">2,839</td>
+</tr>
+<tr>
+<td>HPO, human Entrez</td>
+<td>v2026-09-01</td>
+<td style="text-align: right;">11,933</td>
+</tr>
+<tr>
+<td>GWAS Catalog, union</td>
+<td>ZIP last modified 2026-09-04, retained hashes</td>
+<td style="text-align: right;">13,923</td>
+</tr>
+<tr>
+<td>Monarch:Mondo, human CURIEs</td>
+<td>Current causal associations + Mondo v2026-09-01</td>
+<td style="text-align: right;">9,132</td>
+</tr>
+<tr>
+<td>Open Targets, Ensembl</td>
+<td>26.06, 14 direct-association Parquet parts + disease labels</td>
+<td style="text-align: right;">8,658</td>
+</tr>
+</tbody>
+</table>
+<p>Every listed source completed download, parsing, hash validation and package
+installation. Open Targets was tested through the executable JAR on Windows;
+both its newer <code>associationScore</code> and older <code>score</code> schemas have regression
+coverage. A separate offline Catalog analysis confirmed the default union policy
+in its screen output and log, testing 1,256 terms against a synthetic ten-gene
+background. Counts depend on source releases and settings and are not expected
+to remain constant. Live KEGG requests were not made without academic-user
+authorization; its local parser is tested. MSigDB local GMT import, namespace
+checking and corruption rejection are tested without a registered session.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#a-complete-example">A complete example</a><a href="#define-the-universe-before-looking-at-enrichment">Define the universe before looking at enrichment</a><a href="#selection-expressions-and-missing-results">Selection expressions and missing results</a><a href="#statistical-methods">Statistical methods</a><a href="#overlap-hierarchy-and-fdr">Overlap, hierarchy and FDR</a><a href="#download-and-reuse-annotation-databases">Download and reuse annotation databases</a><a href="#java-api">Java API</a><a href="#validation-and-limits">Validation and limits</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

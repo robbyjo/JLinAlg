@@ -1,4 +1,4 @@
-"""Regenerate the four xWAS pages and validation page. Requires Python Markdown.
+"""Regenerate xWAS/enrichment pages and the xWAS validation page. Requires Python Markdown.
 
 Run from any directory: python docs/render-xwas-pages.py
 The static output is checked in; website deployment needs no Python runtime.
@@ -10,6 +10,7 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets."),
     "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model."),
     "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment."),
     "genomic-factor": ("Shared genetic factors", "Model shared genetic variation and inspect common-factor SNP effects alongside heterogeneity."),

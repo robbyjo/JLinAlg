@@ -121,6 +121,8 @@ dependencies {
     api files(jdistlibJar)
     api 'com.github.samtools:htsjdk:5.0.0'
     api 'com.github.luben:zstd-jni:1.5.7-16'
+    // Local Open Targets Parquet import; no external extensions are required.
+    runtimeOnly 'org.duckdb:duckdb_jdbc:1.5.5.1'
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -220,6 +222,7 @@ tasks.register('checkWebsite') {
             'index.html',
             'verification.html',
             'vignettes/index.html',
+            'vignettes/enrichment.html',
             'vignettes/grm.html',
             'vignettes/command-line.html',
             'vignettes/cli-association-tutorial.html',

@@ -1,0 +1,5 @@
+R 4.6.1
+limma 3.68.5
+BiasedUrn 2.0.12
+missMethyl reference c5d0a518aaacd98c9f31c4b6ca48239246363ad4
+LC_COLLATE=C; custom normalized edges; equiv.cpg=TRUE; fract.counts=TRUE; prior.prob=TRUE

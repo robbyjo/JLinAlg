@@ -32,6 +32,8 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (Arrays.asList(arguments).contains("--enrichment"))
+            return EnrichmentCli.run(arguments, output, errorOutput);
         if (arguments.length > 0 && java.util.Set.of("ldsc", "twas", "pwas", "genomic-factor").contains(arguments[0]))
             return SummaryXwasCli.run(arguments[0], Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && java.util.Set.of("score-train", "score-apply").contains(arguments[0]))
@@ -155,6 +157,10 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar --enrichment GO:BP --enrichment-db DIRECTORY
+                --input results.csv --input-id probe_id --selection "FDR < 0.05" --out enrichment.tsv
+              java -jar jlinalg-<version>.jar --enrichment GO --download NEW_DIRECTORY
+              java -jar jlinalg-<version>.jar --enrichment GO --help
               java -jar jlinalg-<version>.jar grm --genotypes cohort.vcf.gz
                 --out cohort-grm.tsv [--maf 0.01] [--call-rate 0.95]
               java -jar jlinalg-<version>.jar rare-score --vcf cohort.vcf.gz

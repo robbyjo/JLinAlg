@@ -69,6 +69,11 @@ The current source also adds [LDSC](docs/vignettes/ldsc.md),
 each with CLI commands and worked examples. See their
 [validation and supported scope](docs/xwas-followup-validation.md).
 
+[Gene-set enrichment](docs/vignettes/enrichment.md) adds analysis-specific
+backgrounds and selection expressions, Fisher ORA, EWAS `gsameth`, BH/BY correction,
+and explicit annotation downloads. The vignette includes a runnable synthetic
+example, source access requirements, and guidance for overlapping ontologies.
+
 ## License
 
 [GNU General Public License, version 2 or later](LICENSE) (`GPL-2.0-or-later`).

@@ -1,0 +1,8 @@
+IlmnID,genes,chromosome
+p1,A;B,1
+p2,C,2
+p3,D,3
+p4,E,4
+p5,F,5
+failed,G,6
+insufficient,H,7
