@@ -22,7 +22,7 @@ import org.jlinalg.internal.MatrixOps;
 
 /** Prepared-null, block-score GLM association scanner. */
 public final class FastGlmAssociation {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-12;
+    private static final double MINIMUM_WORKING_WEIGHT = Double.MIN_NORMAL;
     private static final double MAXIMUM_WORKING_WEIGHT = 1e12;
 
     private final int observations;
@@ -99,20 +99,21 @@ public final class FastGlmAssociation {
         double[] workingResidual = new double[rows];
         boolean clamped=false;
         for (int row = 0; row < rows; row++) {
-            double derivative = family.meanDerivative(eta[row]);
-            double variance = family.variance(means[row]);
-            if (!Double.isFinite(derivative) || derivative == 0.0
-                    || !Double.isFinite(variance) || !(variance > 0.0))
+            double rawWeight = family.workingWeight(
+                response[row], eta[row], means[row], weights[row]);
+            double workingResponse = family.workingResponse(
+                response[row], eta[row], means[row], weights[row], offsets[row]);
+            if (!(rawWeight > 0.0) || !Double.isFinite(rawWeight)
+                    || !Double.isFinite(workingResponse))
                 throw new IllegalArgumentException(
                     "family produced invalid null-model score weights");
-            double rawWeight=weights[row] * derivative * derivative / variance;
             clamped|=rawWeight<MINIMUM_WORKING_WEIGHT || rawWeight>MAXIMUM_WORKING_WEIGHT;
             double workingWeight = clamp(
                 rawWeight,
                 MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
             squareRootWorkingWeights[row] = Math.sqrt(workingWeight);
             workingResidual[row] = squareRootWorkingWeights[row]
-                * (response[row] - means[row]) / derivative;
+                * (workingResponse - (eta[row] - offsets[row]));
         }
         double[] weightedCovariates = weight(
             covariates, rows, columns, squareRootWorkingWeights);
@@ -208,13 +209,18 @@ public final class FastGlmAssociation {
                 }
             }
         });
-        double degreesOfFreedom = observations - covariateCount - 1.0;
-        if (!(degreesOfFreedom > 0.0))
-            throw new IllegalArgumentException(
-                "GLM association scan requires positive approximate DFE");
-        AssociationStatistics statistics = AssociationStatistics.studentT(
-            beta, standardErrors, degreesOfFreedom,
-            DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
+        AssociationStatistics statistics;
+        if (nullModel.estimatedDispersion()) {
+            double degreesOfFreedom = observations - covariateCount - 1.0;
+            if (!(degreesOfFreedom > 0.0))
+                throw new IllegalArgumentException(
+                    "GLM association scan requires positive approximate DFE");
+            statistics = AssociationStatistics.studentT(
+                beta, standardErrors, degreesOfFreedom,
+                DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
+        } else {
+            statistics = AssociationStatistics.normal(beta, standardErrors);
+        }
         List<AssociationFailure> ordered = failures.stream()
             .sorted(Comparator.comparingInt(AssociationFailure::index)).toList();
         return new AssociationBatchResult(names, statistics.beta(),

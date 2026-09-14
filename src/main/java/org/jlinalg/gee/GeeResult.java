@@ -225,7 +225,8 @@ public final class GeeResult {
     public int omittedObservations() { return originalObservations - observations; }
     public BackendProvenance backend() { return backend; }
 
-    /** Returns coefficient-level asymptotic Wald z inference. */
+    /** Returns coefficient-level Wald inference: asymptotic normal by default,
+     * or cluster Student t when {@link GeeInference#CLUSTER_T} was selected. */
     public AssociationStatistics associationStatistics() {
         return inference == GeeInference.CLUSTER_T
             ? AssociationStatistics.studentT(coefficients, standardErrors,

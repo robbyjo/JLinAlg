@@ -222,8 +222,9 @@ class JLinAlgCliTest {
         assertFalse(row[index(header, "hwe_p_cases")].isEmpty());
         assertFalse(row[index(header, "hwe_p_controls")].isEmpty());
         assertFalse(List.of(header).contains("statistic_type"));
-        assertTrue(Files.readString(Path.of(output + ".log"))
-            .contains("statistic_type=t_approx"));
+        String log = Files.readString(Path.of(output + ".log"));
+        assertTrue(log.contains("statistic_type=z"));
+        assertTrue(log.contains("df_method=asymptotic"));
     }
 
     @Test

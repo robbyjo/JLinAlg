@@ -36,6 +36,9 @@ public final class TweedieLogFamily implements GlmFamily {
     @Override public double meanDerivative(double predictor) {
         return inverseLink(predictor);
     }
+    @Override public double meanSecondDerivative(double predictor) {
+        return inverseLink(predictor);
+    }
     @Override public double variance(double mean) {
         return Math.max(MINIMUM, Math.pow(mean, power));
     }

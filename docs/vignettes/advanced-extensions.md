@@ -62,7 +62,8 @@ References compare to `stats::arima`; a bounded-heap test covers 50,000 position
 R's finite diffuse initialization has a small, documented likelihood difference
 from symbolic exact diffuse initialization. Diffuse coefficient covariance now
 includes joint drift/dynamic uncertainty, with unresolved information suppressed.
-General regression terms and historical smoothing are not exposed.
+`ArimaRegression` adds arbitrary design columns, scalable exact historical
+smoothing, and conditional or joint parameter-aware forecasts.
 See [time series](time-series.md).
 
 ## MR workflow

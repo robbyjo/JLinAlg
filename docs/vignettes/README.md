@@ -25,6 +25,9 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (source build) |
 | [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (source build) |
 | [Prediction scores](prediction-scores.md) | Gaussian ridge/elastic-net training, imported polygenic weights and independent-cohort evaluation (source build) |
+| [Expected responses, scenarios, and marginal effects](predictions-and-contrasts.md) | binomial probit, shared GLM/GEE mean predictions, scenario differences, risk ratios, average marginal effects, and joint delta-method uncertainty (source build) |
+| [Individual-level instrumental-variable regression](instrumental-variable-regression.md) | linear 2SLS, QR/SVD identification checks, robust/cluster inference, and instrument-strength diagnostics (source build) |
+| [Summary-only conditional score analysis](conditional-score-conditioning.md) | versioned score-block import, strict allele/model checks, cohort-wise Schur conditioning, and independent-cohort pooling (source build) |
 | [GRM tutorial and Java vignette](../grm-cli.md) | worked dosage matrix, filtering, VCF input, Java/CLI construction, interpretation, and mixed-model reuse ([website](https://robbyjo.github.io/JLinAlg/vignettes/grm.html); source build) |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
 | [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |
@@ -36,7 +39,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Nonlinear models](nonlinear-models.md) | analytic Gaussian fixed means, additive mixed effects, sparse pedigree structures |
 | [Mediation](mediation.md) | deterministic Gaussian path analysis, Sobel inference, ordinary and pedigree mixed effects |
 | [Beta regression](../beta-regression.md) | classical mean/precision beta ML, CLI, link options, and independent R validation |
-| [Linear models and GLMs](linear-models-and-glms.md) | CLI-only phenotype/omics OLS and GLM commands; Java weights, offsets, contrasts, penalized fits, and inference |
+| [Linear models and GLMs](linear-models-and-glms.md) | CLI-only phenotype/omics OLS and GLM commands, including source-build probit; Java weights, offsets, contrasts, penalized fits, and inference |
 | [Regression families](regression-families.md) | multivariate OLS, multinomial logistic, supersmoother, quantile, kernel nonparametric, and partially linear semiparametric regression |
 | [Advanced extensions](advanced-extensions.md) | SEM extensions, full-covariance meta-regression, sparse unstructured mixed effects, diffuse/missing time series, generalized MR, quadrature GLMM, and selection-aware penalized inference |
 | [Additive, mixed, and distributional models](../additive-models.md) | GAM REML/GCV, multi-penalty te/ti, cyclic/thin-plate/MRF bases, GAMM PQL/Laplace, pedigree/GRM, GAMLSS/VGAM families, prepared scans |
@@ -53,7 +56,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
 | [Meta-analysis](meta-analysis.md) | omics Java/CLI examples, fixed/random pooling, heterogeneity, meta-regression, and links to rare-variant workflows |
 | [Rare-variant cohort summaries and meta-analysis](../rare-variant-meta-analysis.md) | participant score export, RAREMETAL/rvtests import, single variants, equal/weighted burden, SKAT, SKAT-O, and calibration limits (unreleased) |
-| [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, exact ARMA, automatic selection, diagnostics, forecasts, ARIMA-error LMM |
+| [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, scalable exact diffuse smoothing, conditional and parameter-aware forecasts, diagnostics, and ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
 | [Multi-signal colocalization](colocalization.md) | alignment, priors, posterior-overlap trimming, H0-H4, shared-variant posterior, diagnostics, and MR/xWAS follow-up |
 | [Structural equation modeling](sem.md) | joint observed/latent RAM, means, ordinal PML, pattern FIML, robust inference, lavaan validation, and limitations |

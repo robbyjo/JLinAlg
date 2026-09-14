@@ -13,7 +13,8 @@ final class CliRunLogging {
     private CliRunLogging() { }
     private static final Set<String> COMMANDS = Set.of("ld-db", "mr-instruments", "clump",
         "mr-xwas", "mr-estimate", "beta-regression", "penalized-regression",
-        "ldsc", "twas", "pwas", "genomic-factor", "score-train", "score-apply");
+        "ldsc", "twas", "pwas", "genomic-factor", "score-train", "score-apply",
+        "conditional-score");
 
     static boolean accepts(String command) { return COMMANDS.contains(command); }
 

@@ -1,5 +1,34 @@
 # Unreleased
 
+## Probit, predictions, IV, conditional scores, and scalable ARIMA
+
+- Added a stable binomial probit GLM through `GlmFamilies.probit()` and the
+  `--family probit` / `binomial-probit` CLI aliases. Predictor-aware normal-tail
+  likelihood, deviance, IRLS weights, and inference are checked against base R.
+- Added `ModelPredictions`, a shared GLM/GEE API for expected responses,
+  scenario differences, risk ratios, and average marginal effects. It carries
+  joint scenario covariance through analytic delta-method inference, separates
+  population averages from average-covariate predictions, and reports mean
+  uncertainty rather than future-outcome intervals.
+- Added individual-level linear IV/2SLS with QR projections, SVD rank and
+  conditioning checks, homoskedastic/HC0/HC1/cluster covariance, structural-
+  residual inference, first-stage partial R-squared/F diagnostics, and base-R
+  fixtures. Weak-identification-robust intervals and exogeneity tests remain
+  outside this API.
+- Added `conditional-score` to import complete version-1 conditional-GWAS score
+  blocks, align exact alleles (and REF/ALT swaps only for Cox or models with an
+  intercept), validate model contracts and matrix coverage, condition each
+  cohort with a Schur complement, and pool independent cohorts. Unknown cross-
+  block covariance is rejected; nonlinear
+  cohort refits and the existing `mr-estimate` path remain distinct.
+- Replaced the historical ARIMA smoother's dense observation conditioning and
+  1024-date cap with exact diffuse backward information recursions. ARIMA
+  regression now exposes joint regression/dynamic parameter covariance,
+  explicitly conditional forecasts, and delta-method forecasts that add fitted-
+  parameter uncertainty while excluding innovation-variance estimation.
+- Added three focused vignettes and updated the GLM, conditional-GWAS, time-
+  series, estimator-extension, README, TODO, and website feature guidance.
+
 ## xWAS genetic architecture, molecular prediction and scores
 
 - Added `ldsc` for unpartitioned observed-scale heritability, genetic covariance
@@ -43,7 +72,8 @@
 - Non-Gaussian genotype scans print and log the conditional-GWAS limitation;
   the ordinary output schema is unchanged unless the switch is used. Existing
   `mr-estimate` remains the Gaussian summary approximation. Rare-event tail
-  calibration and a new summary-only importer remain separate extensions.
+  calibration remains a separate extension; the summary-only importer above
+  consumes only complete, compatible score/covariance blocks.
 - See the [schema, CLI workflow and independent R validation](docs/conditional-gwas-summary.md).
 
 ## Quantile covariance, missing ordinal SEM, and diffuse ARIMA inference

@@ -110,19 +110,31 @@ Rank-deficient transformed designs, including an intercept eliminated by
 differencing, are rejected. Design values must be finite at all dates.
 
 The returned GLS coefficient covariance conditions on fitted dynamics.
-Forecast bands and smoothed error states also condition on fitted parameters;
-they do not incorporate parameter-estimation uncertainty. Future regressors
-must be supplied explicitly. Optimizer failure leaves coefficient covariance
-unavailable.
+`jointParameterCovariance()` instead uses joint observed information, retaining
+regression/dynamic cross-covariances in regression, AR, MA, seasonal AR and
+seasonal MA order; `jointParameterEstimates()` returns estimates in the
+same coordinates, rather than the multiplicative effective polynomials.
+The joint observed-information Hessian is computed and cached only when a joint
+inference accessor or parameter-aware forecast is requested; ordinary fitting,
+smoothing, and conditional forecasting do not pay that cost.
+`forecastConditional` reports process uncertainty conditional
+on the fit; `forecastWithParameterUncertainty` additionally propagates the joint
+regression/dynamic covariance by the delta method. Innovation-variance
+estimation uncertainty is excluded. Future regressors must be supplied
+explicitly. Optimizer, boundary, singular-information or finite-difference
+failures make joint inference unavailable rather than manufacturing a result.
 
 `ArimaSmoothing.smooth(y, ar, ma, differencePolynomial, innovationVariance)`
 returns historical state means/covariances and signal means/variances. It
 conditions on all observed dates, including future observations relative to
 the historical date, and handles arbitrary missing dates and diffuse initial
-levels. Dense Gaussian conditioning is bounded to **1024 dates and 128 states**;
-it uses cubic observation-matrix work. Existing long-series filtering and
-forecasting retain their state-sized storage. A scalable exact diffuse backward
-smoother is a separate extension.
+levels. Diffuse levels are profiled through the finite-state innovations and an
+exact backward information recursion supplies state moments. Work is linear in
+the number of dates and no observation-sized matrix or date cap remains; at
+most 128 states are accepted. Returned state covariances require
+`O(n r^2)` storage. Smoothing conditions on the supplied (or fitted) regression
+coefficients, dynamics, and innovation variance; it does not integrate their
+estimation uncertainty.
 
 ## Nonparametric inference
 

@@ -1,6 +1,6 @@
 # Development TODO
 
-Last reviewed: 2026-09-12.
+Last reviewed: 2026-09-14.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
@@ -44,25 +44,13 @@ parity with LDSC, MetaXcan, GenomicSEM, or PRS software suites.
 
 ## Zelig-inspired additions — high priority
 
-- [ ] **Unified predictions and contrasts.** Add a common API for expected
-  responses, scenario differences, risk ratios, and average marginal effects
-  with confidence intervals. Reuse fitted coefficient covariance and use
-  analytic gradients/delta-method inference where suitable; simulation should
-  be optional. Account for covariance between scenario predictions and
-  distinguish population-averaged effects from predictions at average
-  covariates. Keep predictive uncertainty distinct from uncertainty in the mean.
-  Reference: [Zelig workflow](https://github.com/IQSS/Zelig#zelig-workflow-overview).
-- [ ] **Binary probit regression.** Add a built-in binomial probit family using
-  the existing `GlmFamily`/IRLS infrastructure, with stable normal-tail
-  probabilities, derivatives, likelihoods, and inference.
-  Reference: [Zelig probit](https://christophergandrud.github.io/Zelig/articles/zelig_probit.html).
-- [ ] **Individual-level instrumental-variable regression / 2SLS.** Add general
-  regression with endogenous predictors and instruments, complementing the
-  existing summary-statistic Mendelian-randomization methods. Use stable QR/SVD
-  projections, identification/rank checks, correct IV covariance, robust/cluster
-  inference, and instrument-strength diagnostics. Do not substitute ordinary
-  second-stage OLS standard errors for IV inference.
-  Reference: [Zelig IV source](https://github.com/IQSS/Zelig/blob/master/R/model-ivreg.R).
+The original high-priority tranche is implemented in the source build:
+[binary probit plus unified predictions and contrasts](docs/vignettes/predictions-and-contrasts.md)
+and [individual-level IV/2SLS](docs/vignettes/instrumental-variable-regression.md).
+The prediction API distinguishes population averaging from average-covariate
+evaluation and mean uncertainty from future-outcome variation. IV inference
+uses the structural residuals, supports robust/cluster covariance, and reports
+identification and instrument-strength diagnostics.
 
 ## Zelig-inspired additions — medium priority
 
@@ -129,18 +117,13 @@ scope; scenario contrasts require additional assumptions for causal interpretati
 
 ## Conditional GWAS — further scope
 
-The opt-in Gaussian/logistic/Poisson/Cox aggregate export and cohort-side
-conditioning refits are implemented; see the
+The opt-in Gaussian/logistic/probit/Poisson/Cox aggregate export, cohort-side
+conditioning refits, and summary-only importer are implemented; see the
 [summary schema and validation](docs/conditional-gwas-summary.md).
 
 - [ ] **Model-specific tail calibration.** Add validated binary rare-case and
   survival calibration, with the required score cumulants/risk-set information.
   Current exports explicitly provide normal tails and no calibrated p-value.
-- [ ] **Summary-only score import and conditioning.** Add an importer for the
-  new schema with allele alignment, null-model compatibility, full matrix
-  coverage and rank checks. Missing cross-block covariance must remain unknown.
-  Keep local Schur-complement inference separate from nonlinear null refits;
-  the existing `mr-estimate` Gaussian summary interface is unchanged.
 - [ ] **Additional cohort score models.** Add dedicated mixed, cluster-robust,
   stratified/repeated-subject Cox, grouped-binomial and other outcome exporters.
   Define cross-cohort overlap handling before pooling dependent study scores.
@@ -148,16 +131,16 @@ conditioning refits are implemented; see the
 ## Remaining estimator extensions
 
 Implemented methods and their tested scope are documented in the
-[estimator extension report](docs/estimator-extensions.md).
+[estimator extension report](docs/estimator-extensions.md). Exact diffuse
+historical smoothing now scales to long series, and ARIMA regression exposes
+both conditional forecasts and forecasts with joint regression/dynamic
+parameter uncertainty.
 
 - [ ] **SEM scalability and additional test variants.** Extend joint ordinal
   integration beyond four observed ordinal responses per row; add multigroup
   WLSMV, DWLS-specific modification indices, robust nested-model comparisons,
   and robust CFI/TLI. Current multigroup and ordinal modification tests use the
   joint likelihood, with explicit equality constraints and MAR marginalization.
-- [ ] **Scalable historical smoothing.** Replace the bounded dense conditioning
-  smoother with exact diffuse backward recursions for long series. Add joint
-  dynamic/regression parameter uncertainty to ARIMA regression predictions.
 - [ ] **Discrete conditional quantile inference.** Extend beyond the iid
   marginal order-statistic interval to regression coefficients for responses
   with mass points. Cluster/HAC density-based regression inference still assumes

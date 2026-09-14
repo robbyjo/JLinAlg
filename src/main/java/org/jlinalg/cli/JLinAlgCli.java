@@ -44,6 +44,9 @@ public final class JLinAlgCli {
             return RareScoreCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("rare-meta"))
             return RareMetaCli.run(Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("conditional-score"))
+            return ConditionalScoreCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && (arguments[0].equals("meta-analysis")
                 || arguments[0].equals("meta-regression")))
             return MetaCli.run(arguments[0], Arrays.copyOfRange(
@@ -168,6 +171,8 @@ public final class JLinAlgCli {
                 --genome-build GRCh38 --out PREFIX
               java -jar jlinalg-<version>.jar rare-meta --cohorts manifest.tsv
                 --genome-build GRCh38 --test single|burden|skat|skat-o --out PREFIX
+              java -jar jlinalg-<version>.jar conditional-score --cohorts manifest.tsv
+                --targets CHR:POS:REF:ALT --condition-on CHR:POS:REF:ALT --out FILE.tsv
               java -jar jlinalg-<version>.jar meta-analysis
                 --cohort NAME=FILE [--cohort NAME=FILE ...] --model fixed|random --out FILE
               java -jar jlinalg-<version>.jar meta-regression
@@ -217,7 +222,7 @@ public final class JLinAlgCli {
                                            scans use the ID intersection
               --formula FORMULA            R-style fixed/random formula
               --model auto|ols|lmm|glm|glmm|cox
-              --family gaussian|binomial|poisson|gamma|
+              --family gaussian|binomial|probit|binomial-probit|poisson|gamma|
                        inverse-gaussian|quasi-binomial|quasi-poisson
               --link LINK                 Restate the family's canonical link;
                                           noncanonical overrides are unavailable

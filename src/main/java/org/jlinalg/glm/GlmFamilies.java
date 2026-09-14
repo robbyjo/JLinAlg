@@ -14,6 +14,7 @@ import jdistlib.Poisson;
 public final class GlmFamilies {
     private static final GlmFamily GAUSSIAN = new GaussianIdentity();
     private static final GlmFamily BINOMIAL = new BinomialLogit();
+    private static final GlmFamily BINOMIAL_PROBIT = new BinomialProbit();
     private static final GlmFamily POISSON = new PoissonLog();
     private static final GlmFamily GAMMA = new GammaLog();
     private static final GlmFamily INVERSE_GAUSSIAN = new InverseGaussianLog();
@@ -28,6 +29,12 @@ public final class GlmFamilies {
 
     /** Binomial proportions with logit link; prior weights represent trials. */
     public static GlmFamily binomial() { return BINOMIAL; }
+
+    /** Binomial proportions with probit link; prior weights represent trials. */
+    public static GlmFamily binomialProbit() { return BINOMIAL_PROBIT; }
+
+    /** Alias for {@link #binomialProbit()}. */
+    public static GlmFamily probit() { return BINOMIAL_PROBIT; }
 
     /** Poisson counts with log link. */
     public static GlmFamily poisson() { return POISSON; }
@@ -60,6 +67,7 @@ public final class GlmFamilies {
         @Override public double link(double mean) { return mean; }
         @Override public double inverseLink(double predictor) { return predictor; }
         @Override public double meanDerivative(double predictor) { return 1.0; }
+        @Override public double meanSecondDerivative(double predictor) { return 0.0; }
         @Override public double variance(double mean) { return 1.0; }
         @Override public double unitDeviance(double response, double mean) {
             double residual = response - mean;
@@ -105,6 +113,13 @@ public final class GlmFamilies {
         @Override public double meanDerivative(double predictor) {
             double tail = Math.exp(-Math.abs(predictor));
             return tail / ((1.0 + tail) * (1.0 + tail));
+        }
+        @Override public double meanSecondDerivative(double predictor) {
+            double derivative = meanDerivative(predictor);
+            double tail = Math.exp(-Math.abs(predictor));
+            double mean = predictor >= 0.0
+                ? 1.0 / (1.0 + tail) : tail / (1.0 + tail);
+            return derivative * (1.0 - 2.0 * mean);
         }
         @Override public double varianceAtPredictor(double predictor, double mean) {
             return meanDerivative(predictor);
@@ -162,6 +177,131 @@ public final class GlmFamilies {
         @Override public boolean fixedDispersion() { return true; }
     }
 
+    /** Predictor-aware probit calculations retain the smaller normal tail. */
+    private static final class BinomialProbit implements GlmFamily {
+        private static final double LOG_SQRT_TWO_PI =
+            0.5 * Math.log(2.0 * Math.PI);
+        private static final double EPSILON = Double.MIN_NORMAL;
+        private static final double MAXIMUM = Math.nextDown(1.0);
+
+        @Override public String name() { return "binomial(probit)"; }
+        @Override public void validateResponse(double response, double priorWeight) {
+            if (response < 0.0 || response > 1.0) {
+                throw new IllegalArgumentException(
+                    "binomial responses must lie between zero and one");
+            }
+        }
+        @Override public double initialMean(double response) {
+            return clamp((response + 0.5) / 2.0, EPSILON, MAXIMUM);
+        }
+        @Override public double link(double mean) {
+            return Normal.quantile(clamp(mean, EPSILON, MAXIMUM),
+                0.0, 1.0, true, false);
+        }
+        @Override public double inverseLink(double predictor) {
+            if (predictor <= 0.0) {
+                return lower(predictor);
+            }
+            return 1.0 - lower(-predictor);
+        }
+        @Override public double meanDerivative(double predictor) {
+            return Math.exp(logDensity(predictor));
+        }
+        @Override public double meanSecondDerivative(double predictor) {
+            return -predictor * meanDerivative(predictor);
+        }
+        @Override public double variance(double mean) {
+            return mean * (1.0 - mean);
+        }
+        @Override public double varianceAtPredictor(double predictor, double mean) {
+            return Math.exp(logLower(predictor) + logUpper(predictor));
+        }
+        @Override public double residualAtPredictor(
+                double response, double predictor, double mean) {
+            double lower = lower(predictor);
+            double upper = lower(-predictor);
+            return response * upper - (1.0 - response) * lower;
+        }
+        @Override public double workingWeight(
+                double response, double predictor, double mean, double weight) {
+            return Math.exp(Math.log(weight) + 2.0 * logDensity(predictor)
+                - logLower(predictor) - logUpper(predictor));
+        }
+        @Override public double workingResponse(
+                double response, double predictor, double mean,
+                double priorWeight, double offset) {
+            double positive = response == 0.0 ? 0.0
+                : response * Math.exp(logUpper(predictor) - logDensity(predictor));
+            double negative = response == 1.0 ? 0.0
+                : (1.0 - response)
+                    * Math.exp(logLower(predictor) - logDensity(predictor));
+            return predictor - offset + positive - negative;
+        }
+        @Override public double unitDeviance(double response, double mean) {
+            if (mean == response) return 0.0;
+            if (mean == 0.0 || mean == 1.0) return Double.POSITIVE_INFINITY;
+            double bounded = clamp(mean, EPSILON, MAXIMUM);
+            double first = response == 0.0 ? 0.0
+                : response * (Math.log(response) - Math.log(bounded));
+            double second = response == 1.0 ? 0.0
+                : (1.0 - response)
+                    * (Math.log1p(-response) - Math.log1p(-bounded));
+            return 2.0 * (first + second);
+        }
+        @Override public double unitDevianceAtPredictor(
+                double response, double predictor, double mean) {
+            double first = response == 0.0 ? 0.0
+                : response * (Math.log(response) - logLower(predictor));
+            double second = response == 1.0 ? 0.0
+                : (1.0 - response)
+                    * (Math.log1p(-response) - logUpper(predictor));
+            return Math.max(0.0, 2.0 * (first + second));
+        }
+        @Override public double logLikelihood(
+                double response, double mean, double priorWeight,
+                double dispersion) {
+            double successes = response * priorWeight;
+            double trials = Math.rint(priorWeight);
+            double roundedSuccesses = Math.rint(successes);
+            if (Math.abs(priorWeight - trials) > 1e-9
+                    || Math.abs(successes - roundedSuccesses) > 1e-9) {
+                return Double.NaN;
+            }
+            return Binomial.density(roundedSuccesses, trials, mean, true);
+        }
+        @Override public double logLikelihoodAtPredictor(
+                double response, double predictor, double mean,
+                double priorWeight, double dispersion) {
+            double successes = response * priorWeight;
+            double trials = Math.rint(priorWeight);
+            double roundedSuccesses = Math.rint(successes);
+            if (Math.abs(priorWeight - trials) > 1e-9
+                    || Math.abs(successes - roundedSuccesses) > 1e-9) {
+                return Double.NaN;
+            }
+            if (predictor <= 0.0) {
+                return Binomial.density(roundedSuccesses, trials,
+                    lower(predictor), true);
+            }
+            return Binomial.density(trials - roundedSuccesses, trials,
+                lower(-predictor), true);
+        }
+        @Override public boolean fixedDispersion() { return true; }
+
+        private static double logDensity(double predictor) {
+            return -0.5 * predictor * predictor - LOG_SQRT_TWO_PI;
+        }
+        private static double lower(double predictor) {
+            return Normal.cumulative(predictor, 0.0, 1.0, true, false);
+        }
+        private static double logLower(double predictor) {
+            return Normal.cumulative(predictor, 0.0, 1.0, true, true);
+        }
+        private static double logUpper(double predictor) {
+            return Normal.cumulative(predictor, 0.0, 1.0, false, true);
+        }
+    }
+
     private static class PoissonLog implements GlmFamily {
         private static final double MINIMUM_MEAN = Double.MIN_NORMAL;
         private static final double MAXIMUM_PREDICTOR = 700.0;
@@ -184,6 +324,9 @@ public final class GlmFamilies {
                 Math.exp(Math.min(MAXIMUM_PREDICTOR, predictor)));
         }
         @Override public double meanDerivative(double predictor) {
+            return inverseLink(predictor);
+        }
+        @Override public double meanSecondDerivative(double predictor) {
             return inverseLink(predictor);
         }
         @Override public double variance(double mean) {
@@ -246,6 +389,9 @@ public final class GlmFamilies {
         @Override public double meanDerivative(double predictor) {
             return inverseLink(predictor);
         }
+        @Override public double meanSecondDerivative(double predictor) {
+            return inverseLink(predictor);
+        }
         @Override public double variance(double mean) {
             return Math.max(MINIMUM, mean * mean);
         }
@@ -281,6 +427,9 @@ public final class GlmFamilies {
             return Math.max(MINIMUM, Math.exp(Math.min(700.0, predictor)));
         }
         @Override public double meanDerivative(double predictor) {
+            return inverseLink(predictor);
+        }
+        @Override public double meanSecondDerivative(double predictor) {
             return inverseLink(predictor);
         }
         @Override public double variance(double mean) {
@@ -330,6 +479,9 @@ public final class GlmFamilies {
             return Math.max(MINIMUM, Math.exp(Math.min(700.0, predictor)));
         }
         @Override public double meanDerivative(double predictor) {
+            return inverseLink(predictor);
+        }
+        @Override public double meanSecondDerivative(double predictor) {
             return inverseLink(predictor);
         }
         @Override public double variance(double mean) {

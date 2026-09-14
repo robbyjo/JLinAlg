@@ -1,9 +1,11 @@
 # Cohort-side conditional GWAS summaries
 
 The general genotype CLI can export efficient scores and their covariance for
-unrelated-sample Gaussian, binary logistic, Poisson-log, and model-based Cox
+unrelated-sample Gaussian, binary logistic or probit, Poisson-log, and model-based Cox
 analyses. Cohorts retain the phenotype and genotype records. The shared files
-contain aggregate statistics and model metadata.
+contain aggregate statistics and model metadata. A separate
+`conditional-score` command now validates and conditions these summaries; see
+the [summary-only conditioning vignette](vignettes/conditional-score-conditioning.md).
 
 This is available in the current source build; build with
 `./gradlew.bat executableJar`. It does not change the existing `mr-estimate`
@@ -112,9 +114,42 @@ The resulting target score tests are conditional on that fitted null. They
 remain asymptotic score tests. Changing the conditioning set requires another
 cohort-side refit for likelihood-based nonlinear conditioning. One exported
 score vector and Hessian describe local curvature, not the full likelihood
-away from the fitted null. The existing `mr-estimate --condition-on` is a
-separate summary-only Gaussian approximation; it does not import this schema.
-These conditional SNP association p-values are not causal MR p-values.
+away from the fitted null. The `conditional-score` importer below can instead
+apply that local Schur complement to an already exported complete score block.
+The existing `mr-estimate --condition-on` remains a separate Gaussian beta/SE
+plus LD approximation with an unchanged interface; it does not import this
+schema. These conditional SNP association p-values are not causal MR p-values.
+
+## Import and condition a complete score block
+
+List one or more independent cohort export trios in a tab-separated manifest:
+
+```text
+cohort	summary	covariance	manifest
+cohort_a	cohort-a.tsv	cohort-a.tsv.score-cov.tsv	cohort-a.tsv.score-manifest.json
+cohort_b	cohort-b.tsv	cohort-b.tsv.score-cov.tsv	cohort-b.tsv.score-manifest.json
+```
+
+Then request output-oriented allele keys explicitly:
+
+```powershell
+java -jar build/cli/jlinalg-0.3.5.jar conditional-score `
+  --cohorts cohorts.tsv `
+  --targets 1:456789:A:G,1:456950:C:T `
+  --condition-on 1:455100:G:A --out locus-conditional.tsv
+```
+
+The importer permits exact forward-strand matches. It aligns REF/ALT swaps only
+for Cox or explicit-intercept null models, where dosage translation is removed
+by the null score; otherwise it requires the exported orientation. The same
+rule applies when comparing fitted conditioning sets across cohorts. It checks
+the completed schema/manifest joins, compatible null contracts, full
+selected-block upper triangles, covariance diagonals, and conditioning rank.
+It applies the Schur complement within each cohort before summing independent
+cohort scores. Output metadata labels this `local_schur_one_step` inference and
+states that no nonlinear cohort refit or cohort-overlap correction was done.
+Targets and conditions in different blocks fail because the missing covariance
+is unknown. See the vignette for output columns, API use, and failure handling.
 
 ## Covariance coverage and operational contract
 
@@ -161,11 +196,17 @@ right censoring, left truncation, and independently refitted conditioning nulls.
 The score/covariance absolute tolerance is 2e-6. Operational tests cover default
 output parity, notices, no-log coding, block boundaries, filtered rows,
 conditioning aliases, unsupported models, and failed-overwrite completion.
+`ConditionalScoreInferenceTest` checks allele-swap alignment, cohort-wise Schur
+conditioning, pooling, compatibility and rank failures. `ConditionalScoreCliTest`
+round-trips the exported fixture, matches a hand Schur complement, and verifies
+that incomplete or cross-block covariance is rejected rather than zero-filled.
 
 ```powershell
 # Optional fixture regeneration; R with survival must already be installed.
 Rscript src/test/resources/r-reference/generate-conditional-score-export.R
 ./gradlew.bat test --tests org.jlinalg.cli.ConditionalGwasExportTest
+./gradlew.bat test --tests org.jlinalg.settest.ConditionalScoreInferenceTest
+./gradlew.bat test --tests org.jlinalg.cli.ConditionalScoreCliTest
 ./gradlew.bat benchmarkConditionalScoreExport
 ./gradlew.bat check benchmarkClasses javadoc executableJar
 ```

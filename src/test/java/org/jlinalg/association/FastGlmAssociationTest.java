@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import jdistlib.Normal;
+import jdistlib.T;
 import org.jlinalg.compute.BackendPolicy;
 import org.jlinalg.glm.GlmFamilies;
 import org.jlinalg.glm.GlmOptions;
+import org.jlinalg.settest.SetTestScoreState;
 import org.junit.jupiter.api.Test;
 
 class FastGlmAssociationTest {
@@ -50,10 +53,75 @@ class FastGlmAssociationTest {
             assertEquals(expectedSe, result.standardErrors()[variable], 1e-12);
             assertEquals(expectedBeta / expectedSe,
                 result.tOrZStatistics()[variable], 1e-12);
-            assertTrue(Double.isFinite(result.pValues()[variable]));
+            double expectedP = 2.0 * Normal.cumulative(
+                Math.abs(expectedBeta / expectedSe),
+                0.0, 1.0, false, false);
+            assertEquals(expectedP, result.pValues()[variable], 1e-15);
+            assertEquals(Double.POSITIVE_INFINITY,
+                result.degreesOfFreedom()[variable]);
         }
         assertEquals(2, result.parallelism());
         assertTrue(prepared.nullModel().converged());
+    }
+
+    @Test
+    void gaussianScoreScanUsesResidualStudentTInference() {
+        double[] response = {1, 2, 2, 4, 5, 7, 7, 9};
+        double[][] covariates = {
+            {1}, {1}, {1}, {1}, {1}, {1}, {1}, {1}
+        };
+        double[][] predictor = {
+            {0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}
+        };
+        AssociationEngineOptions execution =
+            AssociationEngineOptions.defaults()
+                .withBackendPolicy(BackendPolicy.CPU);
+
+        AssociationBatchResult result = FastGlmAssociation.prepare(
+            response, covariates, GlmFamilies.gaussian(), null, null,
+            GlmOptions.defaults(), execution).scan(
+                predictor, List.of("x"), execution);
+
+        double statistic = result.tOrZStatistics()[0];
+        double degreesOfFreedom = response.length - 2.0;
+        double expectedP = 2.0 * T.cumulative(
+            Math.abs(statistic), degreesOfFreedom, false, false);
+        assertEquals(degreesOfFreedom, result.degreesOfFreedom()[0], 0.0);
+        assertEquals(expectedP, result.pValues()[0], 1e-15);
+    }
+
+    @Test
+    void probitScorePreparationRetainsRoundedExtremeTailInformation() {
+        double[] response = {1, 1, 1, 1, 0, 0, 0, 0};
+        double[][] covariates = {
+            {1}, {1}, {1}, {1}, {1}, {1}, {1}, {1}
+        };
+        double[] offset = {10, 10, 10, 10, -10, -10, -10, -10};
+        double[][] predictor = {
+            {0}, {1}, {2}, {3}, {0}, {1}, {2}, {3}
+        };
+        AssociationEngineOptions execution =
+            AssociationEngineOptions.defaults()
+                .withBackendPolicy(BackendPolicy.CPU);
+
+        FastGlmAssociation prepared = FastGlmAssociation.prepare(
+            response, covariates, GlmFamilies.probit(), null, offset,
+            GlmOptions.defaults(), execution);
+        assertEquals(1.0, prepared.nullModel().fittedMeans()[0], 0.0);
+
+        AssociationBatchResult result = prepared.scan(
+            predictor, List.of("x"), execution);
+        assertTrue(result.failures().isEmpty());
+        assertTrue(Double.isFinite(result.effectSizes()[0]));
+        assertTrue(Double.isFinite(result.standardErrors()[0]));
+        assertTrue(Double.isFinite(result.pValues()[0]));
+
+        SetTestScoreState score = prepared.score(new double[][] {
+            {0, 1, 2, 3, 0, 1, 2, 3}
+        });
+        assertTrue(Double.isFinite(score.scores()[0]));
+        assertTrue(Double.isFinite(score.information()[0]));
+        assertTrue(score.information()[0] > 0.0);
     }
 
     @Test

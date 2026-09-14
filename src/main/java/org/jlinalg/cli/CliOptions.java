@@ -220,6 +220,7 @@ final class CliOptions {
         String canonical = switch (family) {
             case "gaussian" -> "identity";
             case "binomial", "quasi-binomial" -> "logit";
+            case "probit", "binomial-probit" -> "probit";
             case "poisson", "gamma", "inverse-gaussian", "quasi-poisson" ->
                 "log";
             default -> throw new IllegalArgumentException(

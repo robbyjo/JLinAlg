@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits."><title>Individual-level instrumental-variable regression · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Individual-level instrumental-variable regression</span></div>
+<span class="eyebrow">Java API · Source build</span><h1>Individual-level instrumental-variable regression</h1><p>Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Use two-stage least squares (2SLS) when a linear outcome model contains a
+predictor that is correlated with the structural error, and you have excluded
+instruments that shift that predictor without directly shifting the outcome.
+This is an individual-level estimator; summary-association Mendelian
+randomization uses the separate <code>org.jlinalg.mr</code> APIs.</p>
+<p>An IV estimate is causal only under substantive assumptions that software
+cannot verify:</p>
+<ol>
+<li>the excluded instruments predict the endogenous regressors (relevance);</li>
+<li>the instruments are independent of unmeasured outcome causes, conditional
+   on the included exogenous regressors (exchangeability);</li>
+<li>the instruments affect the outcome only through the modeled endogenous
+   regressors (exclusion); and</li>
+<li>the linear structural model and observation/cluster independence assumptions
+   used for inference are appropriate.</li>
+</ol>
+<h2 id="fit-a-model">Fit a model</h2>
+<p>The example below estimates the effect of one endogenous exposure. The
+exogenous matrix contains the intercept and an observed covariate. The excluded
+instrument matrix contains two instruments. Include the intercept explicitly
+when the model needs one.</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.regression.InstrumentalVariableCovariance;
+import org.jlinalg.regression.InstrumentalVariableOptions;
+import org.jlinalg.regression.InstrumentalVariableRegression;
+import org.jlinalg.regression.InstrumentalVariableResult;
+
+double[] outcome = {2.2, 3.1, 2.7, 5.8, 4.9, 6.4, 5.7, 7.6};
+double[][] exogenous = {
+    {1, 0}, {1, 1}, {1, 0}, {1, 1},
+    {1, 0}, {1, 1}, {1, 0}, {1, 1}
+};
+double[][] endogenous = {
+    {0.7}, {1.2}, {1.0}, {2.1}, {1.8}, {2.6}, {2.4}, {3.2}
+};
+double[][] excludedInstruments = {
+    {-1.2,  0.3}, {-0.7, -0.8}, {-0.3,  1.0}, {0.2, -0.4},
+    { 0.5,  0.7}, { 0.9, -1.1}, { 1.3,  0.4}, {1.8, -0.2}
+};
+
+InstrumentalVariableOptions options = new InstrumentalVariableOptions(
+    InstrumentalVariableCovariance.HC1, 0.95);
+InstrumentalVariableResult fit = InstrumentalVariableRegression.fit(
+    outcome, exogenous, endogenous, excludedInstruments,
+    options, BackendPolicy.CPU);
+
+// Coefficient order is [all exogenous columns, all endogenous columns].
+double exposureEffect = fit.coefficients()[2];
+double exposureSe = fit.standardErrors()[2];
+double exposureP = fit.associationStatistics().pValues()[2];
+double lower = fit.confidenceLower()[2];
+double upper = fit.confidenceUpper()[2];
+</code></pre></div>
+<p><code>HC1</code> is heteroskedasticity-robust and uses asymptotic normal inference. Choose
+<code>HOMOSKEDASTIC</code> only when a constant structural-error variance is defensible;
+it uses residual Student-t inference. <code>HC0</code> returns the unadjusted observation
+sandwich.</p>
+<p>The coefficient fit is</p>
+<p>[
+\hat\beta=(X'P_ZX)^{-1}X'P_Zy,
+]</p>
+<p>where <code>X</code> contains included exogenous and endogenous regressors, while <code>Z</code>
+contains included exogenous regressors and excluded instruments. JLinAlg
+computes the QR projections without forming the dense <code>P_Z</code> matrix. Fitted
+outcomes and residuals use the observed structural design <code>X</code>. This distinction
+matters: ordinary OLS software applied to first-stage fitted exposures can
+reproduce the 2SLS coefficient, but its default residual variance and standard
+errors are not valid IV inference.</p>
+<h2 id="check-instrument-strength-and-identification">Check instrument strength and identification</h2>
+<p>Each endogenous column has an excluded-instrument diagnostic:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>var strength = fit.strengthDiagnostics().get(0);
+System.out.printf(
+    &quot;partial R2=%.4f, classical F=%.2f, covariance-matched F=%.2f, p=%.4g%n&quot;,
+    strength.partialRSquared(),
+    strength.classicalFStatistic(),
+    strength.effectiveFStatistic(),
+    strength.pValue());
+
+System.out.println(&quot;minimum first-stage F = &quot;
+    + fit.minimumFirstStageFStatistic());
+System.out.println(&quot;projected-design condition number = &quot;
+    + fit.projectedDesignConditionNumber());
+</code></pre></div>
+<p>The partial R-squared compares the full first stage to the included exogenous
+regressors alone. <code>classicalFStatistic()</code> is the conventional homoskedastic
+excluded-instrument F. <code>effectiveFStatistic()</code> instead matches the selected
+covariance: it is the HC Wald chi-square divided by its numerator degrees of
+freedom for <code>HC0</code>/<code>HC1</code>, and a finite-cluster Wald F for clustered fits. Inspect
+<code>referenceDistribution()</code> and <code>denominatorDegreesOfFreedom()</code> before reporting
+the test.</p>
+<p>The familiar first-stage F greater than 10 rule is only a rough screen. It is
+not a universal weak-instrument guarantee, particularly with multiple
+endogenous regressors, heteroskedasticity, or clustering. This API reports
+first-stage diagnostics and numerical rank, but it does not provide
+weak-identification-robust Anderson-Rubin/CLR confidence sets. If weak
+identification is plausible, use a method designed for it rather than treating
+a conventional 2SLS Wald interval as conclusive.</p>
+<p>JLinAlg rejects all of these cases before returning a fit:</p>
+<ul>
+<li>fewer excluded instruments than endogenous regressors;</li>
+<li>a rank-deficient structural or instrument matrix;</li>
+<li>a rank-deficient projected structural design, meaning the instruments do not
+  identify every structural coefficient; or</li>
+<li>too few observations for structural or first-stage residual degrees of
+  freedom.</li>
+</ul>
+<p><code>projectedDesignConditionNumber()</code> scales each projected column by the norm of
+its observed structural counterpart, so it is invariant to simple unit changes
+while retaining information about a weak projection. A very large finite value
+warns that identification is numerically fragile even when the rank check
+passes.</p>
+<h2 id="cluster-robust-inference">Cluster-robust inference</h2>
+<p>Supply one integer cluster identifier per row when observations may be
+dependent within groups:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>int[] household = {0, 0, 1, 1, 2, 3, 4, 5};
+InstrumentalVariableOptions clusteredOptions =
+    new InstrumentalVariableOptions(
+        InstrumentalVariableCovariance.CLUSTER_CR1, 0.95);
+
+InstrumentalVariableResult clustered = InstrumentalVariableRegression.fit(
+    outcome, exogenous, endogenous, excludedInstruments,
+    household, clusteredOptions, BackendPolicy.CPU);
+</code></pre></div>
+<p><code>CLUSTER_CR0</code> accumulates the outer product of cluster-level IV scores.
+<code>CLUSTER_CR1</code> additionally multiplies it by
+<code>G/(G-1) * (n-1)/(n-p)</code>. Coefficient tests use <code>G-p</code> denominator degrees of
+freedom, matching the library's cluster-t convention. First-stage excluded-
+instrument tests use <code>G-l</code>, where <code>l</code> is the number of included plus excluded
+instrument columns. Consequently, clustered fitting requires more independent
+clusters than both the structural and first-stage parameter counts. Clusters
+must be independent; the correction does not rescue a design with only a few
+dominant clusters.</p>
+<h2 id="multiple-endogenous-regressors-and-contrasts">Multiple endogenous regressors and contrasts</h2>
+<p>Put every endogenous regressor in a separate column. There must be at least as
+many excluded instrument columns as endogenous columns. The result exposes the
+first-stage fitted matrix and a diagnostic for each endogenous column:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>double[][] firstStageFits = fit.instrumentedEndogenous();
+
+// Jointly test the exogenous slope and endogenous exposure coefficient.
+var joint = fit.testContrast(new double[][] {
+    {0, 1, 0},
+    {0, 0, 1}
+});
+</code></pre></div>
+<p>Coefficient-level tests use asymptotic normal inference for HC0/HC1,
+residual-t inference for homoskedastic fits, and cluster-t inference for
+clustered fits. Joint <code>testContrast</code> calls use a Wald chi-square law for HC0/HC1
+and an F law for homoskedastic or clustered fits. First-stage column-wise F
+statistics do not replace a substantive assessment of joint identification
+when several endogenous regressors are present.</p>
+<h2 id="reproduce-the-independent-r-fixture">Reproduce the independent R fixture</h2>
+<p>The checked-in fixture uses two endogenous regressors, three excluded
+instruments, 30 clusters, and deterministic heteroskedastic errors. Base R 4.6.1
+computes the pivoted-QR projection and explicit IV/GMM sandwiches independently
+for all five covariance choices:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>&amp; 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
+  src/test/resources/r-reference/generate-instrumental-variable-reference.R
+
+.\gradlew.bat test `
+  --tests org.jlinalg.regression.InstrumentalVariableRegressionTest `
+  --tests org.jlinalg.regression.InstrumentalVariableRReferenceTest
+</code></pre></div>
+<p>The generator requires only base R and <code>stats</code>. Its outputs record the R runtime
+and calculation contract alongside the numeric fixture.</p>
+<h2 id="scope">Scope</h2>
+<p>This API is linear 2SLS with finite rectangular, complete data. It does not yet
+implement formula parsing, observation weights, missing-data omission, LIML,
+continuously updated GMM, nonlinear endogenous models, weak-IV-robust tests, or
+instrument exogeneity tests such as Hansen's J. Scale and encode inputs before
+fitting, and report the covariance choice, cluster count where applicable,
+first-stage diagnostics, and identifying assumptions with the estimate.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#fit-a-model">Fit a model</a><a href="#check-instrument-strength-and-identification">Check instrument strength and identification</a><a href="#cluster-robust-inference">Cluster-robust inference</a><a href="#multiple-endogenous-regressors-and-contrasts">Multiple endogenous regressors and contrasts</a><a href="#reproduce-the-independent-r-fixture">Reproduce the independent R fixture</a><a href="#scope">Scope</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

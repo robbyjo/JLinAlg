@@ -15,7 +15,7 @@ import org.jlinalg.reml.VarianceComponent;
 
 /** Reconstructs the final PQL working model for modes, EDF, and prediction. */
 final class PqlWorkingState {
-    private static final double MINIMUM_WEIGHT = 1e-12;
+    private static final double MINIMUM_WEIGHT = Double.MIN_NORMAL;
     private static final double MAXIMUM_WEIGHT = 1e150;
 
     private PqlWorkingState() { }
@@ -36,13 +36,18 @@ final class PqlWorkingState {
         double[] workingResponse = new double[rows];
         double[] covariance = new double[rows * rows];
         for (int row = 0; row < rows; row++) {
-            double derivative = family.meanDerivative(predictor[row]);
-            double variance = family.variance(means[row]);
-            double weight = clamp(priorWeights[row]
-                * derivative * derivative / variance,
+            double rawWeight = family.workingWeight(
+                response[row], predictor[row], means[row], priorWeights[row]);
+            double target = family.workingResponse(response[row], predictor[row],
+                means[row], priorWeights[row], offset[row]);
+            if (!(rawWeight > 0.0) || !Double.isFinite(rawWeight)
+                    || !Double.isFinite(target)) {
+                throw new IllegalArgumentException(
+                    "family produced invalid reconstructed PQL working values");
+            }
+            double weight = clamp(rawWeight,
                 MINIMUM_WEIGHT, MAXIMUM_WEIGHT);
-            workingResponse[row] = predictor[row]
-                + (response[row] - means[row]) / derivative - offset[row];
+            workingResponse[row] = target;
             covariance[row * rows + row] = 1.0 / weight;
         }
         double[] variances = fitted.varianceComponents();

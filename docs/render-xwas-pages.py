@@ -1,4 +1,4 @@
-"""Regenerate xWAS/enrichment pages and the xWAS validation page. Requires Python Markdown.
+"""Regenerate selected Markdown-backed vignettes and xWAS validation. Requires Python Markdown.
 
 Run from any directory: python docs/render-xwas-pages.py
 The static output is checked in; website deployment needs no Python runtime.
@@ -10,14 +10,17 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
-    "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets."),
-    "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model."),
-    "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment."),
-    "genomic-factor": ("Shared genetic factors", "Model shared genetic variation and inspect common-factor SNP effects alongside heterogeneity."),
-    "prediction-scores": ("Prediction scores", "Train portable scores and evaluate frozen predictions in an independent cohort."),
+    "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.", "CLI + Java · Source build"),
+    "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model.", "CLI + Java · Source build"),
+    "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.", "CLI + Java · Source build"),
+    "genomic-factor": ("Shared genetic factors", "Model shared genetic variation and inspect common-factor SNP effects alongside heterogeneity.", "CLI + Java · Source build"),
+    "prediction-scores": ("Prediction scores", "Train portable scores and evaluate frozen predictions in an independent cohort.", "CLI + Java · Source build"),
+    "predictions-and-contrasts": ("Predictions, scenarios, and marginal effects", "Report expected responses, standardized scenario contrasts, risk ratios, and marginal effects with covariance-aware uncertainty.", "Java API · Source build"),
+    "instrumental-variable-regression": ("Individual-level instrumental-variable regression", "Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.", "Java API · Source build"),
+    "conditional-score-conditioning": ("Summary-only conditional score analysis", "Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results.", "CLI + Java · Source build"),
 }
 
-def render(source, destination, title, description, root):
+def render(source, destination, title, description, root, eyebrow="CLI + Java · Source build"):
     text = source.read_text(encoding="utf-8").split("\n", 1)[1]
     md = markdown.Markdown(extensions=["fenced_code", "tables", "toc"])
     body = md.convert(text)
@@ -40,14 +43,14 @@ def render(source, destination, title, description, root):
 <link rel="stylesheet" href="{root}assets/styles.css"><script src="{root}assets/app.js" defer></script></head>
 <body><site-header root="{root}"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="{root}index.html">Home</a><span>/</span><a href="{root}vignettes/index.html">Vignettes</a><span>/</span><span>{html.escape(title)}</span></div>
-<span class="eyebrow">CLI + Java · Source build</span><h1>{html.escape(title)}</h1><p>{html.escape(description)}</p></div></section>
+<span class="eyebrow">{html.escape(eyebrow)}</span><h1>{html.escape(title)}</h1><p>{html.escape(description)}</p></div></section>
 <div class="container page-layout"><article class="prose">{body}</article>
 <aside class="toc"><strong>On this page</strong>{toc}</aside></div>
 </main><site-footer root="{root}"></site-footer></body></html>
 '''
     destination.write_text(page, encoding="utf-8")
 
-for slug, (title, description) in PAGES.items():
-    render(ROOT / f"docs/vignettes/{slug}.md", ROOT / f"site/vignettes/{slug}.html", title, description, "../")
+for slug, (title, description, eyebrow) in PAGES.items():
+    render(ROOT / f"docs/vignettes/{slug}.md", ROOT / f"site/vignettes/{slug}.html", title, description, "../", eyebrow)
 render(ROOT / "docs/xwas-followup-validation.md", ROOT / "site/xwas-followup-validation.html",
        "xWAS follow-up validation", "Independent numerical fixtures, reproducible checks and explicit estimator boundaries.", "./")

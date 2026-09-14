@@ -9,8 +9,9 @@ with `--help` for their independent table-based schemas.
 
 Every workflow here is invoked through the executable JAR; no Java API code or
 dataframe runtime is required. Start a new general association
-file/formula/pedigree with <code>--dry-run</code>. The commands and options on
-this page are available in `jlinalg-0.3.5.jar`.
+file/formula/pedigree with <code>--dry-run</code>. Published features use
+`jlinalg-0.3.5.jar`; additions explicitly marked as current source builds,
+including probit and `conditional-score`, require an executable built from main.
 
 For a slower first-principles walkthrough, start with the
 [progressive association tutorial](cli-association-tutorial.md). Separate
@@ -207,21 +208,26 @@ exact per-feature REML refits. A GRM and pedigree cannot be combined.
 
 ~~~powershell
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out disease-expression.tsv
+
+java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family probit --case-value case --control-value control --out disease-expression-probit.tsv
 ~~~
 
 Add <code>(1|site)</code>, a GRM, or a matching pedigree term for a
-first-order Laplace GLMM with per-feature glmer-like refits. Use
+first-order Laplace GLMM with per-feature glmer-like refits. The source build's
+<code>--family probit</code> uses a stable binomial normal-CDF link; use
 <code>--family poisson</code> for counts and <code>--family gamma</code> for
 positive continuous outcomes. Genotype Laplace GLMM scans are not exposed.
 
 ## Genotype GWAS and P3D LMM
 
 The current source build adds `--conditional-gwas-summary` with
-`--score-genome-build` for Gaussian, logistic, Poisson and model-based Cox
+`--score-genome-build` for Gaussian, logistic, probit, Poisson and model-based Cox
 genotype scans. It writes aggregate scores, bounded covariance blocks and
 coding/model metadata. Add `--condition-on` to refit the cohort null with lead
 variants. See the [conditional-GWAS workflow](../conditional-gwas-summary.md)
 for complete commands, column definitions and calibration/coverage limits.
+Complete blocks can then be imported by the
+[summary-only conditioning workflow](conditional-score-conditioning.md).
 
 ~~~powershell
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.tsv

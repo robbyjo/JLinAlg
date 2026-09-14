@@ -69,6 +69,14 @@ The current source also adds [LDSC](docs/vignettes/ldsc.md),
 each with CLI commands and worked examples. See their
 [validation and supported scope](docs/xwas-followup-validation.md).
 
+The latest source build also includes [binary probit and a shared GLM/GEE
+prediction-and-contrast API](docs/vignettes/predictions-and-contrasts.md),
+[individual-level IV/2SLS](docs/vignettes/instrumental-variable-regression.md),
+[summary-only conditional-score inference](docs/vignettes/conditional-score-conditioning.md),
+and scalable exact diffuse [ARIMA smoothing and parameter-aware forecasts](docs/vignettes/time-series.md).
+Each guide states the estimand, validation reference, and important inference
+boundaries.
+
 [Gene-set enrichment](docs/vignettes/enrichment.md) adds analysis-specific
 backgrounds and selection expressions, Fisher ORA, EWAS `gsameth`, BH/BY correction,
 and explicit annotation downloads. The vignette includes a runnable synthetic

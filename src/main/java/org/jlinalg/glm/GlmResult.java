@@ -9,6 +9,8 @@ import org.jlinalg.compute.BackendProvenance;
 import org.jlinalg.inference.AssociationStatistics;
 import org.jlinalg.inference.ContrastTestResult;
 import org.jlinalg.inference.LinearHypothesis;
+import org.jlinalg.internal.LeastSquaresSolver;
+import org.jlinalg.internal.MatrixOps;
 
 /** Immutable GLM estimates, diagnostics, inference, and convergence metadata. */
 public final class GlmResult {
@@ -128,9 +130,43 @@ public final class GlmResult {
     /** Alias for {@link #coefficients()} for consistent association APIs. */
     public double[] beta() { return coefficients(); }
 
+    /** Rejects a non-finite or non-estimable coefficient combination. */
+    public void requireEstimable(double[] combination) {
+        if (combination == null || combination.length != parameters) {
+            throw new IllegalArgumentException(
+                "combination columns must equal coefficient count");
+        }
+        double[] checked = MatrixOps.finiteCopy(
+            combination, "coefficient combination");
+        LeastSquaresSolver.requireEstimable(
+            new double[][] {checked}, rowSpaceProjection, parameters);
+    }
+
+    /** Rejects any non-finite or non-estimable coefficient combination row. */
+    public void requireEstimable(double[][] combinations) {
+        if (combinations == null || combinations.length == 0) {
+            throw new IllegalArgumentException(
+                "at least one coefficient combination is required");
+        }
+        for (double[] combination : combinations) requireEstimable(combination);
+    }
+
+    /** Rejects a coefficient coordinate that is not uniquely estimable. */
+    public void requireEstimableCoordinate(int column) {
+        if (column < 0 || column >= parameters) {
+            throw new IllegalArgumentException(
+                "coefficient column is outside the fitted design");
+        }
+        if (!LeastSquaresSolver.estimableCoordinate(
+                rowSpaceProjection, parameters, column)) {
+            throw new IllegalArgumentException(
+                "coefficient coordinate is not estimable in the fitted design");
+        }
+    }
+
     /** Tests estimable contrasts with residual F or asymptotic Wald chi-square. */
     public ContrastTestResult testContrast(double[][] contrast) {
-        org.jlinalg.internal.LeastSquaresSolver.requireEstimable(contrast, rowSpaceProjection, parameters);
+        requireEstimable(contrast);
         return estimatedDispersion ? LinearHypothesis.fTest(coefficients, covariance,
             contrast, residualDegreesOfFreedom)
             : LinearHypothesis.chiSquareTest(coefficients, covariance, contrast);

@@ -23,7 +23,7 @@ import org.jlinalg.reml.VarianceComponent;
 
 /** Generalized additive models fitted by PQL with REML smoothing updates. */
 public final class GeneralizedGam {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-12;
+    private static final double MINIMUM_WORKING_WEIGHT = Double.MIN_NORMAL;
     private static final double MAXIMUM_WORKING_WEIGHT = 1e150;
 
     private GeneralizedGam() { }
@@ -122,13 +122,18 @@ public final class GeneralizedGam {
         double[] covariance = new double[rows * rows];
         double[] variances = fitted.varianceComponents();
         for (int row = 0; row < rows; row++) {
-            double derivative = family.meanDerivative(predictor[row]);
-            double variance = family.variance(means[row]);
-            double workingWeight = clamp(weights[row]
-                * derivative * derivative / variance,
+            double rawWeight = family.workingWeight(
+                response[row], predictor[row], means[row], weights[row]);
+            double target = family.workingResponse(response[row], predictor[row],
+                means[row], weights[row], offsets[row]);
+            if (!(rawWeight > 0.0) || !Double.isFinite(rawWeight)
+                    || !Double.isFinite(target)) {
+                throw new IllegalArgumentException(
+                    "family produced invalid final GAM working values");
+            }
+            double workingWeight = clamp(rawWeight,
                 MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
-            workingResponse[row] = predictor[row]
-                + (response[row] - means[row]) / derivative - offsets[row];
+            workingResponse[row] = target;
             covariance[row * rows + row] = 1.0 / workingWeight;
         }
         for (int component = 0; component < components.size(); component++) {

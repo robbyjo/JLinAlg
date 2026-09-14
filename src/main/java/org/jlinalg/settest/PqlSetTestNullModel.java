@@ -23,7 +23,7 @@ import org.jlinalg.reml.VarianceComponent;
  * tests. Null fitting and the dense projection are performed once.
  */
 public final class PqlSetTestNullModel implements SetTestScoreNullModel {
-    private static final double MINIMUM_WORKING_WEIGHT = 1e-12;
+    private static final double MINIMUM_WORKING_WEIGHT = Double.MIN_NORMAL;
     private static final double MAXIMUM_WORKING_WEIGHT = 1e150;
 
     private final double[] projection;
@@ -77,16 +77,17 @@ public final class PqlSetTestNullModel implements SetTestScoreNullModel {
         double[] workingResponse = new double[rows];
         double[] covariance = new double[rows * rows];
         for (int row = 0; row < rows; row++) {
-            double derivative = family.meanDerivative(predictor[row]);
-            double variance = family.variance(means[row]);
-            if (!Double.isFinite(derivative) || derivative == 0.0
-                    || !(variance > 0.0) || !Double.isFinite(variance))
+            double rawWeight = family.workingWeight(
+                response[row], predictor[row], means[row], 1.0);
+            double target = family.workingResponse(
+                response[row], predictor[row], means[row], 1.0, 0.0);
+            if (!(rawWeight > 0.0) || !Double.isFinite(rawWeight)
+                    || !Double.isFinite(target))
                 throw new IllegalArgumentException(
-                    "family produced invalid final PQL working weights");
-            double weight = clamp(derivative * derivative / variance,
+                    "family produced invalid final PQL working values");
+            double weight = clamp(rawWeight,
                 MINIMUM_WORKING_WEIGHT, MAXIMUM_WORKING_WEIGHT);
-            workingResponse[row] = predictor[row]
-                + (response[row] - means[row]) / derivative;
+            workingResponse[row] = target;
             covariance[row * rows + row] = 1.0 / weight;
         }
         double[] variances = fit.varianceComponents();

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results."><title>Summary-only conditional score analysis · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Summary-only conditional score analysis</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Summary-only conditional score analysis</h1><p>Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Use this workflow when cohorts have already produced JLinAlg's versioned
+conditional-GWAS score exports and the target and conditioning variants share a
+complete covariance block. The analysis uses aggregate scores and covariance;
+participant-level phenotypes and genotypes remain at each cohort.</p>
+<p>This is local, one-step inference at the exported null model. It is useful for
+screening a prespecified conditioning set without another data transfer. It is
+not a replacement for a cohort-side logistic, Poisson, or Cox likelihood refit
+when the conditioning set materially changes a nonlinear null model.</p>
+<h2 id="1-plan-and-export-a-complete-block">1. Plan and export a complete block</h2>
+<p>The target variants, conditioning variants, and every covariance between them
+must be in the same export block. Restricting the genotype input to a locus is
+often the clearest way to guarantee that scope. The block size cannot exceed
+512 variants.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>./gradlew.bat executableJar
+
+java -jar build/cli/jlinalg-0.3.5.jar `
+  --omics cohort-a-locus.vcf.gz --pheno cohort-a-phenotype.tsv --id IID `
+  --formula &quot;case_status ~ age + sex + PC1 + PC2 + &lt;omics&gt;&quot; `
+  --family binomial --case-value case --control-value control `
+  --conditional-gwas-summary --score-genome-build GRCh38 `
+  --score-block-size 128 --out cohort-a-gwas.tsv
+</code></pre></div>
+<p>Repeat the same model contract in each independent cohort. Each successful run
+publishes the linked trio consumed below:</p>
+<ul>
+<li><code>cohort-a-gwas.tsv</code></li>
+<li><code>cohort-a-gwas.tsv.score-cov.tsv</code></li>
+<li><code>cohort-a-gwas.tsv.score-manifest.json</code></li>
+</ul>
+<p>The JSON manifest is the completion marker. Do not import a partial covariance
+file or mix files from different runs.</p>
+<h2 id="2-make-the-cohort-manifest">2. Make the cohort manifest</h2>
+<p>Create a tab-separated file with one row per cohort. Relative paths are
+resolved from the directory containing this manifest.</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>cohort  summary covariance  manifest
+cohort_a    cohort-a-gwas.tsv   cohort-a-gwas.tsv.score-cov.tsv cohort-a-gwas.tsv.score-manifest.json
+cohort_b    cohort-b-gwas.tsv   cohort-b-gwas.tsv.score-cov.tsv cohort-b-gwas.tsv.score-manifest.json
+</code></pre></div>
+<p>Cohorts are assumed independent. Sample overlap is not modeled, so overlapping
+cohorts must not be entered as though their scores were independent.</p>
+<h2 id="3-condition-and-pool">3. Condition and pool</h2>
+<p>Specify allele-aware keys in the orientation wanted in the output:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar conditional-score `
+  --cohorts cohorts.tsv `
+  --targets 1:456789:A:G,1:456950:C:T `
+  --condition-on 1:455100:G:A `
+  --out locus-conditional.tsv
+</code></pre></div>
+<p>For each cohort, JLinAlg performs these operations in order:</p>
+<ol>
+<li>Match exact forward-strand chromosome, position, and allele pairs. A REF/ALT
+   swap is aligned by changing the score sign and the corresponding covariance
+   signs only when the exported null is translation invariant: Cox partial
+   likelihood or a GLM/OLS null with an explicit <code>(Intercept)</code> column. Without
+   that guarantee, request the exported orientation; fitted conditioning sets
+   across cohorts follow the same rule. Strand complements,
+   liftover, and variant normalization are never guessed.</li>
+<li>Verify the completed version-1 manifest, row-level null-model IDs, fitted
+   conditioning-set ID, analyzed sample count, block counts, covariance
+   diagonals, and the complete selected block upper triangle.</li>
+<li>Require compatible genome build, model, family, formula, null covariate
+   columns, fitted conditioning set, case/control mapping, analysis-sample and
+   genotype/missingness conventions,
+   covariance scale, variance method, relatedness adjustment, tie method, and
+   tail-calibration declaration across cohorts.</li>
+<li>Compute the Schur complement separately in each cohort. Singular or
+   ill-conditioned conditioning information is rejected.</li>
+<li>Sum aligned conditional scores and information across the independent
+   cohorts and report normal-score inference.</li>
+</ol>
+<p>The primary output has one row per requested target with <code>score_u</code>,
+<code>score_variance</code>, the one-step <code>beta_score</code>, <code>se_score</code>, <code>z_score</code>, normal-tail
+<code>p_score_normal</code>, contributing cohort count, direction string, and the explicit
+<code>local_schur_one_step</code> scope.</p>
+<p>Two linked files are also written:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>locus-conditional.tsv.score-cov.tsv</code></td>
+<td>Complete upper triangle of the pooled, conditioned target covariance</td>
+</tr>
+<tr>
+<td><code>locus-conditional.tsv.metadata.tsv</code></td>
+<td>Model contract, allele policy, cohort-independence assumption, and inference boundary</td>
+</tr>
+</tbody>
+</table>
+<p>The ordinary run log defaults to <code>locus-conditional.tsv.log</code>; use <code>--log FILE</code>
+or <code>--no-log</code> under the shared CLI logging contract. Existing outputs are never
+replaced.</p>
+<h2 id="missing-covariance-is-not-zero">Missing covariance is not zero</h2>
+<p>An export block is a coverage unit, not an LD window. If a target is in block 2
+and a condition is in block 1, the importer stops with an unknown cross-block
+covariance error. It does not insert zero and does not substitute an external LD
+matrix. Re-export a locus-sized input with one sufficiently large block, or ask
+each cohort to perform a participant-level <code>--condition-on</code> refit.</p>
+<h2 id="api-use">API use</h2>
+<p>The same validated file import and conditioning path is available from Java:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>import java.nio.file.Path;
+import java.util.List;
+import org.jlinalg.cli.ConditionalScoreImporter;
+import org.jlinalg.settest.ConditionalScoreInference;
+
+var requested = List.of(&quot;1:456789:A:G&quot;, &quot;1:455100:G:A&quot;);
+var cohortA = ConditionalScoreImporter.read(&quot;cohort_a&quot;,
+    Path.of(&quot;cohort-a-gwas.tsv&quot;),
+    Path.of(&quot;cohort-a-gwas.tsv.score-cov.tsv&quot;),
+    Path.of(&quot;cohort-a-gwas.tsv.score-manifest.json&quot;), requested);
+var cohortB = ConditionalScoreImporter.read(&quot;cohort_b&quot;,
+    Path.of(&quot;cohort-b-gwas.tsv&quot;),
+    Path.of(&quot;cohort-b-gwas.tsv.score-cov.tsv&quot;),
+    Path.of(&quot;cohort-b-gwas.tsv.score-manifest.json&quot;), requested);
+
+var fit = ConditionalScoreInference.condition(List.of(cohortA, cohortB),
+    List.of(&quot;1:456789:A:G&quot;), List.of(&quot;1:455100:G:A&quot;));
+double conditionalScore = fit.state().scores()[0];
+double conditionalInformation = fit.state().information()[0];
+</code></pre></div>
+<p><code>ConditionalScoreStudy</code> is also public for callers that already hold a complete
+score vector and covariance matrix. Construction validates dimensions,
+allele-aware key uniqueness, positive-semidefinite covariance, and score/null
+space consistency.</p>
+<h2 id="distinguish-the-three-conditioning-routes">Distinguish the three conditioning routes</h2>
+<ul>
+<li>General-scan <code>--condition-on</code> adds dosages to the cohort null model and refits
+  it before export. Use this for likelihood-based nonlinear conditioning.</li>
+<li><code>conditional-score</code> imports the new score schema and uses local Schur-complement
+  curvature, cohort by cohort, without participant-level data.</li>
+<li><code>mr-estimate --method conditional</code> remains the existing Gaussian beta/SE plus
+  LD approximation. Its input and interpretation are unchanged; it does not
+  consume conditional-GWAS score exports.</li>
+</ul>
+<p>Focused validation commands:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>./gradlew.bat test --tests org.jlinalg.settest.ConditionalScoreInferenceTest
+./gradlew.bat test --tests org.jlinalg.cli.ConditionalScoreCliTest
+</code></pre></div></article>
+<aside class="toc"><strong>On this page</strong><a href="#1-plan-and-export-a-complete-block">1. Plan and export a complete block</a><a href="#2-make-the-cohort-manifest">2. Make the cohort manifest</a><a href="#3-condition-and-pool">3. Condition and pool</a><a href="#missing-covariance-is-not-zero">Missing covariance is not zero</a><a href="#api-use">API use</a><a href="#distinguish-the-three-conditioning-routes">Distinguish the three conditioning routes</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

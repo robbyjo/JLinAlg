@@ -236,16 +236,49 @@ missing and diffuse observations. ACF and Ljung-Box methods reject internal
 missing/diffuse gaps rather than silently collapse time. `differencedSeries()`
 is available for inspection but is not used to fit or forecast the exact model.
 
-State storage is `O((r+b)^2)`, plus `O(n)` input/result arrays. Sparse transition
+Filter state storage is `O((r+b)^2)`, plus `O(n)` input/result arrays. Sparse transition
 rows and symmetric covariance updates give `O(n (r+b)^2)` filtering work.
 Stationary initialization uses state-sized matrix doubling. High orders and
 long seasonal periods can still be expensive or ill-conditioned; this is a
 covariance filter, not a square-root filter. The diffuse pivot tolerance is
 `1e-9` in unit diffuse-state coordinates. The separate `ArimaRegression` API
-adds arbitrary design columns using the same innovations, and `ArimaSmoothing`
-provides bounded dense historical state conditioning, including diffuse levels.
-See [API examples and validation](../estimator-extensions.md); the smoother's
-1024-date limit is separate from the scalable filtering path.
+adds arbitrary design columns using the same innovations. `ArimaSmoothing`
+uses those finite-state innovations to estimate symbolic diffuse levels, then
+runs an exact backward information smoother. It is linear in the number of
+dates and stores state-sized matrices per returned date; it no longer forms an
+observation covariance or imposes the former 1024-date bound. The public result
+necessarily stores `O(n (r+b)^2)` historical state covariance values.
+These historical moments condition on fitted regression coefficients, dynamics,
+and innovation variance; they do not include parameter-estimation uncertainty.
+See [API examples and validation](../estimator-extensions.md).
+
+### Regression forecasts with parameter uncertainty
+
+```java
+var regression = ArimaRegression.fit(y, design, order, options);
+ArimaForecast conditional = regression.forecastConditional(futureDesign, .95);
+if (regression.jointParameterInferenceAvailable()) {
+    ArimaForecast full = regression.forecastWithParameterUncertainty(
+        futureDesign, .95);
+    double[] estimates = regression.jointParameterEstimates();
+    double[] joint = regression.jointParameterCovariance();
+}
+```
+
+The joint estimate and covariance order is regression coefficients, AR, MA,
+seasonal AR, then seasonal MA. This keeps seasonal coordinates distinct from
+the multiplicative effective AR/MA polynomials. The covariance comes from
+observed information for the joint likelihood,
+even though regression coefficients are profiled during fitting, and retains
+regression/dynamic cross-covariances. This Hessian is computed and cached only
+when joint inference or a parameter-aware forecast is requested; ordinary fits,
+smoothing, and conditional forecasts remain on the profiled path.
+`forecastWithParameterUncertainty` adds a
+delta-method variance for the fitted regression and dynamic parameters to the
+conditional process variance. Innovation-variance estimation uncertainty is
+not included. `forecast` remains the compatibility alias for the explicitly
+conditional `forecastConditional`; unavailable or unresolved joint information
+causes the parameter-aware method to fail instead of silently reverting.
 
 ### Diffuse coefficient inference
 

@@ -247,7 +247,8 @@ term uses Henderson's additive relationship precision. Another term such as
 
 ## 6. GLM and GLMM
 
-Use `--family binomial` for a binary response, `poisson` for counts, and
+Use `--family binomial` for a logit binary response, source-build
+`--family probit` for a normal-CDF binary response, `poisson` for counts, and
 `gamma` for positive continuous responses. Gaussian is the default.
 
 ```powershell
@@ -271,7 +272,8 @@ java -jar jlinalg-<version>.jar --pheno phenotype.csv --omics expression.csv `
 ```
 
 The CLI currently uses fixed canonical links: identity for Gaussian, logit
-for binomial, and log for Poisson and Gamma. You may restate that choice with
+for binomial, probit for `probit` / `binomial-probit`, and log for
+Poisson and Gamma. You may restate that choice with
 `--link`, such as `--family binomial --link logit`, but a noncanonical link is
 rejected rather than silently ignored. Use the Java API when a custom link is
 required. Genotype Laplace-GLMM scans are not currently exposed.

@@ -134,7 +134,7 @@ final class AnalysisRunner {
             sourceIds = numericSource.metadata().sampleIds();
         }
 
-        boolean binomial = options.family.equals("binomial");
+        boolean binomial = isBinomialFamily(options.family);
         PhenotypeData phenotype = PhenotypeData.read(
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(sourceIds,
@@ -183,15 +183,19 @@ final class AnalysisRunner {
             }
         }
         if(options.conditionalGwasSummary && (!genotype || plan.hasRandomEffects() || grm!=null || pedigree!=null
-                || !(model.equals("ols") || model.equals("cox") || model.equals("glm") && Set.of("binomial","poisson","gaussian").contains(options.family))))
-            throw new IllegalArgumentException("--conditional-gwas-summary supports unrelated genotype OLS, Gaussian/binomial/Poisson GLM, and model-based Cox scans; mixed/robust models need separate score exporters");
+                || !(model.equals("ols") || model.equals("cox") || model.equals("glm")
+                    && Set.of("binomial", "probit", "binomial-probit",
+                        "poisson", "gaussian").contains(options.family))))
+            throw new IllegalArgumentException("--conditional-gwas-summary supports unrelated genotype OLS, Gaussian/binomial-logit/binomial-probit/Poisson GLM, and model-based Cox scans; mixed/robust models need separate score exporters");
         if(model.equals("cox") && (!genotype || grm!=null || plan.hasRandomEffects()))
             throw new IllegalArgumentException("Cox omics scans currently require unrelated genotype data");
         if(genotype && (model.equals("cox") || (model.equals("glm") || model.equals("glmm")) && !options.family.equals("gaussian"))) {
             String notice=options.conditionalGwasSummary
                 ?"Conditional-GWAS export enabled: scores and within-block covariance are local to the fitted null; nonlinear refits for new conditioning sets and rare-event calibration are not supplied by these columns."
                 :"If MR conditional GWAS is planned, the current standard output is insufficient for this outcome model. Use --conditional-gwas-summary with --score-genome-build to export model-specific scores, covariance and metadata; new nonlinear conditioning sets require cohort-side refitting.";
-            if(!options.conditionalGwasSummary && (model.equals("glmm") || model.equals("glm") && !Set.of("binomial","poisson").contains(options.family)))
+            if(!options.conditionalGwasSummary && (model.equals("glmm") || model.equals("glm")
+                    && !Set.of("binomial", "probit", "binomial-probit",
+                        "poisson").contains(options.family)))
                 notice="If MR conditional GWAS is planned, the current standard output is insufficient for this outcome model. A matching cohort-side score/covariance exporter is required; --conditional-gwas-summary does not yet support this mixed/quasi/noncanonical model.";
             output.println(notice);warning(notice);
         }
@@ -283,11 +287,11 @@ final class AnalysisRunner {
             if(model.equals("cox"))scoreExport=new ConditionalGwasExport(options,cox::score,fixed.response(),false,eventCount,
                 "cox","cox-partial-likelihood",Double.NaN,names,conditioningKeys,null);
             else {
-                if(options.family.equals("binomial") && fixed.weights()!=null && Arrays.stream(fixed.weights()).anyMatch(w->w!=1))
+                if(isBinomialFamily(options.family) && fixed.weights()!=null && Arrays.stream(fixed.weights()).anyMatch(w->w!=1))
                     throw new IllegalArgumentException("binary score export requires unit trial weights; grouped-binomial summaries need a different count schema");
                 var glm=org.jlinalg.association.FastGlmAssociation.prepare(fixed.response(),covariates,
                     model.equals("ols")?GlmFamilies.gaussian():family(options.family),fixed.weights(),fixed.offset(),GlmOptions.defaults(),engine);
-                scoreExport=new ConditionalGwasExport(options,glm::score,fixed.response(),options.family.equals("binomial"),-1,
+                scoreExport=new ConditionalGwasExport(options,glm::score,fixed.response(),isBinomialFamily(options.family),-1,
                     model,glm.nullModel().family(),glm.nullModel().dispersion(),names,conditioningKeys,prepared.binaryMapping());
             }
         }
@@ -542,11 +546,11 @@ final class AnalysisRunner {
         PhenotypeData phenotype = PhenotypeData.read(
             options.phenotype, options.idColumn);
         PhenotypeData.Prepared prepared = phenotype.prepare(null,
-            preparedResponse, options.family.equals("binomial") || plan.isCox(),
+            preparedResponse, isBinomialFamily(options.family) || plan.isCox(),
             options.caseValue, options.controlValue, options.individualId);
         int phenotypeSamples = prepared.ids().size();
         prepared = completeCases(phenotype, prepared, preparedResponse,
-            options.family.equals("binomial") || plan.isCox());
+            isBinomialFamily(options.family) || plan.isCox());
         reportPhenotypeSamples(phenotypeSamples, prepared.ids().size());
         GrmContext grm = grm(phenotype, prepared);
         PedigreeContext pedigree = pedigree(phenotype, prepared);
@@ -632,15 +636,14 @@ final class AnalysisRunner {
             plan.withoutOmics(), prepared.modelTable());
         GlmResult fit = compiled.fitGlm(family(options.family),
             GlmOptions.defaults(), options.backend);
-        double df = fit.observations() - fit.rank();
-        AssociationStatistics statistics = AssociationStatistics.studentT(
-            fit.beta(), fit.standardErrors(), df,
-            DegreesOfFreedomMethod.RESIDUAL_APPROXIMATION);
+        requireConverged(fit.converged(), "GLM");
+        AssociationStatistics statistics = fit.associationStatistics();
         return CoefficientOutput.write(options.output, options.overwrite,
             compiled.coefficientNames(), statistics.beta(),
             statistics.standardErrors(), statistics.statistics(),
             statistics.degreesOfFreedom(), statistics.pValues(),
-            "t_approx", null, "transformed_effect");
+            fit.estimatedDispersion() ? "t" : "z",
+            null, "transformed_effect");
     }
 
     private long phenotypeLmm(
@@ -877,12 +880,16 @@ final class AnalysisRunner {
             String model, boolean genotype) {
         resolvedStatisticType = switch (model) {
             case "glmm", "cox" -> "z";
-            case "glm" -> "t_approx";
+            case "glm" -> family(options.family).fixedDispersion()
+                ? "z" : options.omics == null ? "t" : "t_approx";
             default -> "t";
         };
         resolvedDfMethod = switch (model) {
             case "glmm", "cox" -> "asymptotic";
-            case "glm" -> "residual-approximation";
+            case "glm" -> family(options.family).fixedDispersion()
+                ? "asymptotic"
+                : options.omics == null ? "residual"
+                    : "residual-approximation";
             case "lmm" -> genotype
                 ? "residual-approximation"
                 : dfMethod(options.degreesOfFreedom).name()
@@ -909,6 +916,7 @@ final class AnalysisRunner {
         return switch (name) {
             case "gaussian" -> GlmFamilies.gaussian();
             case "binomial" -> GlmFamilies.binomial();
+            case "probit", "binomial-probit" -> GlmFamilies.probit();
             case "poisson" -> GlmFamilies.poisson();
             case "gamma" -> GlmFamilies.gamma();
             case "inverse-gaussian" -> GlmFamilies.inverseGaussian();
@@ -917,6 +925,11 @@ final class AnalysisRunner {
             default -> throw new IllegalArgumentException(
                 "unsupported family: " + name);
         };
+    }
+
+    private static boolean isBinomialFamily(String name) {
+        return name.equals("binomial") || name.equals("probit")
+            || name.equals("binomial-probit");
     }
 
     private static DegreesOfFreedomMethod dfMethod(String name) {

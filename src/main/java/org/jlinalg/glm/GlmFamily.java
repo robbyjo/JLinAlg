@@ -12,6 +12,19 @@ public interface GlmFamily {
     double link(double mean);
     double inverseLink(double linearPredictor);
     double meanDerivative(double linearPredictor);
+
+    /**
+     * Returns the second derivative of the inverse link. Built-in families
+     * override this analytically; the centered finite-difference default keeps
+     * custom families source compatible for marginal-effect calculations.
+     */
+    default double meanSecondDerivative(double linearPredictor) {
+        double step = Math.cbrt(Math.ulp(1.0))
+            * Math.max(1.0, Math.abs(linearPredictor));
+        return (meanDerivative(linearPredictor + step)
+            - meanDerivative(linearPredictor - step)) / (2.0 * step);
+    }
+
     double variance(double mean);
     double unitDeviance(double response, double mean);
     double logLikelihood(

@@ -2,17 +2,22 @@
 
 ## CLI-only OLS and GLM quick starts
 
-These workflows require only the executable JAR:
+These workflows require only an executable JAR. The published v0.3.5 asset
+supports the OLS, logit, and Poisson examples below; the probit example requires
+a current source build produced by `gradlew executableJar`:
 
 ```bash
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-ols.csv
 
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out case-expression.csv
 
+java -jar build/cli/jlinalg-0.3.5.jar --pheno phenotype.csv --id SampleName --formula "case_status ~ Sex + Age" --family probit --case-value case --control-value control --out case-probit.csv
+
 java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "count ~ Sex + Age + <omics>" --family poisson --out count-expression.csv
 ```
 
-Use `--family gamma` for positive continuous outcomes. Phenotype rows missing
+Use `--family probit` for a binary normal-CDF link and `--family gamma` for
+positive continuous outcomes. Phenotype rows missing
 the response or any formula variable are omitted together. Add `--dry-run` to
 inspect sample alignment and model routing without fitting. The sections below
 show the Java APIs for controls not exposed by the general CLI.
@@ -101,9 +106,14 @@ GlmResult logistic = Glm.fit(
     disease, design, GlmFamilies.binomial());
 System.out.println(logistic.coefficients()[1]);
 System.out.println(logistic.pValues()[1]);
+
+GlmResult probit = Glm.fit(
+    disease, design, GlmFamilies.probit());
 ```
 
-Available factories include Gaussian, binomial, Poisson, Gamma,
+`GlmFamilies.binomial()` uses the logit link; `GlmFamilies.probit()` (also
+available as `binomialProbit()`) uses the standard-normal CDF link. Available
+factories also include Gaussian, Poisson, Gamma,
 inverse-Gaussian, fixed-size negative-binomial, quasi-binomial, and
 quasi-Poisson families. Fixed-dispersion GLM coefficient tests use Wald z tests;
 estimated dispersion uses residual Student t inference and F contrasts.
@@ -146,6 +156,10 @@ small tail directly, even when the reported mean rounds to one. Compatible
 contracts. Information is not floored to fabricate finite standard errors:
 unrepresentable working precision is an error. Exactly zero-residual Gaussian
 ML has likelihood supremum `+Infinity` and AIC `-Infinity`.
+
+For expected responses, standardized scenario effects, risk ratios, and
+average marginal effects, continue with the
+[predictions and contrasts vignette](predictions-and-contrasts.md).
 
 ## Clustered marginal models (GEE)
 
