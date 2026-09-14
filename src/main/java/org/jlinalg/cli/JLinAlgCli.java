@@ -47,6 +47,19 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("conditional-score"))
             return ConditionalScoreCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && (arguments[0].equals("confounders")
+                || arguments[0].equals("batch-adjust")))
+            return ConfounderCli.run(arguments[0], Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("glm-predict"))
+            return PredictionCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("iv-regression"))
+            return InstrumentalVariableCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("arima-regression"))
+            return ArimaRegressionCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && (arguments[0].equals("meta-analysis")
                 || arguments[0].equals("meta-regression")))
             return MetaCli.run(arguments[0], Arrays.copyOfRange(
@@ -173,6 +186,16 @@ public final class JLinAlgCli {
                 --genome-build GRCh38 --test single|burden|skat|skat-o --out PREFIX
               java -jar jlinalg-<version>.jar conditional-score --cohorts manifest.tsv
                 --targets CHR:POS:REF:ALT --condition-on CHR:POS:REF:ALT --out FILE.tsv
+              java -jar jlinalg-<version>.jar confounders --method pca|sva|autosva|peer
+                --omics MATRIX [--pheno TABLE --id COLUMN] --factors N|auto --out PREFIX
+              java -jar jlinalg-<version>.jar batch-adjust --method combat --omics MATRIX
+                --pheno TABLE --id COLUMN --batch COLUMN --out PREFIX
+              java -jar jlinalg-<version>.jar glm-predict --input TABLE --response Y
+                --predictors x1,x2 --family probit --estimand expected --out FILE
+              java -jar jlinalg-<version>.jar iv-regression --input TABLE --response Y
+                --endogenous X --instruments Z1,Z2 --out PREFIX
+              java -jar jlinalg-<version>.jar arima-regression --input TABLE --response Y
+                --order p,d,q --out PREFIX [--smooth]
               java -jar jlinalg-<version>.jar meta-analysis
                 --cohort NAME=FILE [--cohort NAME=FILE ...] --model fixed|random --out FILE
               java -jar jlinalg-<version>.jar meta-regression

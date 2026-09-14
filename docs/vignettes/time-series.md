@@ -254,6 +254,26 @@ See [API examples and validation](../estimator-extensions.md).
 
 ### Regression forecasts with parameter uncertainty
 
+The source-build CLI exposes ARIMA-error regression, the scalable historical
+smoother, and both forecast-uncertainty contracts:
+
+```powershell
+java -jar build/cli/jlinalg-0.3.5.jar arima-regression `
+  --input monthly.tsv `
+  --response outcome `
+  --predictors intervention,time `
+  --order 1,0,1 `
+  --seasonal 0,1,1,12 `
+  --smooth `
+  --out results/monthly-arima
+```
+
+Add `--horizon 12 --future future-months.tsv` for conditional forecasts.
+`--parameter-uncertainty` requests the joint regression/dynamic delta-method
+variance and fails if the observed-information covariance is unavailable.
+The future table must contain exactly the requested number of rows and the
+same predictor columns.
+
 ```java
 var regression = ArimaRegression.fit(y, design, order, options);
 ArimaForecast conditional = regression.forecastConditional(futureDesign, .95);

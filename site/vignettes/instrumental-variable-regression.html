@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Individual-level instrumental-variable regression</span></div>
-<span class="eyebrow">Java API · Source build</span><h1>Individual-level instrumental-variable regression</h1><p>Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.</p></div></section>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Individual-level instrumental-variable regression</h1><p>Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.</p></div></section>
 <div class="container page-layout"><article class="prose"><p>Use two-stage least squares (2SLS) when a linear outcome model contains a
 predictor that is correlated with the structural error, and you have excluded
 instruments that shift that predictor without directly shifting the outcome.
@@ -22,6 +22,21 @@ cannot verify:</p>
    used for inference are appropriate.</li>
 </ol>
 <h2 id="fit-a-model">Fit a model</h2>
+<p>For a numeric observation table, the source-build CLI fits the same estimator
+and writes separate coefficient, strength-diagnostic, and manifest tables:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar iv-regression `
+  --input cohort.tsv `
+  --response outcome `
+  --exogenous age,sex `
+  --endogenous exposure `
+  --instruments z1,z2 `
+  --covariance hc1 `
+  --backend preferred `
+  --out results/exposure-iv
+</code></pre></div>
+<p>For clustered observations, choose <code>cluster-cr0</code> or <code>cluster-cr1</code> and provide
+<code>--cluster household</code>. Cluster values may be strings; the CLI maps distinct
+labels deterministically in first-seen order.</p>
 <p>The example below estimates the effect of one endogenous exposure. The
 exogenous matrix contains the intercept and an observed covariate. The excluded
 instrument matrix contains two instruments. Include the intercept explicitly

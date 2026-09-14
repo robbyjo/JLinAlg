@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Estimate unknown sample factors with PCA, SVA, AutoSVA, or PEER, and adjust known batches with ComBat."><title>Latent confounders and batch effects · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Latent confounders and batch effects</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Latent confounders and batch effects</h1><p>Estimate unknown sample factors with PCA, SVA, AutoSVA, or PEER, and adjust known batches with ComBat.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>JLinAlg provides four sample-factor estimators and a separate known-batch
+adjuster. The matrix orientation is always <strong>features by samples</strong>: the first
+column contains feature IDs and the remaining header fields are sample IDs.
+Measurements must already be normalized and approximately continuous.</p>
+<h2 id="choose-the-method-deliberately">Choose the method deliberately</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Use it for</th>
+<th>Required information</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PCA</td>
+<td>A fast unsupervised baseline</td>
+<td>A fixed factor count</td>
+</tr>
+<tr>
+<td>SVA</td>
+<td>Unknown unwanted variation while protecting a biological design</td>
+<td>Full and null designs; factor count or BE selection</td>
+</tr>
+<tr>
+<td>AutoSVA</td>
+<td>Roby Joehanes' iteratively reweighted SVA and preserved-signal factor search</td>
+<td>A protected design; fixed or automatic factor count</td>
+</tr>
+<tr>
+<td>PEER</td>
+<td>Probabilistic factor analysis with optional observed covariates</td>
+<td>A fixed maximum factor count</td>
+</tr>
+<tr>
+<td>ComBat</td>
+<td>Location/scale adjustment for a known categorical batch</td>
+<td>Batch labels and optional covariates to preserve</td>
+</tr>
+</tbody>
+</table>
+<p>PCA, SVA, AutoSVA, and PEER return sample covariates. ComBat returns an adjusted
+feature matrix. They are not interchangeable meanings of "batch correction."</p>
+<h2 id="pca">PCA</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar confounders `
+  --method pca `
+  --omics expression.tsv `
+  --factors 10 `
+  --out results/expression-pca `
+  --write-adjusted
+</code></pre></div>
+<p>The outputs are:</p>
+<ul>
+<li><code>expression-pca.factors.tsv</code>: sample by PC;</li>
+<li><code>expression-pca.loadings.tsv</code>: feature by PC;</li>
+<li><code>expression-pca.adjusted.tsv</code>: optional residual matrix;</li>
+<li><code>expression-pca.manifest.tsv</code>: dimensions, settings, backend and variance
+  fractions.</li>
+</ul>
+<p>Use <code>--scale</code> only when equal feature variances are scientifically appropriate.
+With <code>--pheno</code>, <code>--id</code>, and <code>--full-design age,sex</code>, PCA is fitted after those
+known covariates are projected out. Sample IDs are intersected in omics order;
+the aligned count is printed.</p>
+<p>Tall matrices use a sample-Gram decomposition through the selected JDistlib
+backend. This avoids allocating a feature-by-feature covariance matrix. Factor
+signs are made deterministic by requiring the largest absolute loading to be
+positive.</p>
+<h2 id="standard-sva">Standard SVA</h2>
+<p>The full design contains the variables whose effects must be retained. The
+null design contains adjustment variables but omits the biological term being
+tested:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar confounders `
+  --method sva `
+  --omics methylation.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --full-design case,age,sex `
+  --null-design age,sex `
+  --factors auto `
+  --permutations 20 `
+  --iterations 5 `
+  --seed 7201 `
+  --out results/methylation-sva
+</code></pre></div>
+<p><code>--factors auto</code> follows <code>sva::num.sv(method="be")</code>: it residualizes by the
+full model, independently permutes each feature across samples, and applies the
+ordered 0.10 permutation threshold to residual singular-value fractions.
+Numeric <code>--factors K</code> skips selection.</p>
+<p>The iterative estimator follows <code>sva::irwsva.build</code>: nested-model F tests,
+empirical local-FDR control probabilities, feature reweighting, and repeated
+sample-factor decomposition. <code>feature-weights.tsv</code> makes the final empirical
+control weights auditable.</p>
+<h2 id="autosva">AutoSVA</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar confounders `
+  --method autosva `
+  --omics methylation.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --full-design case,age,sex `
+  --null-design age,sex `
+  --factors auto `
+  --max-factors 30 `
+  --increment 5 `
+  --iterations 20 `
+  --mrse 0.001 `
+  --out results/methylation-autosva
+</code></pre></div>
+<p>AutoSVA is a named adaptation, not an alias for Bioconductor SVA. Its feature
+weight is the probability of latent heterogeneity times the local-FDR
+probability of not being driven by the protected model. Iteration stops at the
+configured weight MRSE. Automatic selection evaluates the preserved-design F
+ratio after residualizing each candidate factor count. The complete search,
+including failures, is written to <code>factor-selection.tsv</code>.</p>
+<p>The Java port deliberately makes degenerate-statistic handling deterministic.
+It clamps invalid zero F statistics to a small positive value rather than
+injecting random noise. It also interprets the source stopping expression as
+<code>length(f_ratios) - index_max &gt; 5</code>, which is the intended distance from the
+most recent improvement.</p>
+<h2 id="peer">PEER</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar confounders `
+  --method peer `
+  --omics expression.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --full-design age,sex,ancestry1,ancestry2 `
+  --factors 20 `
+  --add-mean `
+  --max-iterations 1000 `
+  --seed 7201 `
+  --out results/expression-peer
+</code></pre></div>
+<p>The dense variational updates follow official PEER 1.3: Gaussian factor and
+loading posteriors, Gamma ARD precisions, feature-specific noise precisions,
+known-covariate precision 100, and the original default priors
+<code>alpha=(0.001,0.1)</code> and <code>epsilon=(0.1,10)</code>. The seed is explicit because the
+official implementation initializes hidden factors and loadings randomly.</p>
+<p>Inspect <code>converged</code>, the evidence-bound history available from the Java API,
+and the residual-variance path. Factors can capture ancestry or protected
+biology if those variables are not supplied as observed covariates.</p>
+<h2 id="combat">ComBat</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar batch-adjust `
+  --method combat `
+  --omics expression.tsv `
+  --pheno phenotype.tsv `
+  --id IID `
+  --batch sequencing_plate `
+  --preserve case,age,sex `
+  --out results/expression-combat
+</code></pre></div>
+<p>The default is parametric empirical Bayes. <code>--nonparametric</code>, <code>--mean-only</code>,
+and <code>--reference-batch VALUE</code> expose the corresponding Bioconductor contracts.
+A singleton batch forces mean-only adjustment. Features with zero variance in
+any non-singleton batch are returned unchanged and counted on screen.</p>
+<p>ComBat rejects rank-deficient covariates and covariates confounded with batch.
+This is intentional: when batch and biology cannot be separated, software must
+not invent an adjusted answer. Plain ComBat is not appropriate for raw counts;
+normalize appropriately or use a separately validated count model.</p>
+<h2 id="use-factors-in-association-models">Use factors in association models</h2>
+<p>The default scientific workflow is to merge <code>*.factors.tsv</code> into the phenotype
+table and include the factors explicitly:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg-0.3.5.jar `
+  --pheno phenotype-with-svs.tsv `
+  --id IID `
+  --omics expression.tsv `
+  --formula &quot;trait ~ age + sex + SV1 + SV2 + &lt;omics&gt;&quot; `
+  --out results/association.tsv
+</code></pre></div>
+<p>Do not estimate factors once on the complete dataset and reuse them across
+prediction-validation folds. Frozen projection and fold-owned preprocessing
+remain a separate workflow because refitting on held-out samples leaks their
+distribution into training.</p>
+<h2 id="reproduce-the-reference-checks">Reproduce the reference checks</h2>
+<p>The frozen fixture was generated from Bioconductor <code>sva</code> 3.60.0 at commit
+<code>87a4798db8134fd0952a516489dd555545a92d36</code> and the AutoSVA source file:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>&amp; 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' `
+  src/test/R/confounder-reference.R `
+  build/reference-sources/sva-3.60.0 `
+  'D:/git/NIH-R/src/sva-lite.R' `
+  src/test/resources/r-reference/confounding
+
+.\gradlew.bat test `
+  --tests org.jlinalg.confounding.ConfounderRReferenceTest
+</code></pre></div>
+<p>See <a href="../latent-confounder-validation.html">the validation report</a> for numerical
+criteria, source provenance, performance choices, and unimplemented boundaries.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#choose-the-method-deliberately">Choose the method deliberately</a><a href="#pca">PCA</a><a href="#standard-sva">Standard SVA</a><a href="#autosva">AutoSVA</a><a href="#peer">PEER</a><a href="#combat">ComBat</a><a href="#use-factors-in-association-models">Use factors in association models</a><a href="#reproduce-the-reference-checks">Reproduce the reference checks</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

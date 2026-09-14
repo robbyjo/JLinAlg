@@ -28,6 +28,14 @@ new commands are not in the previously published v0.3.5 release asset.
 Source builds also provide [`grm` construction](../grm-cli.md) from genotype
 files and [rare-variant meta-analysis](../rare-variant-meta-analysis.md).
 
+Latent-factor and batch workflows use dedicated global-matrix commands rather
+than the row-wise `--transform` pipeline. See the
+[latent-confounder vignette](latent-confounders-and-batch.md) for PCA, SVA,
+AutoSVA, PEER, and ComBat commands. The recently added probit, prediction,
+IV/2SLS, conditional-score, and ARIMA-smoothing surfaces are available as
+`--family probit`, `glm-predict`, `iv-regression`, `conditional-score`, and
+`arima-regression`.
+
 ## Understand the three ID layers
 
 | Option | Meaning |
@@ -256,6 +264,11 @@ java -jar jlinalg-0.3.5.jar penalized-regression --input continuous.tsv --respon
 java -jar jlinalg-<version>.jar mediation --input mediation.tsv --outcome y --treatment x --mediator m --covariates age --out mediation-effects.tsv
 java -jar jlinalg-<version>.jar susie --summary locus.tsv --ld locus-ld.tsv --sample-size 10000 --out locus-susie.tsv
 java -jar jlinalg-<version>.jar coloc --trait1 trait1-susie.tsv.effects.tsv --trait2 trait2-susie.tsv.effects.tsv --out coloc.tsv
+java -jar jlinalg-<version>.jar confounders --method sva --omics expression.tsv --pheno phenotype.tsv --id IID --full-design case,age,sex --null-design age,sex --factors auto --out expression-sva
+java -jar jlinalg-<version>.jar batch-adjust --method combat --omics expression.tsv --pheno phenotype.tsv --id IID --batch plate --preserve case,age,sex --out expression-combat
+java -jar jlinalg-<version>.jar glm-predict --input model.tsv --response y --predictors exposure,age --family probit --estimand expected --out predictions.tsv
+java -jar jlinalg-<version>.jar iv-regression --input iv.tsv --response y --exogenous age --endogenous exposure --instruments z1,z2 --out iv-fit
+java -jar jlinalg-<version>.jar arima-regression --input series.tsv --response y --predictors time --order 1,0,1 --smooth --out arima-fit
 ~~~
 
 MR preparation, LD installation/clumping, MR estimation, and parallel xWAS MR

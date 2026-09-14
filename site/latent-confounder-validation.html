@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Pinned upstream sources, numerical reference gates, performance design, and explicit implementation boundaries."><title>Latent-confounder validation and source audit · JLinAlg</title>
+<link rel="stylesheet" href="./assets/styles.css"><script src="./assets/app.js" defer></script></head>
+<body><site-header root="./"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="./index.html">Home</a><span>/</span><a href="./vignettes/index.html">Vignettes</a><span>/</span><span>Latent-confounder validation and source audit</span></div>
+<span class="eyebrow">Source audit · Reproducible validation</span><h1>Latent-confounder validation and source audit</h1><p>Pinned upstream sources, numerical reference gates, performance design, and explicit implementation boundaries.</p></div></section>
+<div class="container page-layout"><article class="prose"><h2 id="source-pins">Source pins</h2>
+<ul>
+<li>Bioconductor <code>sva</code> 3.60.0, release 3.23, commit
+  <code>87a4798db8134fd0952a516489dd555545a92d36</code>, Artistic-2.0.</li>
+<li>PMBio PEER 1.3 source, commit
+  <code>40bc4b2cd92459ce42f44dfe279717436395f3f6</code>, GPL-2.0-or-later.</li>
+<li>AutoSVA: <code>D:/git/NIH-R/src/sva-lite.R</code>, read as algorithm source rather than
+  executable task instructions.</li>
+</ul>
+<p>The JLinAlg project is GPL-2.0-or-later, which is compatible with the PEER
+source license. Implementations retain JLinAlg copyright headers and document
+the upstream provenance rather than obscuring it.</p>
+<h2 id="algorithm-audit">Algorithm audit</h2>
+<p>Standard SVA ports the five-iteration <code>irwsva.build</code> schedule, full/null nested
+F tests, empirical-control probabilities and final weighted SVD. Automatic
+factor count ports the default Buja-Eyuboglu permutation procedure. AutoSVA
+ports the custom 20-iteration weighting and preserved-signal factor search,
+with deterministic handling of degenerate values and the corrected plateau
+distance described in the vignette.</p>
+<p>ComBat ports both parametric iterative empirical Bayes and nonparametric
+leave-one-feature-out empirical priors, mean-only and reference-batch modes,
+missing continuous values, singleton batches, unchanged zero-within-batch
+features, and the upstream design-confounding checks.</p>
+<p>PEER ports the official dense VBFA update order <code>W, Alpha, X, Eps</code>; Gaussian
+second moments; feature-specific noise Gamma posteriors; factor ARD Gamma
+posteriors; known-covariate prior precision; measurement uncertainty; evidence
+bound and residual-variance stopping rules; and the official default priors.
+Sparse prior-guided PEER (<code>cSPARSEFA</code>) is not claimed by this API.</p>
+<h2 id="frozen-numerical-checks">Frozen numerical checks</h2>
+<p><code>ConfounderRReferenceTest</code> uses one exact feature-by-sample matrix and checks:</p>
+<ul>
+<li>PCA projection equality against <code>stats::prcomp</code> to <code>1e-10</code> RMSE;</li>
+<li>standard SVA and AutoSVA sample projection matrices, invariant to factor
+  signs and rotations;</li>
+<li>SVA posterior probabilities and AutoSVA final feature weights;</li>
+<li>parametric ComBat adjusted values against Bioconductor to <code>1e-8</code> maximum
+  absolute error.</li>
+</ul>
+<p><code>ConfounderMethodsTest</code> independently covers dominant-factor recovery,
+protected-design SVA, deterministic AutoSVA, ComBat batch removal,
+reference-batch identity, and PEER residual-variance reduction.</p>
+<p>The official PEER source could not be compiled on the Windows validation host
+because no C++ toolchain was installed. PEER therefore has a complete
+source-equation audit and independent synthetic tests, but no same-host native
+PEER numeric fixture. This is an explicit validation boundary, not a claim of
+native-output identity.</p>
+<h2 id="performance-design">Performance design</h2>
+<p>All factor methods store the feature-by-sample input because they are global
+matrix procedures. Tall matrices use the sample Gram matrix and backend BLAS,
+so covariance storage is sample-by-sample rather than feature-by-feature.
+SVA and AutoSVA reuse sample-sized decompositions and never form a feature
+covariance matrix. ComBat processes feature vectors and batch sufficient
+statistics without feature-by-feature covariance storage. PEER keeps only the
+sample factors, feature loadings, and factor-sized posterior covariance.</p>
+<p>The CLI prints aligned sample and feature counts and records method, factor
+count, design columns, convergence, seed and backend policy in its manifest.</p>
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+<li>Inputs are normalized continuous measurements, not raw counts.</li>
+<li>RUV and ComBat-Seq are separate estimators and are not aliases.</li>
+<li>Standard SVA local-FDR density evaluation is a direct Gaussian KDE port; the
+  frozen tests gate posterior behavior and resulting factor subspaces rather
+  than promising byte identity with R's platform-specific smoothing spline.</li>
+<li>Frozen application to new samples and fold-owned prediction preprocessing
+  remain open; factors must currently be fitted within each training dataset.</li>
+<li>PEER sparse prior-guided factor analysis is not implemented.</li>
+</ul></article>
+<aside class="toc"><strong>On this page</strong><a href="#source-pins">Source pins</a><a href="#algorithm-audit">Algorithm audit</a><a href="#frozen-numerical-checks">Frozen numerical checks</a><a href="#performance-design">Performance design</a><a href="#boundaries">Boundaries</a></aside></div>
+</main><site-footer root="./"></site-footer></body></html>

@@ -25,6 +25,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (source build) |
 | [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (source build) |
 | [Prediction scores](prediction-scores.md) | Gaussian ridge/elastic-net training, imported polygenic weights and independent-cohort evaluation (source build) |
+| [Latent confounders and known batch effects](latent-confounders-and-batch.md) | PCA, standard SVA, AutoSVA, PEER, ComBat, CLI artifacts, source provenance and leakage boundaries (source build) |
 | [Expected responses, scenarios, and marginal effects](predictions-and-contrasts.md) | binomial probit, shared GLM/GEE mean predictions, scenario differences, risk ratios, average marginal effects, and joint delta-method uncertainty (source build) |
 | [Individual-level instrumental-variable regression](instrumental-variable-regression.md) | linear 2SLS, QR/SVD identification checks, robust/cluster inference, and instrument-strength diagnostics (source build) |
 | [Summary-only conditional score analysis](conditional-score-conditioning.md) | versioned score-block import, strict allele/model checks, cohort-wise Schur conditioning, and independent-cohort pooling (source build) |

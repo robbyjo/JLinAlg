@@ -32,6 +32,36 @@ representable floating-point range.
 
 ## Expected responses
 
+The same probit fit and response-scale estimands are available from a numeric
+table through the source-build CLI:
+
+```powershell
+java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+  --input cohort.tsv `
+  --response case `
+  --predictors exposure,age,sex `
+  --family probit `
+  --estimand expected `
+  --out predicted-probabilities.tsv
+```
+
+For standardized contrasts, reuse the observed rows and set one design column
+to each scenario value:
+
+```powershell
+java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+  --input cohort.tsv --response case --predictors exposure,age,sex `
+  --family probit --estimand difference `
+  --scenario-column exposure --first 1 --second 0
+
+java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+  --input cohort.tsv --response case --predictors exposure,age,sex `
+  --family probit --estimand ame --ame-column age
+```
+
+Use `--averaging at-average` only when the synthetic average-covariate
+estimand is intended; population averaging is the default.
+
 ```java
 double[][] people = {
     {1, -.75, 0},

@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://robbyjo.github.io/JLinAlg/</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/verification.html</loc></url>
+  <url><loc>https://robbyjo.github.io/JLinAlg/latent-confounder-validation.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/grm.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/command-line.html</loc></url>
@@ -14,6 +15,7 @@
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/predictions-and-contrasts.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/instrumental-variable-regression.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/conditional-score-conditioning.html</loc></url>
+  <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/latent-confounders-and-batch.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/basic-statistical-tests.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/nonlinear-models.html</loc></url>
   <url><loc>https://robbyjo.github.io/JLinAlg/vignettes/mediation.html</loc></url>

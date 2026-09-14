@@ -19,6 +19,25 @@ cannot verify:
 
 ## Fit a model
 
+For a numeric observation table, the source-build CLI fits the same estimator
+and writes separate coefficient, strength-diagnostic, and manifest tables:
+
+```powershell
+java -jar build/cli/jlinalg-0.3.5.jar iv-regression `
+  --input cohort.tsv `
+  --response outcome `
+  --exogenous age,sex `
+  --endogenous exposure `
+  --instruments z1,z2 `
+  --covariance hc1 `
+  --backend preferred `
+  --out results/exposure-iv
+```
+
+For clustered observations, choose `cluster-cr0` or `cluster-cr1` and provide
+`--cluster household`. Cluster values may be strings; the CLI maps distinct
+labels deterministically in first-seen order.
+
 The example below estimates the effect of one endogenous exposure. The
 exogenous matrix contains the intercept and an observed covariate. The excluded
 instrument matrix contains two instruments. Include the intercept explicitly

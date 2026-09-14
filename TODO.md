@@ -18,10 +18,16 @@ See [xWAS workflow validation and scope](docs/xwas-followup-validation.md).
   moderation, count-library normalization and dispersion shrinkage, with
   separate limma/voom and negative-binomial estimator contracts. Validate
   against limma and DESeq2/edgeR plus independent likelihood fixtures.
-- [ ] **Latent-confounder and batch-effect estimation.** Add SVA/RUV-style
-  nuisance-factor estimation and ComBat-style batch adjustment. Preserve the
-  biological design, detect confounded batch/design matrices, and fit/freeze
-  preprocessing within training folds for prediction workflows.
+- [x] **Latent-confounder and batch-effect estimation.** Added PCA, standard
+  SVA, AutoSVA, dense PEER, and continuous-data ComBat with protected designs,
+  batch/design rank checks, deterministic artifacts, source-pinned fixtures,
+  and dedicated CLI workflows. See the
+  [vignette](docs/vignettes/latent-confounders-and-batch.md) and
+  [validation report](docs/latent-confounder-validation.md).
+- [ ] **Frozen confounder projection and count-aware adjustment.** Add
+  fold-owned fit/freeze/apply artifacts for prediction, plus independently
+  validated RUV and ComBat-Seq contracts. Do not refit preprocessing on held-
+  out folds or apply Gaussian ComBat directly to raw counts.
 - [ ] **Region-level EWAS analysis.** Add coordinate-aware aggregation of
   neighboring CpGs and calibrated region-level significance, with explicit
   spatial dependence, probe coverage and genome-build handling.

@@ -1,5 +1,23 @@
 # Unreleased
 
+## Latent confounders, batch adjustment, and CLI completion
+
+- Added feature-by-sample PCA, Bioconductor-style iteratively reweighted SVA,
+  deterministic AutoSVA, official-source dense PEER VBFA, and parametric or
+  nonparametric continuous-data ComBat APIs.
+- Added `confounders` and `batch-adjust` commands with sample-ID intersection,
+  protected/null designs, factor/loadings/weight outputs, adjusted matrices,
+  factor-selection paths, convergence metadata, and batch-confounding checks.
+- Pinned Bioconductor `sva` 3.60.0 and PMBio PEER 1.3 source revisions. Frozen
+  R fixtures cover PCA, standard SVA, AutoSVA and ComBat; PEER retains an
+  explicit native-runtime validation boundary on the Windows host.
+- Added a tall-matrix sample-Gram/backend path so global factor extraction never
+  allocates a feature-by-feature covariance matrix.
+- Wired the preceding feature tranche through `glm-predict`, `iv-regression`,
+  existing `conditional-score`, `arima-regression --smooth`, and the existing
+  general `--family probit` path, with end-to-end CLI tests.
+- Added a practical latent-confounder vignette and source/validation audit.
+
 ## Probit, predictions, IV, conditional scores, and scalable ARIMA
 
 - Added a stable binomial probit GLM through `GlmFamilies.probit()` and the

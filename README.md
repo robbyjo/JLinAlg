@@ -77,6 +77,13 @@ and scalable exact diffuse [ARIMA smoothing and parameter-aware forecasts](docs/
 Each guide states the estimand, validation reference, and important inference
 boundaries.
 
+The source build now also provides [PCA, standard SVA, AutoSVA, and PEER latent
+factors plus ComBat batch adjustment](docs/vignettes/latent-confounders-and-batch.md).
+The dedicated `confounders` and `batch-adjust` commands align feature matrices
+by sample ID and write reusable factors, adjusted matrices, and audit manifests.
+The five preceding additions are CLI-accessible through `--family probit`,
+`glm-predict`, `iv-regression`, `conditional-score`, and `arima-regression`.
+
 [Gene-set enrichment](docs/vignettes/enrichment.md) adds analysis-specific
 backgrounds and selection expressions, Fisher ORA, EWAS `gsameth`, BH/BY correction,
 and explicit annotation downloads. The vignette includes a runnable synthetic

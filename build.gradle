@@ -215,6 +215,7 @@ tasks.register('checkWebsite') {
 
         List<String> requiredPages = [
             'xwas-followup-validation.html',
+            'latent-confounder-validation.html',
             'vignettes/ldsc.html',
             'vignettes/predicted-omics.html',
             'vignettes/genomic-factor.html',
@@ -222,6 +223,7 @@ tasks.register('checkWebsite') {
             'vignettes/predictions-and-contrasts.html',
             'vignettes/instrumental-variable-regression.html',
             'vignettes/conditional-score-conditioning.html',
+            'vignettes/latent-confounders-and-batch.html',
             'index.html',
             'verification.html',
             'vignettes/index.html',
@@ -267,6 +269,10 @@ tasks.register('checkWebsite') {
             'vignettes/predicted-omics.html',
             'vignettes/genomic-factor.html',
             'vignettes/prediction-scores.html',
+            'vignettes/predictions-and-contrasts.html',
+            'vignettes/instrumental-variable-regression.html',
+            'vignettes/conditional-score-conditioning.html',
+            'vignettes/latent-confounders-and-batch.html',
             'vignettes/grm.html',
             'vignettes/command-line.html',
             'vignettes/cli-association-tutorial.html',
