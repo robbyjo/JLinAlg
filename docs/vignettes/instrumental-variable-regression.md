@@ -222,3 +222,14 @@ continuously updated GMM, nonlinear endogenous models, weak-IV-robust tests, or
 instrument exogeneity tests such as Hansen's J. Scale and encode inputs before
 fitting, and report the covariance choice, cluster count where applicable,
 first-stage diagnostics, and identifying assumptions with the estimate.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Douglas Staiger and James H. Stock (1997) — Instrumental variables regression with weak instruments](../CITATIONS.md#staiger-stock-1997)
+- [Halbert White (1980) — A heteroskedasticity-consistent covariance matrix estimator and a direct test for heteroskedasticity](../CITATIONS.md#white-1980)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

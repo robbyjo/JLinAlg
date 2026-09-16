@@ -151,3 +151,15 @@ Tune benchmark sizes through the documented `jlinalg.benchmark.*` system
 properties. Compare warm runs, record the concrete provider/device, and keep
 the scientific model and numerical tolerances identical across backends. See
 the [benchmark guide](../performance-benchmarks.md) for the complete protocol.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [G. N. Wilkinson and C. E. Rogers (1973) — Symbolic description of factorial models for analysis of variance](../CITATIONS.md#wilkinson-rogers-1973)
+- [J. A. Nelder and R. W. M. Wedderburn (1972) — Generalized linear models](../CITATIONS.md#nelder-wedderburn-1972)
+- [H. D. Patterson and Robin Thompson (1971) — Recovery of inter-block information when block sizes are unequal](../CITATIONS.md#patterson-thompson-1971)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

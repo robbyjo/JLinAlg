@@ -95,3 +95,14 @@ memory; use separate loci or bounded files when necessary.
 Reference: [Genomic SEM paper](https://www.nature.com/articles/s41562-019-0566-x)
 and [reference implementation](https://github.com/GenomicSEM/GenomicSEM).
 See [independent R validation](../xwas-followup-validation.md).
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Brendan K. Bulik-Sullivan et al. (2015) — An atlas of genetic correlations across human diseases and traits](../CITATIONS.md#bulik-sullivan-rg-2015)
+- [Andrew D. Grotzinger et al. (2019) — Genomic structural equation modelling provides insights into the multivariate genetic architecture of complex traits](../CITATIONS.md#grotzinger-genomic-sem-2019)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

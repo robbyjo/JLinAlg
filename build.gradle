@@ -198,11 +198,13 @@ test {
 }
 
 def websiteRootPath = layout.projectDirectory.dir('site').asFile.absolutePath
+def documentationRootPath = layout.projectDirectory.dir('docs').asFile.absolutePath
 
 tasks.register('checkWebsite') {
     group = 'verification'
     description = 'Checks the static website structure, local links, and theme support.'
     inputs.dir(websiteRootPath)
+    inputs.dir(documentationRootPath)
 
     doLast {
         File siteRoot = new File(websiteRootPath).canonicalFile
@@ -226,6 +228,7 @@ tasks.register('checkWebsite') {
             'vignettes/latent-confounders-and-batch.html',
             'index.html',
             'verification.html',
+            'citations.html',
             'vignettes/index.html',
             'vignettes/enrichment.html',
             'vignettes/grm.html',
@@ -261,6 +264,78 @@ tasks.register('checkWebsite') {
             if (!new File(siteRoot, relative).isFile()) {
                 throw new GradleException(
                     "Missing required website page: ${relative}")
+            }
+        }
+
+        File citationRegistry = new File(documentationRootPath, 'citations.json')
+        Map citationData = (Map) new groovy.json.JsonSlurper().parse(citationRegistry)
+        List citationReferences = (List) citationData.references
+        Set citationIds = citationReferences.collect { reference -> reference.id as String } as Set
+        if (citationIds.size() != citationReferences.size()) {
+            throw new GradleException('Scientific citation registry contains duplicate IDs')
+        }
+
+        File citationPage = new File(siteRoot, 'citations.html')
+        String citationSource = citationPage.getText('UTF-8')
+        if (!citationSource.contains('data-citation-search') ||
+            !citationSource.contains('data-citation-entry')) {
+            throw new GradleException(
+                'Scientific citation page must expose searchable citation entries')
+        }
+        citationIds.each { String citationId ->
+            if (!citationSource.contains("id=\"${citationId}\"")) {
+                throw new GradleException(
+                    "Scientific citation page is missing registry entry: ${citationId}")
+            }
+        }
+
+        File citationMarkdown = new File(documentationRootPath, 'CITATIONS.md')
+        if (!citationMarkdown.isFile()) {
+            throw new GradleException('Missing generated docs/CITATIONS.md')
+        }
+        String citationMarkdownSource = citationMarkdown.getText('UTF-8')
+        citationIds.each { String citationId ->
+            if (!citationMarkdownSource.contains("id=\"${citationId}\"")) {
+                throw new GradleException(
+                    "Markdown citation index is missing registry entry: ${citationId}")
+            }
+        }
+
+        Map pageCitations = (Map) citationData.pages
+        File vignetteRoot = new File(siteRoot, 'vignettes')
+        vignetteRoot.eachFileMatch(groovy.io.FileType.FILES, ~/.*\.html/) { File page ->
+            if (page.name == 'index.html') {
+                return
+            }
+            String slug = page.name.substring(0, page.name.length() - '.html'.length())
+            List mapped = (List) pageCitations[slug]
+            if (!mapped) {
+                throw new GradleException(
+                    "Website vignette lacks a citation mapping: ${page.name}")
+            }
+            String source = page.getText('UTF-8')
+            if (!source.contains('SCIENTIFIC-CITATIONS:START') ||
+                !source.contains('SCIENTIFIC-CITATIONS:END')) {
+                throw new GradleException(
+                    "Website vignette lacks a scientific citation panel: ${page.name}")
+            }
+            mapped.each { Object citationId ->
+                if (!source.contains("citations.html#${citationId}")) {
+                    throw new GradleException(
+                        "${page.name} is missing mapped citation ${citationId}")
+                }
+            }
+        }
+
+        File markdownVignettes = new File(documentationRootPath, 'vignettes')
+        markdownVignettes.eachFileMatch(groovy.io.FileType.FILES, ~/.*\.md/) { File page ->
+            if (!page.name.equalsIgnoreCase('README.md')) {
+                String source = page.getText('UTF-8')
+                if (!source.contains('SCIENTIFIC-CITATIONS:START') ||
+                    !source.contains('SCIENTIFIC-CITATIONS:END')) {
+                    throw new GradleException(
+                        "Markdown vignette lacks scientific citations: ${page.name}")
+                }
             }
         }
 

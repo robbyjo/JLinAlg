@@ -114,3 +114,15 @@ must be suitable for the target ancestry and assay.
 See [validation](../xwas-followup-validation.md). For broader polygenic workflow
 context, see [PRSice](https://github.com/choishingwan/PRSice); this implementation
 does not claim its full feature set.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Arthur E. Hoerl and Robert W. Kennard (1970) — Ridge regression: biased estimation for nonorthogonal problems](../CITATIONS.md#hoerl-kennard-1970)
+- [Hui Zou and Trevor Hastie (2005) — Regularization and variable selection via the elastic net](../CITATIONS.md#zou-hastie-2005)
+- [Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly (2015) — PRSice: polygenic risk score software](../CITATIONS.md#euesden-prsice-2015)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

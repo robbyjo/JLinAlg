@@ -203,3 +203,14 @@ log. The toy CLI and Java matrices are checked against analytic fractions, and
 the VCF-to-mixed-model example has regression coverage. See
 [accuracy and performance](verification-and-performance.md) for wider validation;
 no GRM speedup claim follows from this small tutorial.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Paul M. VanRaden (2008) — Efficient methods to compute genomic predictions](CITATIONS.md#vanraden-2008)
+- [Jian Yang et al. (2011) — GCTA: a tool for genome-wide complex trait analysis](CITATIONS.md#yang-gcta-2011)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

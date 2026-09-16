@@ -163,3 +163,14 @@ See the [audit evidence](../../src/benchmark/resources/remaining-model-audit-ben
 for the exact reference generator, reproducible isolated checks, and measured
 warm timings. Those fixtures use first-order Sobel inference, not bootstrap
 or posterior simulation from an R mediation package.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Reuben M. Baron and David A. Kenny (1986) — The moderator-mediator variable distinction in social psychological research](../CITATIONS.md#baron-kenny-1986)
+- [Michael E. Sobel (1982) — Asymptotic confidence intervals for indirect effects in structural equation models](../CITATIONS.md#sobel-1982)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

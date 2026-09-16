@@ -104,3 +104,14 @@ trait-independent percentage of participant overlap.
 Reference: [LDSC source and documentation](https://github.com/bulik/ldsc).
 See [validation](../xwas-followup-validation.md) and continue to
 [genetic factors](genomic-factor.md).
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Brendan K. Bulik-Sullivan et al. (2015) — LD Score regression distinguishes confounding from polygenicity in genome-wide association studies](../CITATIONS.md#bulik-sullivan-ldsc-2015)
+- [Brendan K. Bulik-Sullivan et al. (2015) — An atlas of genetic correlations across human diseases and traits](../CITATIONS.md#bulik-sullivan-rg-2015)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

@@ -131,3 +131,16 @@ The ordinary CLI passes primitive arrays into `PreparedMetaAnalysisBatch`
 and does not construct a `List<MetaStudy>` per feature. Meta-regression uses
 the new primitive-array overload. See the [array benchmark](../meta-cli-validation.md)
 for measured allocation/time results and reproducible validation commands.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](../CITATIONS.md#dersimonian-laird-1986)
+- [Robert C. Paule and John Mandel (1982) — Consensus values and weighting factors](../CITATIONS.md#paule-mandel-1982)
+- [Guido Knapp and Joachim Hartung (2003) — Improved tests for a random effects meta-regression with a single covariate](../CITATIONS.md#knapp-hartung-2003)
+- [Julian P. T. Higgins and Simon G. Thompson (2002) — Quantifying heterogeneity in a meta-analysis](../CITATIONS.md#higgins-thompson-2002)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

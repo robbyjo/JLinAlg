@@ -52,4 +52,19 @@ try (SparseZeroInflatedMixedModel.Prepared prepared =
 <h2 id="interpret">Interpret the working fit</h2><p>Each outer iteration creates a GLM working response and known diagonal residual covariance, estimates random covariance scales by REML, then updates the random linear predictor.</p><div class="note warning"><strong>PQL is not a marginal GLMM likelihood</strong>It can be biased for rare binary events, small clusters, and large random-effect variance. Satterthwaite or Kenward–Roger options apply to the final working linearization—not the exact non-Gaussian model.</div><p>Report the estimator as PQL, check both inner and outer convergence, and avoid likelihood comparisons with Laplace/AGQ fits.</p>
 <h2 id="quadrature">Adaptive random-intercept quadrature</h2><p><code>GlmmQuadrature</code> uses per-group mode/curvature-adaptive Gauss–Hermite nodes and node refinement for binomial or Poisson responses, including trials and offsets. Fits compare the zero-variance boundary and expose joint covariance and numerical integration diagnostics.</p><p>R integrate and lme4 high-node AGQ fixtures check full likelihood, coefficients, SD, and covariance. Java is faster on the measured count examples and slower on rare/binary examples. This API handles independent scalar Gaussian random intercepts, not pedigree, crossed, or multidimensional random effects. Refinement is an error diagnostic, not a certified exact integral. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/pedigree-and-glmm.md">Adaptive quadrature examples and limits →</a></p>
 <div class="next-links"><a href="pedigree.html"><small>Previous</small><strong>Pedigree REML</strong></a><a href="association.html"><small>Next</small><strong>Association engines →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#random">Random covariance</a><a href="#poisson">Count model</a><a href="#binary">Pedigree binary</a><a href="#zero-inflated">Zero-inflated Laplace</a><a href="#interpret">Interpretation</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#random">Random covariance</a><a href="#poisson">Count model</a><a href="#binary">Pedigree binary</a><a href="#zero-inflated">Zero-inflated Laplace</a><a href="#interpret">Interpretation</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-glmm">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-glmm">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#breslow-clayton-1993">Breslow (1993) — PQL</a></li><li><a href="../citations.html#lambert-1992">Lambert (1992) — zero-inflated Poisson</a></li><li><a href="../citations.html#rigby-stasinopoulos-2005">Rigby (2005) — GAMLSS</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

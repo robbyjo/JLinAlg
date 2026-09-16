@@ -348,3 +348,16 @@ Heywood variance estimates; solutions approaching zero need substantive and
 numerical review. `converged()` certifies the configured per-case score
 tolerance, not uniqueness, global optimality, model identification, or good
 substantive fit.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Sewall Wright (1921) — Correlation and causation](../CITATIONS.md#wright-1921)
+- [John J. McArdle and Roderick P. McDonald (1984) — Some algebraic properties of the Reticular Action Model for moment structures](../CITATIONS.md#mcardle-mcdonald-1984)
+- [Craig K. Enders and Deborah L. Bandalos (2001) — The relative performance of full information maximum likelihood estimation for missing data in structural equation models](../CITATIONS.md#enders-bandalos-2001)
+- [Myrsini Katsikatsou et al. (2012) — Pairwise likelihood estimation for factor analysis models with ordinal data](../CITATIONS.md#katsikatsou-2012)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

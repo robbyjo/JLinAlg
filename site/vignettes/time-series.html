@@ -64,4 +64,19 @@ if (regression.jointParameterInferenceAvailable()) {
 }</code></pre></div><p><code>forecastConditional</code> reports process uncertainty conditional on the fitted regression and dynamics; <code>forecast</code> remains its compatibility alias. The parameter-aware method adds delta-method variance from the joint regression/dynamic covariance, retaining their cross-covariances. Its observed-information Hessian is computed and cached only when joint inference or a parameter-aware forecast is requested; ordinary fits, smoothing, and conditional forecasts remain on the profiled path. The matching estimate and covariance order is regression coefficients, AR, MA, seasonal AR, then seasonal MA, keeping seasonal coordinates separate from multiplicative effective polynomials. Innovation-variance estimation uncertainty is excluded, and unresolved joint information fails explicitly instead of silently reverting to a conditional interval.</p>
 <p>Thirteen R fixtures cover coefficients, likelihood, forecast means, and forecast SEs. A 50,000-position missing-series regression test runs under a bounded heap, and a 5,000-date smoothing regression exercises the formerly capped path. R uses finite diffuse initialization, so its small likelihood difference is documented rather than hidden. Diffuse coefficient covariance and SEs include seasonal terms and joint drift/dynamic uncertainty, with unresolved information suppressed. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/estimator-extensions.md">Regression and smoothing contracts</a>. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/time-series.md">Contracts, examples, and timings →</a></p>
 <div class="next-links"><a href="meta-analysis.html"><small>Previous</small><strong>Meta-analysis</strong></a><a href="susie.html"><small>Next</small><strong>SuSiE fine mapping →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#arma">ARMA</a><a href="#seasonal">ARIMA/SARIMA</a><a href="#diagnostics">Diagnostics</a><a href="#exact">Exact ARMA</a><a href="#automatic">Order search</a><a href="#lmm">ARIMA-error LMM</a><a href="#diffuse">Diffuse likelihood</a><a href="#smoothing">Historical smoothing</a><a href="#regression-forecast">Forecast uncertainty</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#arma">ARMA</a><a href="#seasonal">ARIMA/SARIMA</a><a href="#diagnostics">Diagnostics</a><a href="#exact">Exact ARMA</a><a href="#automatic">Order search</a><a href="#lmm">ARIMA-error LMM</a><a href="#diffuse">Diffuse likelihood</a><a href="#smoothing">Historical smoothing</a><a href="#regression-forecast">Forecast uncertainty</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-time-series">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-time-series">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#kalman-1960">Kalman (1960) — Kalman filter</a></li><li><a href="../citations.html#ljung-box-1978">Ljung (1978) — Ljung-Box test</a></li><li><a href="../citations.html#hyndman-khandakar-2008">Hyndman (2008) — automatic ARIMA</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

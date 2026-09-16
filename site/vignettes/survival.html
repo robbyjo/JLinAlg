@@ -62,4 +62,19 @@ double mode = pedigreeFit
     .frailty("offspring");</code></pre></div><p>A term built with <code>ofSparse</code> or justified <code>ofUninbred</code> avoids dense pedigree covariance end to end. The sparse facade supports repeated rows per individual and returns named modes for every pedigree member, including unobserved ancestors. Results expose solver type, sparse equation/factor nonzeros, convergence, boundary singularity, and backend provenance.</p>
 <div class="note warning"><strong>Current boundary</strong>The sparse path requires one-stratum right-censored data with distinct event times and unit incidence. It keeps the exact penalized score but uses a diagonal approximation to profiled random-effect information, so Laplace variance and covariance can differ from the dense fit. Cases needing exact dense frailty information should use the general path.</div>
 <div class="next-links"><a href="mixed-models.html"><small>Previous</small><strong>REML and LMM</strong></a><a href="pedigree.html"><small>Next</small><strong>Pedigree models →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#diagnostics">Diagnostics and scans</a><a href="#gamma">Gamma frailty</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#response">Survival response</a><a href="#fixed">Fixed Cox</a><a href="#diagnostics">Diagnostics and scans</a><a href="#gamma">Gamma frailty</a><a href="#mixed">Gaussian frailty</a><a href="#kinship">Cryptic relatedness</a><a href="#pedigree">Pedigree frailty</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-survival">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-survival">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#cox-1972">Cox (1972) — Cox proportional hazards</a></li><li><a href="../citations.html#efron-1977">Efron (1977) — Efron ties</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

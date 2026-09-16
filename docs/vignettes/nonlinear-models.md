@@ -114,3 +114,13 @@ fixture-specific validation of the additive model, not general `nlme` parity.
 
 Reproduction commands, warm timings, checksums, and limitations are in the
 [audit evidence](../../src/benchmark/resources/remaining-model-audit-benchmark/audit-results.md).
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Mary J. Lindstrom and Douglas M. Bates (1990) — Nonlinear mixed effects models for repeated measures data](../CITATIONS.md#lindstrom-bates-1990)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

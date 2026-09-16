@@ -164,3 +164,15 @@ Each summary reports the fitted estimate, bootstrap mean, bias, empirical SE,
 and percentile interval. Failed/nonconverged replicates remain in
 `failures()`. Use one bootstrap worker with GPU/native multithreaded BLAS; raise
 parallelism deliberately for a CPU backend.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [H. D. Patterson and Robin Thompson (1971) — Recovery of inter-block information when block sizes are unequal](../CITATIONS.md#patterson-thompson-1971)
+- [C. R. Henderson (1975) — Best linear unbiased estimation and prediction under a selection model](../CITATIONS.md#henderson-1975)
+- [Michael G. Kenward and James H. Roger (1997) — Small sample inference for fixed effects from restricted maximum likelihood](../CITATIONS.md#kenward-roger-1997)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

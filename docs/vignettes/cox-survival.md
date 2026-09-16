@@ -258,3 +258,14 @@ remove the sparse diagonal-information approximation described above.
 
 Warm timings, checksums, reference fixtures, and reproduction commands are in
 the [audit evidence](../../src/benchmark/resources/remaining-model-audit-benchmark/audit-results.md).
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [D. R. Cox (1972) — Regression models and life-tables](../CITATIONS.md#cox-1972)
+- [Bradley Efron (1977) — The efficiency of Cox's likelihood function for censored data](../CITATIONS.md#efron-1977)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

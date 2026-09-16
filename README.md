@@ -44,6 +44,8 @@ with a companion run log. Choose a fresh output path for another run.
 Visit the **[JLinAlg website](https://robbyjo.github.io/JLinAlg/)** for the
 complete feature guide, **[tutorials and vignettes](https://robbyjo.github.io/JLinAlg/vignettes/)**,
 and Java/CLI examples, including [GRM construction](https://robbyjo.github.io/JLinAlg/vignettes/grm.html).
+The [searchable scientific citation index](https://robbyjo.github.io/JLinAlg/citations.html)
+links each method family to its primary publication.
 
 ## Numerical accuracy and performance
 

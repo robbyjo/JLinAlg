@@ -183,3 +183,18 @@ a stabilized positive scoring metric during iteration, but reports the
 inverse observed Hessian at the solution, including mean/size cross terms.
 The sparse beta/ZI likelihood fixes and convergence-qualified timings are
 documented there separately from the dense GAM paths.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [William S. Cleveland (1979) — Robust locally weighted regression and smoothing scatterplots](CITATIONS.md#cleveland-1979)
+- [Trevor Hastie and Robert Tibshirani (1986) — Generalized additive models](CITATIONS.md#hastie-tibshirani-1986)
+- [Paul H. C. Eilers and Brian D. Marx (1996) — Flexible smoothing with B-splines and penalties](CITATIONS.md#eilers-marx-1996)
+- [Simon N. Wood (2011) — Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models](CITATIONS.md#wood-2011)
+- [Robert A. Rigby and D. Mikis Stasinopoulos (2005) — Generalized additive models for location, scale and shape](CITATIONS.md#rigby-stasinopoulos-2005)
+- [Thomas W. Yee (2010) — The VGAM package for categorical data analysis](CITATIONS.md#yee-2010)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

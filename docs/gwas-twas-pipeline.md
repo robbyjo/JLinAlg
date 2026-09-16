@@ -219,3 +219,17 @@ provide set membership explicitly.
 The source design was informed by the user-authorized GPU_eQTL repository, but
 this implementation is clean-room rather than copied source so JLinAlg can
 retain its GPL-2.0-or-later licensing.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Hyun Min Kang et al. (2010) — Variance component model to account for sample structure in genome-wide association studies](CITATIONS.md#kang-emmax-2010)
+- [Zhiwu Zhang et al. (2010) — Mixed linear model approach adapted for genome-wide association studies](CITATIONS.md#zhang-p3d-2010)
+- [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011)
+- [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012)
+- [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

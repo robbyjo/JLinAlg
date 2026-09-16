@@ -191,3 +191,16 @@ mixed continuous/ordinal models, general MAR ordinal missingness,
 multigroup invariance, ordinal modification indices, and robust scaled FIML
 fit statistics remain open. The [TOPMed report](../topmed-sem-performance.md)
 records the historical observed-variable benchmark, not these newer workloads.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens (2020) — A simple new approach to variable selection in regression, with application to genetic fine mapping](../CITATIONS.md#wang-susie-2020)
+- [Claudia Giambartolomei et al. (2014) — Bayesian test for colocalisation between pairs of genetic association studies using summary statistics](../CITATIONS.md#giambartolomei-coloc-2014)
+- [Sewall Wright (1921) — Correlation and causation](../CITATIONS.md#wright-1921)
+- [John J. McArdle and Roderick P. McDonald (1984) — Some algebraic properties of the Reticular Action Model for moment structures](../CITATIONS.md#mcardle-mcdonald-1984)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

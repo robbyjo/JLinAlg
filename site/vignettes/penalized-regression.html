@@ -41,4 +41,19 @@ AssociationStatistics stats =
     inference.associationStatistics();</code></pre></div><div class="note warning"><strong>Selection warning</strong>An OLS refit of a LASSO/elastic-net active set is conditional on selection. Its ordinary p-values are not selection-adjusted and should not be marketed as such.</div>
 <h2 id="selection">Selection-aware alternatives</h2><p><code>SelectionAwarePenalizedInference</code> selects on one sample and fits weighted OLS inference on independent held-out rows, preserving penalty factors and split weights. High-dimensional selection is permitted when the held-out selected design is identifiable.</p><p><code>PolyhedralSelectiveInference</code> conditions on the active set and signs at a fixed LASSO/elastic-net penalty and returns truncated-Gaussian p-values and inverted intervals for selected-model projection coefficients. It requires independently known Gaussian noise SD, unstandardized predictors, and tuning choices fixed independently of the response. It does not make ordinary post-selection OLS p-values valid. <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/linear-models-and-glms.md">Examples and validation →</a></p>
 <div class="next-links"><a href="linear-models.html"><small>Previous</small><strong>OLS and GLM</strong></a><a href="mixed-models.html"><small>Next</small><strong>REML and LMM →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#fit">Fit penalties</a><a href="#path">Lambda path</a><a href="#cv">Cross-validation</a><a href="#inference">Inference</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#cli">CLI-only</a><a href="#fit">Fit penalties</a><a href="#path">Lambda path</a><a href="#cv">Cross-validation</a><a href="#inference">Inference</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-penalized-regression">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-penalized-regression">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#hoerl-kennard-1970">Hoerl (1970) — ridge regression</a></li><li><a href="../citations.html#tibshirani-1996">Tibshirani (1996) — lasso</a></li><li><a href="../citations.html#zou-hastie-2005">Zou (2005) — elastic net</a></li><li><a href="../citations.html#lee-2016">Lee (2016) — polyhedral selective inference</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

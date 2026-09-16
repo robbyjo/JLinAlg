@@ -81,4 +81,19 @@ java -jar jlinalg-&lt;version&gt;.jar coloc --trait1 trait1-susie.tsv.effects.ts
 <h2 id="operations">Operational controls</h2>
 <ul><li>Use singular <code>--explain</code> on the general command to print routing and continue fitting; use <code>--dry-run</code> to stop after preflight. A dry run writes the normal log but no result or manifest. Neither switch scans feature rows.</li><li>Automatic block sizing uses JVM heap headroom and the requested thread count. When memory permits it queues at least two complete worker waves so work stealing can absorb slow chunks at block boundaries. Low heap headroom uses the largest complete wave that fits or safely limits worker capacity; explicit <code>--block-size N</code> remains available.</li><li>A <code>.csv</code> output is comma-separated; other suffixes are tab-separated.</li><li>Use <code>--overwrite</code> deliberately. Verified resume of partial output is not available; choose a new output after interruption.</li><li>Preserve the generated log and manifest with the result table.</li></ul>
 <div class="next-links"><a href="association.html"><small>Related</small><strong>Association models</strong></a><a href="pedigree.html"><small>Related</small><strong>Pedigree internals →</strong></a></div>
-</article><aside class="toc"><strong>On this page</strong><a href="#ids">ID layers</a><a href="#routing">Automatic routing</a><a href="#fixed">OLS and omics</a><a href="#grouped">Grouped REML</a><a href="#pedigree">Pedigree</a><a href="#families">Family IDs</a><a href="#grm">GRM</a><a href="#nonGaussian">GLM and GLMM</a><a href="#genotype">Genotype</a><a href="#cox">Cox</a><a href="#specialized">Subcommands</a><a href="#conditional-gwas">Conditional scores</a><a href="#operations">Operations</a></aside></div></main><site-footer root="../"></site-footer></body></html>
+</article><aside class="toc"><strong>On this page</strong><a href="#ids">ID layers</a><a href="#routing">Automatic routing</a><a href="#fixed">OLS and omics</a><a href="#grouped">Grouped REML</a><a href="#pedigree">Pedigree</a><a href="#families">Family IDs</a><a href="#grm">GRM</a><a href="#nonGaussian">GLM and GLMM</a><a href="#genotype">Genotype</a><a href="#cox">Cox</a><a href="#specialized">Subcommands</a><a href="#conditional-gwas">Conditional scores</a><a href="#operations">Operations</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-command-line">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-command-line">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#nelder-wedderburn-1972">Nelder (1972) — generalized linear models</a></li><li><a href="../citations.html#patterson-thompson-1971">Patterson (1971) — REML</a></li><li><a href="../citations.html#cox-1972">Cox (1972) — Cox proportional hazards</a></li><li><a href="../citations.html#breslow-clayton-1993">Breslow (1993) — PQL</a></li><li><a href="../citations.html#kang-emmax-2010">Kang et al. (2010) — EMMAX</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

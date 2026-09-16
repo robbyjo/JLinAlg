@@ -323,3 +323,14 @@ every summary; Java GEE also computes auxiliary diagnostics. These are narrow
 workload timings, not interchangeable feature-cost or universal speed claims.
 Checksums agree to floating-point rounding. Full evidence, allocation counts
 and limitations are in `src/benchmark/resources/fitting-audit-v030/evidence.md`.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [J. A. Nelder and R. W. M. Wedderburn (1972) — Generalized linear models](../CITATIONS.md#nelder-wedderburn-1972)
+- [C. I. Bliss (1934) — The method of probits](../CITATIONS.md#bliss-1934)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

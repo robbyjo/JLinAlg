@@ -20,4 +20,19 @@ var smooth = SuperSmoother.fit(x, y);</code></pre><p>The fitExact API solves the
 <p>Shared Windows host, Java 25 and R 4.6.1, warmed fits, inputs preconstructed, consumed outputs. R's supersmoother was about 7% faster. The R calls include different result bookkeeping; nonsmoothed rq is not the smoothed-loss timing denominator. See <a href="https://github.com/robbyjo/JLinAlg/blob/main/src/benchmark/resources/regression/accuracy-and-timing.md">full measurement conditions and commands</a>.</p>
 <p>The separate exact LP benchmark at 1,024 rows and 6 columns took 1.818 ms in Java versus 0.631 ms for R Frisch–Newton. R was faster across the three exact-LP workloads. <a href="https://github.com/robbyjo/JLinAlg/blob/main/src/benchmark/resources/exact-quantile-benchmark/exact-quantile-results.md">Exact objective accuracy and timing →</a></p><pre><code>./gradlew benchmarkRegressionFamilies
 ./gradlew benchmarkExactQuantile</code></pre>
-<div class="hero-actions"><a class="button" href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/regression-families.md">Read the full source vignette</a><a class="button secondary" href="../verification.html">Accuracy and speed</a></div></div></section></main><site-footer root="../"></site-footer></body></html>
+<div class="hero-actions"><a class="button" href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/regression-families.md">Read the full source vignette</a><a class="button secondary" href="../verification.html">Accuracy and speed</a></div></div></section>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-regression-families">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-regression-families">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#koenker-bassett-1978">Koenker (1978) — quantile regression</a></li><li><a href="../citations.html#friedman-1984">Friedman (1984) — supersmoother</a></li><li><a href="../citations.html#nadaraya-1964">Nadaraya (1964) — kernel regression</a></li><li><a href="../citations.html#robinson-1988">Robinson (1988) — partially linear regression</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

@@ -157,3 +157,13 @@ Focused validation commands:
 ./gradlew.bat test --tests org.jlinalg.settest.ConditionalScoreInferenceTest
 ./gradlew.bat test --tests org.jlinalg.cli.ConditionalScoreCliTest
 ```
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Jian Yang et al. (2012) — Conditional and joint multiple-SNP analysis of GWAS summary statistics](../CITATIONS.md#yang-cojo-2012)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

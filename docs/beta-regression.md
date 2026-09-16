@@ -59,3 +59,13 @@ $env:JLINALG_BETA_R_LIBRARY = 'build/r-library'
 & 'C:\Program Files\R\R-4.6.1\bin\Rscript.exe' `
   src/benchmark/r/beta_regression_benchmark.R
 ```
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Silvia Ferrari and Francisco Cribari-Neto (2004) — Beta regression for modelling rates and proportions](CITATIONS.md#ferrari-cribari-neto-2004)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

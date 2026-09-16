@@ -152,3 +152,13 @@ retained, not permission to lower purity after seeing the desired result.
 Continue with [CLI-only colocalization](cli-colocalization-tutorial.md).
 The [SuSiE API vignette](susie-and-sem.md) explains individual-level and
 sufficient-statistic modes and the numerical validation in more depth.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens (2020) — A simple new approach to variable selection in regression, with application to genetic fine mapping](../CITATIONS.md#wang-susie-2020)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

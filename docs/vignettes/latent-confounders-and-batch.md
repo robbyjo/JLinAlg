@@ -195,3 +195,15 @@ The frozen fixture was generated from Bioconductor `sva` 3.60.0 at commit
 
 See [the validation report](../latent-confounder-validation.md) for numerical
 criteria, source provenance, performance choices, and unimplemented boundaries.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Jeffrey T. Leek and John D. Storey (2007) — Capturing heterogeneity in gene expression studies by surrogate variable analysis](../CITATIONS.md#leek-storey-2007)
+- [Oliver Stegle et al. (2012) — Using probabilistic estimation of expression residuals (PEER) to obtain increased power and interpretability of gene expression analyses](../CITATIONS.md#stegle-peer-2012)
+- [W. Evan Johnson, Cheng Li, and Ariel Rabinovic (2007) — Adjusting batch effects in microarray expression data using empirical Bayes methods](../CITATIONS.md#johnson-combat-2007)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

@@ -28,6 +28,7 @@ class SiteHeader extends HTMLElement {
             <a href="${root}vignettes/command-line.html">Command line</a>
             <a href="${root}vignettes/index.html">Vignettes</a>
             <a href="${root}verification.html">Verification</a>
+            <a href="${root}citations.html">Citations</a>
             <a href="${root}index.html#architecture">Architecture</a>
           </nav>
           <div class="nav-actions">
@@ -65,7 +66,7 @@ class SiteFooter extends HTMLElement {
         <div class="container">
           <div class="footer-grid">
             <div><a class="brand" href="${root}index.html"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><span>JLinAlg</span></a><p>High-performance Java statistical models for genetic association, causal inference, fine mapping, and quantitative research.</p></div>
-            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/command-line.html">Command-line guide</a><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}verification.html">Accuracy and performance</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
+            <div class="footer-links"><strong>Learn</strong><a href="${root}vignettes/command-line.html">Command-line guide</a><a href="${root}vignettes/index.html">All vignettes</a><a href="${root}citations.html">Scientific citations</a><a href="${root}verification.html">Accuracy and performance</a><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/numerical-contract.md">Numerical contract</a></div>
             <div class="footer-links"><strong>Project</strong><a href="https://github.com/robbyjo/JLinAlg">Source code</a><a href="https://github.com/robbyjo/JLinAlg/issues">Issues</a><a href="https://github.com/robbyjo/JDistlib">JDistlib</a></div>
           </div>
           <div class="footer-bottom"><span>© <span data-year></span> JLinAlg contributors · GPL-2.0-or-later</span><span>JLinAlg v0.3.5 · Java 17+ · Source: JDistlib 0.10.2 · FP64</span></div>
@@ -106,6 +107,30 @@ document.addEventListener("DOMContentLoaded", () => {
     cards.forEach(card => { card.hidden = filter !== "all" && card.dataset.category !== filter; });
   }));
 
+  const citationSearch = document.querySelector("[data-citation-search]");
+  if (citationSearch) {
+    const entries = [...document.querySelectorAll("[data-citation-entry]")];
+    const count = document.querySelector("[data-citation-count]");
+    const empty = document.querySelector("[data-citation-empty]");
+    const applyCitationSearch = () => {
+      const terms = citationSearch.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      let visible = 0;
+      entries.forEach(entry => {
+        const matches = terms.every(term => entry.dataset.search.includes(term));
+        entry.hidden = !matches;
+        if (matches) visible += 1;
+      });
+      if (count) count.textContent = String(visible);
+      if (empty) empty.hidden = visible !== 0;
+      const url = new URL(window.location.href);
+      if (citationSearch.value.trim()) url.searchParams.set("q", citationSearch.value.trim());
+      else url.searchParams.delete("q");
+      history.replaceState(null, "", url);
+    };
+    citationSearch.value = new URLSearchParams(window.location.search).get("q") || "";
+    citationSearch.addEventListener("input", applyCitationSearch);
+    applyCitationSearch();
+  }
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!reduced && "IntersectionObserver" in window) {
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {

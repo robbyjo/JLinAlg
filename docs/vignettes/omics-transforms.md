@@ -188,3 +188,15 @@ Then load and use it like a built-in stage:
 
 Providers must return a row with the same sample count. Plugin JARs execute
 arbitrary JVM code in the analysis process, so load only artifacts you trust.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [T. Mark Beasley, Stephen Erickson, and David B. Allison (2009) — Rank-based inverse normal transformations are increasingly used, but are they merited?](../CITATIONS.md#beasley-2009)
+- [Jeffrey T. Leek and John D. Storey (2007) — Capturing heterogeneity in gene expression studies by surrogate variable analysis](../CITATIONS.md#leek-storey-2007)
+- [W. Evan Johnson, Cheng Li, and Ariel Rabinovic (2007) — Adjusting batch effects in microarray expression data using empirical Bayes methods](../CITATIONS.md#johnson-combat-2007)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

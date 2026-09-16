@@ -5,6 +5,10 @@ model is visible. Replace those arrays with your own columnar or file-backed
 data preparation; the fitting APIs consume primitive Java arrays and do not
 require a dataframe runtime.
 
+Every vignette ends with method-specific primary sources. The complete bibliography is
+available in the [scientific citation index](../CITATIONS.md) and on the
+[searchable website](https://robbyjo.github.io/JLinAlg/citations.html).
+
 Run the complete verification suite before adapting an example:
 
 ```powershell

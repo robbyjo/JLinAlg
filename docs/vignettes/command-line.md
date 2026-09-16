@@ -295,3 +295,17 @@ are CLI-native. See the dedicated
 - Use <code>--overwrite</code> deliberately. Verified partial-output resume is
   not available; use a new output path after interruption.
 - Preserve the generated log and manifest with the result table.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [J. A. Nelder and R. W. M. Wedderburn (1972) — Generalized linear models](../CITATIONS.md#nelder-wedderburn-1972)
+- [H. D. Patterson and Robin Thompson (1971) — Recovery of inter-block information when block sizes are unequal](../CITATIONS.md#patterson-thompson-1971)
+- [D. R. Cox (1972) — Regression models and life-tables](../CITATIONS.md#cox-1972)
+- [Norman E. Breslow and David G. Clayton (1993) — Approximate inference in generalized linear mixed models](../CITATIONS.md#breslow-clayton-1993)
+- [Hyun Min Kang et al. (2010) — Variance component model to account for sample structure in genome-wide association studies](../CITATIONS.md#kang-emmax-2010)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

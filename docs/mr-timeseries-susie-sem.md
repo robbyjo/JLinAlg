@@ -64,3 +64,17 @@ covariance, continuous-model efficient modification indices, and indirect delta
 inference are explicit APIs. Ordinal PML is not DWLS/WLSMV. See the
 [SEM vignette](vignettes/sem.md) for identification and unsupported extensions,
 and [TOPMed performance](topmed-sem-performance.md) for the earlier observed model.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Craig K. Enders and Deborah L. Bandalos (2001) — The relative performance of full information maximum likelihood estimation for missing data in structural equation models](CITATIONS.md#enders-bandalos-2001)
+- [Norman E. Breslow and David G. Clayton (1993) — Approximate inference in generalized linear mixed models](CITATIONS.md#breslow-clayton-1993)
+- [Rudolf E. Kalman (1960) — A new approach to linear filtering and prediction problems](CITATIONS.md#kalman-1960)
+- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](CITATIONS.md#bowden-mr-egger-2015)
+- [Jason D. Lee, Dennis L. Sun, Yuekai Sun, and Jonathan E. Taylor (2016) — Exact post-selection inference, with application to the lasso](CITATIONS.md#lee-2016)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

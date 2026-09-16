@@ -6,4 +6,19 @@
 <p>The example uses shell continuation syntax; on PowerShell replace each trailing backslash with a backtick, or use one line. Numeric CSV/TSV input supplies proportion, dose, and batch_score columns.</p>
 <h2>Understand the parameterization</h2><p>Mean μ and precision φ give beta shape parameters μφ and (1−μ)φ. The specialized fixed-effect fitter uses analytic scores and expected-information covariance. Zero/one values are outside the classical beta support; do not silently clip them into the interval.</p>
 <h2>Grouped and pedigree effects</h2><p><code>BetaMixedModel</code> uses sparse Gaussian random effects in the logit mean with constant precision, including pedigree A⁻¹. It uses first-order Laplace inference, not the scalar binomial/Poisson adaptive-quadrature API. Precision-side random effects and extended-support beta mixtures are not part of this path.</p>
-<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/beta-regression.md">Fixed beta API, links, R examples, and benchmark →</a><br><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/beta-mixed-models.md">Sparse beta mixed and pedigree models →</a><br><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">0.3.0 density, fitting, and accuracy audit →</a></p></div></section></main><site-footer root="../"></site-footer></body></html>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/beta-regression.md">Fixed beta API, links, R examples, and benchmark →</a><br><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/beta-mixed-models.md">Sparse beta mixed and pedigree models →</a><br><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">0.3.0 density, fitting, and accuracy audit →</a></p></div></section>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-beta-regression">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-beta-regression">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#ferrari-cribari-neto-2004">Ferrari (2004) — beta regression</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

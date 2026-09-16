@@ -298,3 +298,16 @@ Keep each result, failure, FDR, and follow-up output distinct. See the
 [association output contracts](association-gwas-twas.md#audited-edge-cases-and-output-contracts)
 and [audit evidence](../../src/benchmark/resources/pipeline-audit/AUDIT.md) for
 failure accounting, BH denominator semantics, and raw timing measurements.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](../CITATIONS.md#bowden-mr-egger-2015)
+- [Jack Bowden et al. (2016) — Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator](../CITATIONS.md#bowden-weighted-median-2016)
+- [Gibran Hemani et al. (2018) — The MR-Base platform supports systematic causal inference across the human phenome](../CITATIONS.md#hemani-mrbase-2018)
+- [Yoav Benjamini and Yosef Hochberg (1995) — Controlling the false discovery rate: a practical and powerful approach to multiple testing](../CITATIONS.md#benjamini-hochberg-1995)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

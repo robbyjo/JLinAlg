@@ -389,3 +389,15 @@ becomes zero and is rejected; use a level-scale time trend to represent drift.
 
 The current API treats rows as one ordered series. Use `ExactArma.fitPanel` for
 block-independent shared ARMA parameters outside an LMM.
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [Rudolf E. Kalman (1960) — A new approach to linear filtering and prediction problems](../CITATIONS.md#kalman-1960)
+- [Greta M. Ljung and George E. P. Box (1978) — On a measure of lack of fit in time series models](../CITATIONS.md#ljung-box-1978)
+- [Rob J. Hyndman and Yeasmin Khandakar (2008) — Automatic time series forecasting: the forecast package for R](../CITATIONS.md#hyndman-khandakar-2008)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

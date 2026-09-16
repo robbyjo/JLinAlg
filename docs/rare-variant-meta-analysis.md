@@ -378,3 +378,16 @@ recommended; unindexed files are rescanned on cache misses.
 - [Score-based gene meta-analysis](https://pmc.ncbi.nlm.nih.gov/articles/PMC3939031/)
 - [MetaSKAT framework](https://pmc.ncbi.nlm.nih.gov/articles/PMC3710762/)
 - [SKAT-O method](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+## Scientific citations
+
+These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
+
+- [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009)
+- [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011)
+- [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012)
+- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](CITATIONS.md#dersimonian-laird-1986)
+
+[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
+<!-- SCIENTIFIC-CITATIONS:END -->

@@ -23,4 +23,19 @@ NonlinearMixedFitResult animal = NonlinearMixedModel.fitPedigree(
     NonlinearModelOptions.defaults(), BackendPolicy.CPU);</code></pre>
 <p>Unphenotyped ancestors remain in the coefficient system. The model is <code>y = f(theta,x) + Zb + e</code>: random effects are additive on the response scale. Inspect <code>linearizedModel()</code> for variance components, conditional modes, and sparse diagnostics.</p>
 <h2>Statistical boundary and audit</h2><p>The mixed path uses local Gaussian linearization and REML updates. It is not a general nonlinear random-parameter model, exact nlme likelihood, or non-Gaussian adaptive quadrature. Version 0.3.0 checks the projected correction and final Jacobian instead of accepting a tiny damped step. Large shared response offsets can quantize a near-optimal fit and prevent a score certificate; that case now reports nonconvergence rather than accepting a response-scale floor. Independent R fixtures and reviewer counterexamples cover these limits.</p>
-<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/nonlinear-models.md">Full source vignette and current validation →</a> · <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">Release audit →</a></p></div></section></main><site-footer root="../"></site-footer></body></html>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/nonlinear-models.md">Full source vignette and current validation →</a> · <a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">Release audit →</a></p></div></section>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-nonlinear-models">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-nonlinear-models">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#lindstrom-bates-1990">Lindstrom (1990) — nonlinear mixed-effects models</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

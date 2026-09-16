@@ -11,4 +11,19 @@ System.out.println(fit.confidenceInterval());</code></pre>
 <h2>Validation and speed</h2><p>Base-R fixtures cover both cutoffs, ties, ANOVA, and scale-invariant mean/variance inference. An independent quadratic oracle checks the new O(n log n) Kendall counting path. On a local 5,000-pair tied workload, Java took about 2 ms versus base R's 130 ms; timings are workload-specific.</p>
 <p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/release-0.3.0-audit.md">Audit, timing method, and reproducible commands →</a></p>
 <h2>Boundaries</h2><p>Sample APIs reject NaN/infinity; compact common complete cases before fitting. Welch ANOVA needs positive variance in each group. Classical ANOVA permits a constant group when pooled within-group variance is positive. Exact rectangular Fisher enumeration has an explicit table-count limit. A finite p-value is not a check of modeling assumptions.</p>
-<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/basic-statistical-tests.md">Complete Java examples and API families →</a></p></div></section></main><site-footer root="../"></site-footer></body></html>
+<p><a href="https://github.com/robbyjo/JLinAlg/blob/main/docs/vignettes/basic-statistical-tests.md">Complete Java examples and API families →</a></p></div></section>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-basic-statistical-tests">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-basic-statistical-tests">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#student-1908">Gosset] (1908) — Student t test</a></li><li><a href="../citations.html#welch-1947">Welch (1947) — Welch t test</a></li><li><a href="../citations.html#pearson-1895">Pearson (1895) — Pearson correlation</a></li><li><a href="../citations.html#spearman-1904">Spearman (1904) — Spearman correlation</a></li><li><a href="../citations.html#wilcoxon-1945">Wilcoxon (1945) — Wilcoxon signed-rank test</a></li><li><a href="../citations.html#mann-whitney-1947">Mann (1947) — Mann-Whitney U test</a></li><li><a href="../citations.html#fisher-1922">Fisher (1922) — Fisher exact test</a></li><li><a href="../citations.html#mcnemar-1947">McNemar (1947) — McNemar test</a></li><li><a href="../citations.html#friedman-1937">Friedman (1937) — Friedman test</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>
