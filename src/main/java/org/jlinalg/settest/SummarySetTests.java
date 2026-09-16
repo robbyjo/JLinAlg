@@ -67,6 +67,48 @@ public final class SummarySetTests {
         }
     }
 
+    /** Published ACAT-V with Beta(MAF; a1,a2) coefficients. */
+    public static AcatVResult acatV(
+            String id, SetTestScoreState state, double[] minorAlleleFrequencies,
+            double[] minorAlleleCounts, double shape1, double shape2,
+            double minorAlleleCountThreshold) {
+        return AcatTests.acatV(id, state, minorAlleleFrequencies,
+            minorAlleleCounts, shape1, shape2, minorAlleleCountThreshold);
+    }
+
+    /** Published default ACAT-V with Beta(MAF; 1,25) coefficients. */
+    public static AcatVResult acatV(
+            String id, SetTestScoreState state, double[] minorAlleleFrequencies,
+            double[] minorAlleleCounts) {
+        return AcatTests.acatV(id, state, minorAlleleFrequencies,
+            minorAlleleCounts);
+    }
+
+    /** Custom-weight ACAT-V matching the reference ACAT R interface. */
+    public static AcatVResult acatV(
+            String id, SetTestScoreState state, double[] minorAlleleFrequencies,
+            double[] minorAlleleCounts, double[] weights,
+            double minorAlleleCountThreshold) {
+        return AcatTests.acatV(id, state, minorAlleleFrequencies,
+            minorAlleleCounts, weights, minorAlleleCountThreshold);
+    }
+
+    /** Canonical six-component ACAT-O. */
+    public static AcatOResult acatO(
+            String id, SetTestScoreState state, double[] minorAlleleFrequencies,
+            double[] minorAlleleCounts, double minorAlleleCountThreshold) {
+        return AcatTests.acatO(id, state, minorAlleleFrequencies,
+            minorAlleleCounts, minorAlleleCountThreshold);
+    }
+
+    /** Canonical ACAT-O with the published MAC threshold of ten. */
+    public static AcatOResult acatO(
+            String id, SetTestScoreState state, double[] minorAlleleFrequencies,
+            double[] minorAlleleCounts) {
+        return AcatTests.acatO(id, state, minorAlleleFrequencies,
+            minorAlleleCounts);
+    }
+
     /** Validate covariance and score consistency, including its numerical null space. */
     public static void validate(SetTestScoreState state) {
         if (state == null) throw new IllegalArgumentException("score state required");

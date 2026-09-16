@@ -87,7 +87,7 @@ OmicsAssociationResult traits =
         testedCoefficient, transform,
         OmicsMissingPolicy.MEAN_IMPUTE, 512,
         null, null, OlsOptions.defaults(), execution);</code></pre></div><p>Identity, Winsorization, log, shifted log, z-score, and tie-aware Blom inverse-normal transforms compose without mutating source rows. The <a href="omics-transforms.html">command-line transform tutorial</a> lists every stage, exact syntax, missing-value behavior, and practical recipes.</p>
-<h2 id="sets">Test rare-variant sets</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Burden, SKAT, and SKAT-O</span></div><pre><code>LinearSetTestNullModel nullModel =
+<h2 id="sets">Test rare-variant sets</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Burden, SKAT, SKAT-O, ACAT-V, and ACAT-O</span></div><pre><code>LinearSetTestNullModel nullModel =
     LinearSetTestNullModel.prepare(
         phenotype, covariates,
         OlsOptions.defaults(), BackendPolicy.PREFERRED);
@@ -97,7 +97,11 @@ SetTestResult burden = SetTests.burden(
 SetTestResult skat = SetTests.skat(
     gene, nullModel, SetTestOptions.defaults());
 SkatOResult skatO = SetTests.skatO(
-    gene, nullModel, SetTestOptions.defaults());</code></pre></div><p>Effect-allele orientation and QC are explicit. Wrap the retained mixed scanner in <code>RemlSetTestNullModel</code> to run related-sample Burden/SKAT/SKAT-O without another REML fit per gene.</p>
+    gene, nullModel, SetTestOptions.defaults());
+AcatVResult acatV = SetTests.acatV(
+    gene, nullModel, SetTestOptions.defaults());
+AcatOResult acatO = SetTests.acatO(
+    gene, nullModel, SetTestOptions.defaults());</code></pre></div><p>Effect-allele orientation and QC are explicit. Wrap the retained mixed scanner in <code>RemlSetTestNullModel</code> to run related-sample set tests without another REML fit per gene. The <a href="acat-rare-variants.html">ACAT tutorial</a> covers MAC collapsing, component weights, score summaries, and CLI use.</p>
 <h2 id="output">Write complete results</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Effect and uncertainty</span></div><pre><code>double beta = hit.beta();
 double se = hit.standardError();
 double statistic = hit.statistic();
@@ -114,7 +118,7 @@ double minusLogP = hit.negativeLog10PValue();</code></pre></div><p>Keep allele d
     <h2 id="scientific-citations-association">Primary method citations</h2>
     <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
     <ul class="citation-links">
-      <li><a href="../citations.html#kang-emmax-2010">Kang et al. (2010) — EMMAX</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/20208533/">PMID: 20208533</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3092069/">PMCID: PMC3092069</a>)</span></li><li><a href="../citations.html#zhang-p3d-2010">Zhang et al. (2010) — P3D</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/20208535/">PMID: 20208535</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2931336/">PMCID: PMC2931336</a>)</span></li><li><a href="../citations.html#wu-skat-2011">Wu et al. (2011) — SKAT</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/21737059/">PMID: 21737059</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/">PMCID: PMC3135811</a>)</span></li><li><a href="../citations.html#lee-skato-2012">Lee et al. (2012) — SKAT-O</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/22863193/">PMID: 22863193</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/">PMCID: PMC3415556</a>)</span></li><li><a href="../citations.html#madsen-browning-2009">Madsen (2009) — weighted burden test</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/19214210/">PMID: 19214210</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/">PMCID: PMC2633048</a>)</span></li>
+      <li><a href="../citations.html#kang-emmax-2010">Kang et al. (2010) — EMMAX</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/20208533/">PMID: 20208533</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3092069/">PMCID: PMC3092069</a>)</span></li><li><a href="../citations.html#zhang-p3d-2010">Zhang et al. (2010) — P3D</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/20208535/">PMID: 20208535</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2931336/">PMCID: PMC2931336</a>)</span></li><li><a href="../citations.html#wu-skat-2011">Wu et al. (2011) — SKAT</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/21737059/">PMID: 21737059</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/">PMCID: PMC3135811</a>)</span></li><li><a href="../citations.html#lee-skato-2012">Lee et al. (2012) — SKAT-O</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/22863193/">PMID: 22863193</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/">PMCID: PMC3415556</a>)</span></li><li><a href="../citations.html#liu-acat-2019">Liu et al. (2019) — ACAT</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/30849328/">PMID: 30849328</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/">PMCID: PMC6407498</a>)</span></li><li><a href="../citations.html#madsen-browning-2009">Madsen (2009) — weighted burden test</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/19214210/">PMID: 19214210</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/">PMCID: PMC2633048</a>)</span></li>
     </ul>
     <a class="text-link" href="../citations.html">Search all scientific citations →</a>
   </div>

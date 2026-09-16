@@ -169,10 +169,12 @@ java -jar jlinalg-<version>.jar --pheno phenotype.csv --omics cohort.bgen `
 ```
 
 Frequency and count thresholds are applied to the aligned analysis cohort.
-Single-marker tests can be poorly powered for very rare alleles. JLinAlg also
-implements Burden, SKAT, and SKAT-O set tests in the Java API, but a
-gene/set-membership CLI is not yet exposed; do not describe the command above
-as SKAT or a gene-based test.
+Single-marker tests can be poorly powered for very rare alleles. The command
+above remains a single-variant scan; do not describe it as a gene-based test.
+For score-summary gene or window tests, use the specialized `rare-score` and
+`rare-meta` workflow, which exposes Burden, SKAT, SKAT-O, ACAT-V, and ACAT-O.
+See the [ACAT rare-variant tutorial](acat-rare-variants.md) and the
+[complete rare-meta guide](../rare-variant-meta-analysis.md).
 
 ## 5. Pedigree files, slowly and explicitly
 
@@ -341,6 +343,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Zhiwu Zhang et al. (2010) — Mixed linear model approach adapted for genome-wide association studies](../CITATIONS.md#zhang-p3d-2010) — [PMID: 20208535](https://pubmed.ncbi.nlm.nih.gov/20208535/) · [PMCID: PMC2931336](https://pmc.ncbi.nlm.nih.gov/articles/PMC2931336/)
 - [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](../CITATIONS.md#wu-skat-2011) — [PMID: 21737059](https://pubmed.ncbi.nlm.nih.gov/21737059/) · [PMCID: PMC3135811](https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/)
 - [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](../CITATIONS.md#lee-skato-2012) — [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+- [Yaowu Liu et al. (2019) — ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies](../CITATIONS.md#liu-acat-2019) — [PMID: 30849328](https://pubmed.ncbi.nlm.nih.gov/30849328/) · [PMCID: PMC6407498](https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

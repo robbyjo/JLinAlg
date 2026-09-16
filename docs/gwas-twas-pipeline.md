@@ -168,7 +168,7 @@ random designs, pedigree additive precision, symbolic factorization, and
 bounded feature blocks are retained. P3D/EMMAX remains a separate genotype LMM
 option and is never selected automatically for numeric omics.
 
-## Burden, SKAT, and SKAT-O
+## Burden, SKAT, SKAT-O, ACAT-V, and ACAT-O
 
 Build a `VariantSet` from aligned `WeightedVariant` members. Effect-allele
 orientation, missingness policy, and the same MAF/MAC filters are applied
@@ -185,6 +185,10 @@ SetTestResult skat = SetTests.skat(
     gene, nullModel, SetTestOptions.defaults());
 SkatOResult skatO = SetTests.skatO(
     gene, nullModel, SetTestOptions.defaults());
+AcatVResult acatV = SetTests.acatV(
+    gene, nullModel, SetTestOptions.defaults());
+AcatOResult acatO = SetTests.acatO(
+    gene, nullModel, SetTestOptions.defaults());
 ```
 
 SKAT uses a positive chi-square mixture with deterministic Imhof integration
@@ -192,11 +196,21 @@ and guarded moment matching. SKAT-O reports every rho-grid component and a
 seeded correlated-null adjusted p-value. For related samples, wrap the retained
 mixed projection once:
 
+ACAT-V uses Beta(1,25) coefficients by default and collapses variants with
+MAC <= 10 into a single burden component. Overloads expose Beta shape and MAC
+threshold controls; `acatVCustomWeights` uses each `WeightedVariant` weight as
+both its burden coefficient and Cauchy weight. Canonical ACAT-O always combines
+Burden, SKAT, and ACAT-V under Beta(1,25) and Beta(1,1). It reuses one null-model
+score projection and performs only the two eigendecompositions needed by the
+SKAT components.
+
 ```java
 RemlSetTestNullModel related = new RemlSetTestNullModel(nullModelScanner);
 SetTestResult mixedBurden = SetTests.burden(gene, related, options);
 SetTestResult mixedSkat = SetTests.skat(gene, related, options);
 SkatOResult mixedSkatO = SetTests.skatO(gene, related, options);
+AcatVResult mixedAcatV = SetTests.acatV(gene, related, options);
+AcatOResult mixedAcatO = SetTests.acatO(gene, related, options);
 ```
 
 Gene/region annotation, window construction, conditional analysis, and
@@ -229,6 +243,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Zhiwu Zhang et al. (2010) — Mixed linear model approach adapted for genome-wide association studies](CITATIONS.md#zhang-p3d-2010) — [PMID: 20208535](https://pubmed.ncbi.nlm.nih.gov/20208535/) · [PMCID: PMC2931336](https://pmc.ncbi.nlm.nih.gov/articles/PMC2931336/)
 - [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011) — [PMID: 21737059](https://pubmed.ncbi.nlm.nih.gov/21737059/) · [PMCID: PMC3135811](https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/)
 - [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012) — [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+- [Yaowu Liu et al. (2019) — ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies](CITATIONS.md#liu-acat-2019) — [PMID: 30849328](https://pubmed.ncbi.nlm.nih.gov/30849328/) · [PMCID: PMC6407498](https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/)
 - [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009) — [PMID: 19214210](https://pubmed.ncbi.nlm.nih.gov/19214210/) · [PMCID: PMC2633048](https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

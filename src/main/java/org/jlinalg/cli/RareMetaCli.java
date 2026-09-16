@@ -43,6 +43,7 @@ final class RareMetaCli {
                 journal.metadata("command=rare-meta\ngenome_build="+o.build+"\ncohort_order="+String.join(",",o.names)
                     +"\nmodel_metadata_policy="+o.modelMetadata+"\ntests="+String.join(",",o.tests)+"\nweights="+o.weights+"\nmaf="+o.maf+"\naf_policy="+o.afPolicy
                     +"\nmin_cohorts_per_variant="+o.minimum+"\ncohort_results="+o.cohortResults
+                    +"\nacat_mac_threshold="+o.acatMacThreshold
                     +"\nskato_calibration="+o.calibration+"\nsimulations="+o.simulations+"\nseed="+o.seed
                     +"\nthreads="+o.threads+"\ncache_bytes_per_cohort="+o.cacheBytes+"\ncondition_file="+o.conditionFile+"\ncondition_missing="+o.conditionMissing+"\nleave_variant_out="+o.leaveVariant+"\nleave_cohort_out="+o.leaveCohort+"\nmodel=independent cohorts; quantitative-trait null scores; compatible trait units required\n");
                 for(int i=0;i<studies.size();i++)journal.info("cohort="+o.names.get(i)+" scores="+o.scoreFiles.get(i)
@@ -86,6 +87,8 @@ final class RareMetaCli {
         String common="scope\tfeature_id\tn_variants\tn_cohorts\tstatus";
         if(test.equals("vt"))return common+"\tweights\tselected_maf\tselected_beta\tselected_se\tselected_p\tadjusted_p\tmc_se\tn_thresholds\tsimulations\tseed\tcalibration";
         if(test.equals("burden-fixed")||test.equals("burden-random"))return common+"\tweights\tdirection\tbeta\tse\tp_value\ttau_squared\tcochran_q\tq_p\ti_squared\tcalibration";
+        if(test.equals("acat-v"))return common+"\tweights\tp_value\tneg_log10_p\tcauchy_statistic\tn_components\tn_collapsed\tmac_threshold\tcomponent_p_weight";
+        if(test.equals("acat-o"))return common+"\tweights\tp_value\tneg_log10_p\tcauchy_statistic\tn_components\tmac_threshold\tcomponent_p";
         return common+(test.equals("single")?"\tn_samples\talt_af\tdirection\tscore\tvariance\tbeta\tse\tz\tp_value\tneg_log10_p":
             test.equals("burden")?"\tweights\tdirection\tbeta\tse\tz\tp_value\tneg_log10_p\tcalibration":
             (test.equals("skat")||test.equals("het-skat"))?"\tweights\tq\tp_value\tneg_log10_p\tcalibration":
@@ -128,7 +131,7 @@ final class RareMetaCli {
         if(variants.size()+conditions.size()>o.maxVariants)throw new IOException("target plus conditioning variants exceed --max-variants: "+id);
         int k=studies.size(),n=variants.size();
         Score[][] conditioning=new Score[k][conditions.size()];int[][] conditionSigns=new int[k][conditions.size()];boolean[] excludedCohort=new boolean[k]; Score[][] values=new Score[k][n];int[][] signs=new int[k][n];
-        double[] af=new double[n]; int[] counts=new int[n];boolean[] retained=new boolean[n];
+        double[] af=new double[n],minorAlleleCounts=new double[n]; int[] counts=new int[n];boolean[] retained=new boolean[n];
         for(int c=0;c<k;c++) {
             Map<Long,Score> region=studies.get(c).region(chr,low,high);
             for(int i=0;i<conditions.size();i++) {
@@ -156,7 +159,8 @@ final class RareMetaCli {
                 else if(s==null&&o.afPolicy.equals("raremetal"))denom+=studies.get(c).samples();
             }
             af[i]=denom>0?a/denom:Double.NaN;
-            if(af[i]>.5){af[i]=1-af[i];for(int c=0;c<k;c++)signs[c][i]*=-1;}
+            if(af[i]>.5){a=denom-a;af[i]=1-af[i];for(int c=0;c<k;c++)signs[c][i]*=-1;}
+            minorAlleleCounts[i]=2*a;
             retained[i]=counts[i]>=o.minimum&&af[i]>0&&af[i]<=o.maf;
         }
         for(int c=0;c<k;c++)for(int i=0;i<n;i++) {
@@ -168,11 +172,11 @@ final class RareMetaCli {
         }
         int m=0;for(boolean b:retained)if(b)m++;
         if(m==0){for(String test:o.tests)if(!test.equals("single"))empty(writers.get(test),test,"meta",id,0,0,"no_variants_after_filters",o.weight(test));return;}
-        double[][] u=new double[k][m],cov=new double[k][Math.multiplyExact(m,m)];double[] mafs=new double[m];
+        double[][] u=new double[k][m],cov=new double[k][Math.multiplyExact(m,m)];double[] mafs=new double[m],macs=new double[m];
         for(int c=0;c<k;c++) {
             Arrays.fill(u[c],Double.NaN);List<Score> present=new ArrayList<>();List<Integer> positions=new ArrayList<>();List<Integer> directions=new ArrayList<>();
             for(int i=0,j=0;i<n;i++)if(retained[i]) {
-                mafs[j]=af[i];Score s=values[c][i];
+                mafs[j]=af[i];macs[j]=minorAlleleCounts[i];Score s=values[c][i];
                 if(!excludedCohort[c]&&s!=null&&s.informative()){u[c][j]=signs[c][i]*s.score();present.add(s);positions.add(j);directions.add(signs[c][i]);}j++;
             }
             double[] block;
@@ -196,23 +200,23 @@ final class RareMetaCli {
         }
         List<String> ids=new ArrayList<>();for(int i=0;i<n;i++)if(retained[i])ids.add(variants.get(i).id());
         int totalSamples=studies.stream().mapToInt(RareMetalStudy::samples).sum();
-        analyze(o,writers,"meta",id,u,cov,mafs,totalSamples,o.cohortResults);
+        analyze(o,writers,"meta",id,u,cov,mafs,macs,totalSamples,o.cohortResults);
         if(o.leaveCohort)for(int c=0;c<k;c++) {
             double[][] lu=u.clone(),lv=cov.clone();lu[c]=new double[m];Arrays.fill(lu[c],Double.NaN);lv[c]=new double[m*m];
-            analyze(o,writers,"leave_cohort:"+o.names.get(c),id,lu,lv,mafs,totalSamples,false);
+            analyze(o,writers,"leave_cohort:"+o.names.get(c),id,lu,lv,mafs,macs,totalSamples,false);
         }
         if(o.leaveVariant)for(int omitted=0;omitted<m;omitted++) {
-            int size=m-1;double[][] lu=new double[k][size],lv=new double[k][size*size];double[] lm=new double[size];
+            int size=m-1;double[][] lu=new double[k][size],lv=new double[k][size*size];double[] lm=new double[size],la=new double[size];
             for(int i=0,ii=0;i<m;i++)if(i!=omitted) {
-                lm[ii]=mafs[i];for(int c=0;c<k;c++) {
+                lm[ii]=mafs[i];la[ii]=macs[i];for(int c=0;c<k;c++) {
                     lu[c][ii]=u[c][i];for(int j=0,jj=0;j<m;j++)if(j!=omitted)lv[c][ii*size+jj++]=cov[c][i*m+j];
                 }ii++;
             }
-            analyze(o,writers,"leave_variant:"+ids.get(omitted),id,lu,lv,lm,totalSamples,false);
+            analyze(o,writers,"leave_variant:"+ids.get(omitted),id,lu,lv,lm,la,totalSamples,false);
         }
     }
     private static void analyze(Options o,Map<String,BufferedWriter> writers,String scope,String id,
-            double[][] u,double[][] cov,double[] mafs,int totalSamples,boolean cohortRows)throws IOException {
+            double[][] u,double[][] cov,double[] mafs,double[] macs,int totalSamples,boolean cohortRows)throws IOException {
         int k=u.length,m=mafs.length;
         var pooled=m==0?null:ScoreMetaAnalysis.pool(u,cov,1);
         for(String test:o.tests)if(!test.equals("single")) {
@@ -226,7 +230,7 @@ final class RareMetaCli {
                 if(cm==0){burdenDirection.append('?');if(cohortRows)empty(writers.get(test),test,o.names.get(c),id,0,0,"no_informative_variants",o.weight(test));continue;}
                 if(!cohortRows&&!test.startsWith("het-")&&!test.startsWith("burden-"))continue;
                 var cp=ScoreMetaAnalysis.pool(new double[][]{u[c]},new double[][]{cov[c]},1);
-                double[] cw=select(weights,cp.indices()),cf=select(mafs,cp.indices());
+                double[] cw=select(weights,cp.indices()),cf=select(mafs,cp.indices()),ca=select(macs,cp.indices());
                 states.add(cp.state());for(double w:cw)hetWeights.add(w);
                 if(cm==m&&test.startsWith("burden-")) {
                     var burden=SummarySetTests.burden(id,cp.state(),cw);
@@ -234,7 +238,7 @@ final class RareMetaCli {
                     if(cohortRows)line(writers.get(test),o.names.get(c),id,m,1,Double.isFinite(burden.standardError())?"cohort_estimate":"no_burden_information",o.weight(test),""+burdenDirection.charAt(c),burden.beta(),burden.standardError(),burden.pValue(),Double.NaN,Double.NaN,Double.NaN,Double.NaN,"cohort_normal");
                 }
                 if(cm<m){burdenDirection.append('?');if(cohortRows&&test.startsWith("burden-"))empty(writers.get(test),test,o.names.get(c),id,cm,0,"incomplete_burden_mask",o.weight(test));}
-                if(cohortRows&&!test.startsWith("burden-"))result(writers.get(test),test,o.names.get(c),id,cp.state(),cw,cf,1,"ok",""+direction.charAt(c),o);
+                if(cohortRows&&!test.startsWith("burden-"))result(writers.get(test),test,o.names.get(c),id,cp.state(),cw,cf,ca,1,"ok",""+direction.charAt(c),o);
             }
             if(test.startsWith("burden-")) {
                 if(burdens.isEmpty()){empty(writers.get(test),test,scope,id,m,0,"no_complete_mask_cohorts",o.weight(test));continue;}
@@ -247,13 +251,13 @@ final class RareMetaCli {
                 line(writers.get(test),scope,id,m,burdens.size(),burdens.size()==1?"single_cohort":burdens.size()<count?"incomplete_mask_cohorts_excluded":"ok",o.weight(test),burdenDirection,fit.pooledEffectSize(),fit.standardError(),fit.pValue(),fit.tauSquared(),fit.cochranQ(),fit.cochranQPValue(),fit.iSquared(),test.equals("burden-fixed")?"inverse_variance_normal":"REML_normal");
                 continue;
             }
-            SetTestScoreState state=pooled.state();double[] w=select(weights,pooled.indices()),f=select(mafs,pooled.indices());
+            SetTestScoreState state=pooled.state();double[] w=select(weights,pooled.indices()),f=select(mafs,pooled.indices()),a=select(macs,pooled.indices());
             if(test.startsWith("het-")) {
                 int dimension=states.stream().mapToInt(SetTestScoreState::variants).sum();
                 if(dimension>o.maxVariants)throw new IOException("heterogeneous cohort-by-variant dimension exceeds --max-variants: "+id);
                 state=SummaryScoreModels.heterogeneous(states);w=hetWeights.stream().mapToDouble(Double::doubleValue).toArray();
             }
-            result(writers.get(test),test,scope,id,state,w,f,count,count==1?"single_cohort":"ok",direction.toString(),o);
+            result(writers.get(test),test,scope,id,state,w,f,a,count,count==1?"single_cohort":"ok",direction.toString(),o);
         }
     }
     private static double[] select(double[] values,int[] indices){double[] result=new double[indices.length];for(int i=0;i<indices.length;i++)result[i]=values[indices[i]];return result;}
@@ -263,15 +267,26 @@ final class RareMetaCli {
             case "equal"->1;case "mb"->1/Math.sqrt(maf[i]*(1-maf[i]));
             case "beta"->25*Math.pow(1-maf[i],24);
             case "raremetal-beta"->25*Math.pow(1-Math.min(1-2.0/samples,Math.max(2.0/samples,maf[i])),24);
+            case "canonical"->25*Math.pow(1-maf[i],24);
             default->throw new IllegalArgumentException("unknown weights: "+method);};
         return weights;
     }
-    private static void result(BufferedWriter w,String test,String scope,String id,SetTestScoreState state,double[] weights,double[] mafs,int cohorts,String status,String direction,Options o)throws IOException {
+    private static void result(BufferedWriter w,String test,String scope,String id,SetTestScoreState state,double[] weights,double[] mafs,double[] macs,int cohorts,String status,String direction,Options o)throws IOException {
         int reportedVariants=test.startsWith("het-")?mafs.length:state.variants();
         if(test.equals("vt")) {
             var r=SummaryScoreModels.variableThreshold(id,state,weights,mafs,o.simulations,o.seed);
             if(r.selectedBurden()==null){empty(w,test,scope,id,state.variants(),cohorts,"no_burden_information",o.weight(test));return;}
             var b=r.selectedBurden();line(w,scope,id,state.variants(),cohorts,status,o.weight(test),r.selectedMaf(),b.beta(),b.standardError(),b.pValue(),r.adjustedPValue(),r.monteCarloStandardError(),r.thresholds(),r.simulations(),r.seed(),r.simulations()==0?"single_threshold_normal":"correlated_gaussian_score_simulation");
+        }else if(test.equals("acat-v")) {
+            AcatVResult r=o.weight(test).equals("beta")
+                ?SummarySetTests.acatV(id,state,mafs,macs,1,25,o.acatMacThreshold)
+                :SummarySetTests.acatV(id,state,mafs,macs,weights,o.acatMacThreshold);
+            String components=String.join(";",r.components().stream().map(c->c.name()+":"+c.pValue()+":"+c.normalizedWeight()).toList());
+            line(w,scope,id,reportedVariants,cohorts,status,o.weight(test),r.pValue(),r.negativeLog10PValue(),r.statistic(),r.components().size(),r.collapsedVariants(),r.minorAlleleCountThreshold(),components);
+        }else if(test.equals("acat-o")) {
+            AcatOResult r=SummarySetTests.acatO(id,state,mafs,macs,o.acatMacThreshold);
+            String components=String.join(";",r.components().stream().map(c->c.name()+":"+c.pValue()).toList());
+            line(w,scope,id,reportedVariants,cohorts,status,o.weight(test),r.pValue(),r.negativeLog10PValue(),r.statistic(),r.components().size(),r.minorAlleleCountThreshold(),components);
         }else if(test.equals("skat-o")||test.equals("het-skat-o")) {
             SetTestOptions defaults=SetTestOptions.defaults();
             var options=new SetTestOptions(defaults.variantFilter(),defaults.missingPolicy(),defaults.skatORhoGrid(),o.simulations,o.seed,o.calibration);
@@ -359,23 +374,24 @@ final class RareMetaCli {
         final List<String> names=new ArrayList<>(),tests=new ArrayList<>();final List<Path> scoreFiles=new ArrayList<>(),covFiles=new ArrayList<>();
         final Map<String,List<Variant>> conditions=new HashMap<>();
         Path conditionFile;String conditionMissing="error";boolean leaveVariant,leaveCohort;int threads=1;long cacheBytes=16L*1024*1024;
-        Path output,groups;String modelMetadata="legacy",build,weights="default",afPolicy="observed";int minimum=1,maxVariants=2000,simulations=10000;long seed=20260901L,windowSize,windowStep;double maf=.05,callRate=0,hwe=0;boolean cohortResults;SkatOCalibration calibration=SkatOCalibration.PARAMETRIC_SIMULATION;
+        Path output,groups;String modelMetadata="legacy",build,weights="default",afPolicy="observed";int minimum=1,maxVariants=2000,simulations=10000;long seed=20260901L,windowSize,windowStep;double maf=.05,callRate=0,hwe=0,acatMacThreshold=AcatTests.DEFAULT_MAC_THRESHOLD;boolean cohortResults;SkatOCalibration calibration=SkatOCalibration.PARAMETRIC_SIMULATION;
         Options(String[] args)throws IOException {
             Map<String,String> map=new HashMap<>();
-            for(int i=0;i<args.length;i++){String key=args[i];if(key.equals("--leave-variant-out")){leaveVariant=true;continue;}if(key.equals("--leave-cohort-out")){leaveCohort=true;continue;}if(key.equals("--cohort-results")){cohortResults=true;continue;}if(!Set.of("--cohorts","--out","--test","--groups","--genome-build","--weights","--af-policy","--min-cohorts","--max-variants","--simulations","--seed","--window-size","--window-step","--maf","--call-rate","--hwe","--skato-calibration","--condition","--condition-missing","--threads","--cache-mb","--model-metadata").contains(key)||i+1==args.length||map.put(key,args[++i])!=null)throw new IllegalArgumentException("unknown, duplicate, or incomplete option: "+key);}
+            for(int i=0;i<args.length;i++){String key=args[i];if(key.equals("--leave-variant-out")){leaveVariant=true;continue;}if(key.equals("--leave-cohort-out")){leaveCohort=true;continue;}if(key.equals("--cohort-results")){cohortResults=true;continue;}if(!Set.of("--cohorts","--out","--test","--groups","--genome-build","--weights","--af-policy","--min-cohorts","--max-variants","--simulations","--seed","--window-size","--window-step","--maf","--call-rate","--hwe","--skato-calibration","--acat-mac-threshold","--condition","--condition-missing","--threads","--cache-mb","--model-metadata").contains(key)||i+1==args.length||map.put(key,args[++i])!=null)throw new IllegalArgumentException("unknown, duplicate, or incomplete option: "+key);}
             for(String key:List.of("--cohorts","--out","--test","--genome-build"))if(!map.containsKey(key))throw new IllegalArgumentException("required option: "+key);
             modelMetadata=map.getOrDefault("--model-metadata","legacy");
             if(!Set.of("legacy","strict").contains(modelMetadata))throw new IllegalArgumentException("model-metadata must be legacy or strict");
             output=Path.of(map.get("--out")).toAbsolutePath();build=map.get("--genome-build");
-            for(String t:map.get("--test").split(","))if(!Set.of("single","burden","skat","skat-o","vt","het-skat","het-skat-o","burden-fixed","burden-random").contains(t)||tests.contains(t))throw new IllegalArgumentException("invalid or repeated test: "+t);else tests.add(t);
+            for(String t:map.get("--test").split(","))if(!Set.of("single","burden","skat","skat-o","acat-v","acat-o","vt","het-skat","het-skat-o","burden-fixed","burden-random").contains(t)||tests.contains(t))throw new IllegalArgumentException("invalid or repeated test: "+t);else tests.add(t);
             if(map.containsKey("--groups"))groups=Path.of(map.get("--groups"));
             weights=map.getOrDefault("--weights",weights);if(!Set.of("default","equal","mb","beta","raremetal-beta").contains(weights))throw new IllegalArgumentException("invalid weights");
             afPolicy=map.getOrDefault("--af-policy",afPolicy);if(!Set.of("observed","raremetal").contains(afPolicy))throw new IllegalArgumentException("invalid AF policy");
             minimum=Integer.parseInt(map.getOrDefault("--min-cohorts","1"));maxVariants=Integer.parseInt(map.getOrDefault("--max-variants","2000"));simulations=Integer.parseInt(map.getOrDefault("--simulations","10000"));seed=Long.parseLong(map.getOrDefault("--seed","20260901"));
             windowSize=Long.parseLong(map.getOrDefault("--window-size","0"));windowStep=Long.parseLong(map.getOrDefault("--window-step",Long.toString(windowSize)));
             maf=Double.parseDouble(map.getOrDefault("--maf","0.05"));callRate=Double.parseDouble(map.getOrDefault("--call-rate","0"));hwe=Double.parseDouble(map.getOrDefault("--hwe","0"));
+            acatMacThreshold=Double.parseDouble(map.getOrDefault("--acat-mac-threshold",Double.toString(acatMacThreshold)));
             String c=map.getOrDefault("--skato-calibration","simulation");calibration=switch(c){case "simulation"->SkatOCalibration.PARAMETRIC_SIMULATION;case "analytic"->SkatOCalibration.ANALYTIC;case "deterministic"->SkatOCalibration.DETERMINISTIC;default->throw new IllegalArgumentException("invalid SKAT-O calibration");};
-            if(minimum<1||maxVariants<1||simulations<1||!Double.isFinite(maf)||maf<=0||maf>.5)throw new IllegalArgumentException("invalid count or MAF option");
+            if(minimum<1||maxVariants<1||simulations<1||!Double.isFinite(maf)||maf<=0||maf>.5||!Double.isFinite(acatMacThreshold)||acatMacThreshold<0)throw new IllegalArgumentException("invalid count, MAF, or ACAT MAC option");
             if(tests.stream().anyMatch(t->!t.equals("single")) && (groups==null&&(windowSize<1||windowStep<1)||groups!=null&&windowSize!=0))throw new IllegalArgumentException("group tests require --groups or positive --window-size/--window-step");
             threads=Integer.parseInt(map.getOrDefault("--threads","1"));cacheBytes=Math.multiplyExact(Long.parseLong(map.getOrDefault("--cache-mb","16")),1024L*1024);
             if(threads<1||threads>256||cacheBytes<0)throw new IllegalArgumentException("threads must be 1..256 and cache-mb nonnegative");
@@ -398,15 +414,16 @@ final class RareMetaCli {
             if(names.isEmpty())throw new IllegalArgumentException("empty cohort manifest");
             if((leaveVariant||leaveCohort)&&tests.stream().allMatch(t->t.equals("single")))throw new IllegalArgumentException("leave-out diagnostics require a group test");
         }
-        String weight(String test){return weights.equals("default")?(test.startsWith("burden")||test.equals("vt"))?"equal":"raremetal-beta":weights;}
+        String weight(String test){if(test.equals("acat-o"))return "canonical";return weights.equals("default")?(test.startsWith("burden")||test.equals("vt"))?"equal":test.equals("acat-v")?"beta":"raremetal-beta":weights;}
     }
     static String help(){return """
         Usage: jlinalg rare-meta --cohorts manifest.tsv --genome-build GRCh38
-          --test single|burden|skat|skat-o|vt|het-skat|het-skat-o|burden-fixed|burden-random[,TEST...] --out PREFIX
+          --test single|burden|skat|skat-o|acat-v|acat-o|vt|het-skat|het-skat-o|burden-fixed|burden-random[,TEST...] --out PREFIX
           [--groups groups.txt | --window-size BP --window-step BP]
           [--weights equal|mb|beta|raremetal-beta] [--maf 0.05]
           [--min-cohorts 1] [--af-policy observed|raremetal] [--cohort-results]
           [--call-rate 0] [--hwe 0] [--max-variants 2000]
+          [--acat-mac-threshold 10]
           [--skato-calibration simulation|analytic|deterministic] [--simulations 10000] [--seed 20260901]
           [--leave-variant-out] [--leave-cohort-out] [--threads 1] [--cache-mb 16]
           [--condition group-conditions.txt] [--condition-missing error|exclude]
@@ -414,6 +431,7 @@ final class RareMetaCli {
         Conditions: GROUP_ID CHROM:POS:REF:ALT ...; disjoint from targets; complete cross-covariance required.
         Diagnostics retain original weights/MAFs and report omitted identity in scope.
         VT calibrates the correlated threshold search; selected beta/SE are descriptive after selection.
+        ACAT-V collapses variants with MAC <= threshold; ACAT-O combines six canonical components.
         Heterogeneous kernels stack independent cohort effects; burden-fixed/random require complete masks.
         Deterministic SKAT-O uses conditional Gaussian quadrature (relative tolerance 1e-6); unresolved tails fail.
         Cache budget is per cohort; group results are emitted in input order with bounded concurrency.

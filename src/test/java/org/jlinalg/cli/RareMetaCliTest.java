@@ -104,7 +104,13 @@ class RareMetaCliTest {
             assertEquals((-4.0/3)/3.5,covariance[1],1e-12);
         }
         Files.writeString(directory.resolve("roundtrip.tsv"),"cohort\tscores\tcovariance\nA\tcohort.score.txt.gz\tcohort.cov.txt.gz\n");
-        assertEquals(0,run("rare-meta","--cohorts",directory.resolve("roundtrip.tsv").toString(),"--genome-build","GRCh38","--test","single,burden,skat,skat-o","--maf","0.5","--weights","equal","--window-size","100","--out",directory.resolve("roundtrip").toString()));
+        assertEquals(0,run("rare-meta","--cohorts",directory.resolve("roundtrip.tsv").toString(),"--genome-build","GRCh38","--test","single,burden,skat,skat-o,acat-v,acat-o","--maf","0.5","--weights","equal","--acat-mac-threshold","2","--window-size","100","--out",directory.resolve("roundtrip").toString()));
+        String[] acatV=table(directory.resolve("roundtrip.acat-v.tsv")).get("1:1-100");
+        assertEquals(1,Integer.parseInt(acatV[10]));
+        assertTrue(Double.parseDouble(acatV[6])>0&&Double.parseDouble(acatV[6])<=1);
+        String[] acatO=table(directory.resolve("roundtrip.acat-o.tsv")).get("1:1-100");
+        assertEquals("canonical",acatO[5]);assertEquals(6,Integer.parseInt(acatO[9]));
+        assertTrue(acatO[11].contains("acat-v-beta-1-25"));
     }
     @Test void rvtestsIndexedCovarianceLayout()throws Exception {
         Path root=Path.of("src/test/resources/raremetal").toAbsolutePath();

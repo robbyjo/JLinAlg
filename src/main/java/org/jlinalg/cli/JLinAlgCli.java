@@ -189,7 +189,7 @@ public final class JLinAlgCli {
                 --pheno phenotype.tsv --id sample --response trait
                 --genome-build GRCh38 --out PREFIX
               java -jar jlinalg-<version>.jar rare-meta --cohorts manifest.tsv
-                --genome-build GRCh38 --test single|burden|skat|skat-o --out PREFIX
+                --genome-build GRCh38 --test single|burden|skat|skat-o|acat-v|acat-o --out PREFIX
               java -jar jlinalg-<version>.jar conditional-score --cohorts manifest.tsv
                 --targets CHR:POS:REF:ALT --condition-on CHR:POS:REF:ALT --out FILE.tsv
               java -jar jlinalg-<version>.jar confounders --method pca|sva|autosva|peer

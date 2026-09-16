@@ -187,6 +187,43 @@ class SetTestsTest {
     }
 
     @Test
+    void acatOProjectsOnceAndReportsPublishedComponents() {
+        VariantSet set = new VariantSet("acat", List.of(
+            member("v1", FIRST, EffectAllele.ALTERNATE),
+            member("v2", SECOND, EffectAllele.ALTERNATE)));
+        CountingNullModel counted = new CountingNullModel(nullModel());
+
+        AcatOResult result = SetTests.acatO(
+            set, counted, options(100), 10);
+
+        assertEquals(1, counted.calls);
+        assertEquals(6, result.components().size());
+        assertTrue(result.pValue() > 0 && result.pValue() <= 1);
+        assertEquals(2, result.includedVariants());
+        assertTrue(result.components().stream().anyMatch(
+            component -> component.name().equals("acat-v-beta-1-25")));
+    }
+
+    @Test
+    void acatOOrientsParticipantScoresToTheMinorAllele() {
+        double[] third = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1};
+        VariantSet alternate = new VariantSet("minor-alt", List.of(
+            member("v2", SECOND, EffectAllele.ALTERNATE),
+            member("v3", third, EffectAllele.ALTERNATE)));
+        VariantSet reference = new VariantSet("minor-ref", List.of(
+            member("v2", SECOND, EffectAllele.REFERENCE),
+            member("v3", third, EffectAllele.REFERENCE)));
+
+        AcatOResult alt = SetTests.acatO(alternate, nullModel(), options(100));
+        AcatOResult ref = SetTests.acatO(reference, nullModel(), options(100));
+
+        assertEquals(alt.pValue(), ref.pValue(), 1e-14);
+        for (int index = 0; index < alt.components().size(); index++)
+            assertEquals(alt.components().get(index).pValue(),
+                ref.components().get(index).pValue(), 1e-14);
+    }
+
+    @Test
     void binaryPqlNullSupportsPreparedSetTests() {
         double[] binary = {0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1};
         double[] kinship = new double[binary.length * binary.length];

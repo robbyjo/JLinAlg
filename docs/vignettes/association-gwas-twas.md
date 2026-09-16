@@ -174,11 +174,13 @@ same sample alignment for TWAS, EWAS, and PWAS feature matrices. Compose
 Winsorization, log, z-score, or tie-aware rank inverse-normal transforms before
 the selected missing-data policy.
 
-Burden, SKAT, and SKAT-O accept explicit weighted `VariantSet` membership.
+Burden, SKAT, SKAT-O, ACAT-V, and ACAT-O accept explicit weighted `VariantSet`
+membership.
 `LinearSetTestNullModel` handles unrelated samples; `RemlSetTestNullModel`
 reuses the fitted GRM-adjusted mixed projection for related samples, including
-SKAT-O calibration. The complete file and set-test contract is in the
-[pipeline guide](../gwas-twas-pipeline.md).
+SKAT-O and ACAT-O. The complete file and set-test contract is in the
+[pipeline guide](../gwas-twas-pipeline.md); the score-summary/CLI workflow is in
+the [ACAT tutorial](acat-rare-variants.md).
 
 ## Audited edge cases and output contracts
 
@@ -261,6 +263,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Zhiwu Zhang et al. (2010) — Mixed linear model approach adapted for genome-wide association studies](../CITATIONS.md#zhang-p3d-2010) — [PMID: 20208535](https://pubmed.ncbi.nlm.nih.gov/20208535/) · [PMCID: PMC2931336](https://pmc.ncbi.nlm.nih.gov/articles/PMC2931336/)
 - [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](../CITATIONS.md#wu-skat-2011) — [PMID: 21737059](https://pubmed.ncbi.nlm.nih.gov/21737059/) · [PMCID: PMC3135811](https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/)
 - [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](../CITATIONS.md#lee-skato-2012) — [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+- [Yaowu Liu et al. (2019) — ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies](../CITATIONS.md#liu-acat-2019) — [PMID: 30849328](https://pubmed.ncbi.nlm.nih.gov/30849328/) · [PMCID: PMC6407498](https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/)
 - [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](../CITATIONS.md#madsen-browning-2009) — [PMID: 19214210](https://pubmed.ncbi.nlm.nih.gov/19214210/) · [PMCID: PMC2633048](https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

@@ -3,6 +3,8 @@
 JLinAlg is a Java library and command-line toolkit for statistical analysis,
 including regression, mixed models, omics association, and meta-analysis.
 It uses [JDistlib](https://github.com/robbyjo/JDistlib) for numerical computation.
+Rare-variant APIs and the `rare-meta` CLI include Burden, SKAT, SKAT-O,
+ACAT-V, and canonical six-component ACAT-O tests.
 
 ## Requirements
 
@@ -59,6 +61,8 @@ See the [accuracy and performance tables](docs/verification-and-performance.md),
 [numerical audit](docs/advanced-validation.md), and
 [rare-variant benchmark details](docs/rare-meta-validation.md) for methods,
 measurement conditions, and limitations.
+The [ACAT vignette](docs/vignettes/acat-rare-variants.md) covers stable Cauchy
+tails, ultra-rare collapsing, R reference fixtures, and the fused ACAT-O path.
 
 The [estimator extension guide](docs/estimator-extensions.md) covers mixed and
 ordinal SEM, DWLS/WLSMV, multigroup invariance, ARIMA regression and historical

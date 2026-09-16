@@ -10,6 +10,7 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "acat-rare-variants": ("ACAT rare-variant tests", "Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.", "CLI + Java · Source build"),
     "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.", "CLI + Java · Source build"),
     "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model.", "CLI + Java · Source build"),
     "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.", "CLI + Java · Source build"),

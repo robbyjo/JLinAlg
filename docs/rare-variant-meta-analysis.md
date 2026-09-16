@@ -3,7 +3,8 @@
 JLinAlg separates participant-level summary generation from the choice of
 association test. `rare-score` exports one cohort's variant scores and their
 covariances. `rare-meta` combines independent cohorts and performs the explicitly
-selected single-variant, burden, SKAT, SKAT-O, variable-threshold, or heterogeneous-effect tests. Cohort group-test p-values
+selected single-variant, burden, SKAT, SKAT-O, ACAT-V, ACAT-O,
+variable-threshold, or heterogeneous-effect tests. Cohort group-test p-values
 alone are insufficient input for this score-based workflow.
 
 The scope is quantitative traits, diploid additive biallelic variants, and
@@ -24,7 +25,8 @@ documents the required extensions and the implemented metadata compatibility che
 | `burden` | Association of a specified weighted allele burden; often powerful when many effects have the same direction | Burden beta, SE, signed Z, p, log p, directions |
 | `skat` | Set association allowing mixed effect directions and many non-associated variants | Quadratic Q, p, log p, numerical calibration |
 | `skat-o` | Adaptive combination of burden and SKAT, accounting for the search over combinations | Minimum component p, adjusted p, rho/component diagnostics, calibration and simulation budget |
-
+| `acat-v` | Cauchy combination of marginal variant p-values, after collapsing MAC <= threshold variants into a burden component; often powerful for sparse alternatives | ACAT p, log p, Cauchy statistic, collapsed count, component p-values and normalized weights |
+| `acat-o` | Published six-component omnibus: Burden, SKAT, and ACAT-V under Beta(1,25) and Beta(1,1) weighting | Omnibus p, log p, Cauchy statistic, and all six component p-values |
 | `vt` | Adaptive MAF-threshold burden search, calibrated under correlated Gaussian scores | Selected MAF and descriptive burden beta/SE/p; separate adjusted p, Monte Carlo SE and budget |
 | `het-skat`, `het-skat-o` | Variant effects may differ between independent cohorts | Heterogeneous Q or adjusted omnibus p; separate number of cohort-by-variant effect dimensions |
 | `burden-fixed`, `burden-random` | Common or normally distributed cohort burden effects with a comparable burden definition | Beta, SE, normal p; Cochran Q/p, I-squared, and REML tau-squared for the random model |
@@ -58,6 +60,7 @@ java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/coh
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden --weights mb --maf 0.5 --out build/rare-demo/weighted
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat --weights beta --maf 0.5 --out build/rare-demo/skat
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights beta --maf 0.5 --simulations 100000 --seed 1234 --out build/rare-demo/skato
+java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
 ```
 
 Each selected test creates `PREFIX.TEST.tsv`; `PREFIX.qc.tsv` records group coverage and exclusions. `PREFIX.log` records settings,
@@ -73,6 +76,8 @@ informative cohorts, and `direction=++` when both scores favor the G allele.
 The burden file has `weights`, `direction`, `beta`, `se`, `z`, and `p_value`;
 the SKAT file replaces signed-effect fields with `q` and `calibration`;
 SKAT-O reports `minimum_component_p`, `adjusted_p`, and `component_rho_p`.
+ACAT-V reports its ultra-rare burden and dense single-variant components;
+ACAT-O reports the six canonical set-test components. Both are unsigned tests.
 
 ## Java score-summary example
 
@@ -103,6 +108,9 @@ var weightedBurden = SummarySetTests.burden("GENE1", state, new double[]{1, 2});
 var skat = SummarySetTests.skat("GENE1", state, new double[]{1, 2});
 var skato = SummarySetTests.skatO("GENE1", state, new double[]{1, 2},
     SetTestOptions.defaults());
+double[] maf = {.005, .02}, mac = {8, 32};
+var acatv = SummarySetTests.acatV("GENE1", state, maf, mac);
+var acato = SummarySetTests.acatO("GENE1", state, maf, mac);
 ```
 
 The pooled scores are `(6, -2)` and covariance is `[[20,3],[3,13]]`. Equal
@@ -111,6 +119,7 @@ linear coefficients, not automatically estimated MAF weights; select weights and
 variant masks before testing. SKAT squares those coefficients in its kernel.
 The full example prints both single-variant results and directions, burden
 beta/SE/p, SKAT Q/p, and SKAT-O adjusted p with its simulation budget and seed.
+ACAT-V and ACAT-O additionally expose Cauchy statistics and component p-values.
 The default SKAT-O calibration has the same resolution limits as the CLI.
 
 Represent unavailable variants with `Double.NaN` scores; corresponding covariance
@@ -210,6 +219,13 @@ and SKAT-O use `raremetal-beta`. These choices are explicit in output. `beta`
 burden uses the density directly; it does not emulate RAREMETAL's unusual
 inverse-squared-density `--BBeta` burden implementation.
 
+Default ACAT-V instead uses the published Beta(1,25) coefficients without
+RAREMETAL frequency truncation. Supplying `--weights` selects the reference
+custom-weight behavior: the same values serve as burden coefficients and
+Cauchy component weights. ACAT-O is always the canonical equal combination of
+Burden, SKAT, and ACAT-V at Beta(1,25) and Beta(1,1); `--weights` does not alter
+it. Its output records `weights=canonical`.
+
 For aligned independent cohorts, `U=sum(U_k)` and `V=sum(V_k)`. Single-variant
 beta/SE are `U/V` and `1/sqrt(V)`; burden beta/SE are `(w'U)/(w'Vw)` and
 `1/sqrt(w'Vw)`. These are one-step/null-information estimates, not universally
@@ -224,6 +240,14 @@ even when ordinary double p-values underflow. SKAT uses deterministic positive
 chi-square-mixture tails with the existing labeled saddlepoint fallback where
 the bounded series cannot certify accuracy. Input covariance is checked for
 symmetry, PSD, and score consistency with its numerical null space.
+
+ACAT evaluates very small p-values with a reciprocal Cauchy tail and avoids
+subtraction from one in the final upper tail. ACAT-V uses the pooled allele
+counts behind the reported pooled MAF and collapses MAC <=
+`--acat-mac-threshold` (default 10). ACAT does not recalibrate a conservative or
+otherwise invalid component p-value. The published Cauchy approximation is
+robust to dependence in its intended tail regime but is not a finite-sample
+permutation result.
 
 Default SKAT-O uses correlated Gaussian score-null simulation, in bounded blocks,
 with an explicit seed and `(exceedances+1)/(simulations+1)` p-value. Its minimum
@@ -244,7 +268,7 @@ After generating the two cohort files in the complete example, these commands
 run directly from the repository root. Use a fresh output prefix on each run.
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden,skat,skat-o,vt,het-skat,het-skat-o,burden-fixed,burden-random --weights equal --maf 0.5 --simulations 100000 --cohort-results --leave-variant-out --leave-cohort-out --threads 2 --cache-mb 16 --out build/rare-demo/advanced
+java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden,skat,skat-o,acat-v,acat-o,vt,het-skat,het-skat-o,burden-fixed,burden-random --weights equal --maf 0.5 --simulations 100000 --cohort-results --leave-variant-out --leave-cohort-out --threads 2 --cache-mb 16 --out build/rare-demo/advanced
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/conditional-groups.txt --condition examples/rare-meta/conditions.txt --test burden,skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/conditional
 java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/deterministic
 java --class-path build/cli/jlinalg-0.3.5.jar examples/rare-meta/AdvancedRareMetaExample.java
@@ -387,6 +411,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009) — [PMID: 19214210](https://pubmed.ncbi.nlm.nih.gov/19214210/) · [PMCID: PMC2633048](https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/)
 - [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011) — [PMID: 21737059](https://pubmed.ncbi.nlm.nih.gov/21737059/) · [PMCID: PMC3135811](https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/)
 - [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012) — [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+- [Yaowu Liu et al. (2019) — ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies](CITATIONS.md#liu-acat-2019) — [PMID: 30849328](https://pubmed.ncbi.nlm.nih.gov/30849328/) · [PMCID: PMC6407498](https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/)
 - [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](CITATIONS.md#dersimonian-laird-1986) — [PMID: 3802833](https://pubmed.ncbi.nlm.nih.gov/3802833/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

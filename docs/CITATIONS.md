@@ -190,6 +190,10 @@ PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.n
 - **Seunggeun Lee et al. (2012).** Optimal unified approach for rare-variant association testing. *American Journal of Human Genetics 91:224-237.* [DOI: 10.1016/j.ajhg.2012.06.007](https://doi.org/10.1016/j.ajhg.2012.06.007) · [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
   - JLinAlg methods: SKAT-O, burden-kernel omnibus tests.
 
+<a id="liu-acat-2019"></a>
+- **Yaowu Liu et al. (2019).** ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies. *American Journal of Human Genetics 104:410-421.* [DOI: 10.1016/j.ajhg.2019.01.002](https://doi.org/10.1016/j.ajhg.2019.01.002) · [PMID: 30849328](https://pubmed.ncbi.nlm.nih.gov/30849328/) · [PMCID: PMC6407498](https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/)
+  - JLinAlg methods: ACAT, ACAT-V, ACAT-O, rare-variant omnibus tests.
+
 <a id="madsen-browning-2009"></a>
 - **B. E. Madsen and S. R. Browning (2009).** A groupwise association test for rare mutations using a weighted sum statistic. *PLoS Genetics 5:e1000384.* [DOI: 10.1371/journal.pgen.1000384](https://doi.org/10.1371/journal.pgen.1000384) · [PMID: 19214210](https://pubmed.ncbi.nlm.nih.gov/19214210/) · [PMCID: PMC2633048](https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/)
   - JLinAlg methods: weighted burden test, rare variants.

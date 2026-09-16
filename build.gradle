@@ -216,6 +216,7 @@ tasks.register('checkWebsite') {
         }
 
         List<String> requiredPages = [
+            'vignettes/acat-rare-variants.html',
             'xwas-followup-validation.html',
             'latent-confounder-validation.html',
             'vignettes/ldsc.html',
@@ -356,6 +357,7 @@ tasks.register('checkWebsite') {
         }
 
         List<String> cliExamplePages = [
+            'vignettes/acat-rare-variants.html',
             'vignettes/ldsc.html',
             'vignettes/predicted-omics.html',
             'vignettes/genomic-factor.html',
@@ -479,6 +481,17 @@ tasks.register('benchmarkAssociation', JavaExec) {
     jvmArgs '-Xms1g', '-Xmx4g'
     systemProperties System.properties.findAll { key, ignored ->
         key.toString().startsWith('jlinalg.benchmark.')
+    }
+}
+
+tasks.register('benchmarkAcat', JavaExec) {
+    group = 'benchmark'
+    description = 'Runs the fused-versus-composed ACAT-O score benchmark.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.AcatBenchmark'
+    systemProperties System.properties.findAll { key, value ->
+        key.toString().startsWith('jlinalg.benchmark.acat.')
     }
 }
 

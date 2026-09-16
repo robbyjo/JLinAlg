@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models."><title>ACAT rare-variant tests · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>ACAT rare-variant tests</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>ACAT rare-variant tests</h1><p>Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Use ACAT-V when a set may contain only a few associated variants. Use ACAT-O
+when the genetic architecture is not known in advance: it Cauchy-combines
+Burden, SKAT, and ACAT-V under Beta(1,25) and Beta(1,1) weighting. Both tests
+operate on nuisance-adjusted scores and covariance, so the same APIs work with
+one cohort, pooled independent cohorts, or an individual-level JLinAlg null
+model.</p>
+<h2 id="1-build-the-current-executable">1. Build the current executable</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>./gradlew.bat executableJar --no-daemon --no-parallel
+</code></pre></div>
+<p>The examples below use the source-built
+<code>build/cli/jlinalg-0.3.5.jar</code>. ACAT support is on current <code>main</code>; it is not in
+the previously published v0.3.5 release asset.</p>
+<h2 id="2-export-one-score-file-per-cohort">2. Export one score file per cohort</h2>
+<p>The small checked-in example is quantitative and synthetic. Real analyses
+should use a prespecified rare-variant mask and compatible cohort null models.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/a
+java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-b.vcf --pheno examples/rare-meta/cohort-b.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/b
+</code></pre></div>
+<p>The cohort manifest is <code>examples/rare-meta/cohorts.tsv</code>; paths in a manifest are
+resolved relative to the manifest. Cohorts must be independent and use the same
+trait scale, genome build, null-model contract, and allele convention.</p>
+<h2 id="3-run-acat-v-and-acat-o">3. Run ACAT-V and ACAT-O</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
+</code></pre></div>
+<p>The realistic default for <code>--maf</code> remains 0.05; this miniature example needs
+0.5 to retain its deliberately common synthetic variants. ACAT-V defaults to
+published Beta(1,25) weighting. <code>--weights equal|mb|beta|raremetal-beta</code>
+selects a custom ACAT-V weighting, using the same values as burden coefficients
+and Cauchy component weights as in the reference R custom-weight interface.
+Canonical ACAT-O deliberately ignores that option and always reports
+<code>weights=canonical</code>, because its six components are fixed by the paper.</p>
+<p>Variants with pooled minor-allele count at or below
+<code>--acat-mac-threshold</code> are collapsed into one burden component. JLinAlg derives
+pooled MAC from the cohort allele counts used for the pooled MAF; it does not
+approximate MAC by multiplying one global sample count. Variants above the
+threshold contribute two-sided marginal score p-values. <code>acat-v.tsv</code> reports
+the normalized Cauchy weight and p-value of every retained component.
+<code>acat-o.tsv</code> reports all six set-test p-values.</p>
+<p>ACAT-V is especially useful for sparse alternatives. ACAT-O trades a small
+omnibus penalty for robustness across sparse, same-direction, and
+mixed-direction alternatives. Neither result is a signed effect estimate; run
+<code>--test burden,acat-v,acat-o</code> when an explicitly defined burden beta and SE are
+also scientifically meaningful.</p>
+<h2 id="4-use-score-summary-apis">4. Use score-summary APIs</h2>
+<p>MAF and MAC arrays must be in exactly the same retained-variant order as the
+score state, whose scores and covariance must use the corresponding minor-allele
+orientation. When <code>ScoreMetaAnalysis.pool</code> filters columns, apply
+<code>pooled.indices()</code> to both arrays first.</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>import org.jlinalg.settest.*;
+
+double[] scores = {1.8, -0.7, 2.1, 0.3};
+double[] covariance = {
+    4, .4, .2, 0,
+    .4, 3, .3, .1,
+    .2, .3, 2, .2,
+    0, .1, .2, 1.5
+};
+double[] maf = {.0005, .002, .01, .03};
+double[] mac = {2, 8, 40, 120};
+var state = new SetTestScoreState(scores, covariance, scores.length);
+
+var acatV = SummarySetTests.acatV(&quot;GENE1&quot;, state, maf, mac);
+var acatVEqual = SummarySetTests.acatV(
+    &quot;GENE1&quot;, state, maf, mac, 1, 1, 10);
+var acatO = SummarySetTests.acatO(&quot;GENE1&quot;, state, maf, mac);
+var combined = Acat.combine(new double[]{.02, .0004, .2, .1, .8});
+</code></pre></div>
+<p>For participant-level workflows, <code>SetTests.acatV(...)</code> and
+<code>SetTests.acatO(...)</code> prepare dosages, compute MAF/MAC, orient the score state to
+the minor allele, and request one shared projection from any
+<code>SetTestScoreNullModel</code>. The canonical ACAT-O
+path then performs only the two eigendecompositions required by its two SKAT
+components. <code>SetTests.acatVCustomWeights(...)</code> uses each <code>WeightedVariant</code>
+weight as both the burden coefficient and Cauchy weight.</p>
+<h2 id="5-accuracy-and-performance-contract">5. Accuracy and performance contract</h2>
+<p>The generic combiner evaluates very small p-values with the reciprocal Cauchy
+tail and evaluates the final upper tail without subtracting from one. It rejects
+invalid p-values, negative weights, all-zero weights, and an unresolved mixture
+of exact zero and exact one endpoints.</p>
+<p><code>src/test/R/acat-reference.R</code> independently regenerates four score-summary
+fixtures with R 4.6.1, the published ACAT/ACAT-V formulas, and CompQuadForm
+Davies tails. ACAT and ACAT-V match those fixtures at tight floating-point
+tolerance. ACAT-O inherits JLinAlg's existing positive-mixture tail; the tests
+therefore state a separate bounded tolerance for the known Imhof-versus-Davies
+SKAT component difference instead of attributing it to ACAT.</p>
+<p>The reproducible command</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>./gradlew.bat benchmarkAcat &quot;-Djlinalg.benchmark.acat.variants=40&quot; &quot;-Djlinalg.benchmark.acat.batch=3&quot; &quot;-Djlinalg.benchmark.acat.warmups=2&quot; &quot;-Djlinalg.benchmark.acat.measurements=5&quot; --no-daemon --no-parallel
+</code></pre></div>
+<p>measured 6.734 ms per fused ACAT-O versus 8.555 ms for composing the six public
+tests separately on this development host: 1.270x faster, with p-value
+difference <code>2.78e-16</code>. Preparation and data matching are outside both timed
+regions. These host- and workload-specific medians are not a universal speed
+guarantee.</p>
+<p>The current CLI contract is quantitative Gaussian score meta-analysis. ACAT
+does not repair conservative or otherwise miscalibrated component p-values;
+binary rare-case tails, overlapping cohorts, and phenotype-model mismatch must
+be handled before combination. The Cauchy calibration is the published
+dependence-robust approximation, not an exact finite-sample permutation test.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-acat-rare-variants">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-acat-rare-variants">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#liu-acat-2019">Liu et al. (2019) — ACAT</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/30849328/">PMID: 30849328</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6407498/">PMCID: PMC6407498</a>)</span></li><li><a href="../citations.html#wu-skat-2011">Wu et al. (2011) — SKAT</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/21737059/">PMID: 21737059</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/">PMCID: PMC3135811</a>)</span></li><li><a href="../citations.html#lee-skato-2012">Lee et al. (2012) — SKAT-O</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/22863193/">PMID: 22863193</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/">PMCID: PMC3415556</a>)</span></li><li><a href="../citations.html#madsen-browning-2009">Madsen (2009) — weighted burden test</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/19214210/">PMID: 19214210</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/">PMCID: PMC2633048</a>)</span></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#1-build-the-current-executable">1. Build the current executable</a><a href="#2-export-one-score-file-per-cohort">2. Export one score file per cohort</a><a href="#3-run-acat-v-and-acat-o">3. Run ACAT-V and ACAT-O</a><a href="#4-use-score-summary-apis">4. Use score-summary APIs</a><a href="#5-accuracy-and-performance-contract">5. Accuracy and performance contract</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

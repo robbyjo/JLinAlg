@@ -18,7 +18,7 @@ import org.jlinalg.pipeline.VariantFilters;
 import org.jlinalg.pipeline.VariantRecord;
 import org.jlinalg.pipeline.VariantStatistics;
 
-/** FP64 continuous-trait Burden, SKAT, and SKAT-O tests. */
+/** FP64 continuous-trait Burden, SKAT, SKAT-O, ACAT-V, and ACAT-O tests. */
 public final class SetTests {
     private SetTests() { }
 
@@ -158,6 +158,79 @@ public final class SetTests {
             return new SetTestSuiteResult(
                 burden, skat, skatO(prepared, state, options, backend));
         });
+    }
+
+    /** Published default ACAT-V with Beta(MAF; 1,25) coefficients. */
+    public static AcatVResult acatV(
+            VariantSet set, SetTestScoreNullModel nullModel,
+            SetTestOptions options) {
+        return acatV(prepare(set, nullModel, options), nullModel,
+            1, 25, AcatTests.DEFAULT_MAC_THRESHOLD);
+    }
+
+    /** Published ACAT-V with configurable Beta-MAF coefficients. */
+    public static AcatVResult acatV(
+            VariantSet set, SetTestScoreNullModel nullModel,
+            SetTestOptions options, double shape1, double shape2,
+            double minorAlleleCountThreshold) {
+        return acatV(prepare(set, nullModel, options), nullModel,
+            shape1, shape2, minorAlleleCountThreshold);
+    }
+
+    /** Published ACAT-V from an already prepared variant set. */
+    public static AcatVResult acatV(
+            PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
+            double shape1, double shape2,
+            double minorAlleleCountThreshold) {
+        requireCompatible(prepared, nullModel);
+        AlleleSummary alleles = alleleSummary(prepared);
+        return AcatTests.acatVBeta(prepared.id(),
+            prepared.requestedVariants(), orientToMinor(
+                nullModel.score(prepared.dosagesView()), alleles.directions()),
+            alleles.frequencies(), alleles.counts(), shape1, shape2,
+            minorAlleleCountThreshold, prepared.excludedVariants(),
+            nullModel::burdenPValue);
+    }
+
+    /**
+     * Custom-weight ACAT-V. Each {@link WeightedVariant#weight()} is used as
+     * both its burden coefficient and its Cauchy component weight.
+     */
+    public static AcatVResult acatVCustomWeights(
+            VariantSet set, SetTestScoreNullModel nullModel,
+            SetTestOptions options, double minorAlleleCountThreshold) {
+        PreparedVariantSet prepared = prepare(set, nullModel, options);
+        requireCompatible(prepared, nullModel);
+        AlleleSummary alleles = alleleSummary(prepared);
+        return AcatTests.acatVCustom(prepared.id(),
+            prepared.requestedVariants(), orientToMinor(
+                nullModel.score(prepared.dosagesView()), alleles.directions()),
+            alleles.frequencies(), alleles.counts(), prepared.weightsView(),
+            prepared.weightsView(), minorAlleleCountThreshold,
+            prepared.excludedVariants(), nullModel::burdenPValue);
+    }
+
+    /** Canonical six-component ACAT-O using one shared score projection. */
+    public static AcatOResult acatO(
+            VariantSet set, SetTestScoreNullModel nullModel,
+            SetTestOptions options, double minorAlleleCountThreshold) {
+        PreparedVariantSet prepared = prepare(set, nullModel, options);
+        requireCompatible(prepared, nullModel);
+        AlleleSummary alleles = alleleSummary(prepared);
+        SetTestScoreState state = orientToMinor(
+            nullModel.score(prepared.dosagesView()), alleles.directions());
+        return withBackend(nullModel, backend -> AcatTests.acatO(
+            prepared.id(), prepared.requestedVariants(), state,
+            alleles.frequencies(), alleles.counts(), minorAlleleCountThreshold,
+            prepared.excludedVariants(), nullModel::burdenPValue, backend));
+    }
+
+    /** Canonical ACAT-O with the published MAC threshold of ten. */
+    public static AcatOResult acatO(
+            VariantSet set, SetTestScoreNullModel nullModel,
+            SetTestOptions options) {
+        return acatO(set, nullModel, options,
+            AcatTests.DEFAULT_MAC_THRESHOLD);
     }
 
     private static SkatOResult skatO(
@@ -344,6 +417,35 @@ public final class SetTests {
         return result;
     }
 
+    private static AlleleSummary alleleSummary(PreparedVariantSet prepared) {
+        double[][] dosages = prepared.dosagesView();
+        double[] frequencies = new double[dosages.length];
+        double[] counts = new double[dosages.length];
+        double[] directions = new double[dosages.length];
+        for (int variant = 0; variant < dosages.length; variant++) {
+            double copies = 0;
+            for (double dosage : dosages[variant]) copies += dosage;
+            double total = 2.0 * dosages[variant].length;
+            counts[variant] = Math.min(copies, total - copies);
+            frequencies[variant] = counts[variant] / total;
+            directions[variant] = copies <= total / 2 ? 1 : -1;
+        }
+        return new AlleleSummary(frequencies, counts, directions);
+    }
+
+    private static SetTestScoreState orientToMinor(
+            SetTestScoreState state, double[] directions) {
+        int dimension = state.variants();
+        double[] scores = state.scores(), information = state.information();
+        for (int row = 0; row < dimension; row++) {
+            scores[row] *= directions[row];
+            for (int column = 0; column < dimension; column++)
+                information[row * dimension + column] *=
+                    directions[row] * directions[column];
+        }
+        return new SetTestScoreState(scores, information, dimension);
+    }
+
     private static SetTestResult burdenScore(
             PreparedVariantSet prepared, SetTestScoreNullModel nullModel,
             SetTestScoreState state) {
@@ -489,4 +591,7 @@ public final class SetTests {
                 gaussian, samples);
         }
     }
+
+    private record AlleleSummary(
+        double[] frequencies, double[] counts, double[] directions) { }
 }

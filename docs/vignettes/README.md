@@ -33,6 +33,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Expected responses, scenarios, and marginal effects](predictions-and-contrasts.md) | binomial probit, shared GLM/GEE mean predictions, scenario differences, risk ratios, average marginal effects, and joint delta-method uncertainty (source build) |
 | [Individual-level instrumental-variable regression](instrumental-variable-regression.md) | linear 2SLS, QR/SVD identification checks, robust/cluster inference, and instrument-strength diagnostics (source build) |
 | [Summary-only conditional score analysis](conditional-score-conditioning.md) | versioned score-block import, strict allele/model checks, cohort-wise Schur conditioning, and independent-cohort pooling (source build) |
+| [ACAT rare-variant tests](acat-rare-variants.md) | stable generic ACAT, ACAT-V ultra-rare collapsing, canonical ACAT-O, CLI/API workflows, R fixtures, and fused performance (source build) |
 | [GRM tutorial and Java vignette](../grm-cli.md) | worked dosage matrix, filtering, VCF input, Java/CLI construction, interpretation, and mixed-model reuse ([website](https://robbyjo.github.io/JLinAlg/vignettes/grm.html); source build) |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
 | [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |
@@ -53,7 +54,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Pedigree and generalized mixed models](pedigree-and-glmm.md) | CLI-only pedigree LMM/GLMM; Java pedigree construction, PQL, adaptive quadrature, and ZIP/ZINB |
 | [Cox and frailty survival models](cox-survival.md) | CLI-only fixed/GRM Cox; Java streamed omics, delayed entry, strata, shared frailty, and pedigree frailty |
 | [Formulas and compute backends](formulas-and-backends.md) | CLI-only formula/backend preflight; Java model tables, contrasts, offsets, and nested/correlated terms |
-| [Association, GWAS, and omics QTL](association-gwas-twas.md) | CLI-only numeric omics, VCF/BCF/BGEN, and GRM scans; Java prepared scans and Burden/SKAT/SKAT-O |
+| [Association, GWAS, and omics QTL](association-gwas-twas.md) | CLI-only numeric omics, VCF/BCF/BGEN, and GRM scans; Java prepared scans and Burden/SKAT/SKAT-O/ACAT-V/ACAT-O |
 | [Omics transforms from the command line](omics-transforms.md) | exact `--transform` syntax, all built-in stages, pipeline recipes, missing values, failure conditions, and trusted plugin providers |
 | [End-to-end Mendelian randomization](mr-end-to-end.md) | database installation, public/custom instruments, LD clumping, analysis, diagnostics, plotting exports, bidirectional and molecular MR |
 | [Multivariable and multivariate MR](multivariate-mr.md) | distinct MVMR and correlated-outcome CLI schemas, joint IVW/Wald inference, multivariate heterogeneity and PRESSO diagnostics |
@@ -61,7 +62,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [xWAS MR CLI and benchmark](../xwas-mr-cli-performance.md) | long-format CLI, output schema, reproducible R validation, timing protocol and measured speedup |
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |
 | [Meta-analysis](meta-analysis.md) | omics Java/CLI examples, fixed/random pooling, heterogeneity, meta-regression, and links to rare-variant workflows |
-| [Rare-variant cohort summaries and meta-analysis](../rare-variant-meta-analysis.md) | participant score export, RAREMETAL/rvtests import, single variants, equal/weighted burden, SKAT, SKAT-O, and calibration limits (unreleased) |
+| [Rare-variant cohort summaries and meta-analysis](../rare-variant-meta-analysis.md) | participant score export, RAREMETAL/rvtests import, Burden, SKAT, SKAT-O, ACAT-V, ACAT-O, and calibration limits (unreleased) |
 | [Time series](time-series.md) | AR/MA/ARMA/ARIMA/SARIMA, scalable exact diffuse smoothing, conditional and parameter-aware forecasts, diagnostics, and ARIMA-error LMM |
 | [SuSiE, colocalization, and SEM](susie-and-sem.md) | individual/summary fine mapping, credible sets, multi-signal colocalization, and a compact SEM introduction |
 | [Multi-signal colocalization](colocalization.md) | alignment, priors, posterior-overlap trimming, H0-H4, shared-variant posterior, diagnostics, and MR/xWAS follow-up |

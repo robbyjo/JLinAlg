@@ -593,6 +593,23 @@
       "pmcid": "PMC3415556"
     },
     {
+      "id": "liu-acat-2019",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Yaowu Liu et al.",
+      "year": 2019,
+      "title": "ACAT: A fast and powerful p value combination method for rare-variant analysis in sequencing studies",
+      "venue": "American Journal of Human Genetics 104:410-421",
+      "url": "https://doi.org/10.1016/j.ajhg.2019.01.002",
+      "features": [
+        "ACAT",
+        "ACAT-V",
+        "ACAT-O",
+        "rare-variant omnibus tests"
+      ],
+      "pmid": "30849328",
+      "pmcid": "PMC6407498"
+    },
+    {
       "id": "madsen-browning-2009",
       "category": "Quantitative and statistical genetics",
       "authors": "B. E. Madsen and S. R. Browning",
@@ -1272,6 +1289,13 @@
       "zhang-p3d-2010",
       "wu-skat-2011",
       "lee-skato-2012",
+      "liu-acat-2019",
+      "madsen-browning-2009"
+    ],
+    "acat-rare-variants": [
+      "liu-acat-2019",
+      "wu-skat-2011",
+      "lee-skato-2012",
       "madsen-browning-2009"
     ],
     "basic-statistical-tests": [
@@ -1292,7 +1316,8 @@
       "kang-emmax-2010",
       "zhang-p3d-2010",
       "wu-skat-2011",
-      "lee-skato-2012"
+      "lee-skato-2012",
+      "liu-acat-2019"
     ],
     "cli-colocalization-tutorial": [
       "wang-susie-2020",
@@ -1454,6 +1479,7 @@
       "madsen-browning-2009",
       "wu-skat-2011",
       "lee-skato-2012",
+      "liu-acat-2019",
       "dersimonian-laird-1986"
     ],
     "regression-families": [

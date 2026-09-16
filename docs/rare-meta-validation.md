@@ -191,6 +191,37 @@ work while shared readers serialize regional I/O. Large heterogeneous kernels
 and exhaustive leave-out SKAT-O diagnostics can cost substantially more; the
 benchmark does not measure those workloads or imply a genome-scale heap bound.
 
+## ACAT reference accuracy and fused ACAT-O timing
+
+`src/test/R/acat-reference.R` follows the published ACAT and ACAT-V formulas
+and uses CompQuadForm 1.4.4 Davies tails for the two SKAT components of ACAT-O.
+It generated four checked-in score/covariance fixtures covering mixed,
+all-dense, all-collapsed, and correlated sets. Gradle does not require R.
+
+The generic five-p-value ACAT example agrees with R within `2e-18`. ACAT-V
+Beta(1,25) and Beta(1,1), including MAC <= 10 collapsing, are checked within
+`max(2e-10 * p, 2e-12)`. Burden components use the same bound. The two SKAT
+components retain JLinAlg's existing positive-mixture calibration and are
+checked against Davies with a separate `7e-5` absolute bound; the resulting
+ACAT-O p-value is checked within `1e-5`. This separates ACAT implementation
+accuracy from the previously documented Imhof-versus-Davies kernel-tail
+difference.
+
+ACAT-O now shares one score projection and one weighted score state per Beta
+scheme. The benchmark compares that fused path with composing the same six
+public tests independently. With 40 variants, three tests per measurement, two
+warmups, and five measured repetitions on the development host, median time per
+test was 6.734 ms fused versus 8.555 ms composed: 1.270x faster. The p-values
+differed by `2.78e-16`. Data preparation and matching were outside both timed
+regions.
+
+```powershell
+./gradlew.bat benchmarkAcat "-Djlinalg.benchmark.acat.variants=40" "-Djlinalg.benchmark.acat.batch=3" "-Djlinalg.benchmark.acat.warmups=2" "-Djlinalg.benchmark.acat.measurements=5" --no-daemon --no-parallel
+```
+
+These are workload- and host-specific engineering measurements, not a general
+speed guarantee or a comparison with R wall time.
+
 ## Native executable comparison and timing
 
 The pinned C++ reference was built in Ubuntu under WSL using Release CMake,
