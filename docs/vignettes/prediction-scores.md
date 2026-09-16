@@ -122,7 +122,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 
 - [Arthur E. Hoerl and Robert W. Kennard (1970) — Ridge regression: biased estimation for nonorthogonal problems](../CITATIONS.md#hoerl-kennard-1970)
 - [Hui Zou and Trevor Hastie (2005) — Regularization and variable selection via the elastic net](../CITATIONS.md#zou-hastie-2005)
-- [Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly (2015) — PRSice: polygenic risk score software](../CITATIONS.md#euesden-prsice-2015)
+- [Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly (2015) — PRSice: polygenic risk score software](../CITATIONS.md#euesden-prsice-2015) — [PMID: 25550326](https://pubmed.ncbi.nlm.nih.gov/25550326/) · [PMCID: PMC4410663](https://pmc.ncbi.nlm.nih.gov/articles/PMC4410663/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

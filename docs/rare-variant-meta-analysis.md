@@ -384,10 +384,10 @@ recommended; unindexed files are rescanned on cache misses.
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009)
-- [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011)
-- [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012)
-- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](CITATIONS.md#dersimonian-laird-1986)
+- [B. E. Madsen and S. R. Browning (2009) — A groupwise association test for rare mutations using a weighted sum statistic](CITATIONS.md#madsen-browning-2009) — [PMID: 19214210](https://pubmed.ncbi.nlm.nih.gov/19214210/) · [PMCID: PMC2633048](https://pmc.ncbi.nlm.nih.gov/articles/PMC2633048/)
+- [Michael C. Wu et al. (2011) — Rare-variant association testing for sequencing data with the sequence kernel association test](CITATIONS.md#wu-skat-2011) — [PMID: 21737059](https://pubmed.ncbi.nlm.nih.gov/21737059/) · [PMCID: PMC3135811](https://pmc.ncbi.nlm.nih.gov/articles/PMC3135811/)
+- [Seunggeun Lee et al. (2012) — Optimal unified approach for rare-variant association testing](CITATIONS.md#lee-skato-2012) — [PMID: 22863193](https://pubmed.ncbi.nlm.nih.gov/22863193/) · [PMCID: PMC3415556](https://pmc.ncbi.nlm.nih.gov/articles/PMC3415556/)
+- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](CITATIONS.md#dersimonian-laird-1986) — [PMID: 3802833](https://pubmed.ncbi.nlm.nih.gov/3802833/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

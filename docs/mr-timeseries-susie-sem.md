@@ -73,7 +73,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Craig K. Enders and Deborah L. Bandalos (2001) — The relative performance of full information maximum likelihood estimation for missing data in structural equation models](CITATIONS.md#enders-bandalos-2001)
 - [Norman E. Breslow and David G. Clayton (1993) — Approximate inference in generalized linear mixed models](CITATIONS.md#breslow-clayton-1993)
 - [Rudolf E. Kalman (1960) — A new approach to linear filtering and prediction problems](CITATIONS.md#kalman-1960)
-- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](CITATIONS.md#bowden-mr-egger-2015)
+- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](CITATIONS.md#bowden-mr-egger-2015) — [PMID: 26050253](https://pubmed.ncbi.nlm.nih.gov/26050253/) · [PMCID: PMC4469799](https://pmc.ncbi.nlm.nih.gov/articles/PMC4469799/)
 - [Jason D. Lee, Dennis L. Sun, Yuekai Sun, and Jonathan E. Taylor (2016) — Exact post-selection inference, with application to the lasso](CITATIONS.md#lee-2016)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

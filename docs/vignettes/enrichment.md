@@ -403,9 +403,9 @@ checking and corruption rejection are tested without a registered session.
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Aravind Subramanian et al. (2005) — Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles](../CITATIONS.md#subramanian-gsea-2005)
-- [Di Wu and Gordon K. Smyth (2012) — Camera: a competitive gene set test accounting for inter-gene correlation](../CITATIONS.md#wu-camera-2012)
-- [Christiaan A. de Leeuw et al. (2015) — MAGMA: generalized gene-set analysis of GWAS data](../CITATIONS.md#deleeuw-magma-2015)
+- [Aravind Subramanian et al. (2005) — Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles](../CITATIONS.md#subramanian-gsea-2005) — [PMID: 16199517](https://pubmed.ncbi.nlm.nih.gov/16199517/) · [PMCID: PMC1239896](https://pmc.ncbi.nlm.nih.gov/articles/PMC1239896/)
+- [Di Wu and Gordon K. Smyth (2012) — Camera: a competitive gene set test accounting for inter-gene correlation](../CITATIONS.md#wu-camera-2012) — [PMID: 22638577](https://pubmed.ncbi.nlm.nih.gov/22638577/) · [PMCID: PMC3458527](https://pmc.ncbi.nlm.nih.gov/articles/PMC3458527/)
+- [Christiaan A. de Leeuw et al. (2015) — MAGMA: generalized gene-set analysis of GWAS data](../CITATIONS.md#deleeuw-magma-2015) — [PMID: 25885710](https://pubmed.ncbi.nlm.nih.gov/25885710/) · [PMCID: PMC4401657](https://pmc.ncbi.nlm.nih.gov/articles/PMC4401657/)
 - [Yoav Benjamini and Yosef Hochberg (1995) — Controlling the false discovery rate: a practical and powerful approach to multiple testing](../CITATIONS.md#benjamini-hochberg-1995)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

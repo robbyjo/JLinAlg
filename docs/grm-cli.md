@@ -209,8 +209,8 @@ no GRM speedup claim follows from this small tutorial.
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Paul M. VanRaden (2008) — Efficient methods to compute genomic predictions](CITATIONS.md#vanraden-2008)
-- [Jian Yang et al. (2011) — GCTA: a tool for genome-wide complex trait analysis](CITATIONS.md#yang-gcta-2011)
+- [Paul M. VanRaden (2008) — Efficient methods to compute genomic predictions](CITATIONS.md#vanraden-2008) — [PMID: 18946147](https://pubmed.ncbi.nlm.nih.gov/18946147/)
+- [Jian Yang et al. (2011) — GCTA: a tool for genome-wide complex trait analysis](CITATIONS.md#yang-gcta-2011) — [PMID: 21167468](https://pubmed.ncbi.nlm.nih.gov/21167468/) · [PMCID: PMC3014363](https://pmc.ncbi.nlm.nih.gov/articles/PMC3014363/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

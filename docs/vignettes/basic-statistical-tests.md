@@ -102,13 +102,13 @@ assuming every returned p-value is exact.
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
 - [Student [W. S. Gosset] (1908) — The probable error of a mean](../CITATIONS.md#student-1908)
-- [B. L. Welch (1947) — The generalization of Student's problem when several different population variances are involved](../CITATIONS.md#welch-1947)
+- [B. L. Welch (1947) — The generalization of Student's problem when several different population variances are involved](../CITATIONS.md#welch-1947) — [PMID: 20287819](https://pubmed.ncbi.nlm.nih.gov/20287819/)
 - [Karl Pearson (1895) — Notes on regression and inheritance in the case of two parents](../CITATIONS.md#pearson-1895)
 - [Charles Spearman (1904) — The proof and measurement of association between two things](../CITATIONS.md#spearman-1904)
 - [Frank Wilcoxon (1945) — Individual comparisons by ranking methods](../CITATIONS.md#wilcoxon-1945)
 - [H. B. Mann and D. R. Whitney (1947) — On a test of whether one of two random variables is stochastically larger than the other](../CITATIONS.md#mann-whitney-1947)
 - [R. A. Fisher (1922) — On the interpretation of chi-square from contingency tables, and the calculation of P](../CITATIONS.md#fisher-1922)
-- [Quinn McNemar (1947) — Note on the sampling error of the difference between correlated proportions or percentages](../CITATIONS.md#mcnemar-1947)
+- [Quinn McNemar (1947) — Note on the sampling error of the difference between correlated proportions or percentages](../CITATIONS.md#mcnemar-1947) — [PMID: 20254758](https://pubmed.ncbi.nlm.nih.gov/20254758/)
 - [Milton Friedman (1937) — The use of ranks to avoid the assumption of normality implicit in the analysis of variance](../CITATIONS.md#friedman-1937)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

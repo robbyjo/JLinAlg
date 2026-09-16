@@ -278,7 +278,8 @@ tasks.register('checkWebsite') {
         File citationPage = new File(siteRoot, 'citations.html')
         String citationSource = citationPage.getText('UTF-8')
         if (!citationSource.contains('data-citation-search') ||
-            !citationSource.contains('data-citation-entry')) {
+            !citationSource.contains('data-citation-entry') ||
+            !citationSource.contains('data-citation-topic')) {
             throw new GradleException(
                 'Scientific citation page must expose searchable citation entries')
         }
@@ -301,6 +302,20 @@ tasks.register('checkWebsite') {
             }
         }
 
+        citationReferences.each { Map reference ->
+            String pmid = reference.pmid as String
+            String pmcid = reference.pmcid as String
+            if (pmid && (!citationSource.contains("PMID: ${pmid}") ||
+                !citationMarkdownSource.contains("PMID: ${pmid}"))) {
+                throw new GradleException(
+                    "Generated citation indexes are missing PMID ${pmid}")
+            }
+            if (pmcid && (!citationSource.contains("PMCID: ${pmcid}") ||
+                !citationMarkdownSource.contains("PMCID: ${pmcid}"))) {
+                throw new GradleException(
+                    "Generated citation indexes are missing PMCID ${pmcid}")
+            }
+        }
         Map pageCitations = (Map) citationData.pages
         File vignetteRoot = new File(siteRoot, 'vignettes')
         vignetteRoot.eachFileMatch(groovy.io.FileType.FILES, ~/.*\.html/) { File page ->

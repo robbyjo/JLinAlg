@@ -163,7 +163,7 @@ Focused validation commands:
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Jian Yang et al. (2012) — Conditional and joint multiple-SNP analysis of GWAS summary statistics](../CITATIONS.md#yang-cojo-2012)
+- [Jian Yang et al. (2012) — Conditional and joint multiple-SNP analysis of GWAS summary statistics](../CITATIONS.md#yang-cojo-2012) — [PMID: 22426310](https://pubmed.ncbi.nlm.nih.gov/22426310/) · [PMCID: PMC3593158](https://pmc.ncbi.nlm.nih.gov/articles/PMC3593158/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

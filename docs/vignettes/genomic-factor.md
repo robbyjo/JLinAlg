@@ -101,8 +101,8 @@ See [independent R validation](../xwas-followup-validation.md).
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Brendan K. Bulik-Sullivan et al. (2015) — An atlas of genetic correlations across human diseases and traits](../CITATIONS.md#bulik-sullivan-rg-2015)
-- [Andrew D. Grotzinger et al. (2019) — Genomic structural equation modelling provides insights into the multivariate genetic architecture of complex traits](../CITATIONS.md#grotzinger-genomic-sem-2019)
+- [Brendan K. Bulik-Sullivan et al. (2015) — An atlas of genetic correlations across human diseases and traits](../CITATIONS.md#bulik-sullivan-rg-2015) — [PMID: 26414676](https://pubmed.ncbi.nlm.nih.gov/26414676/) · [PMCID: PMC4797329](https://pmc.ncbi.nlm.nih.gov/articles/PMC4797329/)
+- [Andrew D. Grotzinger et al. (2019) — Genomic structural equation modelling provides insights into the multivariate genetic architecture of complex traits](../CITATIONS.md#grotzinger-genomic-sem-2019) — [PMID: 30962613](https://pubmed.ncbi.nlm.nih.gov/30962613/) · [PMCID: PMC6520146](https://pmc.ncbi.nlm.nih.gov/articles/PMC6520146/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

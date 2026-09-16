@@ -112,7 +112,7 @@ For very small numbers of clusters, prefer a leverage correction or `JACKKNIFE` 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
 - [J. A. Nelder and R. W. M. Wedderburn (1972) — Generalized linear models](CITATIONS.md#nelder-wedderburn-1972)
-- [C. I. Bliss (1934) — The method of probits](CITATIONS.md#bliss-1934)
+- [C. I. Bliss (1934) — The method of probits](CITATIONS.md#bliss-1934) — [PMID: 17813446](https://pubmed.ncbi.nlm.nih.gov/17813446/)
 - [Kung-Yee Liang and Scott L. Zeger (1986) — Longitudinal data analysis using generalized linear models](CITATIONS.md#liang-zeger-1986)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

@@ -233,14 +233,14 @@ For estimator assumptions and limitations, see the
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](../CITATIONS.md#bowden-mr-egger-2015)
-- [Jack Bowden et al. (2016) — Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator](../CITATIONS.md#bowden-weighted-median-2016)
-- [Gibran Hemani, Kate Tilling, and George Davey Smith (2017) — Orienting the causal relationship between imprecisely measured traits using GWAS summary data](../CITATIONS.md#hemani-steiger-2017)
+- [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](../CITATIONS.md#bowden-mr-egger-2015) — [PMID: 26050253](https://pubmed.ncbi.nlm.nih.gov/26050253/) · [PMCID: PMC4469799](https://pmc.ncbi.nlm.nih.gov/articles/PMC4469799/)
+- [Jack Bowden et al. (2016) — Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator](../CITATIONS.md#bowden-weighted-median-2016) — [PMID: 27061298](https://pubmed.ncbi.nlm.nih.gov/27061298/) · [PMCID: PMC4849733](https://pmc.ncbi.nlm.nih.gov/articles/PMC4849733/)
+- [Gibran Hemani, Kate Tilling, and George Davey Smith (2017) — Orienting the causal relationship between imprecisely measured traits using GWAS summary data](../CITATIONS.md#hemani-steiger-2017) — [PMID: 29149188](https://pubmed.ncbi.nlm.nih.gov/29149188/) · [PMCID: PMC5711033](https://pmc.ncbi.nlm.nih.gov/articles/PMC5711033/)
 - [Qingyuan Zhao et al. (2020) — Statistical inference in two-sample summary-data Mendelian randomization using robust adjusted profile score](../CITATIONS.md#zhao-mr-raps-2020)
-- [Marie Verbanck et al. (2018) — Detection of widespread horizontal pleiotropy in causal relationships inferred from Mendelian randomization](../CITATIONS.md#verbanck-mr-presso-2018)
-- [Stephen Burgess and Simon G. Thompson (2015) — Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects](../CITATIONS.md#burgess-mvmr-2015)
-- [Stephen Burgess, Neil M. Davies, and Simon G. Thompson (2016) — Bias due to participant overlap in two-sample Mendelian randomization](../CITATIONS.md#burgess-overlap-2016)
-- [Gibran Hemani et al. (2018) — The MR-Base platform supports systematic causal inference across the human phenome](../CITATIONS.md#hemani-mrbase-2018)
+- [Marie Verbanck et al. (2018) — Detection of widespread horizontal pleiotropy in causal relationships inferred from Mendelian randomization](../CITATIONS.md#verbanck-mr-presso-2018) — [PMID: 29686387](https://pubmed.ncbi.nlm.nih.gov/29686387/) · [PMCID: PMC6083837](https://pmc.ncbi.nlm.nih.gov/articles/PMC6083837/)
+- [Stephen Burgess and Simon G. Thompson (2015) — Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects](../CITATIONS.md#burgess-mvmr-2015) — [PMID: 25632051](https://pubmed.ncbi.nlm.nih.gov/25632051/) · [PMCID: PMC4325677](https://pmc.ncbi.nlm.nih.gov/articles/PMC4325677/)
+- [Stephen Burgess, Neil M. Davies, and Simon G. Thompson (2016) — Bias due to participant overlap in two-sample Mendelian randomization](../CITATIONS.md#burgess-overlap-2016) — [PMID: 27625185](https://pubmed.ncbi.nlm.nih.gov/27625185/) · [PMCID: PMC5082560](https://pmc.ncbi.nlm.nih.gov/articles/PMC5082560/)
+- [Gibran Hemani et al. (2018) — The MR-Base platform supports systematic causal inference across the human phenome](../CITATIONS.md#hemani-mrbase-2018) — [PMID: 29846171](https://pubmed.ncbi.nlm.nih.gov/29846171/) · [PMCID: PMC5976434](https://pmc.ncbi.nlm.nih.gov/articles/PMC5976434/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

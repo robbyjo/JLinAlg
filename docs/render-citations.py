@@ -8,6 +8,7 @@ import html
 import json
 import re
 import sys
+import urllib.parse
 from collections import OrderedDict
 from pathlib import Path
 
@@ -45,6 +46,10 @@ def load_registry() -> tuple[list[dict], dict[str, list[str]], dict[str, str]]:
             raise ValueError(f"{ref.get('id', '<unknown>')} lacks {sorted(missing)}")
         if not str(ref["url"]).startswith("https://"):
             raise ValueError(f"{ref['id']} must use an HTTPS source URL")
+        if ref.get("pmid") and not str(ref["pmid"]).isdigit():
+            raise ValueError(f"{ref['id']} has an invalid PMID")
+        if ref.get("pmcid") and not re.fullmatch(r"PMC\d+", str(ref["pmcid"])):
+            raise ValueError(f"{ref['id']} has an invalid PMCID")
     for page, ids in pages.items():
         if not ids:
             raise ValueError(f"{page} has no citations")
@@ -62,6 +67,77 @@ def short_author(ref: dict) -> str:
     return first.split()[-1]
 
 
+def doi(ref: dict) -> str | None:
+    prefix = "https://doi.org/"
+    return urllib.parse.unquote(ref["url"][len(prefix):]) if ref["url"].startswith(prefix) else None
+
+
+def identifier_links_markdown(ref: dict) -> str:
+    source_doi = doi(ref)
+    links = [
+        f"[DOI: {source_doi}]({ref['url']})"
+        if source_doi
+        else f"[Primary source]({ref['url']})"
+    ]
+    if ref.get("pmid"):
+        links.append(
+            f"[PMID: {ref['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{ref['pmid']}/)"
+        )
+    if ref.get("pmcid"):
+        links.append(
+            f"[PMCID: {ref['pmcid']}](https://pmc.ncbi.nlm.nih.gov/articles/{ref['pmcid']}/)"
+        )
+    return " · ".join(links)
+
+
+def identifier_links_html(ref: dict) -> str:
+    source_doi = doi(ref)
+    source_label = f"DOI: {source_doi}" if source_doi else "Primary source"
+    links = [
+        f'<a href="{html.escape(ref["url"], quote=True)}">'
+        f'{html.escape(source_label)}</a>'
+    ]
+    if ref.get("pmid"):
+        links.append(
+            f'<a href="https://pubmed.ncbi.nlm.nih.gov/{ref["pmid"]}/">'
+            f'PMID: {ref["pmid"]}</a>'
+        )
+    if ref.get("pmcid"):
+        links.append(
+            f'<a href="https://pmc.ncbi.nlm.nih.gov/articles/{ref["pmcid"]}/">'
+            f'PMCID: {ref["pmcid"]}</a>'
+        )
+    return '<span aria-hidden="true"> · </span>'.join(links)
+
+def indexed_links_markdown(ref: dict) -> str:
+    links = []
+    if ref.get("pmid"):
+        links.append(
+            f"[PMID: {ref['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{ref['pmid']}/)"
+        )
+    if ref.get("pmcid"):
+        links.append(
+            f"[PMCID: {ref['pmcid']}](https://pmc.ncbi.nlm.nih.gov/articles/{ref['pmcid']}/)"
+        )
+    return " — " + " · ".join(links) if links else ""
+
+
+def indexed_links_html(ref: dict) -> str:
+    links = []
+    if ref.get("pmid"):
+        links.append(
+            f'<a href="https://pubmed.ncbi.nlm.nih.gov/{ref["pmid"]}/">'
+            f'PMID: {ref["pmid"]}</a>'
+        )
+    if ref.get("pmcid"):
+        links.append(
+            f'<a href="https://pmc.ncbi.nlm.nih.gov/articles/{ref["pmcid"]}/">'
+            f'PMCID: {ref["pmcid"]}</a>'
+        )
+    if not links:
+        return ""
+    return f' <span class="citation-inline-identifiers">({" · ".join(links)})</span>'
+
 def render_markdown(refs: list[dict]) -> str:
     groups: OrderedDict[str, list[dict]] = OrderedDict()
     for ref in refs:
@@ -73,6 +149,8 @@ def render_markdown(refs: list[dict]) -> str:
         "",
         "The website provides a [searchable citation index](https://robbyjo.github.io/JLinAlg/citations.html). This file and the per-vignette citation panels are generated from [citations.json](citations.json).",
         "",
+        "PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.nih.gov/) with [enrich-citation-identifiers.py](enrich-citation-identifiers.py).",
+        "",
     ]
     for category, entries in groups.items():
         lines.extend([f"## {category}", ""])
@@ -80,32 +158,39 @@ def render_markdown(refs: list[dict]) -> str:
             features = ", ".join(ref["features"])
             lines.extend([
                 f'<a id="{ref["id"]}"></a>',
-                f"### {ref['authors']} ({ref['year']})",
-                "",
-                f"**{ref['title']}.** {ref['venue']}. [Primary source]({ref['url']})",
-                "",
-                f"JLinAlg features: {features}.",
+                f"- **{ref['authors']} ({ref['year']}).** {ref['title']}. *{ref['venue']}.* {identifier_links_markdown(ref)}",
+                f"  - JLinAlg methods: {features}.",
                 "",
             ])
     return "\n".join(lines).rstrip() + "\n"
 
 
 def render_html(refs: list[dict]) -> str:
-    cards = []
+    groups: OrderedDict[str, list[dict]] = OrderedDict()
     for ref in refs:
-        search = " ".join([
-            ref["category"], ref["authors"], str(ref["year"]), ref["title"],
-            ref["venue"], *ref["features"], ref["url"],
-        ]).lower()
-        tags = "".join(f'<span>{html.escape(feature)}</span>' for feature in ref["features"])
-        cards.append(f"""        <article class="citation-entry reveal" id="{ref['id']}" data-citation-entry data-search="{html.escape(search, quote=True)}">
-          <div class="citation-meta"><span class="badge">{html.escape(ref['category'])}</span><span>{ref['year']}</span></div>
-          <h2>{html.escape(ref['title'])}</h2>
-          <p class="citation-authors">{html.escape(ref['authors'])}</p>
-          <p>{html.escape(ref['venue'])}</p>
-          <div class="citation-tags">{tags}</div>
-          <a class="text-link" href="{html.escape(ref['url'], quote=True)}">Open primary source ↗</a>
-        </article>""")
+        groups.setdefault(ref["category"], []).append(ref)
+    sections = []
+    for category, entries in groups.items():
+        items = []
+        for ref in entries:
+            search = " ".join([
+                ref["category"], ref["authors"], str(ref["year"]), ref["title"],
+                ref["venue"], *ref["features"], ref["url"],
+                f"pmid {ref['pmid']}" if ref.get("pmid") else "",
+                f"pmcid {ref['pmcid']}" if ref.get("pmcid") else "",
+            ]).lower()
+            methods = ", ".join(ref["features"])
+            items.append(f"""          <li class="citation-entry" id="{ref['id']}" data-citation-entry data-search="{html.escape(search, quote=True)}">
+            <p class="citation-citation"><strong>{html.escape(ref['authors'])} ({ref['year']}).</strong> {html.escape(ref['title'])}. <em>{html.escape(ref['venue'])}.</em></p>
+            <p class="citation-identifiers">{identifier_links_html(ref)}</p>
+            <p class="citation-methods"><strong>JLinAlg methods:</strong> {html.escape(methods)}.</p>
+          </li>""")
+        sections.append(f"""        <section class="citation-topic" data-citation-topic>
+          <h2>{html.escape(category)} <span>{len(entries)} sources</span></h2>
+          <ul class="citation-bibliography">
+{chr(10).join(items)}
+          </ul>
+        </section>""")
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -123,18 +208,19 @@ def render_html(refs: list[dict]) -> str:
       <div class="container narrow">
         <span class="eyebrow">Method provenance</span>
         <h1>Scientific citations</h1>
-        <p>Search the primary publications behind JLinAlg methods by author, year, feature, title, journal, or DOI.</p>
+        <p>Search primary publications by topic, method, author, year, journal, DOI, PMID, or PMCID.</p>
+        <p class="citation-source-note">PMID and PMCID links are retrieved from <a href="https://pubmed.ncbi.nlm.nih.gov/">NCBI PubMed</a>.</p>
         <label class="citation-search">
           <span>Search {len(refs)} sources</span>
-          <input type="search" data-citation-search placeholder="Try MR-Egger, REML, SuSiE, 2015, or a DOI" autocomplete="off">
+          <input type="search" data-citation-search placeholder="Try MR-Egger, REML, PMID 26050253, or a DOI" autocomplete="off">
         </label>
         <p class="citation-result-summary" aria-live="polite"><strong data-citation-count>{len(refs)}</strong> sources shown</p>
       </div>
     </section>
     <section class="section">
       <div class="container citation-list" data-citation-list>
-{chr(10).join(cards)}
-        <p class="citation-empty" data-citation-empty hidden>No citations match that search. Try a method, author, year, or DOI.</p>
+{chr(10).join(sections)}
+        <p class="citation-empty" data-citation-empty hidden>No citations match that search. Try a method, author, year, or identifier.</p>
       </div>
     </section>
   </main>
@@ -143,13 +229,13 @@ def render_html(refs: list[dict]) -> str:
 </html>
 """
 
-
 def citation_block_html(slug: str, ids: list[str], by_id: dict[str, dict]) -> str:
     items = []
     for ref_id in ids:
         ref = by_id[ref_id]
         label = f"{short_author(ref)} ({ref['year']}) — {ref['features'][0]}"
-        items.append(f'<li><a href="../citations.html#{ref_id}">{html.escape(label)}</a></li>')
+        indexed = indexed_links_html(ref)
+        items.append(f'<li><a href="../citations.html#{ref_id}">{html.escape(label)}</a>{indexed}</li>')
     return f"""{HTML_START}
 <section class="citation-strip" aria-labelledby="scientific-citations-{slug}">
   <div class="container narrow">
@@ -175,7 +261,8 @@ def citation_block_markdown(ids: list[str], by_id: dict[str, dict], central: str
     ]
     for ref_id in ids:
         ref = by_id[ref_id]
-        lines.append(f"- [{ref['authors']} ({ref['year']}) — {ref['title']}]({central}#{ref_id})")
+        indexed = indexed_links_markdown(ref)
+        lines.append(f"- [{ref['authors']} ({ref['year']}) — {ref['title']}]({central}#{ref_id}){indexed}")
     lines.extend([
         "",
         "[Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).",

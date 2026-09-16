@@ -1,136 +1,1425 @@
 {
   "schemaVersion": 1,
   "references": [
-    {"id":"student-1908","category":"Foundational inference","authors":"Student [W. S. Gosset]","year":1908,"title":"The probable error of a mean","venue":"Biometrika 6:1-25","url":"https://doi.org/10.2307/2331554","features":["Student t test","small-sample mean inference"]},
-    {"id":"welch-1947","category":"Foundational inference","authors":"B. L. Welch","year":1947,"title":"The generalization of Student's problem when several different population variances are involved","venue":"Biometrika 34:28-35","url":"https://doi.org/10.1093/biomet/34.1-2.28","features":["Welch t test","unequal-variance inference"]},
-    {"id":"pearson-1895","category":"Foundational inference","authors":"Karl Pearson","year":1895,"title":"Notes on regression and inheritance in the case of two parents","venue":"Proceedings of the Royal Society of London 58:240-242","url":"https://doi.org/10.1098/rspl.1895.0041","features":["Pearson correlation","linear association"]},
-    {"id":"spearman-1904","category":"Foundational inference","authors":"Charles Spearman","year":1904,"title":"The proof and measurement of association between two things","venue":"American Journal of Psychology 15:72-101","url":"https://doi.org/10.2307/1412159","features":["Spearman correlation","rank association"]},
-    {"id":"wilcoxon-1945","category":"Foundational inference","authors":"Frank Wilcoxon","year":1945,"title":"Individual comparisons by ranking methods","venue":"Biometrics Bulletin 1:80-83","url":"https://doi.org/10.2307/3001968","features":["Wilcoxon signed-rank test","rank inference"]},
-    {"id":"mann-whitney-1947","category":"Foundational inference","authors":"H. B. Mann and D. R. Whitney","year":1947,"title":"On a test of whether one of two random variables is stochastically larger than the other","venue":"Annals of Mathematical Statistics 18:50-60","url":"https://doi.org/10.1214/aoms/1177730491","features":["Mann-Whitney U test","two-sample rank inference"]},
-    {"id":"fisher-1922","category":"Foundational inference","authors":"R. A. Fisher","year":1922,"title":"On the interpretation of chi-square from contingency tables, and the calculation of P","venue":"Journal of the Royal Statistical Society 85:87-94","url":"https://doi.org/10.2307/2340521","features":["Fisher exact test","contingency tables"]},
-    {"id":"mcnemar-1947","category":"Foundational inference","authors":"Quinn McNemar","year":1947,"title":"Note on the sampling error of the difference between correlated proportions or percentages","venue":"Psychometrika 12:153-157","url":"https://doi.org/10.1007/BF02295996","features":["McNemar test","paired binary data"]},
-    {"id":"friedman-1937","category":"Foundational inference","authors":"Milton Friedman","year":1937,"title":"The use of ranks to avoid the assumption of normality implicit in the analysis of variance","venue":"Journal of the American Statistical Association 32:675-701","url":"https://doi.org/10.1080/01621459.1937.10503522","features":["Friedman test","blocked rank inference"]},
-    {"id":"benjamini-hochberg-1995","category":"Foundational inference","authors":"Yoav Benjamini and Yosef Hochberg","year":1995,"title":"Controlling the false discovery rate: a practical and powerful approach to multiple testing","venue":"Journal of the Royal Statistical Society B 57:289-300","url":"https://doi.org/10.1111/j.2517-6161.1995.tb02031.x","features":["Benjamini-Hochberg FDR","multiple testing"]},
-    {"id":"nelder-wedderburn-1972","category":"Regression","authors":"J. A. Nelder and R. W. M. Wedderburn","year":1972,"title":"Generalized linear models","venue":"Journal of the Royal Statistical Society A 135:370-384","url":"https://doi.org/10.2307/2344614","features":["generalized linear models","IRLS","logistic regression","Poisson regression"]},
-    {"id":"bliss-1934","category":"Regression","authors":"C. I. Bliss","year":1934,"title":"The method of probits","venue":"Science 79:38-39","url":"https://doi.org/10.1126/science.79.2037.38","features":["probit regression","binary response"]},
-    {"id":"hoerl-kennard-1970","category":"Regression","authors":"Arthur E. Hoerl and Robert W. Kennard","year":1970,"title":"Ridge regression: biased estimation for nonorthogonal problems","venue":"Technometrics 12:55-67","url":"https://doi.org/10.1080/00401706.1970.10488634","features":["ridge regression","prediction scores"]},
-    {"id":"tibshirani-1996","category":"Regression","authors":"Robert Tibshirani","year":1996,"title":"Regression shrinkage and selection via the lasso","venue":"Journal of the Royal Statistical Society B 58:267-288","url":"https://doi.org/10.1111/j.2517-6161.1996.tb02080.x","features":["lasso","sparse regression"]},
-    {"id":"zou-hastie-2005","category":"Regression","authors":"Hui Zou and Trevor Hastie","year":2005,"title":"Regularization and variable selection via the elastic net","venue":"Journal of the Royal Statistical Society B 67:301-320","url":"https://doi.org/10.1111/j.1467-9868.2005.00503.x","features":["elastic net","grouped shrinkage"]},
-    {"id":"lee-2016","category":"Regression","authors":"Jason D. Lee, Dennis L. Sun, Yuekai Sun, and Jonathan E. Taylor","year":2016,"title":"Exact post-selection inference, with application to the lasso","venue":"Annals of Statistics 44:907-927","url":"https://doi.org/10.1214/15-AOS1371","features":["polyhedral selective inference","lasso inference"]},
-    {"id":"koenker-bassett-1978","category":"Regression","authors":"Roger Koenker and Gilbert Bassett Jr.","year":1978,"title":"Regression quantiles","venue":"Econometrica 46:33-50","url":"https://doi.org/10.2307/1913643","features":["quantile regression"]},
-    {"id":"friedman-1984","category":"Regression","authors":"Jerome H. Friedman","year":1984,"title":"A variable span smoother","venue":"Laboratory for Computational Statistics Technical Report 5","url":"https://doi.org/10.2172/1447470","features":["supersmoother","adaptive span smoothing"]},
-    {"id":"nadaraya-1964","category":"Regression","authors":"E. A. Nadaraya","year":1964,"title":"On estimating regression","venue":"Theory of Probability and Its Applications 9:141-142","url":"https://doi.org/10.1137/1109020","features":["kernel regression","Nadaraya-Watson estimator"]},
-    {"id":"robinson-1988","category":"Regression","authors":"Peter M. Robinson","year":1988,"title":"Root-N-consistent semiparametric regression","venue":"Econometrica 56:931-954","url":"https://doi.org/10.2307/1912705","features":["partially linear regression","semiparametric regression"]},
-    {"id":"cleveland-1979","category":"Regression","authors":"William S. Cleveland","year":1979,"title":"Robust locally weighted regression and smoothing scatterplots","venue":"Journal of the American Statistical Association 74:829-836","url":"https://doi.org/10.1080/01621459.1979.10481038","features":["LOESS","robust local regression"]},
-    {"id":"hastie-tibshirani-1986","category":"Regression","authors":"Trevor Hastie and Robert Tibshirani","year":1986,"title":"Generalized additive models","venue":"Statistical Science 1:297-310","url":"https://doi.org/10.1214/ss/1177013604","features":["generalized additive models","additive smooths"]},
-    {"id":"eilers-marx-1996","category":"Regression","authors":"Paul H. C. Eilers and Brian D. Marx","year":1996,"title":"Flexible smoothing with B-splines and penalties","venue":"Statistical Science 11:89-121","url":"https://doi.org/10.1214/ss/1038425655","features":["P-splines","penalized B-splines"]},
-    {"id":"wood-2011","category":"Regression","authors":"Simon N. Wood","year":2011,"title":"Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models","venue":"Journal of the Royal Statistical Society B 73:3-36","url":"https://doi.org/10.1111/j.1467-9868.2010.00749.x","features":["GAM REML","smoothness selection","penalized GLM"]},
-    {"id":"rigby-stasinopoulos-2005","category":"Regression","authors":"Robert A. Rigby and D. Mikis Stasinopoulos","year":2005,"title":"Generalized additive models for location, scale and shape","venue":"Applied Statistics 54:507-554","url":"https://doi.org/10.1111/j.1467-9876.2005.00510.x","features":["GAMLSS","distributional regression"]},
-    {"id":"yee-2010","category":"Regression","authors":"Thomas W. Yee","year":2010,"title":"The VGAM package for categorical data analysis","venue":"Journal of Statistical Software 32:1-34","url":"https://doi.org/10.18637/jss.v032.i10","features":["VGAM","ordinal and categorical regression"]},
-    {"id":"ferrari-cribari-neto-2004","category":"Regression","authors":"Silvia Ferrari and Francisco Cribari-Neto","year":2004,"title":"Beta regression for modelling rates and proportions","venue":"Journal of Applied Statistics 31:799-815","url":"https://doi.org/10.1080/0266476042000214501","features":["beta regression","mean-precision models"]},
-    {"id":"beasley-2009","category":"Regression","authors":"T. Mark Beasley, Stephen Erickson, and David B. Allison","year":2009,"title":"Rank-based inverse normal transformations are increasingly used, but are they merited?","venue":"Behavior Genetics 39:580-595","url":"https://doi.org/10.1007/s10519-009-9281-0","features":["rank inverse-normal transform","omics transforms"]},
-    {"id":"patterson-thompson-1971","category":"Mixed, longitudinal, and survival models","authors":"H. D. Patterson and Robin Thompson","year":1971,"title":"Recovery of inter-block information when block sizes are unequal","venue":"Biometrika 58:545-554","url":"https://doi.org/10.1093/biomet/58.3.545","features":["REML","variance components"]},
-    {"id":"henderson-1975","category":"Mixed, longitudinal, and survival models","authors":"C. R. Henderson","year":1975,"title":"Best linear unbiased estimation and prediction under a selection model","venue":"Biometrics 31:423-447","url":"https://doi.org/10.2307/2529430","features":["BLUP","mixed-model equations"]},
-    {"id":"kenward-roger-1997","category":"Mixed, longitudinal, and survival models","authors":"Michael G. Kenward and James H. Roger","year":1997,"title":"Small sample inference for fixed effects from restricted maximum likelihood","venue":"Biometrics 53:983-997","url":"https://doi.org/10.2307/2533558","features":["Kenward-Roger inference","small-sample mixed models"]},
-    {"id":"breslow-clayton-1993","category":"Mixed, longitudinal, and survival models","authors":"Norman E. Breslow and David G. Clayton","year":1993,"title":"Approximate inference in generalized linear mixed models","venue":"Journal of the American Statistical Association 88:9-25","url":"https://doi.org/10.1080/01621459.1993.10594284","features":["PQL","generalized linear mixed models"]},
-    {"id":"lambert-1992","category":"Mixed, longitudinal, and survival models","authors":"Diane Lambert","year":1992,"title":"Zero-inflated Poisson regression, with an application to defects in manufacturing","venue":"Technometrics 34:1-14","url":"https://doi.org/10.1080/00401706.1992.10485228","features":["zero-inflated Poisson","mixture count models"]},
-    {"id":"lindstrom-bates-1990","category":"Mixed, longitudinal, and survival models","authors":"Mary J. Lindstrom and Douglas M. Bates","year":1990,"title":"Nonlinear mixed effects models for repeated measures data","venue":"Biometrics 46:673-687","url":"https://doi.org/10.2307/2532087","features":["nonlinear mixed-effects models"]},
-    {"id":"liang-zeger-1986","category":"Mixed, longitudinal, and survival models","authors":"Kung-Yee Liang and Scott L. Zeger","year":1986,"title":"Longitudinal data analysis using generalized linear models","venue":"Biometrika 73:13-22","url":"https://doi.org/10.1093/biomet/73.1.13","features":["GEE","working correlation","sandwich inference"]},
-    {"id":"cox-1972","category":"Mixed, longitudinal, and survival models","authors":"D. R. Cox","year":1972,"title":"Regression models and life-tables","venue":"Journal of the Royal Statistical Society B 34:187-220","url":"https://doi.org/10.1111/j.2517-6161.1972.tb00899.x","features":["Cox proportional hazards","partial likelihood"]},
-    {"id":"efron-1977","category":"Mixed, longitudinal, and survival models","authors":"Bradley Efron","year":1977,"title":"The efficiency of Cox's likelihood function for censored data","venue":"Journal of the American Statistical Association 72:557-565","url":"https://doi.org/10.1080/01621459.1977.10480613","features":["Efron ties","Cox regression"]},
-    {"id":"henderson-1976","category":"Quantitative and statistical genetics","authors":"C. R. Henderson","year":1976,"title":"A simple method for computing the inverse of a numerator relationship matrix used in prediction of breeding values","venue":"Biometrics 32:69-83","url":"https://doi.org/10.2307/2529339","features":["pedigree A inverse","animal models"]},
-    {"id":"vanraden-2008","category":"Quantitative and statistical genetics","authors":"Paul M. VanRaden","year":2008,"title":"Efficient methods to compute genomic predictions","venue":"Journal of Dairy Science 91:4414-4423","url":"https://doi.org/10.3168/jds.2007-0980","features":["genomic relationship matrix","genomic prediction"]},
-    {"id":"yang-gcta-2011","category":"Quantitative and statistical genetics","authors":"Jian Yang et al.","year":2011,"title":"GCTA: a tool for genome-wide complex trait analysis","venue":"American Journal of Human Genetics 88:76-82","url":"https://doi.org/10.1016/j.ajhg.2010.11.011","features":["GRM","SNP heritability","GCTA"]},
-    {"id":"kang-emmax-2010","category":"Quantitative and statistical genetics","authors":"Hyun Min Kang et al.","year":2010,"title":"Variance component model to account for sample structure in genome-wide association studies","venue":"Nature Genetics 42:348-354","url":"https://doi.org/10.1038/ng.548","features":["EMMAX","mixed-model GWAS"]},
-    {"id":"zhang-p3d-2010","category":"Quantitative and statistical genetics","authors":"Zhiwu Zhang et al.","year":2010,"title":"Mixed linear model approach adapted for genome-wide association studies","venue":"Nature Genetics 42:355-360","url":"https://doi.org/10.1038/ng.546","features":["P3D","compressed mixed-model GWAS"]},
-    {"id":"wu-skat-2011","category":"Quantitative and statistical genetics","authors":"Michael C. Wu et al.","year":2011,"title":"Rare-variant association testing for sequencing data with the sequence kernel association test","venue":"American Journal of Human Genetics 89:82-93","url":"https://doi.org/10.1016/j.ajhg.2011.05.029","features":["SKAT","rare-variant set tests"]},
-    {"id":"lee-skato-2012","category":"Quantitative and statistical genetics","authors":"Seunggeun Lee et al.","year":2012,"title":"Optimal unified approach for rare-variant association testing","venue":"American Journal of Human Genetics 91:224-237","url":"https://doi.org/10.1016/j.ajhg.2012.06.007","features":["SKAT-O","burden-kernel omnibus tests"]},
-    {"id":"madsen-browning-2009","category":"Quantitative and statistical genetics","authors":"B. E. Madsen and S. R. Browning","year":2009,"title":"A groupwise association test for rare mutations using a weighted sum statistic","venue":"PLoS Genetics 5:e1000384","url":"https://doi.org/10.1371/journal.pgen.1000384","features":["weighted burden test","rare variants"]},
-    {"id":"yang-cojo-2012","category":"Quantitative and statistical genetics","authors":"Jian Yang et al.","year":2012,"title":"Conditional and joint multiple-SNP analysis of GWAS summary statistics","venue":"Nature Genetics 44:369-375","url":"https://doi.org/10.1038/ng.2213","features":["COJO","conditional summary statistics"]},
-    {"id":"bulik-sullivan-ldsc-2015","category":"Quantitative and statistical genetics","authors":"Brendan K. Bulik-Sullivan et al.","year":2015,"title":"LD Score regression distinguishes confounding from polygenicity in genome-wide association studies","venue":"Nature Genetics 47:291-295","url":"https://doi.org/10.1038/ng.3211","features":["LD Score regression","SNP heritability","confounding intercept"]},
-    {"id":"bulik-sullivan-rg-2015","category":"Quantitative and statistical genetics","authors":"Brendan K. Bulik-Sullivan et al.","year":2015,"title":"An atlas of genetic correlations across human diseases and traits","venue":"Nature Genetics 47:1236-1241","url":"https://doi.org/10.1038/ng.3406","features":["genetic correlation","bivariate LDSC"]},
-    {"id":"gamazon-predixcan-2015","category":"Quantitative and statistical genetics","authors":"Eric R. Gamazon et al.","year":2015,"title":"A gene-based association method for mapping traits using reference transcriptome data","venue":"Nature Genetics 47:1091-1098","url":"https://doi.org/10.1038/ng.3367","features":["PrediXcan","genetically predicted expression","TWAS"]},
-    {"id":"gusev-fusion-2016","category":"Quantitative and statistical genetics","authors":"Alexander Gusev et al.","year":2016,"title":"Integrative approaches for large-scale transcriptome-wide association studies","venue":"Nature Genetics 48:245-252","url":"https://doi.org/10.1038/ng.3506","features":["FUSION TWAS","summary TWAS","PWAS"]},
-    {"id":"grotzinger-genomic-sem-2019","category":"Quantitative and statistical genetics","authors":"Andrew D. Grotzinger et al.","year":2019,"title":"Genomic structural equation modelling provides insights into the multivariate genetic architecture of complex traits","venue":"Nature Human Behaviour 3:513-525","url":"https://doi.org/10.1038/s41562-019-0566-x","features":["Genomic SEM","shared genetic factors"]},
-    {"id":"euesden-prsice-2015","category":"Quantitative and statistical genetics","authors":"Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly","year":2015,"title":"PRSice: polygenic risk score software","venue":"Bioinformatics 31:1466-1468","url":"https://doi.org/10.1093/bioinformatics/btu848","features":["polygenic scores","score evaluation"]},
-    {"id":"leek-storey-2007","category":"Latent variation and batch correction","authors":"Jeffrey T. Leek and John D. Storey","year":2007,"title":"Capturing heterogeneity in gene expression studies by surrogate variable analysis","venue":"PLoS Genetics 3:e161","url":"https://doi.org/10.1371/journal.pgen.0030161","features":["SVA","latent confounders"]},
-    {"id":"stegle-peer-2012","category":"Latent variation and batch correction","authors":"Oliver Stegle et al.","year":2012,"title":"Using probabilistic estimation of expression residuals (PEER) to obtain increased power and interpretability of gene expression analyses","venue":"Nature Protocols 7:500-507","url":"https://doi.org/10.1038/nprot.2011.457","features":["PEER","Bayesian factor analysis"]},
-    {"id":"johnson-combat-2007","category":"Latent variation and batch correction","authors":"W. Evan Johnson, Cheng Li, and Ariel Rabinovic","year":2007,"title":"Adjusting batch effects in microarray expression data using empirical Bayes methods","venue":"Biostatistics 8:118-127","url":"https://doi.org/10.1093/biostatistics/kxj037","features":["ComBat","batch correction","empirical Bayes"]},
-    {"id":"baron-kenny-1986","category":"Causal and mediation analysis","authors":"Reuben M. Baron and David A. Kenny","year":1986,"title":"The moderator-mediator variable distinction in social psychological research","venue":"Journal of Personality and Social Psychology 51:1173-1182","url":"https://doi.org/10.1037/0022-3514.51.6.1173","features":["mediation","path decomposition"]},
-    {"id":"sobel-1982","category":"Causal and mediation analysis","authors":"Michael E. Sobel","year":1982,"title":"Asymptotic confidence intervals for indirect effects in structural equation models","venue":"Sociological Methodology 13:290-312","url":"https://doi.org/10.2307/270723","features":["Sobel test","indirect-effect inference"]},
-    {"id":"staiger-stock-1997","category":"Causal and mediation analysis","authors":"Douglas Staiger and James H. Stock","year":1997,"title":"Instrumental variables regression with weak instruments","venue":"Econometrica 65:557-586","url":"https://doi.org/10.2307/2171753","features":["2SLS","weak instruments","first-stage diagnostics"]},
-    {"id":"white-1980","category":"Causal and mediation analysis","authors":"Halbert White","year":1980,"title":"A heteroskedasticity-consistent covariance matrix estimator and a direct test for heteroskedasticity","venue":"Econometrica 48:817-838","url":"https://doi.org/10.2307/1912934","features":["heteroskedasticity-robust covariance","robust 2SLS inference"]},
-    {"id":"bowden-mr-egger-2015","category":"Causal and mediation analysis","authors":"Jack Bowden, George Davey Smith, and Stephen Burgess","year":2015,"title":"Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression","venue":"International Journal of Epidemiology 44:512-525","url":"https://doi.org/10.1093/ije/dyv080","features":["MR-Egger","directional pleiotropy","Egger intercept"]},
-    {"id":"bowden-weighted-median-2016","category":"Causal and mediation analysis","authors":"Jack Bowden et al.","year":2016,"title":"Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator","venue":"Genetic Epidemiology 40:304-314","url":"https://doi.org/10.1002/gepi.21965","features":["weighted-median MR","invalid instruments"]},
-    {"id":"hemani-steiger-2017","category":"Causal and mediation analysis","authors":"Gibran Hemani, Kate Tilling, and George Davey Smith","year":2017,"title":"Orienting the causal relationship between imprecisely measured traits using GWAS summary data","venue":"PLoS Genetics 13:e1007081","url":"https://doi.org/10.1371/journal.pgen.1007081","features":["Steiger directionality","MR orientation"]},
-    {"id":"zhao-mr-raps-2020","category":"Causal and mediation analysis","authors":"Qingyuan Zhao et al.","year":2020,"title":"Statistical inference in two-sample summary-data Mendelian randomization using robust adjusted profile score","venue":"Annals of Statistics 48:1742-1769","url":"https://doi.org/10.1214/19-AOS1866","features":["MR-RAPS","weak instruments","idiosyncratic pleiotropy"]},
-    {"id":"verbanck-mr-presso-2018","category":"Causal and mediation analysis","authors":"Marie Verbanck et al.","year":2018,"title":"Detection of widespread horizontal pleiotropy in causal relationships inferred from Mendelian randomization","venue":"Nature Genetics 50:693-698","url":"https://doi.org/10.1038/s41588-018-0099-7","features":["MR-PRESSO","pleiotropic outliers"]},
-    {"id":"burgess-mvmr-2015","category":"Causal and mediation analysis","authors":"Stephen Burgess and Simon G. Thompson","year":2015,"title":"Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects","venue":"American Journal of Epidemiology 181:251-260","url":"https://doi.org/10.1093/aje/kwu283","features":["multivariable MR","direct causal effects"]},
-    {"id":"burgess-overlap-2016","category":"Causal and mediation analysis","authors":"Stephen Burgess, Neil M. Davies, and Simon G. Thompson","year":2016,"title":"Bias due to participant overlap in two-sample Mendelian randomization","venue":"Genetic Epidemiology 40:597-608","url":"https://doi.org/10.1002/gepi.21998","features":["sample overlap","two-sample MR"]},
-    {"id":"hemani-mrbase-2018","category":"Causal and mediation analysis","authors":"Gibran Hemani et al.","year":2018,"title":"The MR-Base platform supports systematic causal inference across the human phenome","venue":"eLife 7:e34408","url":"https://doi.org/10.7554/eLife.34408","features":["TwoSampleMR","MR-Base","phenome-wide MR"]},
-    {"id":"dersimonian-laird-1986","category":"Evidence synthesis","authors":"Rebecca DerSimonian and Nan Laird","year":1986,"title":"Meta-analysis in clinical trials","venue":"Controlled Clinical Trials 7:177-188","url":"https://doi.org/10.1016/0197-2456(86)90046-2","features":["random-effects meta-analysis","DerSimonian-Laird"]},
-    {"id":"paule-mandel-1982","category":"Evidence synthesis","authors":"Robert C. Paule and John Mandel","year":1982,"title":"Consensus values and weighting factors","venue":"Journal of Research of the National Bureau of Standards 87:377-385","url":"https://doi.org/10.6028/jres.087.022","features":["Paule-Mandel tau squared","random-effects meta-analysis"]},
-    {"id":"knapp-hartung-2003","category":"Evidence synthesis","authors":"Guido Knapp and Joachim Hartung","year":2003,"title":"Improved tests for a random effects meta-regression with a single covariate","venue":"Statistics in Medicine 22:2693-2710","url":"https://doi.org/10.1002/sim.1482","features":["Knapp-Hartung inference","meta-regression"]},
-    {"id":"higgins-thompson-2002","category":"Evidence synthesis","authors":"Julian P. T. Higgins and Simon G. Thompson","year":2002,"title":"Quantifying heterogeneity in a meta-analysis","venue":"Statistics in Medicine 21:1539-1558","url":"https://doi.org/10.1002/sim.1186","features":["I-squared","heterogeneity"]},
-    {"id":"kalman-1960","category":"Time series","authors":"Rudolf E. Kalman","year":1960,"title":"A new approach to linear filtering and prediction problems","venue":"Journal of Basic Engineering 82:35-45","url":"https://doi.org/10.1115/1.3662552","features":["Kalman filter","state-space models","diffuse smoothing"]},
-    {"id":"ljung-box-1978","category":"Time series","authors":"Greta M. Ljung and George E. P. Box","year":1978,"title":"On a measure of lack of fit in time series models","venue":"Biometrika 65:297-303","url":"https://doi.org/10.1093/biomet/65.2.297","features":["Ljung-Box test","residual diagnostics"]},
-    {"id":"hyndman-khandakar-2008","category":"Time series","authors":"Rob J. Hyndman and Yeasmin Khandakar","year":2008,"title":"Automatic time series forecasting: the forecast package for R","venue":"Journal of Statistical Software 27:1-22","url":"https://doi.org/10.18637/jss.v027.i03","features":["automatic ARIMA","stepwise order selection"]},
-    {"id":"wang-susie-2020","category":"Fine mapping, colocalization, and SEM","authors":"Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens","year":2020,"title":"A simple new approach to variable selection in regression, with application to genetic fine mapping","venue":"Journal of the Royal Statistical Society B 82:1273-1300","url":"https://doi.org/10.1111/rssb.12388","features":["SuSiE","credible sets","fine mapping"]},
-    {"id":"giambartolomei-coloc-2014","category":"Fine mapping, colocalization, and SEM","authors":"Claudia Giambartolomei et al.","year":2014,"title":"Bayesian test for colocalisation between pairs of genetic association studies using summary statistics","venue":"PLoS Genetics 10:e1004383","url":"https://doi.org/10.1371/journal.pgen.1004383","features":["coloc","H0-H4 hypotheses"]},
-    {"id":"wallace-coloc-2021","category":"Fine mapping, colocalization, and SEM","authors":"Chris Wallace","year":2021,"title":"A more accurate method for colocalisation analysis allowing for multiple causal variants","venue":"PLoS Genetics 17:e1009440","url":"https://doi.org/10.1371/journal.pgen.1009440","features":["SuSiE colocalization","multiple causal variants"]},
-    {"id":"wright-1921","category":"Fine mapping, colocalization, and SEM","authors":"Sewall Wright","year":1921,"title":"Correlation and causation","venue":"Journal of Agricultural Research 20:557-585","url":"https://naldc.nal.usda.gov/catalog/IND43966364","features":["path analysis","structural equation models"]},
-    {"id":"mcardle-mcdonald-1984","category":"Fine mapping, colocalization, and SEM","authors":"John J. McArdle and Roderick P. McDonald","year":1984,"title":"Some algebraic properties of the Reticular Action Model for moment structures","venue":"British Journal of Mathematical and Statistical Psychology 37:234-251","url":"https://doi.org/10.1111/j.2044-8317.1984.tb00802.x","features":["RAM formulation","SEM covariance structure"]},
-    {"id":"enders-bandalos-2001","category":"Fine mapping, colocalization, and SEM","authors":"Craig K. Enders and Deborah L. Bandalos","year":2001,"title":"The relative performance of full information maximum likelihood estimation for missing data in structural equation models","venue":"Structural Equation Modeling 8:430-457","url":"https://doi.org/10.1207/S15328007SEM0803_5","features":["FIML","SEM missing data"]},
-    {"id":"katsikatsou-2012","category":"Fine mapping, colocalization, and SEM","authors":"Myrsini Katsikatsou et al.","year":2012,"title":"Pairwise likelihood estimation for factor analysis models with ordinal data","venue":"Computational Statistics and Data Analysis 56:4243-4258","url":"https://doi.org/10.1016/j.csda.2012.04.010","features":["ordinal pairwise likelihood","ordinal SEM"]},
-    {"id":"subramanian-gsea-2005","category":"Enrichment and annotation","authors":"Aravind Subramanian et al.","year":2005,"title":"Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles","venue":"Proceedings of the National Academy of Sciences 102:15545-15550","url":"https://doi.org/10.1073/pnas.0506580102","features":["GSEA","gene-set enrichment"]},
-    {"id":"wu-camera-2012","category":"Enrichment and annotation","authors":"Di Wu and Gordon K. Smyth","year":2012,"title":"Camera: a competitive gene set test accounting for inter-gene correlation","venue":"Nucleic Acids Research 40:e133","url":"https://doi.org/10.1093/nar/gks461","features":["CAMERA","correlation-aware enrichment"]},
-    {"id":"deleeuw-magma-2015","category":"Enrichment and annotation","authors":"Christiaan A. de Leeuw et al.","year":2015,"title":"MAGMA: generalized gene-set analysis of GWAS data","venue":"PLoS Computational Biology 11:e1004219","url":"https://doi.org/10.1371/journal.pcbi.1004219","features":["MAGMA","GWAS gene-set analysis"]},
-    {"id":"wilkinson-rogers-1973","category":"Software interfaces","authors":"G. N. Wilkinson and C. E. Rogers","year":1973,"title":"Symbolic description of factorial models for analysis of variance","venue":"Applied Statistics 22:392-399","url":"https://doi.org/10.2307/2346786","features":["statistical formulas","model matrices"]}
+    {
+      "id": "student-1908",
+      "category": "Foundational inference",
+      "authors": "Student [W. S. Gosset]",
+      "year": 1908,
+      "title": "The probable error of a mean",
+      "venue": "Biometrika 6:1-25",
+      "url": "https://doi.org/10.2307/2331554",
+      "features": [
+        "Student t test",
+        "small-sample mean inference"
+      ]
+    },
+    {
+      "id": "welch-1947",
+      "category": "Foundational inference",
+      "authors": "B. L. Welch",
+      "year": 1947,
+      "title": "The generalization of Student's problem when several different population variances are involved",
+      "venue": "Biometrika 34:28-35",
+      "url": "https://doi.org/10.1093/biomet/34.1-2.28",
+      "features": [
+        "Welch t test",
+        "unequal-variance inference"
+      ],
+      "pmid": "20287819"
+    },
+    {
+      "id": "pearson-1895",
+      "category": "Foundational inference",
+      "authors": "Karl Pearson",
+      "year": 1895,
+      "title": "Notes on regression and inheritance in the case of two parents",
+      "venue": "Proceedings of the Royal Society of London 58:240-242",
+      "url": "https://doi.org/10.1098/rspl.1895.0041",
+      "features": [
+        "Pearson correlation",
+        "linear association"
+      ]
+    },
+    {
+      "id": "spearman-1904",
+      "category": "Foundational inference",
+      "authors": "Charles Spearman",
+      "year": 1904,
+      "title": "The proof and measurement of association between two things",
+      "venue": "American Journal of Psychology 15:72-101",
+      "url": "https://doi.org/10.2307/1412159",
+      "features": [
+        "Spearman correlation",
+        "rank association"
+      ]
+    },
+    {
+      "id": "wilcoxon-1945",
+      "category": "Foundational inference",
+      "authors": "Frank Wilcoxon",
+      "year": 1945,
+      "title": "Individual comparisons by ranking methods",
+      "venue": "Biometrics Bulletin 1:80-83",
+      "url": "https://doi.org/10.2307/3001968",
+      "features": [
+        "Wilcoxon signed-rank test",
+        "rank inference"
+      ]
+    },
+    {
+      "id": "mann-whitney-1947",
+      "category": "Foundational inference",
+      "authors": "H. B. Mann and D. R. Whitney",
+      "year": 1947,
+      "title": "On a test of whether one of two random variables is stochastically larger than the other",
+      "venue": "Annals of Mathematical Statistics 18:50-60",
+      "url": "https://doi.org/10.1214/aoms/1177730491",
+      "features": [
+        "Mann-Whitney U test",
+        "two-sample rank inference"
+      ]
+    },
+    {
+      "id": "fisher-1922",
+      "category": "Foundational inference",
+      "authors": "R. A. Fisher",
+      "year": 1922,
+      "title": "On the interpretation of chi-square from contingency tables, and the calculation of P",
+      "venue": "Journal of the Royal Statistical Society 85:87-94",
+      "url": "https://doi.org/10.2307/2340521",
+      "features": [
+        "Fisher exact test",
+        "contingency tables"
+      ]
+    },
+    {
+      "id": "mcnemar-1947",
+      "category": "Foundational inference",
+      "authors": "Quinn McNemar",
+      "year": 1947,
+      "title": "Note on the sampling error of the difference between correlated proportions or percentages",
+      "venue": "Psychometrika 12:153-157",
+      "url": "https://doi.org/10.1007/BF02295996",
+      "features": [
+        "McNemar test",
+        "paired binary data"
+      ],
+      "pmid": "20254758"
+    },
+    {
+      "id": "friedman-1937",
+      "category": "Foundational inference",
+      "authors": "Milton Friedman",
+      "year": 1937,
+      "title": "The use of ranks to avoid the assumption of normality implicit in the analysis of variance",
+      "venue": "Journal of the American Statistical Association 32:675-701",
+      "url": "https://doi.org/10.1080/01621459.1937.10503522",
+      "features": [
+        "Friedman test",
+        "blocked rank inference"
+      ]
+    },
+    {
+      "id": "benjamini-hochberg-1995",
+      "category": "Foundational inference",
+      "authors": "Yoav Benjamini and Yosef Hochberg",
+      "year": 1995,
+      "title": "Controlling the false discovery rate: a practical and powerful approach to multiple testing",
+      "venue": "Journal of the Royal Statistical Society B 57:289-300",
+      "url": "https://doi.org/10.1111/j.2517-6161.1995.tb02031.x",
+      "features": [
+        "Benjamini-Hochberg FDR",
+        "multiple testing"
+      ]
+    },
+    {
+      "id": "nelder-wedderburn-1972",
+      "category": "Regression",
+      "authors": "J. A. Nelder and R. W. M. Wedderburn",
+      "year": 1972,
+      "title": "Generalized linear models",
+      "venue": "Journal of the Royal Statistical Society A 135:370-384",
+      "url": "https://doi.org/10.2307/2344614",
+      "features": [
+        "generalized linear models",
+        "IRLS",
+        "logistic regression",
+        "Poisson regression"
+      ]
+    },
+    {
+      "id": "bliss-1934",
+      "category": "Regression",
+      "authors": "C. I. Bliss",
+      "year": 1934,
+      "title": "The method of probits",
+      "venue": "Science 79:38-39",
+      "url": "https://doi.org/10.1126/science.79.2037.38",
+      "features": [
+        "probit regression",
+        "binary response"
+      ],
+      "pmid": "17813446"
+    },
+    {
+      "id": "hoerl-kennard-1970",
+      "category": "Regression",
+      "authors": "Arthur E. Hoerl and Robert W. Kennard",
+      "year": 1970,
+      "title": "Ridge regression: biased estimation for nonorthogonal problems",
+      "venue": "Technometrics 12:55-67",
+      "url": "https://doi.org/10.1080/00401706.1970.10488634",
+      "features": [
+        "ridge regression",
+        "prediction scores"
+      ]
+    },
+    {
+      "id": "tibshirani-1996",
+      "category": "Regression",
+      "authors": "Robert Tibshirani",
+      "year": 1996,
+      "title": "Regression shrinkage and selection via the lasso",
+      "venue": "Journal of the Royal Statistical Society B 58:267-288",
+      "url": "https://doi.org/10.1111/j.2517-6161.1996.tb02080.x",
+      "features": [
+        "lasso",
+        "sparse regression"
+      ]
+    },
+    {
+      "id": "zou-hastie-2005",
+      "category": "Regression",
+      "authors": "Hui Zou and Trevor Hastie",
+      "year": 2005,
+      "title": "Regularization and variable selection via the elastic net",
+      "venue": "Journal of the Royal Statistical Society B 67:301-320",
+      "url": "https://doi.org/10.1111/j.1467-9868.2005.00503.x",
+      "features": [
+        "elastic net",
+        "grouped shrinkage"
+      ]
+    },
+    {
+      "id": "lee-2016",
+      "category": "Regression",
+      "authors": "Jason D. Lee, Dennis L. Sun, Yuekai Sun, and Jonathan E. Taylor",
+      "year": 2016,
+      "title": "Exact post-selection inference, with application to the lasso",
+      "venue": "Annals of Statistics 44:907-927",
+      "url": "https://doi.org/10.1214/15-AOS1371",
+      "features": [
+        "polyhedral selective inference",
+        "lasso inference"
+      ]
+    },
+    {
+      "id": "koenker-bassett-1978",
+      "category": "Regression",
+      "authors": "Roger Koenker and Gilbert Bassett Jr.",
+      "year": 1978,
+      "title": "Regression quantiles",
+      "venue": "Econometrica 46:33-50",
+      "url": "https://doi.org/10.2307/1913643",
+      "features": [
+        "quantile regression"
+      ]
+    },
+    {
+      "id": "friedman-1984",
+      "category": "Regression",
+      "authors": "Jerome H. Friedman",
+      "year": 1984,
+      "title": "A variable span smoother",
+      "venue": "Laboratory for Computational Statistics Technical Report 5",
+      "url": "https://doi.org/10.2172/1447470",
+      "features": [
+        "supersmoother",
+        "adaptive span smoothing"
+      ]
+    },
+    {
+      "id": "nadaraya-1964",
+      "category": "Regression",
+      "authors": "E. A. Nadaraya",
+      "year": 1964,
+      "title": "On estimating regression",
+      "venue": "Theory of Probability and Its Applications 9:141-142",
+      "url": "https://doi.org/10.1137/1109020",
+      "features": [
+        "kernel regression",
+        "Nadaraya-Watson estimator"
+      ]
+    },
+    {
+      "id": "robinson-1988",
+      "category": "Regression",
+      "authors": "Peter M. Robinson",
+      "year": 1988,
+      "title": "Root-N-consistent semiparametric regression",
+      "venue": "Econometrica 56:931-954",
+      "url": "https://doi.org/10.2307/1912705",
+      "features": [
+        "partially linear regression",
+        "semiparametric regression"
+      ]
+    },
+    {
+      "id": "cleveland-1979",
+      "category": "Regression",
+      "authors": "William S. Cleveland",
+      "year": 1979,
+      "title": "Robust locally weighted regression and smoothing scatterplots",
+      "venue": "Journal of the American Statistical Association 74:829-836",
+      "url": "https://doi.org/10.1080/01621459.1979.10481038",
+      "features": [
+        "LOESS",
+        "robust local regression"
+      ]
+    },
+    {
+      "id": "hastie-tibshirani-1986",
+      "category": "Regression",
+      "authors": "Trevor Hastie and Robert Tibshirani",
+      "year": 1986,
+      "title": "Generalized additive models",
+      "venue": "Statistical Science 1:297-310",
+      "url": "https://doi.org/10.1214/ss/1177013604",
+      "features": [
+        "generalized additive models",
+        "additive smooths"
+      ]
+    },
+    {
+      "id": "eilers-marx-1996",
+      "category": "Regression",
+      "authors": "Paul H. C. Eilers and Brian D. Marx",
+      "year": 1996,
+      "title": "Flexible smoothing with B-splines and penalties",
+      "venue": "Statistical Science 11:89-121",
+      "url": "https://doi.org/10.1214/ss/1038425655",
+      "features": [
+        "P-splines",
+        "penalized B-splines"
+      ]
+    },
+    {
+      "id": "wood-2011",
+      "category": "Regression",
+      "authors": "Simon N. Wood",
+      "year": 2011,
+      "title": "Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models",
+      "venue": "Journal of the Royal Statistical Society B 73:3-36",
+      "url": "https://doi.org/10.1111/j.1467-9868.2010.00749.x",
+      "features": [
+        "GAM REML",
+        "smoothness selection",
+        "penalized GLM"
+      ]
+    },
+    {
+      "id": "rigby-stasinopoulos-2005",
+      "category": "Regression",
+      "authors": "Robert A. Rigby and D. Mikis Stasinopoulos",
+      "year": 2005,
+      "title": "Generalized additive models for location, scale and shape",
+      "venue": "Applied Statistics 54:507-554",
+      "url": "https://doi.org/10.1111/j.1467-9876.2005.00510.x",
+      "features": [
+        "GAMLSS",
+        "distributional regression"
+      ]
+    },
+    {
+      "id": "yee-2010",
+      "category": "Regression",
+      "authors": "Thomas W. Yee",
+      "year": 2010,
+      "title": "The VGAM package for categorical data analysis",
+      "venue": "Journal of Statistical Software 32:1-34",
+      "url": "https://doi.org/10.18637/jss.v032.i10",
+      "features": [
+        "VGAM",
+        "ordinal and categorical regression"
+      ]
+    },
+    {
+      "id": "ferrari-cribari-neto-2004",
+      "category": "Regression",
+      "authors": "Silvia Ferrari and Francisco Cribari-Neto",
+      "year": 2004,
+      "title": "Beta regression for modelling rates and proportions",
+      "venue": "Journal of Applied Statistics 31:799-815",
+      "url": "https://doi.org/10.1080/0266476042000214501",
+      "features": [
+        "beta regression",
+        "mean-precision models"
+      ]
+    },
+    {
+      "id": "beasley-2009",
+      "category": "Regression",
+      "authors": "T. Mark Beasley, Stephen Erickson, and David B. Allison",
+      "year": 2009,
+      "title": "Rank-based inverse normal transformations are increasingly used, but are they merited?",
+      "venue": "Behavior Genetics 39:580-595",
+      "url": "https://doi.org/10.1007/s10519-009-9281-0",
+      "features": [
+        "rank inverse-normal transform",
+        "omics transforms"
+      ],
+      "pmid": "19526352",
+      "pmcid": "PMC2921808"
+    },
+    {
+      "id": "patterson-thompson-1971",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "H. D. Patterson and Robin Thompson",
+      "year": 1971,
+      "title": "Recovery of inter-block information when block sizes are unequal",
+      "venue": "Biometrika 58:545-554",
+      "url": "https://doi.org/10.1093/biomet/58.3.545",
+      "features": [
+        "REML",
+        "variance components"
+      ]
+    },
+    {
+      "id": "henderson-1975",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "C. R. Henderson",
+      "year": 1975,
+      "title": "Best linear unbiased estimation and prediction under a selection model",
+      "venue": "Biometrics 31:423-447",
+      "url": "https://doi.org/10.2307/2529430",
+      "features": [
+        "BLUP",
+        "mixed-model equations"
+      ]
+    },
+    {
+      "id": "kenward-roger-1997",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Michael G. Kenward and James H. Roger",
+      "year": 1997,
+      "title": "Small sample inference for fixed effects from restricted maximum likelihood",
+      "venue": "Biometrics 53:983-997",
+      "url": "https://doi.org/10.2307/2533558",
+      "features": [
+        "Kenward-Roger inference",
+        "small-sample mixed models"
+      ]
+    },
+    {
+      "id": "breslow-clayton-1993",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Norman E. Breslow and David G. Clayton",
+      "year": 1993,
+      "title": "Approximate inference in generalized linear mixed models",
+      "venue": "Journal of the American Statistical Association 88:9-25",
+      "url": "https://doi.org/10.1080/01621459.1993.10594284",
+      "features": [
+        "PQL",
+        "generalized linear mixed models"
+      ]
+    },
+    {
+      "id": "lambert-1992",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Diane Lambert",
+      "year": 1992,
+      "title": "Zero-inflated Poisson regression, with an application to defects in manufacturing",
+      "venue": "Technometrics 34:1-14",
+      "url": "https://doi.org/10.1080/00401706.1992.10485228",
+      "features": [
+        "zero-inflated Poisson",
+        "mixture count models"
+      ]
+    },
+    {
+      "id": "lindstrom-bates-1990",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Mary J. Lindstrom and Douglas M. Bates",
+      "year": 1990,
+      "title": "Nonlinear mixed effects models for repeated measures data",
+      "venue": "Biometrics 46:673-687",
+      "url": "https://doi.org/10.2307/2532087",
+      "features": [
+        "nonlinear mixed-effects models"
+      ]
+    },
+    {
+      "id": "liang-zeger-1986",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Kung-Yee Liang and Scott L. Zeger",
+      "year": 1986,
+      "title": "Longitudinal data analysis using generalized linear models",
+      "venue": "Biometrika 73:13-22",
+      "url": "https://doi.org/10.1093/biomet/73.1.13",
+      "features": [
+        "GEE",
+        "working correlation",
+        "sandwich inference"
+      ]
+    },
+    {
+      "id": "cox-1972",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "D. R. Cox",
+      "year": 1972,
+      "title": "Regression models and life-tables",
+      "venue": "Journal of the Royal Statistical Society B 34:187-220",
+      "url": "https://doi.org/10.1111/j.2517-6161.1972.tb00899.x",
+      "features": [
+        "Cox proportional hazards",
+        "partial likelihood"
+      ]
+    },
+    {
+      "id": "efron-1977",
+      "category": "Mixed, longitudinal, and survival models",
+      "authors": "Bradley Efron",
+      "year": 1977,
+      "title": "The efficiency of Cox's likelihood function for censored data",
+      "venue": "Journal of the American Statistical Association 72:557-565",
+      "url": "https://doi.org/10.1080/01621459.1977.10480613",
+      "features": [
+        "Efron ties",
+        "Cox regression"
+      ]
+    },
+    {
+      "id": "henderson-1976",
+      "category": "Quantitative and statistical genetics",
+      "authors": "C. R. Henderson",
+      "year": 1976,
+      "title": "A simple method for computing the inverse of a numerator relationship matrix used in prediction of breeding values",
+      "venue": "Biometrics 32:69-83",
+      "url": "https://doi.org/10.2307/2529339",
+      "features": [
+        "pedigree A inverse",
+        "animal models"
+      ]
+    },
+    {
+      "id": "vanraden-2008",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Paul M. VanRaden",
+      "year": 2008,
+      "title": "Efficient methods to compute genomic predictions",
+      "venue": "Journal of Dairy Science 91:4414-4423",
+      "url": "https://doi.org/10.3168/jds.2007-0980",
+      "features": [
+        "genomic relationship matrix",
+        "genomic prediction"
+      ],
+      "pmid": "18946147"
+    },
+    {
+      "id": "yang-gcta-2011",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Jian Yang et al.",
+      "year": 2011,
+      "title": "GCTA: a tool for genome-wide complex trait analysis",
+      "venue": "American Journal of Human Genetics 88:76-82",
+      "url": "https://doi.org/10.1016/j.ajhg.2010.11.011",
+      "features": [
+        "GRM",
+        "SNP heritability",
+        "GCTA"
+      ],
+      "pmid": "21167468",
+      "pmcid": "PMC3014363"
+    },
+    {
+      "id": "kang-emmax-2010",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Hyun Min Kang et al.",
+      "year": 2010,
+      "title": "Variance component model to account for sample structure in genome-wide association studies",
+      "venue": "Nature Genetics 42:348-354",
+      "url": "https://doi.org/10.1038/ng.548",
+      "features": [
+        "EMMAX",
+        "mixed-model GWAS"
+      ],
+      "pmid": "20208533",
+      "pmcid": "PMC3092069"
+    },
+    {
+      "id": "zhang-p3d-2010",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Zhiwu Zhang et al.",
+      "year": 2010,
+      "title": "Mixed linear model approach adapted for genome-wide association studies",
+      "venue": "Nature Genetics 42:355-360",
+      "url": "https://doi.org/10.1038/ng.546",
+      "features": [
+        "P3D",
+        "compressed mixed-model GWAS"
+      ],
+      "pmid": "20208535",
+      "pmcid": "PMC2931336"
+    },
+    {
+      "id": "wu-skat-2011",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Michael C. Wu et al.",
+      "year": 2011,
+      "title": "Rare-variant association testing for sequencing data with the sequence kernel association test",
+      "venue": "American Journal of Human Genetics 89:82-93",
+      "url": "https://doi.org/10.1016/j.ajhg.2011.05.029",
+      "features": [
+        "SKAT",
+        "rare-variant set tests"
+      ],
+      "pmid": "21737059",
+      "pmcid": "PMC3135811"
+    },
+    {
+      "id": "lee-skato-2012",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Seunggeun Lee et al.",
+      "year": 2012,
+      "title": "Optimal unified approach for rare-variant association testing",
+      "venue": "American Journal of Human Genetics 91:224-237",
+      "url": "https://doi.org/10.1016/j.ajhg.2012.06.007",
+      "features": [
+        "SKAT-O",
+        "burden-kernel omnibus tests"
+      ],
+      "pmid": "22863193",
+      "pmcid": "PMC3415556"
+    },
+    {
+      "id": "madsen-browning-2009",
+      "category": "Quantitative and statistical genetics",
+      "authors": "B. E. Madsen and S. R. Browning",
+      "year": 2009,
+      "title": "A groupwise association test for rare mutations using a weighted sum statistic",
+      "venue": "PLoS Genetics 5:e1000384",
+      "url": "https://doi.org/10.1371/journal.pgen.1000384",
+      "features": [
+        "weighted burden test",
+        "rare variants"
+      ],
+      "pmid": "19214210",
+      "pmcid": "PMC2633048"
+    },
+    {
+      "id": "yang-cojo-2012",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Jian Yang et al.",
+      "year": 2012,
+      "title": "Conditional and joint multiple-SNP analysis of GWAS summary statistics",
+      "venue": "Nature Genetics 44:369-375",
+      "url": "https://doi.org/10.1038/ng.2213",
+      "features": [
+        "COJO",
+        "conditional summary statistics"
+      ],
+      "pmid": "22426310",
+      "pmcid": "PMC3593158"
+    },
+    {
+      "id": "bulik-sullivan-ldsc-2015",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Brendan K. Bulik-Sullivan et al.",
+      "year": 2015,
+      "title": "LD Score regression distinguishes confounding from polygenicity in genome-wide association studies",
+      "venue": "Nature Genetics 47:291-295",
+      "url": "https://doi.org/10.1038/ng.3211",
+      "features": [
+        "LD Score regression",
+        "SNP heritability",
+        "confounding intercept"
+      ],
+      "pmid": "25642630",
+      "pmcid": "PMC4495769"
+    },
+    {
+      "id": "bulik-sullivan-rg-2015",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Brendan K. Bulik-Sullivan et al.",
+      "year": 2015,
+      "title": "An atlas of genetic correlations across human diseases and traits",
+      "venue": "Nature Genetics 47:1236-1241",
+      "url": "https://doi.org/10.1038/ng.3406",
+      "features": [
+        "genetic correlation",
+        "bivariate LDSC"
+      ],
+      "pmid": "26414676",
+      "pmcid": "PMC4797329"
+    },
+    {
+      "id": "gamazon-predixcan-2015",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Eric R. Gamazon et al.",
+      "year": 2015,
+      "title": "A gene-based association method for mapping traits using reference transcriptome data",
+      "venue": "Nature Genetics 47:1091-1098",
+      "url": "https://doi.org/10.1038/ng.3367",
+      "features": [
+        "PrediXcan",
+        "genetically predicted expression",
+        "TWAS"
+      ],
+      "pmid": "26258848",
+      "pmcid": "PMC4552594"
+    },
+    {
+      "id": "gusev-fusion-2016",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Alexander Gusev et al.",
+      "year": 2016,
+      "title": "Integrative approaches for large-scale transcriptome-wide association studies",
+      "venue": "Nature Genetics 48:245-252",
+      "url": "https://doi.org/10.1038/ng.3506",
+      "features": [
+        "FUSION TWAS",
+        "summary TWAS",
+        "PWAS"
+      ],
+      "pmid": "26854917",
+      "pmcid": "PMC4767558"
+    },
+    {
+      "id": "grotzinger-genomic-sem-2019",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Andrew D. Grotzinger et al.",
+      "year": 2019,
+      "title": "Genomic structural equation modelling provides insights into the multivariate genetic architecture of complex traits",
+      "venue": "Nature Human Behaviour 3:513-525",
+      "url": "https://doi.org/10.1038/s41562-019-0566-x",
+      "features": [
+        "Genomic SEM",
+        "shared genetic factors"
+      ],
+      "pmid": "30962613",
+      "pmcid": "PMC6520146"
+    },
+    {
+      "id": "euesden-prsice-2015",
+      "category": "Quantitative and statistical genetics",
+      "authors": "Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly",
+      "year": 2015,
+      "title": "PRSice: polygenic risk score software",
+      "venue": "Bioinformatics 31:1466-1468",
+      "url": "https://doi.org/10.1093/bioinformatics/btu848",
+      "features": [
+        "polygenic scores",
+        "score evaluation"
+      ],
+      "pmid": "25550326",
+      "pmcid": "PMC4410663"
+    },
+    {
+      "id": "leek-storey-2007",
+      "category": "Latent variation and batch correction",
+      "authors": "Jeffrey T. Leek and John D. Storey",
+      "year": 2007,
+      "title": "Capturing heterogeneity in gene expression studies by surrogate variable analysis",
+      "venue": "PLoS Genetics 3:e161",
+      "url": "https://doi.org/10.1371/journal.pgen.0030161",
+      "features": [
+        "SVA",
+        "latent confounders"
+      ],
+      "pmid": "17907809",
+      "pmcid": "PMC1994707"
+    },
+    {
+      "id": "stegle-peer-2012",
+      "category": "Latent variation and batch correction",
+      "authors": "Oliver Stegle et al.",
+      "year": 2012,
+      "title": "Using probabilistic estimation of expression residuals (PEER) to obtain increased power and interpretability of gene expression analyses",
+      "venue": "Nature Protocols 7:500-507",
+      "url": "https://doi.org/10.1038/nprot.2011.457",
+      "features": [
+        "PEER",
+        "Bayesian factor analysis"
+      ],
+      "pmid": "22343431",
+      "pmcid": "PMC3398141"
+    },
+    {
+      "id": "johnson-combat-2007",
+      "category": "Latent variation and batch correction",
+      "authors": "W. Evan Johnson, Cheng Li, and Ariel Rabinovic",
+      "year": 2007,
+      "title": "Adjusting batch effects in microarray expression data using empirical Bayes methods",
+      "venue": "Biostatistics 8:118-127",
+      "url": "https://doi.org/10.1093/biostatistics/kxj037",
+      "features": [
+        "ComBat",
+        "batch correction",
+        "empirical Bayes"
+      ],
+      "pmid": "16632515"
+    },
+    {
+      "id": "baron-kenny-1986",
+      "category": "Causal and mediation analysis",
+      "authors": "Reuben M. Baron and David A. Kenny",
+      "year": 1986,
+      "title": "The moderator-mediator variable distinction in social psychological research",
+      "venue": "Journal of Personality and Social Psychology 51:1173-1182",
+      "url": "https://doi.org/10.1037/0022-3514.51.6.1173",
+      "features": [
+        "mediation",
+        "path decomposition"
+      ]
+    },
+    {
+      "id": "sobel-1982",
+      "category": "Causal and mediation analysis",
+      "authors": "Michael E. Sobel",
+      "year": 1982,
+      "title": "Asymptotic confidence intervals for indirect effects in structural equation models",
+      "venue": "Sociological Methodology 13:290-312",
+      "url": "https://doi.org/10.2307/270723",
+      "features": [
+        "Sobel test",
+        "indirect-effect inference"
+      ]
+    },
+    {
+      "id": "staiger-stock-1997",
+      "category": "Causal and mediation analysis",
+      "authors": "Douglas Staiger and James H. Stock",
+      "year": 1997,
+      "title": "Instrumental variables regression with weak instruments",
+      "venue": "Econometrica 65:557-586",
+      "url": "https://doi.org/10.2307/2171753",
+      "features": [
+        "2SLS",
+        "weak instruments",
+        "first-stage diagnostics"
+      ]
+    },
+    {
+      "id": "white-1980",
+      "category": "Causal and mediation analysis",
+      "authors": "Halbert White",
+      "year": 1980,
+      "title": "A heteroskedasticity-consistent covariance matrix estimator and a direct test for heteroskedasticity",
+      "venue": "Econometrica 48:817-838",
+      "url": "https://doi.org/10.2307/1912934",
+      "features": [
+        "heteroskedasticity-robust covariance",
+        "robust 2SLS inference"
+      ]
+    },
+    {
+      "id": "bowden-mr-egger-2015",
+      "category": "Causal and mediation analysis",
+      "authors": "Jack Bowden, George Davey Smith, and Stephen Burgess",
+      "year": 2015,
+      "title": "Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression",
+      "venue": "International Journal of Epidemiology 44:512-525",
+      "url": "https://doi.org/10.1093/ije/dyv080",
+      "features": [
+        "MR-Egger",
+        "directional pleiotropy",
+        "Egger intercept"
+      ],
+      "pmid": "26050253",
+      "pmcid": "PMC4469799"
+    },
+    {
+      "id": "bowden-weighted-median-2016",
+      "category": "Causal and mediation analysis",
+      "authors": "Jack Bowden et al.",
+      "year": 2016,
+      "title": "Consistent estimation in Mendelian randomization with some invalid instruments using a weighted median estimator",
+      "venue": "Genetic Epidemiology 40:304-314",
+      "url": "https://doi.org/10.1002/gepi.21965",
+      "features": [
+        "weighted-median MR",
+        "invalid instruments"
+      ],
+      "pmid": "27061298",
+      "pmcid": "PMC4849733"
+    },
+    {
+      "id": "hemani-steiger-2017",
+      "category": "Causal and mediation analysis",
+      "authors": "Gibran Hemani, Kate Tilling, and George Davey Smith",
+      "year": 2017,
+      "title": "Orienting the causal relationship between imprecisely measured traits using GWAS summary data",
+      "venue": "PLoS Genetics 13:e1007081",
+      "url": "https://doi.org/10.1371/journal.pgen.1007081",
+      "features": [
+        "Steiger directionality",
+        "MR orientation"
+      ],
+      "pmid": "29149188",
+      "pmcid": "PMC5711033"
+    },
+    {
+      "id": "zhao-mr-raps-2020",
+      "category": "Causal and mediation analysis",
+      "authors": "Qingyuan Zhao et al.",
+      "year": 2020,
+      "title": "Statistical inference in two-sample summary-data Mendelian randomization using robust adjusted profile score",
+      "venue": "Annals of Statistics 48:1742-1769",
+      "url": "https://doi.org/10.1214/19-AOS1866",
+      "features": [
+        "MR-RAPS",
+        "weak instruments",
+        "idiosyncratic pleiotropy"
+      ]
+    },
+    {
+      "id": "verbanck-mr-presso-2018",
+      "category": "Causal and mediation analysis",
+      "authors": "Marie Verbanck et al.",
+      "year": 2018,
+      "title": "Detection of widespread horizontal pleiotropy in causal relationships inferred from Mendelian randomization",
+      "venue": "Nature Genetics 50:693-698",
+      "url": "https://doi.org/10.1038/s41588-018-0099-7",
+      "features": [
+        "MR-PRESSO",
+        "pleiotropic outliers"
+      ],
+      "pmid": "29686387",
+      "pmcid": "PMC6083837"
+    },
+    {
+      "id": "burgess-mvmr-2015",
+      "category": "Causal and mediation analysis",
+      "authors": "Stephen Burgess and Simon G. Thompson",
+      "year": 2015,
+      "title": "Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects",
+      "venue": "American Journal of Epidemiology 181:251-260",
+      "url": "https://doi.org/10.1093/aje/kwu283",
+      "features": [
+        "multivariable MR",
+        "direct causal effects"
+      ],
+      "pmid": "25632051",
+      "pmcid": "PMC4325677"
+    },
+    {
+      "id": "burgess-overlap-2016",
+      "category": "Causal and mediation analysis",
+      "authors": "Stephen Burgess, Neil M. Davies, and Simon G. Thompson",
+      "year": 2016,
+      "title": "Bias due to participant overlap in two-sample Mendelian randomization",
+      "venue": "Genetic Epidemiology 40:597-608",
+      "url": "https://doi.org/10.1002/gepi.21998",
+      "features": [
+        "sample overlap",
+        "two-sample MR"
+      ],
+      "pmid": "27625185",
+      "pmcid": "PMC5082560"
+    },
+    {
+      "id": "hemani-mrbase-2018",
+      "category": "Causal and mediation analysis",
+      "authors": "Gibran Hemani et al.",
+      "year": 2018,
+      "title": "The MR-Base platform supports systematic causal inference across the human phenome",
+      "venue": "eLife 7:e34408",
+      "url": "https://doi.org/10.7554/eLife.34408",
+      "features": [
+        "TwoSampleMR",
+        "MR-Base",
+        "phenome-wide MR"
+      ],
+      "pmid": "29846171",
+      "pmcid": "PMC5976434"
+    },
+    {
+      "id": "dersimonian-laird-1986",
+      "category": "Evidence synthesis",
+      "authors": "Rebecca DerSimonian and Nan Laird",
+      "year": 1986,
+      "title": "Meta-analysis in clinical trials",
+      "venue": "Controlled Clinical Trials 7:177-188",
+      "url": "https://doi.org/10.1016/0197-2456(86)90046-2",
+      "features": [
+        "random-effects meta-analysis",
+        "DerSimonian-Laird"
+      ],
+      "pmid": "3802833"
+    },
+    {
+      "id": "paule-mandel-1982",
+      "category": "Evidence synthesis",
+      "authors": "Robert C. Paule and John Mandel",
+      "year": 1982,
+      "title": "Consensus values and weighting factors",
+      "venue": "Journal of Research of the National Bureau of Standards 87:377-385",
+      "url": "https://doi.org/10.6028/jres.087.022",
+      "features": [
+        "Paule-Mandel tau squared",
+        "random-effects meta-analysis"
+      ],
+      "pmid": "34566088",
+      "pmcid": "PMC6768160"
+    },
+    {
+      "id": "knapp-hartung-2003",
+      "category": "Evidence synthesis",
+      "authors": "Guido Knapp and Joachim Hartung",
+      "year": 2003,
+      "title": "Improved tests for a random effects meta-regression with a single covariate",
+      "venue": "Statistics in Medicine 22:2693-2710",
+      "url": "https://doi.org/10.1002/sim.1482",
+      "features": [
+        "Knapp-Hartung inference",
+        "meta-regression"
+      ],
+      "pmid": "12939780"
+    },
+    {
+      "id": "higgins-thompson-2002",
+      "category": "Evidence synthesis",
+      "authors": "Julian P. T. Higgins and Simon G. Thompson",
+      "year": 2002,
+      "title": "Quantifying heterogeneity in a meta-analysis",
+      "venue": "Statistics in Medicine 21:1539-1558",
+      "url": "https://doi.org/10.1002/sim.1186",
+      "features": [
+        "I-squared",
+        "heterogeneity"
+      ],
+      "pmid": "12111919"
+    },
+    {
+      "id": "kalman-1960",
+      "category": "Time series",
+      "authors": "Rudolf E. Kalman",
+      "year": 1960,
+      "title": "A new approach to linear filtering and prediction problems",
+      "venue": "Journal of Basic Engineering 82:35-45",
+      "url": "https://doi.org/10.1115/1.3662552",
+      "features": [
+        "Kalman filter",
+        "state-space models",
+        "diffuse smoothing"
+      ]
+    },
+    {
+      "id": "ljung-box-1978",
+      "category": "Time series",
+      "authors": "Greta M. Ljung and George E. P. Box",
+      "year": 1978,
+      "title": "On a measure of lack of fit in time series models",
+      "venue": "Biometrika 65:297-303",
+      "url": "https://doi.org/10.1093/biomet/65.2.297",
+      "features": [
+        "Ljung-Box test",
+        "residual diagnostics"
+      ]
+    },
+    {
+      "id": "hyndman-khandakar-2008",
+      "category": "Time series",
+      "authors": "Rob J. Hyndman and Yeasmin Khandakar",
+      "year": 2008,
+      "title": "Automatic time series forecasting: the forecast package for R",
+      "venue": "Journal of Statistical Software 27:1-22",
+      "url": "https://doi.org/10.18637/jss.v027.i03",
+      "features": [
+        "automatic ARIMA",
+        "stepwise order selection"
+      ]
+    },
+    {
+      "id": "wang-susie-2020",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens",
+      "year": 2020,
+      "title": "A simple new approach to variable selection in regression, with application to genetic fine mapping",
+      "venue": "Journal of the Royal Statistical Society B 82:1273-1300",
+      "url": "https://doi.org/10.1111/rssb.12388",
+      "features": [
+        "SuSiE",
+        "credible sets",
+        "fine mapping"
+      ],
+      "pmid": "37220626",
+      "pmcid": "PMC10201948"
+    },
+    {
+      "id": "giambartolomei-coloc-2014",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Claudia Giambartolomei et al.",
+      "year": 2014,
+      "title": "Bayesian test for colocalisation between pairs of genetic association studies using summary statistics",
+      "venue": "PLoS Genetics 10:e1004383",
+      "url": "https://doi.org/10.1371/journal.pgen.1004383",
+      "features": [
+        "coloc",
+        "H0-H4 hypotheses"
+      ],
+      "pmid": "24830394",
+      "pmcid": "PMC4022491"
+    },
+    {
+      "id": "wallace-coloc-2021",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Chris Wallace",
+      "year": 2021,
+      "title": "A more accurate method for colocalisation analysis allowing for multiple causal variants",
+      "venue": "PLoS Genetics 17:e1009440",
+      "url": "https://doi.org/10.1371/journal.pgen.1009440",
+      "features": [
+        "SuSiE colocalization",
+        "multiple causal variants"
+      ],
+      "pmid": "34587156",
+      "pmcid": "PMC8504726"
+    },
+    {
+      "id": "wright-1921",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Sewall Wright",
+      "year": 1921,
+      "title": "Correlation and causation",
+      "venue": "Journal of Agricultural Research 20:557-585",
+      "url": "https://naldc.nal.usda.gov/catalog/IND43966364",
+      "features": [
+        "path analysis",
+        "structural equation models"
+      ]
+    },
+    {
+      "id": "mcardle-mcdonald-1984",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "John J. McArdle and Roderick P. McDonald",
+      "year": 1984,
+      "title": "Some algebraic properties of the Reticular Action Model for moment structures",
+      "venue": "British Journal of Mathematical and Statistical Psychology 37:234-251",
+      "url": "https://doi.org/10.1111/j.2044-8317.1984.tb00802.x",
+      "features": [
+        "RAM formulation",
+        "SEM covariance structure"
+      ],
+      "pmid": "6509005"
+    },
+    {
+      "id": "enders-bandalos-2001",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Craig K. Enders and Deborah L. Bandalos",
+      "year": 2001,
+      "title": "The relative performance of full information maximum likelihood estimation for missing data in structural equation models",
+      "venue": "Structural Equation Modeling 8:430-457",
+      "url": "https://doi.org/10.1207/S15328007SEM0803_5",
+      "features": [
+        "FIML",
+        "SEM missing data"
+      ]
+    },
+    {
+      "id": "katsikatsou-2012",
+      "category": "Fine mapping, colocalization, and SEM",
+      "authors": "Myrsini Katsikatsou et al.",
+      "year": 2012,
+      "title": "Pairwise likelihood estimation for factor analysis models with ordinal data",
+      "venue": "Computational Statistics and Data Analysis 56:4243-4258",
+      "url": "https://doi.org/10.1016/j.csda.2012.04.010",
+      "features": [
+        "ordinal pairwise likelihood",
+        "ordinal SEM"
+      ]
+    },
+    {
+      "id": "subramanian-gsea-2005",
+      "category": "Enrichment and annotation",
+      "authors": "Aravind Subramanian et al.",
+      "year": 2005,
+      "title": "Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles",
+      "venue": "Proceedings of the National Academy of Sciences 102:15545-15550",
+      "url": "https://doi.org/10.1073/pnas.0506580102",
+      "features": [
+        "GSEA",
+        "gene-set enrichment"
+      ],
+      "pmid": "16199517",
+      "pmcid": "PMC1239896"
+    },
+    {
+      "id": "wu-camera-2012",
+      "category": "Enrichment and annotation",
+      "authors": "Di Wu and Gordon K. Smyth",
+      "year": 2012,
+      "title": "Camera: a competitive gene set test accounting for inter-gene correlation",
+      "venue": "Nucleic Acids Research 40:e133",
+      "url": "https://doi.org/10.1093/nar/gks461",
+      "features": [
+        "CAMERA",
+        "correlation-aware enrichment"
+      ],
+      "pmid": "22638577",
+      "pmcid": "PMC3458527"
+    },
+    {
+      "id": "deleeuw-magma-2015",
+      "category": "Enrichment and annotation",
+      "authors": "Christiaan A. de Leeuw et al.",
+      "year": 2015,
+      "title": "MAGMA: generalized gene-set analysis of GWAS data",
+      "venue": "PLoS Computational Biology 11:e1004219",
+      "url": "https://doi.org/10.1371/journal.pcbi.1004219",
+      "features": [
+        "MAGMA",
+        "GWAS gene-set analysis"
+      ],
+      "pmid": "25885710",
+      "pmcid": "PMC4401657"
+    },
+    {
+      "id": "wilkinson-rogers-1973",
+      "category": "Software interfaces",
+      "authors": "G. N. Wilkinson and C. E. Rogers",
+      "year": 1973,
+      "title": "Symbolic description of factorial models for analysis of variance",
+      "venue": "Applied Statistics 22:392-399",
+      "url": "https://doi.org/10.2307/2346786",
+      "features": [
+        "statistical formulas",
+        "model matrices"
+      ]
+    }
   ],
   "pages": {
-    "additive-models": ["cleveland-1979", "hastie-tibshirani-1986", "eilers-marx-1996", "wood-2011", "rigby-stasinopoulos-2005", "yee-2010"],
-    "advanced-extensions": ["enders-bandalos-2001", "breslow-clayton-1993", "kalman-1960", "bowden-mr-egger-2015", "lee-2016"],
-    "association": ["kang-emmax-2010", "zhang-p3d-2010", "wu-skat-2011", "lee-skato-2012", "madsen-browning-2009"],
-    "basic-statistical-tests": ["student-1908", "welch-1947", "pearson-1895", "spearman-1904", "wilcoxon-1945", "mann-whitney-1947", "fisher-1922", "mcnemar-1947", "friedman-1937"],
-    "beta-regression": ["ferrari-cribari-neto-2004"],
-    "cli-association-tutorial": ["kang-emmax-2010", "zhang-p3d-2010", "wu-skat-2011", "lee-skato-2012"],
-    "cli-colocalization-tutorial": ["wang-susie-2020", "giambartolomei-coloc-2014", "wallace-coloc-2021"],
-    "cli-mediation-tutorial": ["baron-kenny-1986", "sobel-1982"],
-    "cli-meta-analysis-tutorial": ["dersimonian-laird-1986", "paule-mandel-1982", "knapp-hartung-2003", "higgins-thompson-2002"],
-    "cli-mr-tutorial": ["bowden-mr-egger-2015", "bowden-weighted-median-2016", "hemani-steiger-2017", "zhao-mr-raps-2020", "hemani-mrbase-2018"],
-    "cli-susie-tutorial": ["wang-susie-2020"],
-    "colocalization": ["giambartolomei-coloc-2014", "wallace-coloc-2021", "wang-susie-2020"],
-    "command-line": ["nelder-wedderburn-1972", "patterson-thompson-1971", "cox-1972", "breslow-clayton-1993", "kang-emmax-2010"],
-    "conditional-score-conditioning": ["yang-cojo-2012"],
-    "enrichment": ["subramanian-gsea-2005", "wu-camera-2012", "deleeuw-magma-2015", "benjamini-hochberg-1995"],
-    "formulas-backends": ["wilkinson-rogers-1973", "nelder-wedderburn-1972", "patterson-thompson-1971"],
-    "genomic-factor": ["bulik-sullivan-rg-2015", "grotzinger-genomic-sem-2019"],
-    "glmm": ["breslow-clayton-1993", "lambert-1992", "rigby-stasinopoulos-2005"],
-    "grm": ["vanraden-2008", "yang-gcta-2011"],
-    "instrumental-variable-regression": ["staiger-stock-1997", "white-1980"],
-    "latent-confounders-and-batch": ["leek-storey-2007", "stegle-peer-2012", "johnson-combat-2007"],
-    "ldsc": ["bulik-sullivan-ldsc-2015", "bulik-sullivan-rg-2015"],
-    "linear-models": ["nelder-wedderburn-1972", "bliss-1934"],
-    "mediation": ["baron-kenny-1986", "sobel-1982"],
-    "mendelian-randomization": ["bowden-mr-egger-2015", "bowden-weighted-median-2016", "hemani-steiger-2017", "zhao-mr-raps-2020", "verbanck-mr-presso-2018", "burgess-mvmr-2015", "burgess-overlap-2016", "hemani-mrbase-2018"],
-    "meta-analysis": ["dersimonian-laird-1986", "paule-mandel-1982", "knapp-hartung-2003", "higgins-thompson-2002"],
-    "mixed-models": ["patterson-thompson-1971", "henderson-1975", "kenward-roger-1997"],
-    "nonlinear-models": ["lindstrom-bates-1990"],
-    "omics-transforms": ["beasley-2009", "leek-storey-2007", "johnson-combat-2007"],
-    "pedigree": ["henderson-1975", "henderson-1976", "vanraden-2008"],
-    "pedigree-and-glmm": ["henderson-1976", "breslow-clayton-1993", "lambert-1992"],
-    "penalized-regression": ["hoerl-kennard-1970", "tibshirani-1996", "zou-hastie-2005", "lee-2016"],
-    "predicted-omics": ["gamazon-predixcan-2015", "gusev-fusion-2016"],
-    "prediction-scores": ["hoerl-kennard-1970", "zou-hastie-2005", "euesden-prsice-2015"],
-    "predictions-and-contrasts": ["nelder-wedderburn-1972", "bliss-1934", "liang-zeger-1986"],
-    "rare-variant-meta-analysis": ["madsen-browning-2009", "wu-skat-2011", "lee-skato-2012", "dersimonian-laird-1986"],
-    "regression-families": ["koenker-bassett-1978", "friedman-1984", "nadaraya-1964", "robinson-1988"],
-    "sem": ["wright-1921", "mcardle-mcdonald-1984", "enders-bandalos-2001", "katsikatsou-2012"],
-    "survival": ["cox-1972", "efron-1977"],
-    "susie": ["wang-susie-2020", "giambartolomei-coloc-2014", "wallace-coloc-2021"],
-    "susie-and-sem": ["wang-susie-2020", "giambartolomei-coloc-2014", "wright-1921", "mcardle-mcdonald-1984"],
-    "time-series": ["kalman-1960", "ljung-box-1978", "hyndman-khandakar-2008"],
-    "xwas-mr-pipeline": ["bowden-mr-egger-2015", "bowden-weighted-median-2016", "hemani-mrbase-2018", "benjamini-hochberg-1995"]
+    "additive-models": [
+      "cleveland-1979",
+      "hastie-tibshirani-1986",
+      "eilers-marx-1996",
+      "wood-2011",
+      "rigby-stasinopoulos-2005",
+      "yee-2010"
+    ],
+    "advanced-extensions": [
+      "enders-bandalos-2001",
+      "breslow-clayton-1993",
+      "kalman-1960",
+      "bowden-mr-egger-2015",
+      "lee-2016"
+    ],
+    "association": [
+      "kang-emmax-2010",
+      "zhang-p3d-2010",
+      "wu-skat-2011",
+      "lee-skato-2012",
+      "madsen-browning-2009"
+    ],
+    "basic-statistical-tests": [
+      "student-1908",
+      "welch-1947",
+      "pearson-1895",
+      "spearman-1904",
+      "wilcoxon-1945",
+      "mann-whitney-1947",
+      "fisher-1922",
+      "mcnemar-1947",
+      "friedman-1937"
+    ],
+    "beta-regression": [
+      "ferrari-cribari-neto-2004"
+    ],
+    "cli-association-tutorial": [
+      "kang-emmax-2010",
+      "zhang-p3d-2010",
+      "wu-skat-2011",
+      "lee-skato-2012"
+    ],
+    "cli-colocalization-tutorial": [
+      "wang-susie-2020",
+      "giambartolomei-coloc-2014",
+      "wallace-coloc-2021"
+    ],
+    "cli-mediation-tutorial": [
+      "baron-kenny-1986",
+      "sobel-1982"
+    ],
+    "cli-meta-analysis-tutorial": [
+      "dersimonian-laird-1986",
+      "paule-mandel-1982",
+      "knapp-hartung-2003",
+      "higgins-thompson-2002"
+    ],
+    "cli-mr-tutorial": [
+      "bowden-mr-egger-2015",
+      "bowden-weighted-median-2016",
+      "hemani-steiger-2017",
+      "zhao-mr-raps-2020",
+      "hemani-mrbase-2018"
+    ],
+    "cli-susie-tutorial": [
+      "wang-susie-2020"
+    ],
+    "colocalization": [
+      "giambartolomei-coloc-2014",
+      "wallace-coloc-2021",
+      "wang-susie-2020"
+    ],
+    "command-line": [
+      "nelder-wedderburn-1972",
+      "patterson-thompson-1971",
+      "cox-1972",
+      "breslow-clayton-1993",
+      "kang-emmax-2010"
+    ],
+    "conditional-score-conditioning": [
+      "yang-cojo-2012"
+    ],
+    "enrichment": [
+      "subramanian-gsea-2005",
+      "wu-camera-2012",
+      "deleeuw-magma-2015",
+      "benjamini-hochberg-1995"
+    ],
+    "formulas-backends": [
+      "wilkinson-rogers-1973",
+      "nelder-wedderburn-1972",
+      "patterson-thompson-1971"
+    ],
+    "genomic-factor": [
+      "bulik-sullivan-rg-2015",
+      "grotzinger-genomic-sem-2019"
+    ],
+    "glmm": [
+      "breslow-clayton-1993",
+      "lambert-1992",
+      "rigby-stasinopoulos-2005"
+    ],
+    "grm": [
+      "vanraden-2008",
+      "yang-gcta-2011"
+    ],
+    "instrumental-variable-regression": [
+      "staiger-stock-1997",
+      "white-1980"
+    ],
+    "latent-confounders-and-batch": [
+      "leek-storey-2007",
+      "stegle-peer-2012",
+      "johnson-combat-2007"
+    ],
+    "ldsc": [
+      "bulik-sullivan-ldsc-2015",
+      "bulik-sullivan-rg-2015"
+    ],
+    "linear-models": [
+      "nelder-wedderburn-1972",
+      "bliss-1934"
+    ],
+    "mediation": [
+      "baron-kenny-1986",
+      "sobel-1982"
+    ],
+    "mendelian-randomization": [
+      "bowden-mr-egger-2015",
+      "bowden-weighted-median-2016",
+      "hemani-steiger-2017",
+      "zhao-mr-raps-2020",
+      "verbanck-mr-presso-2018",
+      "burgess-mvmr-2015",
+      "burgess-overlap-2016",
+      "hemani-mrbase-2018"
+    ],
+    "meta-analysis": [
+      "dersimonian-laird-1986",
+      "paule-mandel-1982",
+      "knapp-hartung-2003",
+      "higgins-thompson-2002"
+    ],
+    "mixed-models": [
+      "patterson-thompson-1971",
+      "henderson-1975",
+      "kenward-roger-1997"
+    ],
+    "nonlinear-models": [
+      "lindstrom-bates-1990"
+    ],
+    "omics-transforms": [
+      "beasley-2009",
+      "leek-storey-2007",
+      "johnson-combat-2007"
+    ],
+    "pedigree": [
+      "henderson-1975",
+      "henderson-1976",
+      "vanraden-2008"
+    ],
+    "pedigree-and-glmm": [
+      "henderson-1976",
+      "breslow-clayton-1993",
+      "lambert-1992"
+    ],
+    "penalized-regression": [
+      "hoerl-kennard-1970",
+      "tibshirani-1996",
+      "zou-hastie-2005",
+      "lee-2016"
+    ],
+    "predicted-omics": [
+      "gamazon-predixcan-2015",
+      "gusev-fusion-2016"
+    ],
+    "prediction-scores": [
+      "hoerl-kennard-1970",
+      "zou-hastie-2005",
+      "euesden-prsice-2015"
+    ],
+    "predictions-and-contrasts": [
+      "nelder-wedderburn-1972",
+      "bliss-1934",
+      "liang-zeger-1986"
+    ],
+    "rare-variant-meta-analysis": [
+      "madsen-browning-2009",
+      "wu-skat-2011",
+      "lee-skato-2012",
+      "dersimonian-laird-1986"
+    ],
+    "regression-families": [
+      "koenker-bassett-1978",
+      "friedman-1984",
+      "nadaraya-1964",
+      "robinson-1988"
+    ],
+    "sem": [
+      "wright-1921",
+      "mcardle-mcdonald-1984",
+      "enders-bandalos-2001",
+      "katsikatsou-2012"
+    ],
+    "survival": [
+      "cox-1972",
+      "efron-1977"
+    ],
+    "susie": [
+      "wang-susie-2020",
+      "giambartolomei-coloc-2014",
+      "wallace-coloc-2021"
+    ],
+    "susie-and-sem": [
+      "wang-susie-2020",
+      "giambartolomei-coloc-2014",
+      "wright-1921",
+      "mcardle-mcdonald-1984"
+    ],
+    "time-series": [
+      "kalman-1960",
+      "ljung-box-1978",
+      "hyndman-khandakar-2008"
+    ],
+    "xwas-mr-pipeline": [
+      "bowden-mr-egger-2015",
+      "bowden-weighted-median-2016",
+      "hemani-mrbase-2018",
+      "benjamini-hochberg-1995"
+    ]
   },
   "markdownAliases": {
     "association-gwas-twas": "association",

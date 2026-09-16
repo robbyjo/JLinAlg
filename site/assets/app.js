@@ -110,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const citationSearch = document.querySelector("[data-citation-search]");
   if (citationSearch) {
     const entries = [...document.querySelectorAll("[data-citation-entry]")];
+    const topics = [...document.querySelectorAll("[data-citation-topic]")];
     const count = document.querySelector("[data-citation-count]");
     const empty = document.querySelector("[data-citation-empty]");
     const applyCitationSearch = () => {
@@ -119,6 +120,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const matches = terms.every(term => entry.dataset.search.includes(term));
         entry.hidden = !matches;
         if (matches) visible += 1;
+      });
+      topics.forEach(topic => {
+        topic.hidden = !topic.querySelector("[data-citation-entry]:not([hidden])");
       });
       if (count) count.textContent = String(visible);
       if (empty) empty.hidden = visible !== 0;

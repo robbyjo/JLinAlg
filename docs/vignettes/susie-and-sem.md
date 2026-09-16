@@ -197,10 +197,10 @@ records the historical observed-variable benchmark, not these newer workloads.
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens (2020) — A simple new approach to variable selection in regression, with application to genetic fine mapping](../CITATIONS.md#wang-susie-2020)
-- [Claudia Giambartolomei et al. (2014) — Bayesian test for colocalisation between pairs of genetic association studies using summary statistics](../CITATIONS.md#giambartolomei-coloc-2014)
+- [Gao Wang, Abhishek Sarkar, Peter Carbonetto, and Matthew Stephens (2020) — A simple new approach to variable selection in regression, with application to genetic fine mapping](../CITATIONS.md#wang-susie-2020) — [PMID: 37220626](https://pubmed.ncbi.nlm.nih.gov/37220626/) · [PMCID: PMC10201948](https://pmc.ncbi.nlm.nih.gov/articles/PMC10201948/)
+- [Claudia Giambartolomei et al. (2014) — Bayesian test for colocalisation between pairs of genetic association studies using summary statistics](../CITATIONS.md#giambartolomei-coloc-2014) — [PMID: 24830394](https://pubmed.ncbi.nlm.nih.gov/24830394/) · [PMCID: PMC4022491](https://pmc.ncbi.nlm.nih.gov/articles/PMC4022491/)
 - [Sewall Wright (1921) — Correlation and causation](../CITATIONS.md#wright-1921)
-- [John J. McArdle and Roderick P. McDonald (1984) — Some algebraic properties of the Reticular Action Model for moment structures](../CITATIONS.md#mcardle-mcdonald-1984)
+- [John J. McArdle and Roderick P. McDonald (1984) — Some algebraic properties of the Reticular Action Model for moment structures](../CITATIONS.md#mcardle-mcdonald-1984) — [PMID: 6509005](https://pubmed.ncbi.nlm.nih.gov/6509005/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

@@ -137,10 +137,10 @@ for measured allocation/time results and reproducible validation commands.
 
 These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.
 
-- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](../CITATIONS.md#dersimonian-laird-1986)
-- [Robert C. Paule and John Mandel (1982) — Consensus values and weighting factors](../CITATIONS.md#paule-mandel-1982)
-- [Guido Knapp and Joachim Hartung (2003) — Improved tests for a random effects meta-regression with a single covariate](../CITATIONS.md#knapp-hartung-2003)
-- [Julian P. T. Higgins and Simon G. Thompson (2002) — Quantifying heterogeneity in a meta-analysis](../CITATIONS.md#higgins-thompson-2002)
+- [Rebecca DerSimonian and Nan Laird (1986) — Meta-analysis in clinical trials](../CITATIONS.md#dersimonian-laird-1986) — [PMID: 3802833](https://pubmed.ncbi.nlm.nih.gov/3802833/)
+- [Robert C. Paule and John Mandel (1982) — Consensus values and weighting factors](../CITATIONS.md#paule-mandel-1982) — [PMID: 34566088](https://pubmed.ncbi.nlm.nih.gov/34566088/) · [PMCID: PMC6768160](https://pmc.ncbi.nlm.nih.gov/articles/PMC6768160/)
+- [Guido Knapp and Joachim Hartung (2003) — Improved tests for a random effects meta-regression with a single covariate](../CITATIONS.md#knapp-hartung-2003) — [PMID: 12939780](https://pubmed.ncbi.nlm.nih.gov/12939780/)
+- [Julian P. T. Higgins and Simon G. Thompson (2002) — Quantifying heterogeneity in a meta-analysis](../CITATIONS.md#higgins-thompson-2002) — [PMID: 12111919](https://pubmed.ncbi.nlm.nih.gov/12111919/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->
