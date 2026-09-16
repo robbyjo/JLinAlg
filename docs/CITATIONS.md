@@ -278,6 +278,22 @@ PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.n
 - **Stephen Burgess and Simon G. Thompson (2015).** Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects. *American Journal of Epidemiology 181:251-260.* [DOI: 10.1093/aje/kwu283](https://doi.org/10.1093/aje/kwu283) · [PMID: 25632051](https://pubmed.ncbi.nlm.nih.gov/25632051/) · [PMCID: PMC4325677](https://pmc.ncbi.nlm.nih.gov/articles/PMC4325677/)
   - JLinAlg methods: multivariable MR, direct causal effects.
 
+<a id="sanderson-mvmr-diagnostics-2021"></a>
+- **Eleanor Sanderson, Wesley Spiller, and Jack Bowden (2021).** Testing and correcting for weak and pleiotropic instruments in two-sample multivariable Mendelian randomization. *Statistics in Medicine 40:5434-5452.* [DOI: 10.1002/sim.9133](https://doi.org/10.1002/sim.9133) · [PMID: 34338327](https://pubmed.ncbi.nlm.nih.gov/34338327/) · [PMCID: PMC9479726](https://pmc.ncbi.nlm.nih.gov/articles/PMC9479726/)
+  - JLinAlg methods: multivariable MR diagnostics, conditional instrument strength, pleiotropy heterogeneity.
+
+<a id="zuber-mr2-2023"></a>
+- **Verena Zuber et al. (2023).** Multi-response Mendelian randomization: Identification of shared and distinct exposures for multimorbidity and multiple related disease outcomes. *American Journal of Human Genetics 110:1177-1199.* [DOI: 10.1016/j.ajhg.2023.06.005](https://doi.org/10.1016/j.ajhg.2023.06.005) · [PMID: 37419091](https://pubmed.ncbi.nlm.nih.gov/37419091/) · [PMCID: PMC10357504](https://pmc.ncbi.nlm.nih.gov/articles/PMC10357504/)
+  - JLinAlg methods: multi-response MR literature, sparse Bayesian Gaussian-copula MR2 method boundary.
+
+<a id="deng-mrmo-2023"></a>
+- **Yangqing Deng et al. (2023).** Two-stage multivariate Mendelian randomization on multiple outcomes with mixed distributions. *Statistical Methods in Medical Research 32:1543-1558.* [DOI: 10.1177/09622802231181220](https://doi.org/10.1177/09622802231181220) · [PMID: 37338962](https://pubmed.ncbi.nlm.nih.gov/37338962/) · [PMCID: PMC10515454](https://pmc.ncbi.nlm.nih.gov/articles/PMC10515454/)
+  - JLinAlg methods: individual-level mixed-response MR literature, MRMO method boundary.
+
+<a id="zhang-multivariate-mr-2026"></a>
+- **Yuankai Zhang et al. (2026).** Multivariate Mendelian randomization for joint inferences of correlated outcomes. *European Journal of Epidemiology.* [DOI: 10.1007/s10654-026-01406-1](https://doi.org/10.1007/s10654-026-01406-1) · [PMID: 42207415](https://pubmed.ncbi.nlm.nih.gov/42207415/)
+  - JLinAlg methods: multivariate MR-IVW, joint correlated-outcome inference, multivariate MR-PRESSO.
+
 <a id="burgess-overlap-2016"></a>
 - **Stephen Burgess, Neil M. Davies, and Simon G. Thompson (2016).** Bias due to participant overlap in two-sample Mendelian randomization. *Genetic Epidemiology 40:597-608.* [DOI: 10.1002/gepi.21998](https://doi.org/10.1002/gepi.21998) · [PMID: 27625185](https://pubmed.ncbi.nlm.nih.gov/27625185/) · [PMCID: PMC5082560](https://pmc.ncbi.nlm.nih.gov/articles/PMC5082560/)
   - JLinAlg methods: sample overlap, two-sample MR.

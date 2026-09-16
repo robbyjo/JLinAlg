@@ -904,6 +904,67 @@
       "pmcid": "PMC4325677"
     },
     {
+      "id": "sanderson-mvmr-diagnostics-2021",
+      "category": "Causal and mediation analysis",
+      "authors": "Eleanor Sanderson, Wesley Spiller, and Jack Bowden",
+      "year": 2021,
+      "title": "Testing and correcting for weak and pleiotropic instruments in two-sample multivariable Mendelian randomization",
+      "venue": "Statistics in Medicine 40:5434-5452",
+      "url": "https://doi.org/10.1002/sim.9133",
+      "features": [
+        "multivariable MR diagnostics",
+        "conditional instrument strength",
+        "pleiotropy heterogeneity"
+      ],
+      "pmid": "34338327",
+      "pmcid": "PMC9479726"
+    },
+    {
+      "id": "zuber-mr2-2023",
+      "category": "Causal and mediation analysis",
+      "authors": "Verena Zuber et al.",
+      "year": 2023,
+      "title": "Multi-response Mendelian randomization: Identification of shared and distinct exposures for multimorbidity and multiple related disease outcomes",
+      "venue": "American Journal of Human Genetics 110:1177-1199",
+      "url": "https://doi.org/10.1016/j.ajhg.2023.06.005",
+      "features": [
+        "multi-response MR literature",
+        "sparse Bayesian Gaussian-copula MR2 method boundary"
+      ],
+      "pmid": "37419091",
+      "pmcid": "PMC10357504"
+    },
+    {
+      "id": "deng-mrmo-2023",
+      "category": "Causal and mediation analysis",
+      "authors": "Yangqing Deng et al.",
+      "year": 2023,
+      "title": "Two-stage multivariate Mendelian randomization on multiple outcomes with mixed distributions",
+      "venue": "Statistical Methods in Medical Research 32:1543-1558",
+      "url": "https://doi.org/10.1177/09622802231181220",
+      "features": [
+        "individual-level mixed-response MR literature",
+        "MRMO method boundary"
+      ],
+      "pmid": "37338962",
+      "pmcid": "PMC10515454"
+    },
+    {
+      "id": "zhang-multivariate-mr-2026",
+      "category": "Causal and mediation analysis",
+      "authors": "Yuankai Zhang et al.",
+      "year": 2026,
+      "title": "Multivariate Mendelian randomization for joint inferences of correlated outcomes",
+      "venue": "European Journal of Epidemiology",
+      "url": "https://doi.org/10.1007/s10654-026-01406-1",
+      "features": [
+        "multivariate MR-IVW",
+        "joint correlated-outcome inference",
+        "multivariate MR-PRESSO"
+      ],
+      "pmid": "42207415"
+    },
+    {
       "id": "burgess-overlap-2016",
       "category": "Causal and mediation analysis",
       "authors": "Stephen Burgess, Neil M. Davies, and Simon G. Thompson",
@@ -1203,6 +1264,7 @@
       "breslow-clayton-1993",
       "kalman-1960",
       "bowden-mr-egger-2015",
+      "zhang-multivariate-mr-2026",
       "lee-2016"
     ],
     "association": [
@@ -1252,7 +1314,9 @@
       "bowden-weighted-median-2016",
       "hemani-steiger-2017",
       "zhao-mr-raps-2020",
-      "hemani-mrbase-2018"
+      "hemani-mrbase-2018",
+      "burgess-mvmr-2015",
+      "zhang-multivariate-mr-2026"
     ],
     "cli-susie-tutorial": [
       "wang-susie-2020"
@@ -1324,8 +1388,18 @@
       "zhao-mr-raps-2020",
       "verbanck-mr-presso-2018",
       "burgess-mvmr-2015",
+      "sanderson-mvmr-diagnostics-2021",
+      "zhang-multivariate-mr-2026",
       "burgess-overlap-2016",
       "hemani-mrbase-2018"
+    ],
+    "multivariate-mr": [
+      "burgess-mvmr-2015",
+      "sanderson-mvmr-diagnostics-2021",
+      "zhang-multivariate-mr-2026",
+      "zuber-mr2-2023",
+      "deng-mrmo-2023",
+      "verbanck-mr-presso-2018"
     ],
     "meta-analysis": [
       "dersimonian-laird-1986",

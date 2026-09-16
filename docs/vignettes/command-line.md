@@ -100,7 +100,8 @@ meta-analysis, meta-regression, mediation, SuSiE, and colocalization retain
 their command-specific metadata plus these timing fields. Existing explicit
 log paths and the general CLI's `--no-log` option continue to work.
 
-`ld-db`, `mr-instruments`, `clump`, `mr-xwas`, `mr-estimate`,
+`ld-db`, `mr-instruments`, `clump`, `mr-xwas`, `mr-estimate`, `mr-mvmr`,
+`mr-multivariate`,
 `beta-regression`, and `penalized-regression` now also write run logs when
 invoked through the executable. Their defaults are `OUT.log` when an
 `--out`/`--output` is supplied, or a unique `logs/jlinalg-COMMAND-*.log`

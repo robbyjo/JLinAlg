@@ -199,7 +199,29 @@ passed with `--ld` must follow the exact input row order.
 detect an allele flip. If you have separate unharmonized exposure and outcome
 files, use `mr-xwas` instead.
 
-## 10. Interpretation checklist
+## 10. Distinguish MVMR from joint correlated-outcome MR
+
+Use the source-build commands only after constructing a complete, harmonized
+wide table:
+
+```powershell
+java -jar jlinalg-<version>.jar mr-mvmr --input harmonized-wide.tsv `
+  --exposures bmi,ldl --outcome cad --method ivw --output mvmr.tsv
+
+java -jar jlinalg-<version>.jar mr-multivariate --input harmonized-wide.tsv `
+  --exposures bmi,ldl --outcomes cad,stroke `
+  --outcome-correlation outcome-correlation.tsv `
+  --method ivw-fixed --output multivariate-mr.tsv
+```
+
+`mr-mvmr` estimates direct effects of multiple exposures on one outcome.
+`mr-multivariate` jointly models two or more correlated outcomes. `mr-xwas`
+continues to run separate exposure-outcome pairs and is useful for screening,
+but it is not a joint model. The
+[joint-model MR vignette](multivariate-mr.md) defines every input column,
+joint test, multivariate MR-PRESSO output, and method boundary.
+
+## 11. Interpretation checklist
 
 - Treat strength, heterogeneity, Egger intercept, robust estimates, and
   leave-one-out behavior as a joint diagnostic set.
@@ -226,6 +248,8 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Gibran Hemani, Kate Tilling, and George Davey Smith (2017) — Orienting the causal relationship between imprecisely measured traits using GWAS summary data](../CITATIONS.md#hemani-steiger-2017) — [PMID: 29149188](https://pubmed.ncbi.nlm.nih.gov/29149188/) · [PMCID: PMC5711033](https://pmc.ncbi.nlm.nih.gov/articles/PMC5711033/)
 - [Qingyuan Zhao et al. (2020) — Statistical inference in two-sample summary-data Mendelian randomization using robust adjusted profile score](../CITATIONS.md#zhao-mr-raps-2020)
 - [Gibran Hemani et al. (2018) — The MR-Base platform supports systematic causal inference across the human phenome](../CITATIONS.md#hemani-mrbase-2018) — [PMID: 29846171](https://pubmed.ncbi.nlm.nih.gov/29846171/) · [PMCID: PMC5976434](https://pmc.ncbi.nlm.nih.gov/articles/PMC5976434/)
+- [Stephen Burgess and Simon G. Thompson (2015) — Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects](../CITATIONS.md#burgess-mvmr-2015) — [PMID: 25632051](https://pubmed.ncbi.nlm.nih.gov/25632051/) · [PMCID: PMC4325677](https://pmc.ncbi.nlm.nih.gov/articles/PMC4325677/)
+- [Yuankai Zhang et al. (2026) — Multivariate Mendelian randomization for joint inferences of correlated outcomes](../CITATIONS.md#zhang-multivariate-mr-2026) — [PMID: 42207415](https://pubmed.ncbi.nlm.nih.gov/42207415/)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

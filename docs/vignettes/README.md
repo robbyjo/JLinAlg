@@ -56,6 +56,7 @@ including cohort meta-analysis, rare-variant workflows, and GRM construction.
 | [Association, GWAS, and omics QTL](association-gwas-twas.md) | CLI-only numeric omics, VCF/BCF/BGEN, and GRM scans; Java prepared scans and Burden/SKAT/SKAT-O |
 | [Omics transforms from the command line](omics-transforms.md) | exact `--transform` syntax, all built-in stages, pipeline recipes, missing values, failure conditions, and trusted plugin providers |
 | [End-to-end Mendelian randomization](mr-end-to-end.md) | database installation, public/custom instruments, LD clumping, analysis, diagnostics, plotting exports, bidirectional and molecular MR |
+| [Multivariable and multivariate MR](multivariate-mr.md) | distinct MVMR and correlated-outcome CLI schemas, joint IVW/Wald inference, multivariate heterogeneity and PRESSO diagnostics |
 | [Parallel xWAS MR](xwas-mr-pipeline.md) | reusable clumped instruments, phenotype families, bounded parallel exposure-outcome scans, all-pairs BH/FDR, scale-safe thresholds, and two-stage diagnostics |
 | [xWAS MR CLI and benchmark](../xwas-mr-cli-performance.md) | long-format CLI, output schema, reproducible R validation, timing protocol and measured speedup |
 | [MR estimator reference](mendelian-randomization.md) | harmonization, IVW, MR-Egger, LD, directionality, robust/outlier, multivariable, overlap and winner's curse |

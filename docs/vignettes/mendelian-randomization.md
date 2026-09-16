@@ -168,7 +168,7 @@ evaluated without probability floors; unresolved/boundary curvature throws
 instead of substituting the grid spacing as an SE. Grid resolution and this
 scale-dependent variance remain substantive modeling choices.
 
-## Multivariable and overlapping-sample MR
+## Multivariable, multivariate, and overlapping-sample MR
 
 ```java
 MultivariableMrResult direct =
@@ -180,6 +180,22 @@ OverlapAwareMrResult overlapAware =
     OverlapAwareMendelianRandomization.ivw(
         aligned.instruments(), exposureOutcomeCovariance);
 ```
+
+Multivariable MR means multiple exposures and one outcome. The source-build
+CLI exposes it explicitly as `mr-mvmr`:
+
+```console
+java -jar jlinalg-<version>.jar mr-mvmr --input harmonized-wide.tsv \
+  --exposures LDL,HDL --outcome CAD --method ivw --output mvmr.tsv
+```
+
+It is not the same as joint correlated-outcome MR. Use `mr-multivariate` for
+one or more exposures and two or more correlated outcomes; that command
+requires an ordered outcome-association correlation matrix and reports joint
+Wald tests and multivariate heterogeneity. See the dedicated
+[multivariable and multivariate MR vignette](multivariate-mr.md) for its wide
+schema, covariance assumptions, multivariate MR-PRESSO diagnostic, and xWAS
+follow-up pattern.
 
 `exposureOutcomeCovariance` is per-instrument sampling covariance, not a sample
 overlap percentage. For selection sensitivity, apply
@@ -239,6 +255,8 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Qingyuan Zhao et al. (2020) — Statistical inference in two-sample summary-data Mendelian randomization using robust adjusted profile score](../CITATIONS.md#zhao-mr-raps-2020)
 - [Marie Verbanck et al. (2018) — Detection of widespread horizontal pleiotropy in causal relationships inferred from Mendelian randomization](../CITATIONS.md#verbanck-mr-presso-2018) — [PMID: 29686387](https://pubmed.ncbi.nlm.nih.gov/29686387/) · [PMCID: PMC6083837](https://pmc.ncbi.nlm.nih.gov/articles/PMC6083837/)
 - [Stephen Burgess and Simon G. Thompson (2015) — Multivariable Mendelian randomization: the use of pleiotropic genetic variants to estimate causal effects](../CITATIONS.md#burgess-mvmr-2015) — [PMID: 25632051](https://pubmed.ncbi.nlm.nih.gov/25632051/) · [PMCID: PMC4325677](https://pmc.ncbi.nlm.nih.gov/articles/PMC4325677/)
+- [Eleanor Sanderson, Wesley Spiller, and Jack Bowden (2021) — Testing and correcting for weak and pleiotropic instruments in two-sample multivariable Mendelian randomization](../CITATIONS.md#sanderson-mvmr-diagnostics-2021) — [PMID: 34338327](https://pubmed.ncbi.nlm.nih.gov/34338327/) · [PMCID: PMC9479726](https://pmc.ncbi.nlm.nih.gov/articles/PMC9479726/)
+- [Yuankai Zhang et al. (2026) — Multivariate Mendelian randomization for joint inferences of correlated outcomes](../CITATIONS.md#zhang-multivariate-mr-2026) — [PMID: 42207415](https://pubmed.ncbi.nlm.nih.gov/42207415/)
 - [Stephen Burgess, Neil M. Davies, and Simon G. Thompson (2016) — Bias due to participant overlap in two-sample Mendelian randomization](../CITATIONS.md#burgess-overlap-2016) — [PMID: 27625185](https://pubmed.ncbi.nlm.nih.gov/27625185/) · [PMCID: PMC5082560](https://pmc.ncbi.nlm.nih.gov/articles/PMC5082560/)
 - [Gibran Hemani et al. (2018) — The MR-Base platform supports systematic causal inference across the human phenome](../CITATIONS.md#hemani-mrbase-2018) — [PMID: 29846171](https://pubmed.ncbi.nlm.nih.gov/29846171/) · [PMCID: PMC5976434](https://pmc.ncbi.nlm.nih.gov/articles/PMC5976434/)
 

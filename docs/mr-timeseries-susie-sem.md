@@ -15,6 +15,9 @@ The core independent- and LD-aware estimators are supplemented by:
 - `MrPresso` for fast analytic, robust-center outlier diagnostics;
 - `ContaminationMixture` for valid/invalid-instrument mixture profiling;
 - `MultivariableMendelianRandomization` for IVW and Egger direct effects;
+- `MultivariateMendelianRandomization` for covariance-aware joint inference
+  across correlated outcomes and `MultivariateMrPresso` for reproducible
+  Mahalanobis/bootstrap outlier diagnostics;
 - `OverlapAwareMendelianRandomization` for per-instrument sampling covariance;
 - `WinnerCurseCorrection` for selection-adjusted normal likelihood.
 
@@ -26,8 +29,11 @@ must be supplied by the caller when samples overlap.
 allele-aligned LD. Its conditional instrument p-values are not causal MR
 p-values. `SecondarySignalClumper.select` implements conditional forward/backward
 selection; the older `clump` method is explicitly marginal LD pruning. The
-`mr-estimate` CLI and native SVG output expose these separate workflows; see
-[the end-to-end vignette](vignettes/mr-end-to-end.md).
+`mr-estimate`, `mr-mvmr`, and `mr-multivariate` expose separate schemas rather
+than treating multivariable and multivariate MR as synonyms. Native SVG forest
+output is available for the joint effect matrix; see the
+[end-to-end vignette](vignettes/mr-end-to-end.md) and
+[joint-model guide](vignettes/multivariate-mr.md).
 
 ## Time series
 
@@ -74,6 +80,7 @@ These are the primary sources for the methods used in this workflow. Cite the re
 - [Norman E. Breslow and David G. Clayton (1993) — Approximate inference in generalized linear mixed models](CITATIONS.md#breslow-clayton-1993)
 - [Rudolf E. Kalman (1960) — A new approach to linear filtering and prediction problems](CITATIONS.md#kalman-1960)
 - [Jack Bowden, George Davey Smith, and Stephen Burgess (2015) — Mendelian randomization with invalid instruments: effect estimation and bias detection through Egger regression](CITATIONS.md#bowden-mr-egger-2015) — [PMID: 26050253](https://pubmed.ncbi.nlm.nih.gov/26050253/) · [PMCID: PMC4469799](https://pmc.ncbi.nlm.nih.gov/articles/PMC4469799/)
+- [Yuankai Zhang et al. (2026) — Multivariate Mendelian randomization for joint inferences of correlated outcomes](CITATIONS.md#zhang-multivariate-mr-2026) — [PMID: 42207415](https://pubmed.ncbi.nlm.nih.gov/42207415/)
 - [Jason D. Lee, Dennis L. Sun, Yuekai Sun, and Jonathan E. Taylor (2016) — Exact post-selection inference, with application to the lasso](CITATIONS.md#lee-2016)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).

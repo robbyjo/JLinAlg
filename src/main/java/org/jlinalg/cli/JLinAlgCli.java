@@ -79,6 +79,12 @@ public final class JLinAlgCli {
         if (arguments.length > 0 && arguments[0].equals("mr-estimate"))
             return MrEstimatorCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mr-mvmr"))
+            return MultivariableMrCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && arguments[0].equals("mr-multivariate"))
+            return MultivariateMrCli.run(Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && (arguments[0].equals("susie")
                 || arguments[0].equals("coloc")))
             return FineMappingCli.run(arguments[0], Arrays.copyOfRange(
@@ -220,6 +226,11 @@ public final class JLinAlgCli {
                  ivw-generalized-fixed|ivw-generalized-random|egger-generalized|
                  overlap-aware|conditional|all] [--ld MATRIX]
                 [--sampling-covariance FILE] [--output FILE] [--plot FILE]
+              java -jar jlinalg-<version>.jar mr-mvmr --input FILE
+                --exposures NAME1,NAME2 [--outcome NAME] [--method ivw|egger]
+              java -jar jlinalg-<version>.jar mr-multivariate --input FILE
+                --exposures NAME[,NAME...] --outcomes NAME1,NAME2
+                --outcome-correlation MATRIX [--method ivw-fixed|ivw-random|presso]
               java -jar jlinalg-<version>.jar susie --summary FILE --ld FILE
                 --sample-size N --out FILE
               java -jar jlinalg-<version>.jar coloc --trait1 FILE
@@ -333,6 +344,11 @@ public final class JLinAlgCli {
               --threads N                 Bounded exposure-outcome workers
               --pair-block-size N         Maximum resident pair evaluations
               Run mr-xwas --help for log-scale thresholds and table columns.
+
+            Joint-model MR terminology:
+              mr-mvmr                    Multiple exposures, exactly one outcome
+              mr-multivariate            One or more exposures, multiple correlated outcomes
+              mr-xwas                    Parallel independent exposure-outcome pairs; not a joint model
             """;
     }
 }

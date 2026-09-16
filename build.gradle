@@ -251,6 +251,7 @@ tasks.register('checkWebsite') {
             'vignettes/association.html',
             'vignettes/omics-transforms.html',
             'vignettes/mendelian-randomization.html',
+            'vignettes/multivariate-mr.html',
             'vignettes/xwas-mr-pipeline.html',
             'vignettes/meta-analysis.html',
             'vignettes/time-series.html',
@@ -380,6 +381,7 @@ tasks.register('checkWebsite') {
             'vignettes/association.html',
             'vignettes/omics-transforms.html',
             'vignettes/mendelian-randomization.html',
+            'vignettes/multivariate-mr.html',
             'vignettes/xwas-mr-pipeline.html',
             'vignettes/formulas-backends.html'
         ]

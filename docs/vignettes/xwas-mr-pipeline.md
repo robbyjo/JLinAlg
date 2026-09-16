@@ -139,6 +139,13 @@ See [xWAS MR CLI and performance](../xwas-mr-cli-performance.md) for the full
 input/output contract, reproducible benchmark commands, numerical comparison
 with R, and measured throughput.
 
+`mr-xwas` estimates each exposure-outcome pair separately. For a prespecified
+related phenotype family, follow screening with the covariance-aware
+`mr-multivariate` command after constructing a complete wide table and an
+ordered outcome-association correlation matrix. The
+[multivariable and multivariate MR vignette](multivariate-mr.md) explains why
+this joint follow-up is not equivalent to another nested loop.
+
 ## Make the threshold scale unambiguous
 
 Three mathematically equivalent threshold forms have different comparison

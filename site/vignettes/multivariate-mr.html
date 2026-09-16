@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Distinguish and run multivariable MVMR, covariance-aware multivariate MR-IVW, and multivariate MR-PRESSO in JLinAlg."><title>Multivariable and multivariate MR · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Joint-model MR</span></div><h1>Multivariable is not multivariate.</h1><p>Use separate, schema-checked commands for multiple-exposure MVMR and covariance-aware joint inference on correlated outcomes.</p></div></section>
+<div class="container page-layout"><article class="prose">
+<div class="note"><strong>Current source build</strong>Build the executable with <code>gradlew.bat assemble</code>. On this checkout it is <code>build/cli/jlinalg-0.3.5.jar</code>. Published release JARs predating these commands do not contain them.</div>
+<h2 id="names">Three different workflows</h2>
+<table><thead><tr><th>Command</th><th>Exposures</th><th>Outcomes</th><th>Meaning</th></tr></thead><tbody><tr><td><code>mr-mvmr</code></td><td>2+</td><td>1</td><td>Mutually adjusted direct effects</td></tr><tr><td><code>mr-multivariate</code></td><td>1+</td><td>2+ correlated</td><td>Joint covariance-aware effects and tests</td></tr><tr><td><code>mr-xwas</code></td><td>many</td><td>many</td><td>Parallel separate-pair screening, not a joint model</td></tr></tbody></table>
+<h2 id="input">Prepare one complete wide table</h2><pre><code>variant_id  beta_exposure_bmi  se_exposure_bmi  beta_exposure_ldl  se_exposure_ldl  beta_outcome_cad  se_outcome_cad  beta_outcome_stroke  se_outcome_stroke
+rs101       0.08               0.02              0.03               0.01             0.025             0.010           0.018                0.012</code></pre><p>Clump the exposure instruments once and harmonize every association to the same effect allele first. Every selected variant must have all selected exposure and outcome associations; the joint commands do not guess allele orientation or change the instrument set by outcome.</p>
+<h2 id="mvmr">Run multivariable MR</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple exposures, one outcome</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-mvmr &#96;
+  --input harmonized-wide.tsv &#96;
+  --exposures bmi,ldl --outcome cad &#96;
+  --method ivw --backend cpu &#96;
+  --output mvmr-cad.tsv</code></pre></div><p>Each coefficient is a direct effect conditional on the other listed exposures. <code>--method egger</code> adds a multivariable intercept. The reported <code>marginal_f</code> is not conditional strength; conditional F inference requires cross-exposure sampling covariance through the Java covariance-aware MVMR API.</p>
+<h2 id="correlation">Supply outcome-association correlation</h2><pre><code>1.00  0.42
+0.42  1.00</code></pre><p>The headerless matrix follows <code>--outcomes</code> exactly and must be finite, symmetric, positive definite, and have unit diagonal. It represents correlation among estimated SNP-outcome associations—not automatically phenotypic correlation. Record how it was estimated and the relevant sample overlap.</p>
+<h2 id="multivariate">Run multivariate MR-IVW</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple correlated outcomes</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate &#96;
+  --input harmonized-wide.tsv &#96;
+  --exposures bmi,ldl --outcomes cad,stroke &#96;
+  --outcome-correlation outcome-correlation.tsv &#96;
+  --method ivw-fixed --backend cpu &#96;
+  --output multivariate-mr.tsv &#96;
+  --plot multivariate-mr-forest.svg</code></pre></div><p>The generalized least-squares model estimates every exposure-outcome cell and propagates outcome correlation into the coefficient covariance. It reports cell tests, per-exposure and per-outcome joint Wald tests, an overall test, multivariate Cochran Q, and dispersion. Choose <code>ivw-random</code> for multiplicative-random standard errors. <code>--plot</code> writes a dependency-free SVG forest plot of every effect and confidence interval.</p>
+<h2 id="presso">Run multivariate MR-PRESSO</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Mahalanobis bootstrap diagnostic</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate &#96;
+  --input harmonized-wide.tsv &#96;
+  --exposures bmi,ldl --outcomes cad,stroke &#96;
+  --outcome-correlation outcome-correlation.tsv &#96;
+  --method presso --simulations 10000 --seed 20260916 &#96;
+  --output multivariate-presso-effects.tsv &#96;
+  --diagnostics multivariate-presso-instruments.tsv</code></pre></div><p>The diagnostic combines leave-one-instrument-out residual vectors, Mahalanobis distance, a reproducible parametric bootstrap, and Bonferroni-adjusted instrument tests. Results contain raw and, when estimable, outlier-corrected fits. Report all exclusions; outlier removal does not prove instrument validity.</p>
+<h2 id="xwas">Use xWAS for screening, then fit jointly</h2><ol><li>Clump each exposure once.</li><li>Screen all pairs with <code>mr-xwas</code> and complete-family BH FDR.</li><li>Prespecify the related-outcome family and construct a complete wide table.</li><li>Estimate the outcome-association correlation matrix.</li><li>Run <code>mr-multivariate</code> as the joint follow-up.</li></ol><p>A loop of univariate MR fits cannot reproduce covariance-aware joint tests.</p>
+<h2 id="boundaries">Do not relabel other published models</h2><div class="note warning"><strong>Method boundary</strong><code>mr-multivariate</code> implements summary-data multivariate MR-IVW and a Mahalanobis/bootstrap multivariate MR-PRESSO diagnostic. It is not MR²'s sparse Bayesian Gaussian-copula/MCMC selection model and it is not individual-level MRMO for mixed continuous and binary responses. Those methods require different inputs, algorithms, and convergence diagnostics.</div>
+<h2 id="validation">Numerical evidence</h2><p>A frozen independent base-R generalized-least-squares fixture checks every coefficient, standard error, covariance element, multivariate Q, and joint Wald statistic. Tests also cover identity-correlation reduction to separate MVMR, random-effect inflation, deterministic PRESSO simulation, invalid matrices, and both command schemas.</p>
+<div class="next-links"><a href="mendelian-randomization.html"><small>Previous</small><strong>MR estimators</strong></a><a href="xwas-mr-pipeline.html"><small>Next</small><strong>Parallel xWAS MR →</strong></a></div>
+</article><aside class="toc"><strong>On this page</strong><a href="#names">Terminology</a><a href="#input">Input</a><a href="#mvmr">MVMR</a><a href="#correlation">Correlation</a><a href="#multivariate">Multivariate IVW</a><a href="#presso">MR-PRESSO</a><a href="#xwas">xWAS follow-up</a><a href="#boundaries">Boundaries</a><a href="#validation">Validation</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-multivariate-mr">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-multivariate-mr">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#burgess-mvmr-2015">Burgess (2015) — multivariable MR</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/25632051/">PMID: 25632051</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4325677/">PMCID: PMC4325677</a>)</span></li><li><a href="../citations.html#sanderson-mvmr-diagnostics-2021">Sanderson (2021) — multivariable MR diagnostics</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/34338327/">PMID: 34338327</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9479726/">PMCID: PMC9479726</a>)</span></li><li><a href="../citations.html#zhang-multivariate-mr-2026">Zhang et al. (2026) — multivariate MR-IVW</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/42207415/">PMID: 42207415</a>)</span></li><li><a href="../citations.html#zuber-mr2-2023">Zuber et al. (2023) — multi-response MR literature</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/37419091/">PMID: 37419091</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10357504/">PMCID: PMC10357504</a>)</span></li><li><a href="../citations.html#deng-mrmo-2023">Deng et al. (2023) — individual-level mixed-response MR literature</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/37338962/">PMID: 37338962</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10515454/">PMCID: PMC10515454</a>)</span></li><li><a href="../citations.html#verbanck-mr-presso-2018">Verbanck et al. (2018) — MR-PRESSO</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/29686387/">PMID: 29686387</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6083837/">PMCID: PMC6083837</a>)</span></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>
