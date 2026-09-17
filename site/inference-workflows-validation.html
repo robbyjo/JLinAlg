@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Frozen Bioconductor comparisons, independent formula checks, reproducible commands, and explicit estimator boundaries."><title>Modern inference workflow validation · JLinAlg</title>
+<link rel="stylesheet" href="./assets/styles.css"><script src="./assets/app.js" defer></script></head>
+<body><site-header root="./"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="./index.html">Home</a><span>/</span><a href="./vignettes/index.html">Vignettes</a><span>/</span><span>Modern inference workflow validation</span></div>
+<span class="eyebrow">Source audit · Reproducible validation</span><h1>Modern inference workflow validation</h1><p>Frozen Bioconductor comparisons, independent formula checks, reproducible commands, and explicit estimator boundaries.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Source-build addition, September 2026. The implementation is organized under
+<code>org.jlinalg.differential</code>, <code>org.jlinalg.ewas</code>,
+<code>org.jlinalg.multipletesting</code>, and <code>org.jlinalg.imputation</code>; file-oriented
+workflows are in <code>XwasInferenceCli</code>.</p>
+<h2 id="executed-numerical-gates">Executed numerical gates</h2>
+<p>The focused Gradle suite contains 14 tests and passed locally on 2026-09-17.
+It covers the public APIs, CLI dispatch, output sidecars, reproducible streams,
+failure accounting, and the following independent or external oracles:</p>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Executed check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gaussian empirical Bayes</td>
+<td>Coefficients agree with frozen limma to <code>2e-12</code>; moderated-t correlation exceeds <code>0.995</code></td>
+</tr>
+<tr>
+<td>Voom</td>
+<td>Log-fold-change correlation with frozen limma/voom exceeds <code>0.97</code>; every precision weight is positive</td>
+</tr>
+<tr>
+<td>Negative binomial</td>
+<td>Log2-fold-change correlation exceeds <code>0.90</code> against both edgeR and DESeq2; all 14 simulated non-null directions agree</td>
+</tr>
+<tr>
+<td>NB likelihood mechanics</td>
+<td>Majority-invariant size-factor fixture checks the fitted log mean ratio and geometric-mean-one normalization</td>
+</tr>
+<tr>
+<td>Spatial EWAS</td>
+<td>Hand evaluation of all nine exponential-covariance terms reproduces the signed regional Z to <code>1e-12</code></td>
+</tr>
+<tr>
+<td>BH/IHW</td>
+<td>A known BH vector is exact to <code>1e-15</code>; changing held-out-fold p-values leaves its learned weights unchanged</td>
+</tr>
+<tr>
+<td>Hierarchy</td>
+<td>Weights sum to one, ancestor gating is enforced, and arbitrary-dependence weighted Bonferroni output is checked</td>
+</tr>
+<tr>
+<td>MICE</td>
+<td>Same seed gives byte-identical completed numeric matrices, observed cells remain unchanged, and all cells are completed</td>
+</tr>
+<tr>
+<td>Rubin pooling</td>
+<td>A three-imputation hand calculation gives within variance 4, between variance 1, and total variance <code>16/3</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>src/test/resources/inference-workflows/generate-reference.R</code> generated the
+checked-in continuous/count inputs and package outputs with seed <code>17092026</code>.
+<code>versions.tsv</code> freezes R 4.6.1, Bioconductor 3.23, limma 3.68.5, edgeR 4.10.5,
+and DESeq2 1.52.0. No cohort or downloaded analysis data are included.</p>
+<p>The local reference run emitted DESeq2's documented fallback from a parametric
+to a local dispersion trend for this small synthetic matrix. That behavior is
+part of the frozen comparator, not silently repaired in JLinAlg.</p>
+<h2 id="reproduce">Reproduce</h2>
+<p>Install reference packages into a disposable repository-local library if they
+are not already present:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>&amp; 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' -e &quot;dir.create('build/r-lib',recursive=TRUE,showWarnings=FALSE); .libPaths(c(normalizePath('build/r-lib'),.libPaths())); if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager',repos='https://cloud.r-project.org'); BiocManager::install(c('limma','edgeR','DESeq2'),ask=FALSE,update=FALSE)&quot;
+&amp; 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/inference-workflows/generate-reference.R
+</code></pre></div>
+<p>Run the focused and full Java gates serially so concurrent Gradle jobs do not
+race over <code>build/</code>:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>.\gradlew.bat test --tests &quot;org.jlinalg.differential.*&quot; --tests &quot;org.jlinalg.ewas.*&quot; --tests &quot;org.jlinalg.multipletesting.*&quot; --tests &quot;org.jlinalg.imputation.*&quot; --tests &quot;org.jlinalg.cli.XwasInferenceCliTest&quot; --no-daemon --no-parallel
+.\gradlew.bat clean check assemble --no-daemon --no-parallel
+</code></pre></div>
+<h2 id="supported-scope-and-non-equivalence-boundaries">Supported scope and non-equivalence boundaries</h2>
+<ul>
+<li><code>limma</code> uses a common scaled-inverse-chi-square residual-variance prior.
+  Robust/winsorized priors, duplicate correlation, array weights, treat-style
+  fold-change testing, and arbitrary contrast matrices in the CLI are outside
+  this first interface.</li>
+<li><code>voom</code> uses median-ratio library scaling and a direct local precision trend.
+  It does not claim exact TMM or lowess identity with limma/edgeR for every
+  workload. The separate NB path must be used for count likelihood inference.</li>
+<li>The NB path uses fixed shrunken dispersions in model-based Wald inference.
+  edgeR quasi-likelihood, DESeq2 coefficient priors, Cook outlier replacement,
+  independent filtering, and their full dispersion-trend choices are not
+  relabeled as implemented.</li>
+<li>EWAS regions are nonoverlapping coordinate runs using a declared exponential
+  covariance. The build is required metadata; coordinate lifting and reference
+  annotation are upstream responsibilities. This is not comb-p or DMRcate
+  option-for-option parity.</li>
+<li>IHW requires a covariate independent of null p-values and independent folds.
+  The compact cross-fitted bin estimator is not the complete IHW convex
+  optimizer. Hierarchical output controls FWER, not FDR.</li>
+<li>MICE uses predictive mean matching, binary logistic draws, and categorical
+  probability draws for numeric or CLI-encoded categories. It does not include
+  multilevel random effects, passive formulas, survey weights, or MNAR models.
+  Chain summaries are diagnostics, not proof of convergence or correct MAR
+  specification.</li>
+</ul></article>
+<aside class="toc"><strong>On this page</strong><a href="#executed-numerical-gates">Executed numerical gates</a><a href="#reproduce">Reproduce</a><a href="#supported-scope-and-non-equivalence-boundaries">Supported scope and non-equivalence boundaries</a></aside></div>
+</main><site-footer root="./"></site-footer></body></html>

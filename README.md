@@ -90,6 +90,15 @@ by sample ID and write reusable factors, adjusted matrices, and audit manifests.
 The five preceding additions are CLI-accessible through `--family probit`,
 `glm-predict`, `iv-regression`, `conditional-score`, and `arima-regression`.
 
+The current source also provides [empirical-Bayes differential analysis,
+coordinate-aware EWAS regions, adaptive/hierarchical multiple testing, and
+multiple-imputation inference](docs/vignettes/differential-regions-testing-imputation.md).
+The `differential`, `ewas-regions`, `multiple-test`, `multiple-impute`,
+and `mi-pool` commands preserve complete testing families, required genome
+builds, reproducible imputation streams, and auditable method sidecars. See the
+[validation report](docs/inference-workflows-validation.md) for frozen
+limma/voom, edgeR, and DESeq2 comparisons and explicit parity boundaries.
+
 [Gene-set enrichment](docs/vignettes/enrichment.md) adds analysis-specific
 backgrounds and selection expressions, Fisher ORA, EWAS `gsameth`, BH/BY correction,
 and explicit annotation downloads. The vignette includes a runnable synthetic

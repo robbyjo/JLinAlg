@@ -1,5 +1,29 @@
 # Unreleased
 
+## Differential, regional, multiplicity, and imputation inference
+
+- Added continuous empirical-Bayes and count-aware voom differential models,
+  plus a separate median-ratio normalized negative-binomial estimator with
+  cross-feature dispersion shrinkage and fixed-dispersion Wald inference.
+- Added coordinate/build-aware EWAS regions using signed Stouffer aggregation
+  with an explicit exponential spatial-correlation matrix, coverage metadata,
+  duplicate-coordinate rejection, and complete-region BH adjustment.
+- Added cross-fitted IHW-style bin weights with weighted BH and a separate
+  hierarchy-respecting leaf-weighted Bonferroni procedure. Failed hypotheses
+  remain in the prespecified family with p=1; hierarchical output controls
+  FWER rather than being mislabeled as hierarchical FDR.
+- Added mixed-type chained-equations imputation with reproducible independent
+  streams, predictive mean matching, binary/categorical probability draws,
+  chain diagnostics, Rubin pooling, and Barnard-Rubin finite-sample degrees of
+  freedom.
+- Added `differential`, `ewas-regions`, `multiple-test`,
+  `multiple-impute`, and `mi-pool` commands, a worked vignette, a dedicated
+  validation report, and website/citation navigation.
+- Frozen R 4.6.1/Bioconductor 3.23 fixtures validate effects against limma
+  3.68.5, voom, edgeR 4.10.5, and DESeq2 1.52.0. Independent checks cover the
+  NB mean ratio, spatial covariance, fold isolation, hierarchy accounting,
+  reproducible imputations, and Rubin variance arithmetic.
+
 ## Latent confounders, batch adjustment, and CLI completion
 
 - Added feature-by-sample PCA, Bioconductor-style iteratively reweighted SVA,

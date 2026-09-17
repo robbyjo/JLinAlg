@@ -382,6 +382,56 @@ PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.n
 - **Christiaan A. de Leeuw et al. (2015).** MAGMA: generalized gene-set analysis of GWAS data. *PLoS Computational Biology 11:e1004219.* [DOI: 10.1371/journal.pcbi.1004219](https://doi.org/10.1371/journal.pcbi.1004219) · [PMID: 25885710](https://pubmed.ncbi.nlm.nih.gov/25885710/) · [PMCID: PMC4401657](https://pmc.ncbi.nlm.nih.gov/articles/PMC4401657/)
   - JLinAlg methods: MAGMA, GWAS gene-set analysis.
 
+## High-throughput inference
+
+<a id="smyth-limma-2004"></a>
+- **Gordon K. Smyth (2004).** Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. *Statistical Applications in Genetics and Molecular Biology 3:Article 3.* [DOI: 10.2202/1544-6115.1027](https://doi.org/10.2202/1544-6115.1027) · [PMID: 16646809](https://pubmed.ncbi.nlm.nih.gov/16646809/)
+  - JLinAlg methods: moderated differential analysis, empirical-Bayes variance shrinkage.
+
+<a id="law-voom-2014"></a>
+- **Charity W. Law, Yunshun Chen, Wei Shi, and Gordon K. Smyth (2014).** voom: precision weights unlock linear model analysis tools for RNA-seq read counts. *Genome Biology 15:R29.* [DOI: 10.1186/gb-2014-15-2-r29](https://doi.org/10.1186/gb-2014-15-2-r29) · [PMID: 24485249](https://pubmed.ncbi.nlm.nih.gov/24485249/) · [PMCID: PMC4053721](https://pmc.ncbi.nlm.nih.gov/articles/PMC4053721/)
+  - JLinAlg methods: voom mean-variance precision weights, count differential analysis.
+
+<a id="robinson-edger-2010"></a>
+- **Mark D. Robinson, Davis J. McCarthy, and Gordon K. Smyth (2010).** edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. *Bioinformatics 26:139-140.* [DOI: 10.1093/bioinformatics/btp616](https://doi.org/10.1093/bioinformatics/btp616) · [PMID: 19910308](https://pubmed.ncbi.nlm.nih.gov/19910308/) · [PMCID: PMC2796818](https://pmc.ncbi.nlm.nih.gov/articles/PMC2796818/)
+  - JLinAlg methods: negative-binomial differential analysis, dispersion moderation.
+
+<a id="love-deseq2-2014"></a>
+- **Michael I. Love, Wolfgang Huber, and Simon Anders (2014).** Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. *Genome Biology 15:550.* [DOI: 10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8) · [PMID: 25516281](https://pubmed.ncbi.nlm.nih.gov/25516281/) · [PMCID: PMC4302049](https://pmc.ncbi.nlm.nih.gov/articles/PMC4302049/)
+  - JLinAlg methods: median-ratio count normalization, dispersion shrinkage.
+
+<a id="pedersen-combp-2012"></a>
+- **Brent S. Pedersen, David A. Schwartz, Ivana V. Yang, and Katerina J. Kechris (2012).** Comb-p: software for combining, analyzing, grouping and correcting spatially correlated P-values. *Bioinformatics 28:2986-2988.* [DOI: 10.1093/bioinformatics/bts545](https://doi.org/10.1093/bioinformatics/bts545) · [PMID: 22954632](https://pubmed.ncbi.nlm.nih.gov/22954632/) · [PMCID: PMC3496335](https://pmc.ncbi.nlm.nih.gov/articles/PMC3496335/)
+  - JLinAlg methods: spatially correlated p-values, region-level genomic inference.
+
+<a id="peters-dmrcate-2015"></a>
+- **Timothy J. Peters et al. (2015).** De novo identification of differentially methylated regions in the human genome. *Epigenetics and Chromatin 8:6.* [DOI: 10.1186/1756-8935-8-6](https://doi.org/10.1186/1756-8935-8-6) · [PMID: 25972926](https://pubmed.ncbi.nlm.nih.gov/25972926/) · [PMCID: PMC4429355](https://pmc.ncbi.nlm.nih.gov/articles/PMC4429355/)
+  - JLinAlg methods: differentially methylated regions, spatial methylation smoothing.
+
+## Multiple testing
+
+<a id="ignatiadis-ihw-2016"></a>
+- **Nikolaos Ignatiadis, Bernd Klaus, Judith B. Zaugg, and Wolfgang Huber (2016).** Data-driven hypothesis weighting increases detection power in genome-scale multiple testing. *Nature Methods 13:577-580.* [DOI: 10.1038/nmeth.3885](https://doi.org/10.1038/nmeth.3885) · [PMID: 27240256](https://pubmed.ncbi.nlm.nih.gov/27240256/) · [PMCID: PMC4930141](https://pmc.ncbi.nlm.nih.gov/articles/PMC4930141/)
+  - JLinAlg methods: independent hypothesis weighting, covariate-adaptive FDR.
+
+<a id="meinshausen-hierarchy-2008"></a>
+- **Nicolai Meinshausen (2008).** Hierarchical testing of variable importance. *Biometrika 95:265-278.* [DOI: 10.1093/biomet/asn007](https://doi.org/10.1093/biomet/asn007)
+  - JLinAlg methods: hierarchical testing, familywise error control.
+
+## Missing-data inference
+
+<a id="rubin-mi-1987"></a>
+- **Donald B. Rubin (1987).** Multiple Imputation for Nonresponse in Surveys. *Wiley.* [DOI: 10.1002/9780470316696](https://doi.org/10.1002/9780470316696)
+  - JLinAlg methods: multiple-imputation pooling, missing-data uncertainty.
+
+<a id="vanbuuren-mice-2011"></a>
+- **Stef van Buuren and Karin Groothuis-Oudshoorn (2011).** mice: Multivariate Imputation by Chained Equations in R. *Journal of Statistical Software 45:1-67.* [DOI: 10.18637/jss.v045.i03](https://doi.org/10.18637/jss.v045.i03)
+  - JLinAlg methods: chained-equations imputation, mixed-type imputers.
+
+<a id="barnard-rubin-1999"></a>
+- **John Barnard and Donald B. Rubin (1999).** Small-sample degrees of freedom with multiple imputation. *Biometrika 86:948-955.* [DOI: 10.1093/biomet/86.4.948](https://doi.org/10.1093/biomet/86.4.948)
+  - JLinAlg methods: Barnard-Rubin degrees of freedom, finite-sample multiple-imputation inference.
+
 ## Software interfaces
 
 <a id="wilkinson-rogers-1973"></a>

@@ -14,10 +14,11 @@ TWAS/PWAS, a single genetic factor with conditional SNP tests, and prediction
 score training/application/evaluation) are implemented in the source build.
 See [xWAS workflow validation and scope](docs/xwas-followup-validation.md).
 
-- [ ] **Empirical-Bayes differential analysis.** Add cross-feature variance
-  moderation, count-library normalization and dispersion shrinkage, with
-  separate limma/voom and negative-binomial estimator contracts. Validate
-  against limma and DESeq2/edgeR plus independent likelihood fixtures.
+- [x] **Empirical-Bayes differential analysis.** Added cross-feature Gaussian
+  variance moderation, normalized voom precision weights, and a separate
+  median-ratio/negative-binomial dispersion-shrinkage contract. Frozen limma,
+  voom, edgeR and DESeq2 fixtures plus independent likelihood checks are in the
+  [validation report](docs/inference-workflows-validation.md).
 - [x] **Latent-confounder and batch-effect estimation.** Added PCA, standard
   SVA, AutoSVA, dense PEER, and continuous-data ComBat with protected designs,
   batch/design rank checks, deterministic artifacts, source-pinned fixtures,
@@ -28,17 +29,18 @@ See [xWAS workflow validation and scope](docs/xwas-followup-validation.md).
   fold-owned fit/freeze/apply artifacts for prediction, plus independently
   validated RUV and ComBat-Seq contracts. Do not refit preprocessing on held-
   out folds or apply Gaussian ComBat directly to raw counts.
-- [ ] **Region-level EWAS analysis.** Add coordinate-aware aggregation of
-  neighboring CpGs and calibrated region-level significance, with explicit
-  spatial dependence, probe coverage and genome-build handling.
-- [ ] **Adaptive and hierarchical multiple testing.** Add IHW and a defined
-  gene/tissue/phenotype hierarchy with validated error control. Require
-  weighting covariates independent of null p-values and retain the complete
-  prespecified hypothesis family, including failure accounting.
-- [ ] **Multiple-imputation inference.** Add chained-equations imputation,
-  reproducible streams, Rubin pooling and pooled degrees of freedom, with
-  model-compatible categorical/continuous imputers and diagnostics. Keep
-  missing-data uncertainty distinct from deterministic mean imputation.
+- [x] **Region-level EWAS analysis.** Added build-required coordinate runs,
+  signed Stouffer aggregation under an explicit exponential spatial covariance,
+  probe coverage/gap metadata, and complete-region BH.
+- [x] **Adaptive and hierarchical multiple testing.** Added cross-fitted
+  IHW-style weighting with an explicit null-independence acknowledgement and
+  hierarchy-gated weighted Bonferroni FWER. Complete families retain failures
+  as p=1. See the
+  [vignette](docs/vignettes/differential-regions-testing-imputation.md).
+- [x] **Multiple-imputation inference.** Added reproducible independent MICE
+  streams, continuous predictive mean matching, binary/categorical draws,
+  diagnostics, Rubin variance pooling and Barnard-Rubin pooled degrees of
+  freedom. This remains distinct from deterministic mean imputation.
 
 Further extensions of the new workflows remain explicit scope boundaries:
 partitioned/two-step/liability-scale LDSC and native summary munging; native

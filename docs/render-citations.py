@@ -24,6 +24,7 @@ ROOT_DOCS = {
     "gee.md": "predictions-and-contrasts",
     "grm-cli.md": "grm",
     "gwas-twas-pipeline.md": "association",
+    "inference-workflows-validation.md": "differential-regions-testing-imputation",
     "latent-confounder-validation.md": "latent-confounders-and-batch",
     "loess.md": "additive-models",
     "mr-timeseries-susie-sem.md": "advanced-extensions",

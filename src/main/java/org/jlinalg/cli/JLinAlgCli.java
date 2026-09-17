@@ -51,6 +51,11 @@ public final class JLinAlgCli {
                 || arguments[0].equals("batch-adjust")))
             return ConfounderCli.run(arguments[0], Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
+        if (arguments.length > 0 && java.util.Set.of("differential",
+                "ewas-regions", "multiple-test", "multiple-impute", "mi-pool")
+                .contains(arguments[0]))
+            return XwasInferenceCli.run(arguments[0], Arrays.copyOfRange(
+                arguments, 1, arguments.length), output, errorOutput);
         if (arguments.length > 0 && arguments[0].equals("glm-predict"))
             return PredictionCli.run(Arrays.copyOfRange(
                 arguments, 1, arguments.length), output, errorOutput);
@@ -196,6 +201,15 @@ public final class JLinAlgCli {
                 --omics MATRIX [--pheno TABLE --id COLUMN] --factors N|auto --out PREFIX
               java -jar jlinalg-<version>.jar batch-adjust --method combat --omics MATRIX
                 --pheno TABLE --id COLUMN --batch COLUMN --out PREFIX
+              java -jar jlinalg-<version>.jar differential --method limma|voom|negative-binomial
+                --omics MATRIX --pheno TABLE --id COLUMN --group COLUMN --out FILE.tsv
+              java -jar jlinalg-<version>.jar ewas-regions --input probes.tsv
+                --genome-build GRCh38 --out regions.tsv
+              java -jar jlinalg-<version>.jar multiple-test --method ihw|hierarchy
+                --input tests.tsv --out adjusted.tsv
+              java -jar jlinalg-<version>.jar multiple-impute --input TABLE
+                --types age:continuous,case:binary --out PREFIX
+              java -jar jlinalg-<version>.jar mi-pool --input estimates.tsv --out pooled.tsv
               java -jar jlinalg-<version>.jar glm-predict --input TABLE --response Y
                 --predictors x1,x2 --family probit --estimand expected --out FILE
               java -jar jlinalg-<version>.jar iv-regression --input TABLE --response Y

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation."><title>Differential, regional, multiple-testing, and imputation workflows · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Differential, regional, multiple-testing, and imputation workflows</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Differential, regional, multiple-testing, and imputation workflows</h1><p>Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>These source-build workflows cover four common points after an omics matrix has
+been quality controlled: differential analysis, spatial EWAS aggregation,
+prespecified multiplicity correction, and uncertainty-aware missing-data
+inference. They are deliberately separate commands because count likelihoods,
+region definitions, testing families, and imputation uncertainty are different
+statistical contracts.</p>
+<p>Build the executable before using these examples:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>.\gradlew.bat clean check executableJar --no-daemon --no-parallel
+$jar = 'build/cli/jlinalg-0.3.5.jar'
+</code></pre></div>
+<p>The commands below are source-build additions after v0.3.5. Do not use an older
+published JAR and assume that it contains them.</p>
+<h2 id="empirical-bayes-differential-analysis">Empirical-Bayes differential analysis</h2>
+<p>The feature matrix is feature-by-sample with a row identifier in column one.
+The phenotype table supplies the sample ID, a two-level group, and optional
+numeric covariates. Samples are intersected in matrix order; the first aligned
+group level is the reference and the second is tested.</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>feature_id  s1  s2  s3  s4  s5  s6
+gene_a      10  12  11  30  33  29
+gene_b      50  51  49  52  48  50
+</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>sample_id  condition  age
+s1         control    40
+s2         control    41
+s3         control    39
+s4         case       40
+s5         case       41
+s6         case       39
+</code></pre></div>
+<p>Continuous intensities use moderated Gaussian linear models:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar differential --method limma `
+  --omics methylation.tsv --pheno samples.tsv --id sample_id `
+  --group condition --covariates age --out build/differential-limma.tsv
+</code></pre></div>
+<p>Counts have two distinct choices. <code>voom</code> calculates normalized log counts,
+estimates a mean/variance precision trend, fits weighted linear models, and
+moderates their residual variances. <code>negative-binomial</code> uses median-ratio size
+factors, feature dispersions shrunk on the log scale, and log-link NB IRLS.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar differential --method voom `
+  --omics counts.tsv --pheno samples.tsv --id sample_id `
+  --group condition --out build/differential-voom.tsv
+
+java -jar $jar differential --method negative-binomial `
+  --omics counts.tsv --pheno samples.tsv --id sample_id `
+  --group condition --out build/differential-nb.tsv
+</code></pre></div>
+<p>The primary table contains the effect, log2 fold change where applicable,
+standard error, statistic, degrees of freedom, raw and moderated variance or
+dispersion, p-value, BH FDR, convergence, and iterations. Companion files
+record every sample's size factor and the fitted prior. The BH family contains
+all fitted features, not only rows that passed a significance filter.</p>
+<p>These compact estimators match the documented contracts and checked fixtures;
+they are not full reimplementations of every limma, edgeR, or DESeq2 option.
+There is no automatic contrast search, outlier replacement, independent
+filtering, quasi-likelihood empirical Bayes layer, or fold-change prior.</p>
+<h2 id="region-level-ewas">Region-level EWAS</h2>
+<p>Region input is one row per probe with explicit build and coordinate columns:</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>probe_id  chromosome  position  effect  p
+cg001     chr1        101230    0.08    0.002
+cg002     chr1        101370    0.05    0.010
+cg003     chr1        101540    0.07    0.004
+</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar ewas-regions --input probe-results.tsv `
+  --genome-build GRCh38 --max-gap 500 --min-probes 3 `
+  --correlation-length 200 --out build/ewas-regions.tsv
+</code></pre></div>
+<p>Probes are canonicalized and sorted by chromosome and position. Duplicate
+coordinates are rejected. A region is a nonoverlapping, same-chromosome run in
+which adjacent probes are no farther apart than <code>--max-gap</code>. Signed two-sided
+probe Z statistics are summed with covariance
+<code>R(i,j) = exp(-abs(position_i-position_j)/correlation_length)</code>. This makes the
+spatial-dependence assumption visible instead of treating neighboring probes as
+independent. Region BH is calculated over every retained region.</p>
+<p>Outputs retain the genome build, start/end, complete probe list, probe count,
+probes per kilobase, maximum observed gap, correlation length, mean effect,
+spatial Z, p-value, and FDR. The command does not lift coordinates or infer a
+build. Change-direction mixtures can cancel by design; use a separately
+prespecified unsigned regional hypothesis if cancellation is not the estimand.</p>
+<h2 id="adaptive-and-hierarchical-multiple-testing">Adaptive and hierarchical multiple testing</h2>
+<p>IHW-style cross-weighting needs a p-value, an informative covariate, and an
+independent fold. The covariate must be independent of the p-value under every
+true null. The CLI makes the analyst acknowledge that design condition:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar multiple-test --method ihw --input tests.tsv `
+  --id id --p p --covariate mean_normalized_count --fold fold `
+  --null-independent true --bins 5 --out build/tests-ihw.tsv
+</code></pre></div>
+<p>Weights for one fold are learned only from other folds, normalized to mean one
+within the held-out fold, and passed to weighted BH. This is a compact
+cross-fitted bin-weighting estimator, not the full convex IHW optimizer.
+FDR interpretation requires independent folds and the null-independence or
+appropriate positive-dependence assumptions documented for weighted BH.</p>
+<p>For a prespecified forest, every internal and leaf hypothesis is supplied:</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>id                 parent       p       status
+gene_G                           0.001   ok
+gene_G:tissue_A    gene_G       0.010   ok
+gene_G:A:trait_1   gene_G:tissue_A  NA  failed
+</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar multiple-test --method hierarchy --input hierarchy.tsv `
+  --id id --parent parent --p p --status status --alpha 0.05 `
+  --out build/hierarchy-adjusted.tsv
+</code></pre></div>
+<p>Leaf-count weights are normalized across every tested node, then weighted
+Bonferroni p-values are gated through all ancestors. This controls familywise
+error under arbitrary dependence and ensures that a child cannot be rejected
+when its parent is not. It is intentionally not labeled hierarchical FDR.
+Failed rows remain in the complete prespecified family with p=1 and appear in
+the output and metadata.</p>
+<h2 id="multiple-imputation-and-pooled-inference">Multiple imputation and pooled inference</h2>
+<p>Specify every modeled variable and its compatible imputer. Missing tokens are
+blank, <code>NA</code>, <code>NaN</code>, or <code>.</code>.</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar multiple-impute --input incomplete.tsv --id sample_id `
+  --types age:continuous,case:binary,site:categorical `
+  --imputations 20 --iterations 20 --donors 5 --seed 1709 `
+  --out build/imputed/cohort
+</code></pre></div>
+<p>Continuous variables use stochastic predictive mean matching from observed
+donors, binary variables use logistic probability draws, and integer-encoded
+categories use categorical probability draws. Each completed data set uses an
+independent deterministic stream derived from the recorded seed. The command
+writes <code>OUT.impN.tsv</code>, chain mean/variance diagnostics for originally missing
+cells, and run metadata. Observed cells are never replaced.</p>
+<p>Fit the same prespecified analysis separately to every completed data set and
+assemble one row per parameter and imputation:</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>parameter  imputation  estimate  variance
+case       1           0.42      0.010
+case       2           0.47      0.012
+case       3           0.39      0.011
+</code></pre></div>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar $jar mi-pool --input estimates.tsv --complete-df 120 `
+  --out build/imputed/pooled.tsv
+</code></pre></div>
+<p>Pooling reports the mean estimate, within- and between-imputation variance,
+total variance, standard error, relative variance increase, fraction of missing
+information, statistic, p-value, and Barnard-Rubin finite-sample degrees of
+freedom. Omit <code>--complete-df</code> only for a justified large-sample analysis.
+Multiple imputation assumes an adequate imputation model and missing at random
+conditional on its predictors; reproducible draws do not make that assumption
+true. Deterministic mean imputation is not used and is not equivalent.</p>
+<h2 id="java-api-map">Java API map</h2>
+<p>The command implementations are thin file adapters over these public APIs:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>DifferentialFit fit = EmpiricalBayesDifferential.fitVoom(
+    countsByFeature, designBySample, contrast);
+
+List&lt;EwasRegion&gt; regions = RegionLevelEwas.scan(
+    probes, &quot;GRCh38&quot;, RegionLevelEwas.Options.defaults());
+
+IndependentHypothesisWeighting.Result weighted =
+    IndependentHypothesisWeighting.adjust(p, covariate, folds,
+        IndependentHypothesisWeighting.Options.defaults());
+
+MiceResult imputed = MiceImputer.impute(data, variableTypes,
+    new MiceOptions(20, 20, 5, 1709L, 1e-6));
+RubinPooling.Estimate pooled = RubinPooling.pool(beta, variance, 120);
+</code></pre></div>
+<p>See the <a href="../inference-workflows-validation.html">validation report</a> for frozen
+Bioconductor versions, exact numerical gates, reproducibility commands, and
+the supported-scope audit.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#empirical-bayes-differential-analysis">Empirical-Bayes differential analysis</a><a href="#region-level-ewas">Region-level EWAS</a><a href="#adaptive-and-hierarchical-multiple-testing">Adaptive and hierarchical multiple testing</a><a href="#multiple-imputation-and-pooled-inference">Multiple imputation and pooled inference</a><a href="#java-api-map">Java API map</a></aside></div>
+
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-differential-regions-testing-imputation">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-differential-regions-testing-imputation">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#smyth-limma-2004">Smyth (2004) — moderated differential analysis</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/16646809/">PMID: 16646809</a>)</span></li><li><a href="../citations.html#law-voom-2014">Law (2014) — voom mean-variance precision weights</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/24485249/">PMID: 24485249</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4053721/">PMCID: PMC4053721</a>)</span></li><li><a href="../citations.html#robinson-edger-2010">Robinson (2010) — negative-binomial differential analysis</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/19910308/">PMID: 19910308</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2796818/">PMCID: PMC2796818</a>)</span></li><li><a href="../citations.html#love-deseq2-2014">Love (2014) — median-ratio count normalization</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/25516281/">PMID: 25516281</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4302049/">PMCID: PMC4302049</a>)</span></li><li><a href="../citations.html#pedersen-combp-2012">Pedersen (2012) — spatially correlated p-values</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/22954632/">PMID: 22954632</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3496335/">PMCID: PMC3496335</a>)</span></li><li><a href="../citations.html#peters-dmrcate-2015">Peters et al. (2015) — differentially methylated regions</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/25972926/">PMID: 25972926</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4429355/">PMCID: PMC4429355</a>)</span></li><li><a href="../citations.html#benjamini-hochberg-1995">Benjamini (1995) — Benjamini-Hochberg FDR</a></li><li><a href="../citations.html#ignatiadis-ihw-2016">Ignatiadis (2016) — independent hypothesis weighting</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/27240256/">PMID: 27240256</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4930141/">PMCID: PMC4930141</a>)</span></li><li><a href="../citations.html#meinshausen-hierarchy-2008">Meinshausen (2008) — hierarchical testing</a></li><li><a href="../citations.html#rubin-mi-1987">Rubin (1987) — multiple-imputation pooling</a></li><li><a href="../citations.html#vanbuuren-mice-2011">Buuren (2011) — chained-equations imputation</a></li><li><a href="../citations.html#barnard-rubin-1999">Barnard (1999) — Barnard-Rubin degrees of freedom</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+</main><site-footer root="../"></site-footer></body></html>

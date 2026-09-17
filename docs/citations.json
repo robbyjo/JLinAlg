@@ -1254,6 +1254,162 @@
       "pmcid": "PMC4401657"
     },
     {
+      "id": "smyth-limma-2004",
+      "category": "High-throughput inference",
+      "authors": "Gordon K. Smyth",
+      "year": 2004,
+      "title": "Linear models and empirical Bayes methods for assessing differential expression in microarray experiments",
+      "venue": "Statistical Applications in Genetics and Molecular Biology 3:Article 3",
+      "url": "https://doi.org/10.2202/1544-6115.1027",
+      "features": [
+        "moderated differential analysis",
+        "empirical-Bayes variance shrinkage"
+      ],
+      "pmid": "16646809"
+    },
+    {
+      "id": "law-voom-2014",
+      "category": "High-throughput inference",
+      "authors": "Charity W. Law, Yunshun Chen, Wei Shi, and Gordon K. Smyth",
+      "year": 2014,
+      "title": "voom: precision weights unlock linear model analysis tools for RNA-seq read counts",
+      "venue": "Genome Biology 15:R29",
+      "url": "https://doi.org/10.1186/gb-2014-15-2-r29",
+      "features": [
+        "voom mean-variance precision weights",
+        "count differential analysis"
+      ],
+      "pmid": "24485249",
+      "pmcid": "PMC4053721"
+    },
+    {
+      "id": "robinson-edger-2010",
+      "category": "High-throughput inference",
+      "authors": "Mark D. Robinson, Davis J. McCarthy, and Gordon K. Smyth",
+      "year": 2010,
+      "title": "edgeR: a Bioconductor package for differential expression analysis of digital gene expression data",
+      "venue": "Bioinformatics 26:139-140",
+      "url": "https://doi.org/10.1093/bioinformatics/btp616",
+      "features": [
+        "negative-binomial differential analysis",
+        "dispersion moderation"
+      ],
+      "pmid": "19910308",
+      "pmcid": "PMC2796818"
+    },
+    {
+      "id": "love-deseq2-2014",
+      "category": "High-throughput inference",
+      "authors": "Michael I. Love, Wolfgang Huber, and Simon Anders",
+      "year": 2014,
+      "title": "Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2",
+      "venue": "Genome Biology 15:550",
+      "url": "https://doi.org/10.1186/s13059-014-0550-8",
+      "features": [
+        "median-ratio count normalization",
+        "dispersion shrinkage"
+      ],
+      "pmid": "25516281",
+      "pmcid": "PMC4302049"
+    },
+    {
+      "id": "pedersen-combp-2012",
+      "category": "High-throughput inference",
+      "authors": "Brent S. Pedersen, David A. Schwartz, Ivana V. Yang, and Katerina J. Kechris",
+      "year": 2012,
+      "title": "Comb-p: software for combining, analyzing, grouping and correcting spatially correlated P-values",
+      "venue": "Bioinformatics 28:2986-2988",
+      "url": "https://doi.org/10.1093/bioinformatics/bts545",
+      "features": [
+        "spatially correlated p-values",
+        "region-level genomic inference"
+      ],
+      "pmid": "22954632",
+      "pmcid": "PMC3496335"
+    },
+    {
+      "id": "peters-dmrcate-2015",
+      "category": "High-throughput inference",
+      "authors": "Timothy J. Peters et al.",
+      "year": 2015,
+      "title": "De novo identification of differentially methylated regions in the human genome",
+      "venue": "Epigenetics and Chromatin 8:6",
+      "url": "https://doi.org/10.1186/1756-8935-8-6",
+      "features": [
+        "differentially methylated regions",
+        "spatial methylation smoothing"
+      ],
+      "pmid": "25972926",
+      "pmcid": "PMC4429355"
+    },
+    {
+      "id": "ignatiadis-ihw-2016",
+      "category": "Multiple testing",
+      "authors": "Nikolaos Ignatiadis, Bernd Klaus, Judith B. Zaugg, and Wolfgang Huber",
+      "year": 2016,
+      "title": "Data-driven hypothesis weighting increases detection power in genome-scale multiple testing",
+      "venue": "Nature Methods 13:577-580",
+      "url": "https://doi.org/10.1038/nmeth.3885",
+      "features": [
+        "independent hypothesis weighting",
+        "covariate-adaptive FDR"
+      ],
+      "pmid": "27240256",
+      "pmcid": "PMC4930141"
+    },
+    {
+      "id": "meinshausen-hierarchy-2008",
+      "category": "Multiple testing",
+      "authors": "Nicolai Meinshausen",
+      "year": 2008,
+      "title": "Hierarchical testing of variable importance",
+      "venue": "Biometrika 95:265-278",
+      "url": "https://doi.org/10.1093/biomet/asn007",
+      "features": [
+        "hierarchical testing",
+        "familywise error control"
+      ]
+    },
+    {
+      "id": "rubin-mi-1987",
+      "category": "Missing-data inference",
+      "authors": "Donald B. Rubin",
+      "year": 1987,
+      "title": "Multiple Imputation for Nonresponse in Surveys",
+      "venue": "Wiley",
+      "url": "https://doi.org/10.1002/9780470316696",
+      "features": [
+        "multiple-imputation pooling",
+        "missing-data uncertainty"
+      ]
+    },
+    {
+      "id": "vanbuuren-mice-2011",
+      "category": "Missing-data inference",
+      "authors": "Stef van Buuren and Karin Groothuis-Oudshoorn",
+      "year": 2011,
+      "title": "mice: Multivariate Imputation by Chained Equations in R",
+      "venue": "Journal of Statistical Software 45:1-67",
+      "url": "https://doi.org/10.18637/jss.v045.i03",
+      "features": [
+        "chained-equations imputation",
+        "mixed-type imputers"
+      ]
+    },
+    {
+      "id": "barnard-rubin-1999",
+      "category": "Missing-data inference",
+      "authors": "John Barnard and Donald B. Rubin",
+      "year": 1999,
+      "title": "Small-sample degrees of freedom with multiple imputation",
+      "venue": "Biometrika 86:948-955",
+      "url": "https://doi.org/10.1093/biomet/86.4.948",
+      "features": [
+        "Barnard-Rubin degrees of freedom",
+        "finite-sample multiple-imputation inference"
+      ]
+    },
+    {
       "id": "wilkinson-rogers-1973",
       "category": "Software interfaces",
       "authors": "G. N. Wilkinson and C. E. Rogers",
@@ -1360,6 +1516,20 @@
     ],
     "conditional-score-conditioning": [
       "yang-cojo-2012"
+    ],
+    "differential-regions-testing-imputation": [
+      "smyth-limma-2004",
+      "law-voom-2014",
+      "robinson-edger-2010",
+      "love-deseq2-2014",
+      "pedersen-combp-2012",
+      "peters-dmrcate-2015",
+      "benjamini-hochberg-1995",
+      "ignatiadis-ihw-2016",
+      "meinshausen-hierarchy-2008",
+      "rubin-mi-1987",
+      "vanbuuren-mice-2011",
+      "barnard-rubin-1999"
     ],
     "enrichment": [
       "subramanian-gsea-2005",

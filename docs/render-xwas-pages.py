@@ -20,6 +20,7 @@ PAGES = {
     "instrumental-variable-regression": ("Individual-level instrumental-variable regression", "Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.", "CLI + Java · Source build"),
     "conditional-score-conditioning": ("Summary-only conditional score analysis", "Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results.", "CLI + Java · Source build"),
     "latent-confounders-and-batch": ("Latent confounders and batch effects", "Estimate unknown sample factors with PCA, SVA, AutoSVA, or PEER, and adjust known batches with ComBat.", "CLI + Java · Source build"),
+    "differential-regions-testing-imputation": ("Differential, regional, multiple-testing, and imputation workflows", "Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.", "CLI + Java · Source build"),
 }
 
 def render(source, destination, title, description, root, eyebrow="CLI + Java · Source build"):
@@ -58,4 +59,7 @@ render(ROOT / "docs/xwas-followup-validation.md", ROOT / "site/xwas-followup-val
        "xWAS follow-up validation", "Independent numerical fixtures, reproducible checks and explicit estimator boundaries.", "./")
 render(ROOT / "docs/latent-confounder-validation.md", ROOT / "site/latent-confounder-validation.html",
        "Latent-confounder validation and source audit", "Pinned upstream sources, numerical reference gates, performance design, and explicit implementation boundaries.", "./",
+       "Source audit · Reproducible validation")
+render(ROOT / "docs/inference-workflows-validation.md", ROOT / "site/inference-workflows-validation.html",
+       "Modern inference workflow validation", "Frozen Bioconductor comparisons, independent formula checks, reproducible commands, and explicit estimator boundaries.", "./",
        "Source audit · Reproducible validation")

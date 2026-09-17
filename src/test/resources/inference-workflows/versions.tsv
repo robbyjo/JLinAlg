@@ -1,0 +1,6 @@
+component	version
+R	4.6.1
+Bioconductor	3.23
+limma	3.68.5
+edgeR	4.10.5
+DESeq2	1.52.0
