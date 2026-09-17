@@ -409,7 +409,9 @@ tasks.register('checkWebsite') {
                     return
                 }
 
-                File resolved = new File(page.parentFile, path).canonicalFile
+                java.nio.file.Path requested = page.parentFile.toPath()
+                    .resolve(path).normalize().toAbsolutePath()
+                File resolved = requested.toFile().canonicalFile
                 if (!resolved.toPath().startsWith(siteRoot.toPath())) {
                     throw new GradleException(
                         "Website reference escapes site root in ${page}: ${target}")
@@ -417,6 +419,24 @@ tasks.register('checkWebsite') {
                 if (!resolved.exists()) {
                     throw new GradleException(
                         "Broken website reference in ${page}: ${target}")
+                }
+
+                java.nio.file.Path relative = siteRoot.toPath().relativize(requested)
+                File exactParent = siteRoot
+                relative.each { java.nio.file.Path segment ->
+                    String expectedName = segment.toString()
+                    String[] childNames = exactParent.list()
+                    if (childNames == null || !childNames.contains(expectedName)) {
+                        String actualName = childNames == null ? null :
+                            childNames.find { String candidate ->
+                                candidate.equalsIgnoreCase(expectedName)
+                            }
+                        String detail = actualName == null ? "missing path component" :
+                            "path case differs from ${actualName}"
+                        throw new GradleException(
+                            "Broken website reference in ${page}: ${target} (${detail})")
+                    }
+                    exactParent = new File(exactParent, expectedName)
                 }
             }
         }

@@ -32,6 +32,7 @@ def render(source, destination, title, description, root, eyebrow="CLI + Java ·
         if url.endswith("TODO.md"):
             url = "https://github.com/robbyjo/JLinAlg/blob/main/TODO.md"
         elif not url.startswith("http"):
+            url = re.sub(r"(?i)CITATIONS\.md", "citations.html", url)
             url = url.replace(".md", ".html")
         return 'href="' + url + '"'
     body = re.sub(r'href="([^"]+)"', links, body)
