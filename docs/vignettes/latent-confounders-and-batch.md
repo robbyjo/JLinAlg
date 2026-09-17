@@ -21,7 +21,7 @@ feature matrix. They are not interchangeable meanings of "batch correction."
 ## PCA
 
 ```powershell
-java -jar jlinalg-0.3.5.jar confounders `
+java -jar jlinalg-0.3.6.jar confounders `
   --method pca `
   --omics expression.tsv `
   --factors 10 `
@@ -54,7 +54,7 @@ null design contains adjustment variables but omits the biological term being
 tested:
 
 ```powershell
-java -jar jlinalg-0.3.5.jar confounders `
+java -jar jlinalg-0.3.6.jar confounders `
   --method sva `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
@@ -81,7 +81,7 @@ control weights auditable.
 ## AutoSVA
 
 ```powershell
-java -jar jlinalg-0.3.5.jar confounders `
+java -jar jlinalg-0.3.6.jar confounders `
   --method autosva `
   --omics methylation.tsv `
   --pheno phenotype.tsv `
@@ -112,7 +112,7 @@ most recent improvement.
 ## PEER
 
 ```powershell
-java -jar jlinalg-0.3.5.jar confounders `
+java -jar jlinalg-0.3.6.jar confounders `
   --method peer `
   --omics expression.tsv `
   --pheno phenotype.tsv `
@@ -138,7 +138,7 @@ biology if those variables are not supplied as observed covariates.
 ## ComBat
 
 ```powershell
-java -jar jlinalg-0.3.5.jar batch-adjust `
+java -jar jlinalg-0.3.6.jar batch-adjust `
   --method combat `
   --omics expression.tsv `
   --pheno phenotype.tsv `
@@ -164,7 +164,7 @@ The default scientific workflow is to merge `*.factors.tsv` into the phenotype
 table and include the factors explicitly:
 
 ```powershell
-java -jar jlinalg-0.3.5.jar `
+java -jar jlinalg-0.3.6.jar `
   --pheno phenotype-with-svs.tsv `
   --id IID `
   --omics expression.tsv `

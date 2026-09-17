@@ -14,8 +14,7 @@ model.
 ```
 
 The examples below use the source-built
-`build/cli/jlinalg-0.3.5.jar`. ACAT support is on current `main`; it is not in
-the previously published v0.3.5 release asset.
+`build/cli/jlinalg-0.3.6.jar`. ACAT support is included in v0.3.6 and later.
 
 ## 2. Export one score file per cohort
 
@@ -23,8 +22,8 @@ The small checked-in example is quantitative and synthetic. Real analyses
 should use a prespecified rare-variant mask and compatible cohort null models.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/a
-java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-b.vcf --pheno examples/rare-meta/cohort-b.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/b
+java -jar build/cli/jlinalg-0.3.6.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/a
+java -jar build/cli/jlinalg-0.3.6.jar rare-score --vcf examples/rare-meta/cohort-b.vcf --pheno examples/rare-meta/cohort-b.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/b
 ```
 
 The cohort manifest is `examples/rare-meta/cohorts.tsv`; paths in a manifest are
@@ -34,7 +33,7 @@ trait scale, genome build, null-model contract, and allele convention.
 ## 3. Run ACAT-V and ACAT-O
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
 ```
 
 The realistic default for `--maf` remains 0.05; this miniature example needs

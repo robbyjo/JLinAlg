@@ -15,7 +15,7 @@ reconstruct a logistic or Cox likelihood.
 ## Export from a cohort
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar `
+java -jar build/cli/jlinalg-0.3.6.jar `
   --omics cohort.vcf.gz --pheno phenotype.tsv --id IID `
   --formula "case_status ~ age + sex + PC1 + PC2 + <omics>" `
   --family binomial --case-value case --control-value control `
@@ -28,7 +28,7 @@ when appropriate. Gaussian OLS and Gaussian GLM exports are also supported.
 Cox genotype scans now accept the ordinary survival formula:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar `
+java -jar build/cli/jlinalg-0.3.6.jar `
   --omics cohort.vcf.gz --pheno phenotype.tsv --id IID `
   --formula "Surv(entry,time,event) ~ age + sex + PC1 + <omics>" `
   --ties efron --conditional-gwas-summary --score-genome-build GRCh38 `
@@ -96,7 +96,7 @@ Offsets and the actual complete-case sample enter these calculations.
 Add the lead variants to the cohort run:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar `
+java -jar build/cli/jlinalg-0.3.6.jar `
   --omics cohort.vcf.gz --pheno phenotype.tsv --id IID `
   --formula "case_status ~ age + sex + PC1 + PC2 + <omics>" `
   --family binomial --conditional-gwas-summary --score-genome-build GRCh38 `
@@ -133,7 +133,7 @@ cohort_b	cohort-b.tsv	cohort-b.tsv.score-cov.tsv	cohort-b.tsv.score-manifest.jso
 Then request output-oriented allele keys explicitly:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar conditional-score `
+java -jar build/cli/jlinalg-0.3.6.jar conditional-score `
   --cohorts cohorts.tsv `
   --targets 1:456789:A:G,1:456950:C:T `
   --condition-on 1:455100:G:A --out locus-conditional.tsv

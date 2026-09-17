@@ -17,25 +17,25 @@ Run the complete verification suite before adapting an example:
 
 ## Choose a vignette
 
-The v0.3.5 executable includes the `mediation`, `susie`, and `coloc` CLI
-subcommands, association preflight and variant-filter updates, and recursive
-pedigree identity resolution. Examples that name `jlinalg-0.3.5.jar` are
-release-compatible except the explicitly marked source-build additions,
-including cohort meta-analysis, rare-variant workflows, and GRM construction.
+The v0.3.6 executable includes the complete CLI documented here: cohort and
+rare-variant meta-analysis, GRM construction, xWAS follow-up, latent-factor and
+batch adjustment, ACAT, differential/regional analysis, adaptive or hierarchical
+testing, and multiple-imputation inference. Examples naming
+`jlinalg-0.3.6.jar` are release-compatible.
 
 | Vignette | Features covered |
 | --- | --- |
-| [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (source build) |
-| [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (source build) |
-| [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (source build) |
-| [Prediction scores](prediction-scores.md) | Gaussian ridge/elastic-net training, imported polygenic weights and independent-cohort evaluation (source build) |
-| [Latent confounders and known batch effects](latent-confounders-and-batch.md) | PCA, standard SVA, AutoSVA, PEER, ComBat, CLI artifacts, source provenance and leakage boundaries (source build) |
-| [Differential, regional, multiple-testing, and imputation workflows](differential-regions-testing-imputation.md) | moderated continuous/voom/NB differential analysis, spatial EWAS regions, cross-fitted IHW, hierarchical FWER, MICE, and Rubin pooling (source build) |
-| [Expected responses, scenarios, and marginal effects](predictions-and-contrasts.md) | binomial probit, shared GLM/GEE mean predictions, scenario differences, risk ratios, average marginal effects, and joint delta-method uncertainty (source build) |
-| [Individual-level instrumental-variable regression](instrumental-variable-regression.md) | linear 2SLS, QR/SVD identification checks, robust/cluster inference, and instrument-strength diagnostics (source build) |
-| [Summary-only conditional score analysis](conditional-score-conditioning.md) | versioned score-block import, strict allele/model checks, cohort-wise Schur conditioning, and independent-cohort pooling (source build) |
-| [ACAT rare-variant tests](acat-rare-variants.md) | stable generic ACAT, ACAT-V ultra-rare collapsing, canonical ACAT-O, CLI/API workflows, R fixtures, and fused performance (source build) |
-| [GRM tutorial and Java vignette](../grm-cli.md) | worked dosage matrix, filtering, VCF input, Java/CLI construction, interpretation, and mixed-model reuse ([website](https://robbyjo.github.io/JLinAlg/vignettes/grm.html); source build) |
+| [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (v0.3.6+) |
+| [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (v0.3.6+) |
+| [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (v0.3.6+) |
+| [Prediction scores](prediction-scores.md) | Gaussian ridge/elastic-net training, imported polygenic weights and independent-cohort evaluation (v0.3.6+) |
+| [Latent confounders and known batch effects](latent-confounders-and-batch.md) | PCA, standard SVA, AutoSVA, PEER, ComBat, CLI artifacts, source provenance and leakage boundaries (v0.3.6+) |
+| [Differential, regional, multiple-testing, and imputation workflows](differential-regions-testing-imputation.md) | moderated continuous/voom/NB differential analysis, spatial EWAS regions, cross-fitted IHW, hierarchical FWER, MICE, and Rubin pooling (v0.3.6+) |
+| [Expected responses, scenarios, and marginal effects](predictions-and-contrasts.md) | binomial probit, shared GLM/GEE mean predictions, scenario differences, risk ratios, average marginal effects, and joint delta-method uncertainty (v0.3.6+) |
+| [Individual-level instrumental-variable regression](instrumental-variable-regression.md) | linear 2SLS, QR/SVD identification checks, robust/cluster inference, and instrument-strength diagnostics (v0.3.6+) |
+| [Summary-only conditional score analysis](conditional-score-conditioning.md) | versioned score-block import, strict allele/model checks, cohort-wise Schur conditioning, and independent-cohort pooling (v0.3.6+) |
+| [ACAT rare-variant tests](acat-rare-variants.md) | stable generic ACAT, ACAT-V ultra-rare collapsing, canonical ACAT-O, CLI/API workflows, R fixtures, and fused performance (v0.3.6+) |
+| [GRM tutorial and Java vignette](../grm-cli.md) | worked dosage matrix, filtering, VCF input, Java/CLI construction, interpretation, and mixed-model reuse ([website](https://robbyjo.github.io/JLinAlg/vignettes/grm.html); v0.3.6+) |
 | [Progressive CLI association tutorial](cli-association-tutorial.md) | phenotype-only OLS/REML, numeric omics, common and rare-variant GWAS, pedigree IDs, GLM/GLMM, Cox, and penalized regression |
 | [CLI-only mediation tutorial](cli-mediation-tutorial.md) | tabular OLS mediation, common complete-case filtering, grouped REML, pedigrees, output files, and causal interpretation limits |
 | [CLI-only Mendelian-randomization tutorial](cli-mr-tutorial.md) | public or custom GWAS inputs, canonical columns, LD-panel installation, clumping, harmonization, estimation, and outputs |

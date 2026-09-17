@@ -4,8 +4,8 @@
 <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Genetically predicted TWAS and PWAS</span></div>
-<span class="eyebrow">CLI + Java · Source build</span><h1>Genetically predicted TWAS and PWAS</h1><p>Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.</p></div></section>
-<div class="container page-layout"><article class="prose"><p>Source-build feature. These commands test genetically predicted molecular
+<span class="eyebrow">CLI + Java · v0.3.6</span><h1>Genetically predicted TWAS and PWAS</h1><p>Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Released in v0.3.6. These commands test genetically predicted molecular
 abundance using GWAS statistics and molecular prediction weights. The existing
 numeric-omics association scan remains the workflow for measured expression,
 methylation or protein abundance.</p>
@@ -49,8 +49,8 @@ GWAS statistics. Missing model coverage is an error, so the test does not
 silently change the molecular predictor. Use a reference/LD subset appropriate
 for the requested locus. Matrix labels are reordered by ID, not by row position.</p>
 <h2 id="run-the-example">Run the example</h2>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar twas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --joint true --out build/xwas/twas.tsv
-java -jar build/cli/jlinalg-0.3.5.jar pwas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --out build/xwas/pwas.tsv
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar twas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --joint true --out build/xwas/twas.tsv
+java -jar build/cli/jlinalg-0.3.6.jar pwas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --out build/xwas/pwas.tsv
 </code></pre></div>
 <p>The shared synthetic example uses two molecular predictors. Its second GWAS
 variant is deliberately allele-reversed to exercise alignment. Use your protein

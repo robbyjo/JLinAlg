@@ -1,4 +1,4 @@
-# Unreleased
+# JLinAlg 0.3.6
 
 ## Differential, regional, multiplicity, and imputation inference
 
@@ -23,6 +23,9 @@
   3.68.5, voom, edgeR 4.10.5, and DESeq2 1.52.0. Independent checks cover the
   NB mean ratio, spatial covariance, fold isolation, hierarchy accounting,
   reproducible imputations, and Rubin variance arithmetic.
+- Updated the generated scientific references page with a dedicated v0.3.6
+  index linking the primary sources for differential, regional EWAS,
+  multiple-testing, and multiple-imputation inference.
 
 ## Latent confounders, batch adjustment, and CLI completion
 

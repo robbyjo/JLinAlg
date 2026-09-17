@@ -12,7 +12,7 @@ table at the multivariate boundary.
 
 The new commands are available from a current source build. Build the
 executable with `gradlew.bat assemble`; on this checkout the runnable artifact
-is `build/cli/jlinalg-0.3.5.jar`. A published release JAR predating these
+is `build/cli/jlinalg-0.3.6.jar`. A published release JAR predating these
 commands will not acquire them merely because the website has been updated.
 
 ## Prepare one wide, harmonized table
@@ -35,7 +35,7 @@ would change the joint model.
 ## Run MVMR: multiple exposures, one outcome
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar mr-mvmr `
+java -jar build/cli/jlinalg-0.3.6.jar mr-mvmr `
   --input harmonized-wide.tsv `
   --exposures bmi,ldl `
   --outcome cad `
@@ -70,7 +70,7 @@ positive definite, and have a unit diagonal.
 ## Run covariance-aware multivariate MR-IVW
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate `
+java -jar build/cli/jlinalg-0.3.6.jar mr-multivariate `
   --input harmonized-wide.tsv `
   --exposures bmi,ldl `
   --outcomes cad,stroke `
@@ -103,7 +103,7 @@ loop of univariate fits cannot reproduce these joint tests.
 ## Run multivariate MR-PRESSO
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate `
+java -jar build/cli/jlinalg-0.3.6.jar mr-multivariate `
   --input harmonized-wide.tsv `
   --exposures bmi,ldl `
   --outcomes cad,stroke `

@@ -11,11 +11,10 @@ Build the executable before using these examples:
 
 ```powershell
 .\gradlew.bat clean check executableJar --no-daemon --no-parallel
-$jar = 'build/cli/jlinalg-0.3.5.jar'
+$jar = 'build/cli/jlinalg-0.3.6.jar'
 ```
 
-The commands below are source-build additions after v0.3.5. Do not use an older
-published JAR and assume that it contains them.
+The commands below are included in v0.3.6 and later.
 
 ## Empirical-Bayes differential analysis
 

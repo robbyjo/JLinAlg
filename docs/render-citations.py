@@ -31,6 +31,29 @@ ROOT_DOCS = {
     "rare-variant-meta-analysis.md": "rare-variant-meta-analysis",
 }
 
+RECENT_INFERENCE_GROUPS = (
+    (
+        "Empirical-Bayes differential analysis",
+        "Moderated Gaussian models, precision-weighted counts, and negative-binomial dispersion shrinkage.",
+        ("smyth-limma-2004", "law-voom-2014", "robinson-edger-2010", "love-deseq2-2014"),
+    ),
+    (
+        "Region-level EWAS",
+        "Coordinate-aware aggregation with explicit spatial dependence and region-wide multiplicity control.",
+        ("pedersen-combp-2012", "peters-dmrcate-2015"),
+    ),
+    (
+        "Adaptive and hierarchical testing",
+        "Weighted FDR and prespecified hierarchy-aware familywise inference.",
+        ("benjamini-hochberg-1995", "ignatiadis-ihw-2016", "meinshausen-hierarchy-2008"),
+    ),
+    (
+        "Multiple-imputation inference",
+        "Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.",
+        ("rubin-mi-1987", "vanbuuren-mice-2011", "barnard-rubin-1999"),
+    ),
+)
+
 
 def load_registry() -> tuple[list[dict], dict[str, list[str]], dict[str, str]]:
     data = json.loads(REGISTRY.read_text(encoding="utf-8"))
@@ -143,6 +166,7 @@ def render_markdown(refs: list[dict]) -> str:
     groups: OrderedDict[str, list[dict]] = OrderedDict()
     for ref in refs:
         groups.setdefault(ref["category"], []).append(ref)
+    by_id = {ref["id"]: ref for ref in refs}
     lines = [
         "# Scientific citations",
         "",
@@ -152,7 +176,19 @@ def render_markdown(refs: list[dict]) -> str:
         "",
         "PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.nih.gov/) with [enrich-citation-identifiers.py](enrich-citation-identifiers.py).",
         "",
+        "## v0.3.6 inference additions",
+        "",
+        "The v0.3.6 release adds four connected inference workflows. These quick links expose their primary methodological foundations; the canonical entries remain in the topic bibliography below.",
+        "",
     ]
+    for title, description, ids in RECENT_INFERENCE_GROUPS:
+        lines.extend([f"### {title}", "", description, ""])
+        for ref_id in ids:
+            ref = by_id[ref_id]
+            lines.append(
+                f"- [{short_author(ref)} ({ref['year']}) — {ref['title']}](#{ref_id})"
+            )
+        lines.append("")
     for category, entries in groups.items():
         lines.extend([f"## {category}", ""])
         for ref in entries:
@@ -170,6 +206,20 @@ def render_html(refs: list[dict]) -> str:
     groups: OrderedDict[str, list[dict]] = OrderedDict()
     for ref in refs:
         groups.setdefault(ref["category"], []).append(ref)
+    by_id = {ref["id"]: ref for ref in refs}
+    recent_cards = []
+    for title, description, ids in RECENT_INFERENCE_GROUPS:
+        links = "".join(
+            f'<li><a href="#{ref_id}">{html.escape(short_author(by_id[ref_id]))} '
+            f'({by_id[ref_id]["year"]})</a></li>'
+            for ref_id in ids
+        )
+        recent_cards.append(f"""        <article class="vignette-card citation-release-card">
+          <small>v0.3.6 references</small>
+          <h3>{html.escape(title)}</h3>
+          <p>{html.escape(description)}</p>
+          <ul class="citation-links">{links}</ul>
+        </article>""")
     sections = []
     for category, entries in groups.items():
         items = []
@@ -216,6 +266,17 @@ def render_html(refs: list[dict]) -> str:
           <input type="search" data-citation-search placeholder="Try MR-Egger, REML, PMID 26050253, or a DOI" autocomplete="off">
         </label>
         <p class="citation-result-summary" aria-live="polite"><strong data-citation-count>{len(refs)}</strong> sources shown</p>
+      </div>
+    </section>
+    <section class="section alt" aria-labelledby="recent-inference-references">
+      <div class="container">
+        <div class="section-head">
+          <div><span class="eyebrow">New in v0.3.6</span><h2 id="recent-inference-references">Recent inference foundations.</h2></div>
+          <p>Primary sources for the new differential, regional EWAS, multiple-testing, and multiple-imputation workflows. See the <a href="vignettes/differential-regions-testing-imputation.html">worked workflow</a> for estimator scope and validation.</p>
+        </div>
+        <div class="vignette-grid citation-release-grid">
+{chr(10).join(recent_cards)}
+        </div>
       </div>
     </section>
     <section class="section">

@@ -28,7 +28,7 @@ Use the included Gradle wrapper; no separate Gradle installation is required.
 .\gradlew.bat check executableJar
 ```
 
-The self-contained executable is `build/cli/jlinalg-0.3.5.jar`.
+The self-contained executable is `build/cli/jlinalg-0.3.6.jar`.
 [Published releases](https://github.com/robbyjo/JLinAlg/releases) are also
 available; newer source-build features may not be in the latest release asset.
 
@@ -37,7 +37,7 @@ available; newer source-build features may not be in the latest release asset.
 Fit a linear regression using the included synthetic phenotype table:
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar --pheno examples/quickstart/phenotype.tsv --id sample --formula "trait ~ age" --out build/quickstart/results.tsv
+java -jar build/cli/jlinalg-0.3.6.jar --pheno examples/quickstart/phenotype.tsv --id sample --formula "trait ~ age" --out build/quickstart/results.tsv
 ```
 
 The result contains coefficient estimates, standard errors, and p-values,
@@ -68,14 +68,14 @@ The [estimator extension guide](docs/estimator-extensions.md) covers mixed and
 ordinal SEM, DWLS/WLSMV, multigroup invariance, ARIMA regression and historical
 smoothing, mixed-type kernels, quantile inference, and non-tensor integration.
 
-The current source also adds [LDSC](docs/vignettes/ldsc.md),
+JLinAlg v0.3.6 adds [LDSC](docs/vignettes/ldsc.md),
 [genetically predicted TWAS/PWAS](docs/vignettes/predicted-omics.md),
 [genetic-factor GWAS](docs/vignettes/genomic-factor.md), and
 [prediction score training and evaluation](docs/vignettes/prediction-scores.md),
 each with CLI commands and worked examples. See their
 [validation and supported scope](docs/xwas-followup-validation.md).
 
-The latest source build also includes [binary probit and a shared GLM/GEE
+JLinAlg v0.3.6 also includes [binary probit and a shared GLM/GEE
 prediction-and-contrast API](docs/vignettes/predictions-and-contrasts.md),
 [individual-level IV/2SLS](docs/vignettes/instrumental-variable-regression.md),
 [summary-only conditional-score inference](docs/vignettes/conditional-score-conditioning.md),
@@ -83,14 +83,14 @@ and scalable exact diffuse [ARIMA smoothing and parameter-aware forecasts](docs/
 Each guide states the estimand, validation reference, and important inference
 boundaries.
 
-The source build now also provides [PCA, standard SVA, AutoSVA, and PEER latent
+JLinAlg v0.3.6 provides [PCA, standard SVA, AutoSVA, and PEER latent
 factors plus ComBat batch adjustment](docs/vignettes/latent-confounders-and-batch.md).
 The dedicated `confounders` and `batch-adjust` commands align feature matrices
 by sample ID and write reusable factors, adjusted matrices, and audit manifests.
 The five preceding additions are CLI-accessible through `--family probit`,
 `glm-predict`, `iv-regression`, `conditional-score`, and `arima-regression`.
 
-The current source also provides [empirical-Bayes differential analysis,
+JLinAlg v0.3.6 provides [empirical-Bayes differential analysis,
 coordinate-aware EWAS regions, adaptive/hierarchical multiple testing, and
 multiple-imputation inference](docs/vignettes/differential-regions-testing-imputation.md).
 The `differential`, `ewas-regions`, `multiple-test`, `multiple-impute`,

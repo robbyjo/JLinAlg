@@ -4,8 +4,8 @@
 <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Prediction scores</span></div>
-<span class="eyebrow">CLI + Java · Source build</span><h1>Prediction scores</h1><p>Train portable scores and evaluate frozen predictions in an independent cohort.</p></div></section>
-<div class="container page-layout"><article class="prose"><p>Source-build feature. Train a Gaussian ridge/elastic-net score, save portable
+<span class="eyebrow">CLI + Java · v0.3.6</span><h1>Prediction scores</h1><p>Train portable scores and evaluate frozen predictions in an independent cohort.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Released in v0.3.6. Train a Gaussian ridge/elastic-net score, save portable
 weights, and apply frozen weights to a separate cohort. Imported genetic
 weights can be used without training in JLinAlg. Score training can also learn
 genotype-to-expression/protein weights for <a href="predicted-omics.html">TWAS/PWAS</a>.</p>
@@ -13,7 +13,7 @@ genotype-to-expression/protein weights for <a href="predicted-omics.html">TWAS/P
 <p>The input is a CSV/TSV with sample rows and named numeric feature columns. Each
 sample ID is unique. Explicitly list the predictors, excluding the outcome and
 ID. All features and outcomes must be finite and complete.</p>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-train --input examples/xwas/train.tsv --features x1,x2 --outcome y --lambdas 1,0.1,0.01 --alpha 0 --folds 5 --seed 42 --out build/xwas/score.tsv
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar score-train --input examples/xwas/train.tsv --features x1,x2 --outcome y --lambdas 1,0.1,0.01 --alpha 0 --folds 5 --seed 42 --out build/xwas/score.tsv
 </code></pre></div>
 <p>Alpha 0 fits ridge, alpha 1 fits lasso, and values between them fit elastic net.
 A single lambda is prespecified; multiple descending lambdas use shuffled,
@@ -34,7 +34,7 @@ features. Non-genetic features have dot placeholders for both alleles.
 <code>OUT.training-ids.tsv</code> retains training sample IDs for overlap checks;
 <code>OUT.metadata.tsv</code> records selection, seed, penalty and sample/feature counts.
 Keep these sidecars with the model when moving it.</p>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/test.tsv --weights build/xwas/score.tsv --outcome y --out build/xwas/predictions.tsv
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar score-apply --input examples/xwas/test.tsv --weights build/xwas/score.tsv --outcome y --out build/xwas/predictions.tsv
 </code></pre></div>
 <p>Application joins model feature names to table columns, preserving sample order.
 It never estimates new feature means, retunes penalties or refits predictions.
@@ -67,7 +67,7 @@ training workflow can predict a quantitative phenotype or a molecular trait.</p>
 or train LD-aware weights upstream as appropriate; the existing <code>clump</code> command
 can prepare variant selections. The scorer itself does not perform LD pruning.</p>
 <p>At application, <code>--alleles</code> describes the target table's dosage allele:</p>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/target-dosages.tsv --weights examples/xwas/polygenic-weights.tsv --alleles examples/xwas/target-alleles.tsv --outcome case_status --family binary --out build/xwas/polygenic.tsv
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar score-apply --input examples/xwas/target-dosages.tsv --weights examples/xwas/polygenic-weights.tsv --alleles examples/xwas/target-alleles.tsv --outcome case_status --family binary --out build/xwas/polygenic.tsv
 </code></pre></div>
 <p>An allele swap uses <code>2 - dosage</code>, preserving the constant term needed for raw
 genetic scores. No strand complements are inferred. Resolve genome build and

@@ -1,6 +1,6 @@
 # Polygenic and multi-omics prediction scores
 
-Source-build feature. Train a Gaussian ridge/elastic-net score, save portable
+Released in v0.3.6. Train a Gaussian ridge/elastic-net score, save portable
 weights, and apply frozen weights to a separate cohort. Imported genetic
 weights can be used without training in JLinAlg. Score training can also learn
 genotype-to-expression/protein weights for [TWAS/PWAS](predicted-omics.md).
@@ -12,7 +12,7 @@ sample ID is unique. Explicitly list the predictors, excluding the outcome and
 ID. All features and outcomes must be finite and complete.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar score-train --input examples/xwas/train.tsv --features x1,x2 --outcome y --lambdas 1,0.1,0.01 --alpha 0 --folds 5 --seed 42 --out build/xwas/score.tsv
+java -jar build/cli/jlinalg-0.3.6.jar score-train --input examples/xwas/train.tsv --features x1,x2 --outcome y --lambdas 1,0.1,0.01 --alpha 0 --folds 5 --seed 42 --out build/xwas/score.tsv
 ```
 
 Alpha 0 fits ridge, alpha 1 fits lasso, and values between them fit elastic net.
@@ -39,7 +39,7 @@ features. Non-genetic features have dot placeholders for both alleles.
 Keep these sidecars with the model when moving it.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/test.tsv --weights build/xwas/score.tsv --outcome y --out build/xwas/predictions.tsv
+java -jar build/cli/jlinalg-0.3.6.jar score-apply --input examples/xwas/test.tsv --weights build/xwas/score.tsv --outcome y --out build/xwas/predictions.tsv
 ```
 
 Application joins model feature names to table columns, preserving sample order.
@@ -81,7 +81,7 @@ can prepare variant selections. The scorer itself does not perform LD pruning.
 At application, `--alleles` describes the target table's dosage allele:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar score-apply --input examples/xwas/target-dosages.tsv --weights examples/xwas/polygenic-weights.tsv --alleles examples/xwas/target-alleles.tsv --outcome case_status --family binary --out build/xwas/polygenic.tsv
+java -jar build/cli/jlinalg-0.3.6.jar score-apply --input examples/xwas/target-dosages.tsv --weights examples/xwas/polygenic-weights.tsv --alleles examples/xwas/target-alleles.tsv --outcome case_status --family binary --out build/xwas/polygenic.tsv
 ```
 
 An allele swap uses `2 - dosage`, preserving the constant term needed for raw

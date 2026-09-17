@@ -1,26 +1,26 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Distinguish and run multivariable MVMR, covariance-aware multivariate MR-IVW, and multivariate MR-PRESSO in JLinAlg."><title>Multivariable and multivariate MR · JLinAlg</title><link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head><body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="index.html">Vignettes</a><span>/</span><span>Joint-model MR</span></div><h1>Multivariable is not multivariate.</h1><p>Use separate, schema-checked commands for multiple-exposure MVMR and covariance-aware joint inference on correlated outcomes.</p></div></section>
 <div class="container page-layout"><article class="prose">
-<div class="note"><strong>Current source build</strong>Build the executable with <code>gradlew.bat assemble</code>. On this checkout it is <code>build/cli/jlinalg-0.3.5.jar</code>. Published release JARs predating these commands do not contain them.</div>
+<div class="note"><strong>Current source build</strong>Build the executable with <code>gradlew.bat assemble</code>. On this checkout it is <code>build/cli/jlinalg-0.3.6.jar</code>. Published release JARs predating these commands do not contain them.</div>
 <h2 id="names">Three different workflows</h2>
 <table><thead><tr><th>Command</th><th>Exposures</th><th>Outcomes</th><th>Meaning</th></tr></thead><tbody><tr><td><code>mr-mvmr</code></td><td>2+</td><td>1</td><td>Mutually adjusted direct effects</td></tr><tr><td><code>mr-multivariate</code></td><td>1+</td><td>2+ correlated</td><td>Joint covariance-aware effects and tests</td></tr><tr><td><code>mr-xwas</code></td><td>many</td><td>many</td><td>Parallel separate-pair screening, not a joint model</td></tr></tbody></table>
 <h2 id="input">Prepare one complete wide table</h2><pre><code>variant_id  beta_exposure_bmi  se_exposure_bmi  beta_exposure_ldl  se_exposure_ldl  beta_outcome_cad  se_outcome_cad  beta_outcome_stroke  se_outcome_stroke
 rs101       0.08               0.02              0.03               0.01             0.025             0.010           0.018                0.012</code></pre><p>Clump the exposure instruments once and harmonize every association to the same effect allele first. Every selected variant must have all selected exposure and outcome associations; the joint commands do not guess allele orientation or change the instrument set by outcome.</p>
-<h2 id="mvmr">Run multivariable MR</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple exposures, one outcome</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-mvmr &#96;
+<h2 id="mvmr">Run multivariable MR</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple exposures, one outcome</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar mr-mvmr &#96;
   --input harmonized-wide.tsv &#96;
   --exposures bmi,ldl --outcome cad &#96;
   --method ivw --backend cpu &#96;
   --output mvmr-cad.tsv</code></pre></div><p>Each coefficient is a direct effect conditional on the other listed exposures. <code>--method egger</code> adds a multivariable intercept. The reported <code>marginal_f</code> is not conditional strength; conditional F inference requires cross-exposure sampling covariance through the Java covariance-aware MVMR API.</p>
 <h2 id="correlation">Supply outcome-association correlation</h2><pre><code>1.00  0.42
 0.42  1.00</code></pre><p>The headerless matrix follows <code>--outcomes</code> exactly and must be finite, symmetric, positive definite, and have unit diagonal. It represents correlation among estimated SNP-outcome associations—not automatically phenotypic correlation. Record how it was estimated and the relevant sample overlap.</p>
-<h2 id="multivariate">Run multivariate MR-IVW</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple correlated outcomes</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate &#96;
+<h2 id="multivariate">Run multivariate MR-IVW</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Multiple correlated outcomes</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar mr-multivariate &#96;
   --input harmonized-wide.tsv &#96;
   --exposures bmi,ldl --outcomes cad,stroke &#96;
   --outcome-correlation outcome-correlation.tsv &#96;
   --method ivw-fixed --backend cpu &#96;
   --output multivariate-mr.tsv &#96;
   --plot multivariate-mr-forest.svg</code></pre></div><p>The generalized least-squares model estimates every exposure-outcome cell and propagates outcome correlation into the coefficient covariance. It reports cell tests, per-exposure and per-outcome joint Wald tests, an overall test, multivariate Cochran Q, and dispersion. Choose <code>ivw-random</code> for multiplicative-random standard errors. <code>--plot</code> writes a dependency-free SVG forest plot of every effect and confidence interval.</p>
-<h2 id="presso">Run multivariate MR-PRESSO</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Mahalanobis bootstrap diagnostic</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar mr-multivariate &#96;
+<h2 id="presso">Run multivariate MR-PRESSO</h2><div class="code-window"><div class="code-bar"><i class="code-dot"></i><i class="code-dot"></i><i class="code-dot"></i><span>Mahalanobis bootstrap diagnostic</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar mr-multivariate &#96;
   --input harmonized-wide.tsv &#96;
   --exposures bmi,ldl --outcomes cad,stroke &#96;
   --outcome-correlation outcome-correlation.tsv &#96;

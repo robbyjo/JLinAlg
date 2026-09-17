@@ -304,3 +304,6 @@ pre code { color: inherit; }
 .citation-links a:hover { color: var(--brand-strong); }
 .citation-inline-identifiers { color: var(--faint); font: 650 .75rem/1.5 var(--mono); }
 .citation-inline-identifiers a { color: var(--brand-strong); }
+.citation-release-card { min-height: 0; }
+.citation-release-card .citation-links { display: block; margin: 16px 0 0; padding-left: 18px; }
+.citation-release-card .citation-links li { margin: 5px 0; font-size: .82rem; }

@@ -1,6 +1,6 @@
 # Shared genetic factors and common-factor GWAS
 
-Source-build feature. Fit a shared genetic factor from GWAS-derived genetic
+Released in v0.3.6. Fit a shared genetic factor from GWAS-derived genetic
 covariances, then optionally test SNP effects on that factor. The estimator
 uses the full sampling covariance of the genetic moments; ordinary SEM with
 a fabricated sample size is not an equivalent analysis.
@@ -28,7 +28,7 @@ under the regular asymptotic moment model. Parameter covariance is
 ## Fit the synthetic example
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar genomic-factor --s examples/xwas/factor-S.tsv --v examples/xwas/factor-V.tsv --traits A,B,C,D --out build/xwas/factor.tsv
+java -jar build/cli/jlinalg-0.3.6.jar genomic-factor --s examples/xwas/factor-S.tsv --v examples/xwas/factor-V.tsv --traits A,B,C,D --out build/xwas/factor.tsv
 ```
 
 `OUT` contains loadings, residual genetic variances and their standard errors.
@@ -39,7 +39,7 @@ java -jar build/cli/jlinalg-0.3.5.jar genomic-factor --s examples/xwas/factor-S.
 To use LDSC output instead:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar genomic-factor --s build/xwas/ldsc.tsv.S.tsv --v build/xwas/ldsc.tsv.V.tsv --traits A,B,C,D --out build/xwas/ldsc-factor.tsv
+java -jar build/cli/jlinalg-0.3.6.jar genomic-factor --s build/xwas/ldsc.tsv.S.tsv --v build/xwas/ldsc.tsv.V.tsv --traits A,B,C,D --out build/xwas/ldsc-factor.tsv
 ```
 
 S must be positive semidefinite and V positive definite. Negative genetic
@@ -59,7 +59,7 @@ usually require off-diagonal terms. This command assumes that the supplied
 error correlation applies across the scanned SNPs.
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar genomic-factor --s examples/xwas/factor-S.tsv --v examples/xwas/factor-V.tsv --traits A,B,C,D --gwas examples/xwas/factor-gwas.tsv --sampling-correlation examples/xwas/sampling-correlation.tsv --out build/xwas/factor-scan.tsv
+java -jar build/cli/jlinalg-0.3.6.jar genomic-factor --s examples/xwas/factor-S.tsv --v examples/xwas/factor-V.tsv --traits A,B,C,D --gwas examples/xwas/factor-gwas.tsv --sampling-correlation examples/xwas/sampling-correlation.tsv --out build/xwas/factor-scan.tsv
 ```
 
 `OUT.gwas.tsv` reports unadjusted p-values and the GLS common-factor effect

@@ -1,7 +1,6 @@
 # xWAS follow-up workflows: validation and supported scope
 
-Source-build additions, September 2026. These commands are not present in the
-previously published v0.3.5 executable; build the current source.
+Released in v0.3.6, September 2026.
 
 Final local gate: `check javadoc executableJar` passed on 2026-09-12 with
 772 discovered tests: **769 passed, three optional CHOLMOD skips, zero failures

@@ -20,7 +20,7 @@ often the clearest way to guarantee that scope. The block size cannot exceed
 ```powershell
 ./gradlew.bat executableJar
 
-java -jar build/cli/jlinalg-0.3.5.jar `
+java -jar build/cli/jlinalg-0.3.6.jar `
   --omics cohort-a-locus.vcf.gz --pheno cohort-a-phenotype.tsv --id IID `
   --formula "case_status ~ age + sex + PC1 + PC2 + <omics>" `
   --family binomial --case-value case --control-value control `
@@ -57,7 +57,7 @@ cohorts must not be entered as though their scores were independent.
 Specify allele-aware keys in the orientation wanted in the output:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar conditional-score `
+java -jar build/cli/jlinalg-0.3.6.jar conditional-score `
   --cohorts cohorts.tsv `
   --targets 1:456789:A:G,1:456950:C:T `
   --condition-on 1:455100:G:A `

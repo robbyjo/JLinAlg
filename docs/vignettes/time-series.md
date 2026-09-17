@@ -258,7 +258,7 @@ The source-build CLI exposes ARIMA-error regression, the scalable historical
 smoother, and both forecast-uncertainty contracts:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar arima-regression `
+java -jar build/cli/jlinalg-0.3.6.jar arima-regression `
   --input monthly.tsv `
   --response outcome `
   --predictors intervention,time `

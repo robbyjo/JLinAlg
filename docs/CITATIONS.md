@@ -6,6 +6,42 @@ The website provides a [searchable citation index](https://robbyjo.github.io/JLi
 
 PMID and PMCID values are retrieved from [NCBI PubMed](https://pubmed.ncbi.nlm.nih.gov/) with [enrich-citation-identifiers.py](enrich-citation-identifiers.py).
 
+## v0.3.6 inference additions
+
+The v0.3.6 release adds four connected inference workflows. These quick links expose their primary methodological foundations; the canonical entries remain in the topic bibliography below.
+
+### Empirical-Bayes differential analysis
+
+Moderated Gaussian models, precision-weighted counts, and negative-binomial dispersion shrinkage.
+
+- [Smyth (2004) — Linear models and empirical Bayes methods for assessing differential expression in microarray experiments](#smyth-limma-2004)
+- [Law (2014) — voom: precision weights unlock linear model analysis tools for RNA-seq read counts](#law-voom-2014)
+- [Robinson (2010) — edgeR: a Bioconductor package for differential expression analysis of digital gene expression data](#robinson-edger-2010)
+- [Love (2014) — Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2](#love-deseq2-2014)
+
+### Region-level EWAS
+
+Coordinate-aware aggregation with explicit spatial dependence and region-wide multiplicity control.
+
+- [Pedersen (2012) — Comb-p: software for combining, analyzing, grouping and correcting spatially correlated P-values](#pedersen-combp-2012)
+- [Peters et al. (2015) — De novo identification of differentially methylated regions in the human genome](#peters-dmrcate-2015)
+
+### Adaptive and hierarchical testing
+
+Weighted FDR and prespecified hierarchy-aware familywise inference.
+
+- [Benjamini (1995) — Controlling the false discovery rate: a practical and powerful approach to multiple testing](#benjamini-hochberg-1995)
+- [Ignatiadis (2016) — Data-driven hypothesis weighting increases detection power in genome-scale multiple testing](#ignatiadis-ihw-2016)
+- [Meinshausen (2008) — Hierarchical testing of variable importance](#meinshausen-hierarchy-2008)
+
+### Multiple-imputation inference
+
+Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
+
+- [Rubin (1987) — Multiple Imputation for Nonresponse in Surveys](#rubin-mi-1987)
+- [Buuren (2011) — mice: Multivariate Imputation by Chained Equations in R](#vanbuuren-mice-2011)
+- [Barnard (1999) — Small-sample degrees of freedom with multiple imputation](#barnard-rubin-1999)
+
 ## Foundational inference
 
 <a id="student-1908"></a>

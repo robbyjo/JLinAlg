@@ -1,6 +1,6 @@
 # Genetically predicted TWAS and PWAS
 
-Source-build feature. These commands test genetically predicted molecular
+Released in v0.3.6. These commands test genetically predicted molecular
 abundance using GWAS statistics and molecular prediction weights. The existing
 numeric-omics association scan remains the workflow for measured expression,
 methylation or protein abundance.
@@ -31,8 +31,8 @@ for the requested locus. Matrix labels are reordered by ID, not by row position.
 ## Run the example
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar twas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --joint true --out build/xwas/twas.tsv
-java -jar build/cli/jlinalg-0.3.5.jar pwas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --out build/xwas/pwas.tsv
+java -jar build/cli/jlinalg-0.3.6.jar twas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --joint true --out build/xwas/twas.tsv
+java -jar build/cli/jlinalg-0.3.6.jar pwas --gwas examples/xwas/gwas.tsv --weights examples/xwas/weights.tsv --reference examples/xwas/reference.tsv --ld examples/xwas/ld.tsv --out build/xwas/pwas.tsv
 ```
 
 The shared synthetic example uses two molecular predictors. Its second GWAS

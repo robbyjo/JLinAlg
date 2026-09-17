@@ -46,21 +46,21 @@ can cancel opposing effects even when SKAT detects a strong association.
 ## A complete small example
 
 Run from the repository root after `gradlew executableJar`. The executable uses
-the current project version, presently `build/cli/jlinalg-0.3.5.jar`; these commands
-are unreleased and are not in the previously published v0.3.5 asset. Example
+the current project version, presently `build/cli/jlinalg-0.3.6.jar`; these commands
+are included in v0.3.6 and later. Example
 cohorts have only six synthetic people, so `--maf 0.5` is used to retain variants
 for illustration. This is not a realistic rare-variant power study.
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/a
-java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-b.vcf --pheno examples/rare-meta/cohort-b.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/b
+java -jar build/cli/jlinalg-0.3.6.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/a
+java -jar build/cli/jlinalg-0.3.6.jar rare-score --vcf examples/rare-meta/cohort-b.vcf --pheno examples/rare-meta/cohort-b.tsv --id sample --response trait --genome-build GRCh38 --cov-window 100 --out build/rare-demo/b
 
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --test single --out build/rare-demo/single
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden --weights equal --maf 0.5 --cohort-results --out build/rare-demo/burden
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden --weights mb --maf 0.5 --out build/rare-demo/weighted
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat --weights beta --maf 0.5 --out build/rare-demo/skat
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights beta --maf 0.5 --simulations 100000 --seed 1234 --out build/rare-demo/skato
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --test single --out build/rare-demo/single
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden --weights equal --maf 0.5 --cohort-results --out build/rare-demo/burden
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden --weights mb --maf 0.5 --out build/rare-demo/weighted
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat --weights beta --maf 0.5 --out build/rare-demo/skat
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights beta --maf 0.5 --simulations 100000 --seed 1234 --out build/rare-demo/skato
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test acat-v,acat-o --maf 0.5 --acat-mac-threshold 10 --out build/rare-demo/acat
 ```
 
 Each selected test creates `PREFIX.TEST.tsv`; `PREFIX.qc.tsv` records group coverage and exclusions. `PREFIX.log` records settings,
@@ -86,7 +86,7 @@ performs single-variant, equal-weight burden, weighted burden, SKAT, and SKAT-O
 meta-analysis using primitive arrays. With a JDK and the source-built JAR:
 
 ```shell
-java --class-path build/cli/jlinalg-0.3.5.jar examples/rare-meta/RareMetaExample.java
+java --class-path build/cli/jlinalg-0.3.6.jar examples/rare-meta/RareMetaExample.java
 ```
 
 Its two synthetic independent cohorts have scores for the same two variants.
@@ -268,10 +268,10 @@ After generating the two cohort files in the complete example, these commands
 run directly from the repository root. Use a fresh output prefix on each run.
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden,skat,skat-o,acat-v,acat-o,vt,het-skat,het-skat-o,burden-fixed,burden-random --weights equal --maf 0.5 --simulations 100000 --cohort-results --leave-variant-out --leave-cohort-out --threads 2 --cache-mb 16 --out build/rare-demo/advanced
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/conditional-groups.txt --condition examples/rare-meta/conditions.txt --test burden,skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/conditional
-java -jar build/cli/jlinalg-0.3.5.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/deterministic
-java --class-path build/cli/jlinalg-0.3.5.jar examples/rare-meta/AdvancedRareMetaExample.java
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test burden,skat,skat-o,acat-v,acat-o,vt,het-skat,het-skat-o,burden-fixed,burden-random --weights equal --maf 0.5 --simulations 100000 --cohort-results --leave-variant-out --leave-cohort-out --threads 2 --cache-mb 16 --out build/rare-demo/advanced
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/conditional-groups.txt --condition examples/rare-meta/conditions.txt --test burden,skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/conditional
+java -jar build/cli/jlinalg-0.3.6.jar rare-meta --cohorts examples/rare-meta/cohorts.tsv --genome-build GRCh38 --groups examples/rare-meta/groups.txt --test skat-o --weights equal --maf 0.5 --skato-calibration deterministic --out build/rare-demo/deterministic
+java --class-path build/cli/jlinalg-0.3.6.jar examples/rare-meta/AdvancedRareMetaExample.java
 ```
 
 The [Java example](../examples/rare-meta/AdvancedRareMetaExample.java) demonstrates
@@ -366,7 +366,7 @@ exact finite-sample calibration for sparse or non-Gaussian phenotypes.
 ### Related-sample export, QC, and memory
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --grm examples/rare-meta/cohort-a.grm.tsv --cov-window 100 --out build/rare-demo/a-related
+java -jar build/cli/jlinalg-0.3.6.jar rare-score --vcf examples/rare-meta/cohort-a.vcf --pheno examples/rare-meta/cohort-a.tsv --id sample --response trait --genome-build GRCh38 --grm examples/rare-meta/cohort-a.grm.tsv --cov-window 100 --out build/rare-demo/a-related
 ```
 
 `--grm` accepts a labeled dense matrix or GCTA binary prefix, as described in

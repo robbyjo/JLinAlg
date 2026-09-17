@@ -1,6 +1,6 @@
 # Command-line-only workflows
 
-Current source builds additionally provide [LDSC](ldsc.md),
+JLinAlg v0.3.6 additionally provides [LDSC](ldsc.md),
 [genetically predicted TWAS/PWAS](predicted-omics.md),
 [genetic factors and common-factor GWAS](genomic-factor.md), and
 [prediction score training/application](prediction-scores.md).
@@ -9,9 +9,8 @@ with `--help` for their independent table-based schemas.
 
 Every workflow here is invoked through the executable JAR; no Java API code or
 dataframe runtime is required. Start a new general association
-file/formula/pedigree with <code>--dry-run</code>. Published features use
-`jlinalg-0.3.5.jar`; additions explicitly marked as current source builds,
-including probit and `conditional-score`, require an executable built from main.
+file/formula/pedigree with <code>--dry-run</code>. The complete documented CLI is
+available in `jlinalg-0.3.6.jar` and later.
 
 For a slower first-principles walkthrough, start with the
 [progressive association tutorial](cli-association-tutorial.md). Separate
@@ -20,12 +19,11 @@ file-to-result tutorials cover [mediation](cli-mediation-tutorial.md),
 [SuSiE](cli-susie-tutorial.md), and
 [multi-signal colocalization](cli-colocalization-tutorial.md).
 
-Source builds after v0.3.5 also provide `meta-analysis` and `meta-regression`
+JLinAlg v0.3.6 also provides `meta-analysis` and `meta-regression`
 for separate cohort summary files. See the [meta-analysis tutorial](cli-meta-analysis-tutorial.md)
-for cohort directions, missing values, and minimum-cohort controls. These two
-new commands are not in the previously published v0.3.5 release asset.
+for cohort directions, missing values, and minimum-cohort controls.
 
-Source builds also provide [`grm` construction](../grm-cli.md) from genotype
+The release also provides [`grm` construction](../grm-cli.md) from genotype
 files and [rare-variant meta-analysis](../rare-variant-meta-analysis.md).
 
 Latent-factor and batch workflows use dedicated global-matrix commands rather
@@ -61,7 +59,7 @@ rather than replacing the requested pedigree with an all-singleton model.
 ## Inspect routing without fitting
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics>" --out bmi-expression.csv --dry-run
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics>" --out bmi-expression.csv --dry-run
 ~~~
 
 For the general command, <code>--dry-run</code> reads and aligns inputs,
@@ -113,7 +111,7 @@ case another timing block is appended. Help/version requests do not create logs.
 ## Phenotype-only OLS
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-coefficients.csv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --id SampleName --formula "BMI ~ Sex + Age" --out bmi-coefficients.csv
 ~~~
 
 Gaussian data with no random term, GRM, or pedigree selects OLS. Rows missing
@@ -125,7 +123,7 @@ Numeric omics files are feature-by-sample: the first column contains feature
 IDs and the remaining headers contain sample IDs.
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --omics-type expression --formula "BMI ~ Sex + Age + <omics>" --transform "<omics> = winsor_mad(k=4) | zscore()" --annot genes.tsv --annot-id gene_id --annot-cols symbol,chromosome --threads 8 --block-size auto --out bmi-expression.csv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --omics-type expression --formula "BMI ~ Sex + Age + <omics>" --transform "<omics> = winsor_mad(k=4) | zscore()" --annot genes.tsv --annot-id gene_id --annot-cols symbol,chromosome --threads 8 --block-size auto --out bmi-expression.csv
 ~~~
 
 Phenotype and omics IDs are intersected automatically. Missing phenotype rows
@@ -135,7 +133,7 @@ transformation.
 ## Grouped numeric LMM
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics> + (1|site)" --variance-components auto --df satterth --out bmi-expression-site.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "BMI ~ Sex + Age + <omics> + (1|site)" --variance-components auto --df satterth --out bmi-expression-site.tsv
 ~~~
 
 For numeric omics, <code>auto</code> refits variance components by REML for
@@ -144,7 +142,7 @@ every feature. This is the exact lmer-like path, not P3D/EMMAX.
 ## Pedigree LMM with globally unique IDs
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-expression-pedigree.csv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-expression-pedigree.csv
 ~~~
 
 The <code>(1|sabreid)</code> term uses Henderson's sparse additive relationship
@@ -171,7 +169,7 @@ S3,SINGLETON_3,22.9,61
 ~~~
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --id SampleName --individual-id pedigree_key --formula "BMI ~ Age + (1|pedigree_key)" --pedigree pedigree.csv --pedigree-family-id family --pedigree-id member --sire-id sire --dam-id dam --out bmi-family-pedigree.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --id SampleName --individual-id pedigree_key --formula "BMI ~ Age + (1|pedigree_key)" --pedigree pedigree.csv --pedigree-family-id family --pedigree-id member --sire-id sire --dam-id dam --out bmi-family-pedigree.tsv
 ~~~
 
 <code>F01:1001</code> maps to the qualified pedigree member.
@@ -187,7 +185,7 @@ sharing a family label alone does not make two founders related.
 ## Pedigree plus an ordinary grouping effect
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid) + (1|batch)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-pedigree-batch.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id sabreid --formula "BMI ~ Sex + Age + <omics> + (1|sabreid) + (1|batch)" --pedigree pedigree.csv --pedigree-id sabreid --sire-id fid --dam-id mid --out bmi-pedigree-batch.tsv
 ~~~
 
 Only the term matching <code>--individual-id</code> receives pedigree
@@ -198,7 +196,7 @@ precision. <code>(1|batch)</code> is an independent random intercept.
 To construct the input matrix first, use the source-build `grm` command:
 
 ```shell
-java -jar build/cli/jlinalg-0.3.5.jar grm --genotypes cohort.vcf.gz --maf 0.01 --call-rate 0.95 --out cohort-grm.tsv
+java -jar build/cli/jlinalg-0.3.6.jar grm --genotypes cohort.vcf.gz --maf 0.01 --call-rate 0.95 --out cohort-grm.tsv
 ```
 
 Pass `--grm cohort-grm.tsv` to the analysis command. See the
@@ -206,7 +204,7 @@ Pass `--grm cohort-grm.tsv` to the analysis command. See the
 formats, normalization, and dense-memory requirements.
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id IID --formula "BMI ~ Sex + Age + <omics>" --grm cohort --out bmi-expression-grm.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --individual-id IID --formula "BMI ~ Sex + Age + <omics>" --grm cohort --out bmi-expression-grm.tsv
 ~~~
 
 <code>--grm</code> accepts a labeled square CSV/TSV or a GCTA prefix backed by
@@ -216,9 +214,9 @@ exact per-feature REML refits. A GRM and pedigree cannot be combined.
 ## Binary, count, and positive outcomes
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out disease-expression.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family binomial --case-value case --control-value control --out disease-expression.tsv
 
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family probit --case-value case --control-value control --out disease-expression-probit.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics expression.csv --id SampleName --formula "case_status ~ Sex + Age + <omics>" --family probit --case-value case --control-value control --out disease-expression-probit.tsv
 ~~~
 
 Add <code>(1|site)</code>, a GRM, or a matching pedigree term for a
@@ -239,7 +237,7 @@ Complete blocks can then be imported by the
 [summary-only conditioning workflow](conditional-score-conditioning.md).
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --omics cohort.vcf.gz --id IID --formula "BMI ~ Sex + Age + PC1 + PC2 + <omics>" --min-maf 0.01 --min-mac 20 --max-marker-missing 0.02 --out bmi-gwas.tsv
 ~~~
 
 BCF and biallelic layout-2 BGEN are accepted; add
@@ -250,7 +248,7 @@ per-marker variance-component refits are not yet available.
 ## Cox regression and GRM frailty
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar --pheno phenotype.csv --id SampleName --formula "Surv(followup,event) ~ Sex + Age" --ties efron --out survival.tsv
+java -jar jlinalg-0.3.6.jar --pheno phenotype.csv --id SampleName --formula "Surv(followup,event) ~ Sex + Age" --ties efron --out survival.tsv
 ~~~
 
 Add <code>--grm cohort --individual-id IID</code> for Gaussian kinship frailty.
@@ -260,8 +258,8 @@ not yet through this general CLI.
 ## Specialized CLI subcommands
 
 ~~~powershell
-java -jar jlinalg-0.3.5.jar beta-regression --input proportions.tsv --response proportion --mean dose,age --precision batch --out beta.tsv
-java -jar jlinalg-0.3.5.jar penalized-regression --input continuous.tsv --response y --predictors x1,x2,x3 --model elastic-net --alpha 0.5 --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 --out elastic-net.tsv
+java -jar jlinalg-0.3.6.jar beta-regression --input proportions.tsv --response proportion --mean dose,age --precision batch --out beta.tsv
+java -jar jlinalg-0.3.6.jar penalized-regression --input continuous.tsv --response y --predictors x1,x2,x3 --model elastic-net --alpha 0.5 --lambda-grid 1,0.3,0.1,0.03 --cv-folds 5 --out elastic-net.tsv
 java -jar jlinalg-<version>.jar mediation --input mediation.tsv --outcome y --treatment x --mediator m --covariates age --out mediation-effects.tsv
 java -jar jlinalg-<version>.jar susie --summary locus.tsv --ld locus-ld.tsv --sample-size 10000 --out locus-susie.tsv
 java -jar jlinalg-<version>.jar coloc --trait1 trait1-susie.tsv.effects.tsv --trait2 trait2-susie.tsv.effects.tsv --out coloc.tsv

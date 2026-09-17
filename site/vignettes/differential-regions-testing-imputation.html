@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Differential, regional, multiple-testing, and imputation workflows</span></div>
-<span class="eyebrow">CLI + Java · Source build</span><h1>Differential, regional, multiple-testing, and imputation workflows</h1><p>Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.</p></div></section>
+<span class="eyebrow">CLI + Java · v0.3.6</span><h1>Differential, regional, multiple-testing, and imputation workflows</h1><p>Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.</p></div></section>
 <div class="container page-layout"><article class="prose"><p>These source-build workflows cover four common points after an omics matrix has
 been quality controlled: differential analysis, spatial EWAS aggregation,
 prespecified multiplicity correction, and uncertainty-aware missing-data
@@ -13,10 +13,9 @@ region definitions, testing families, and imputation uncertainty are different
 statistical contracts.</p>
 <p>Build the executable before using these examples:</p>
 <div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>.\gradlew.bat clean check executableJar --no-daemon --no-parallel
-$jar = 'build/cli/jlinalg-0.3.5.jar'
+$jar = 'build/cli/jlinalg-0.3.6.jar'
 </code></pre></div>
-<p>The commands below are source-build additions after v0.3.5. Do not use an older
-published JAR and assume that it contains them.</p>
+<p>The commands below are included in v0.3.6 and later.</p>
 <h2 id="empirical-bayes-differential-analysis">Empirical-Bayes differential analysis</h2>
 <p>The feature matrix is feature-by-sample with a row identifier in column one.
 The phenotype table supplies the sample ID, a two-level group, and optional
@@ -161,9 +160,7 @@ RubinPooling.Estimate pooled = RubinPooling.pool(beta, variance, 120);
 </code></pre></div>
 <p>See the <a href="../inference-workflows-validation.html">validation report</a> for frozen
 Bioconductor versions, exact numerical gates, reproducibility commands, and
-the supported-scope audit.</p></article>
-<aside class="toc"><strong>On this page</strong><a href="#empirical-bayes-differential-analysis">Empirical-Bayes differential analysis</a><a href="#region-level-ewas">Region-level EWAS</a><a href="#adaptive-and-hierarchical-multiple-testing">Adaptive and hierarchical multiple testing</a><a href="#multiple-imputation-and-pooled-inference">Multiple imputation and pooled inference</a><a href="#java-api-map">Java API map</a></aside></div>
-
+the supported-scope audit.</p>
 <!-- SCIENTIFIC-CITATIONS:START -->
 <section class="citation-strip" aria-labelledby="scientific-citations-differential-regions-testing-imputation">
   <div class="container narrow">
@@ -176,5 +173,6 @@ the supported-scope audit.</p></article>
     <a class="text-link" href="../citations.html">Search all scientific citations →</a>
   </div>
 </section>
-<!-- SCIENTIFIC-CITATIONS:END -->
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#empirical-bayes-differential-analysis">Empirical-Bayes differential analysis</a><a href="#region-level-ewas">Region-level EWAS</a><a href="#adaptive-and-hierarchical-multiple-testing">Adaptive and hierarchical multiple testing</a><a href="#multiple-imputation-and-pooled-inference">Multiple imputation and pooled inference</a><a href="#java-api-map">Java API map</a><a href="#scientific-citations">Scientific citations</a></aside></div>
 </main><site-footer root="../"></site-footer></body></html>

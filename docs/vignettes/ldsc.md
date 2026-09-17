@@ -1,6 +1,6 @@
 # Heritability and genetic correlation with LDSC
 
-Source-build feature. Build with `./gradlew.bat executableJar` on Windows,
+Released in v0.3.6. Build with `./gradlew.bat executableJar` on Windows,
 then run commands below from the repository root. Use fresh `.tsv` output
 paths. The command creates an accompanying lifecycle log; `--log FILE` or
 `--no-log` follows the other xWAS subcommands.
@@ -38,7 +38,7 @@ to capture local LD. Tiny tutorial inputs do not establish genome-wide calibrati
 ## Run the checked-in example
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar ldsc --input examples/xwas/ldsc.tsv --traits A,B,C,D --reference-variants 100000 --blocks 30 --out build/xwas/ldsc.tsv
+java -jar build/cli/jlinalg-0.3.6.jar ldsc --input examples/xwas/ldsc.tsv --traits A,B,C,D --reference-variants 100000 --blocks 30 --out build/xwas/ldsc.tsv
 ```
 
 The synthetic example has 1,200 variants and four quantitative traits. Its

@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
 <body><site-header root="../"></site-header><main id="main">
 <section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Predictions, scenarios, and marginal effects</span></div>
-<span class="eyebrow">CLI + Java · Source build</span><h1>Predictions, scenarios, and marginal effects</h1><p>Report expected responses, standardized scenario contrasts, risk ratios, and marginal effects with covariance-aware uncertainty.</p></div></section>
+<span class="eyebrow">CLI + Java · v0.3.6</span><h1>Predictions, scenarios, and marginal effects</h1><p>Report expected responses, standardized scenario contrasts, risk ratios, and marginal effects with covariance-aware uncertainty.</p></div></section>
 <div class="container page-layout"><article class="prose"><p><code>ModelPredictions</code> gives GLM and GEE fits one response-scale reporting API. It
 uses the fitted coefficient covariance and analytic delta-method gradients. The
 examples below use a probit GLM, but the same methods accept a <code>GeeResult</code>.</p>
@@ -31,7 +31,7 @@ representable floating-point range.</p>
 <h2 id="expected-responses">Expected responses</h2>
 <p>The same probit fit and response-scale estimands are available from a numeric
 table through the source-build CLI:</p>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar glm-predict `
   --input cohort.tsv `
   --response case `
   --predictors exposure,age,sex `
@@ -41,12 +41,12 @@ table through the source-build CLI:</p>
 </code></pre></div>
 <p>For standardized contrasts, reuse the observed rows and set one design column
 to each scenario value:</p>
-<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar glm-predict `
   --input cohort.tsv --response case --predictors exposure,age,sex `
   --family probit --estimand difference `
   --scenario-column exposure --first 1 --second 0
 
-java -jar build/cli/jlinalg-0.3.5.jar glm-predict `
+java -jar build/cli/jlinalg-0.3.6.jar glm-predict `
   --input cohort.tsv --response case --predictors exposure,age,sex `
   --family probit --estimand ame --ame-column age
 </code></pre></div>

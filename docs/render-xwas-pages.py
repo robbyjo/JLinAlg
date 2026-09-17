@@ -10,20 +10,20 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
-    "acat-rare-variants": ("ACAT rare-variant tests", "Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.", "CLI + Java · Source build"),
-    "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.", "CLI + Java · Source build"),
-    "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model.", "CLI + Java · Source build"),
-    "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.", "CLI + Java · Source build"),
-    "genomic-factor": ("Shared genetic factors", "Model shared genetic variation and inspect common-factor SNP effects alongside heterogeneity.", "CLI + Java · Source build"),
-    "prediction-scores": ("Prediction scores", "Train portable scores and evaluate frozen predictions in an independent cohort.", "CLI + Java · Source build"),
-    "predictions-and-contrasts": ("Predictions, scenarios, and marginal effects", "Report expected responses, standardized scenario contrasts, risk ratios, and marginal effects with covariance-aware uncertainty.", "CLI + Java · Source build"),
-    "instrumental-variable-regression": ("Individual-level instrumental-variable regression", "Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.", "CLI + Java · Source build"),
-    "conditional-score-conditioning": ("Summary-only conditional score analysis", "Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results.", "CLI + Java · Source build"),
-    "latent-confounders-and-batch": ("Latent confounders and batch effects", "Estimate unknown sample factors with PCA, SVA, AutoSVA, or PEER, and adjust known batches with ComBat.", "CLI + Java · Source build"),
-    "differential-regions-testing-imputation": ("Differential, regional, multiple-testing, and imputation workflows", "Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.", "CLI + Java · Source build"),
+    "acat-rare-variants": ("ACAT rare-variant tests", "Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.", "CLI + Java · v0.3.6"),
+    "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.", "CLI + Java · v0.3.6"),
+    "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model.", "CLI + Java · v0.3.6"),
+    "predicted-omics": ("Genetically predicted TWAS and PWAS", "Connect molecular prediction weights to GWAS evidence with explicit allele, scale and LD alignment.", "CLI + Java · v0.3.6"),
+    "genomic-factor": ("Shared genetic factors", "Model shared genetic variation and inspect common-factor SNP effects alongside heterogeneity.", "CLI + Java · v0.3.6"),
+    "prediction-scores": ("Prediction scores", "Train portable scores and evaluate frozen predictions in an independent cohort.", "CLI + Java · v0.3.6"),
+    "predictions-and-contrasts": ("Predictions, scenarios, and marginal effects", "Report expected responses, standardized scenario contrasts, risk ratios, and marginal effects with covariance-aware uncertainty.", "CLI + Java · v0.3.6"),
+    "instrumental-variable-regression": ("Individual-level instrumental-variable regression", "Fit linear 2SLS models with robust or clustered inference, instrument-strength diagnostics, and explicit identification limits.", "CLI + Java · v0.3.6"),
+    "conditional-score-conditioning": ("Summary-only conditional score analysis", "Import compatible cohort score blocks, condition by Schur complement, and pool auditable aggregate-data results.", "CLI + Java · v0.3.6"),
+    "latent-confounders-and-batch": ("Latent confounders and batch effects", "Estimate unknown sample factors with PCA, SVA, AutoSVA, or PEER, and adjust known batches with ComBat.", "CLI + Java · v0.3.6"),
+    "differential-regions-testing-imputation": ("Differential, regional, multiple-testing, and imputation workflows", "Run moderated continuous or count differential analysis, spatial EWAS regions, prespecified adaptive or hierarchical testing, and uncertainty-aware multiple imputation.", "CLI + Java · v0.3.6"),
 }
 
-def render(source, destination, title, description, root, eyebrow="CLI + Java · Source build"):
+def render(source, destination, title, description, root, eyebrow="CLI + Java · v0.3.6"):
     text = source.read_text(encoding="utf-8").split("\n", 1)[1]
     md = markdown.Markdown(extensions=["fenced_code", "tables", "toc"])
     body = md.convert(text)

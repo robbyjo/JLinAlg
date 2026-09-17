@@ -23,7 +23,7 @@ For a numeric observation table, the source-build CLI fits the same estimator
 and writes separate coefficient, strength-diagnostic, and manifest tables:
 
 ```powershell
-java -jar build/cli/jlinalg-0.3.5.jar iv-regression `
+java -jar build/cli/jlinalg-0.3.6.jar iv-regression `
   --input cohort.tsv `
   --response outcome `
   --exogenous age,sex `
