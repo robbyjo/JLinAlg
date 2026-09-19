@@ -10,6 +10,8 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "censored-ordinal": ("Censored and ordinal regression", "Fit Tobit, parametric survival-time and ordered logit/probit likelihoods with validated covariance.", "CLI + Java · Source build"),
+    "sampling-models": ("Rare-event and survey inference", "Separate coefficient and prevalence corrections, and model sampling weights, strata and PSUs explicitly.", "CLI + Java · Source build"),
     "acat-rare-variants": ("ACAT rare-variant tests", "Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.", "CLI + Java · v0.3.6"),
     "enrichment": ("Gene-set enrichment", "Define analysis-specific backgrounds, select defensible tests, and interpret overlapping gene, disease and phenotype sets.", "CLI + Java · v0.3.6"),
     "ldsc": ("LDSC genetic architecture", "Estimate heritability and shared genetic architecture, then carry sampling uncertainty into the next model.", "CLI + Java · v0.3.6"),
@@ -61,6 +63,9 @@ render(ROOT / "docs/xwas-followup-validation.md", ROOT / "site/xwas-followup-val
 render(ROOT / "docs/latent-confounder-validation.md", ROOT / "site/latent-confounder-validation.html",
        "Latent-confounder validation and source audit", "Pinned upstream sources, numerical reference gates, performance design, and explicit implementation boundaries.", "./",
        "Source audit · Reproducible validation")
+render(ROOT / "docs/regression-inference-validation.md", ROOT / "site/regression-inference-validation.html",
+       "Regression inference validation", "Independent R fixtures, numerical checks, workload timings and estimator boundaries.", "./",
+       "Source build · Reproducible validation")
 render(ROOT / "docs/inference-workflows-validation.md", ROOT / "site/inference-workflows-validation.html",
        "Modern inference workflow validation", "Frozen Bioconductor comparisons, independent formula checks, reproducible commands, and explicit estimator boundaries.", "./",
        "Source audit · Reproducible validation")

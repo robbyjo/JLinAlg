@@ -216,6 +216,9 @@ tasks.register('checkWebsite') {
         }
 
         List<String> requiredPages = [
+            'regression-inference-validation.html',
+            'vignettes/censored-ordinal.html',
+            'vignettes/sampling-models.html',
             'vignettes/acat-rare-variants.html',
             'xwas-followup-validation.html',
             'latent-confounder-validation.html',
@@ -359,6 +362,8 @@ tasks.register('checkWebsite') {
         }
 
         List<String> cliExamplePages = [
+            'vignettes/censored-ordinal.html',
+            'vignettes/sampling-models.html',
             'vignettes/acat-rare-variants.html',
             'vignettes/ldsc.html',
             'vignettes/predicted-omics.html',
@@ -464,6 +469,15 @@ tasks.register('benchmarkXwasFollowup', JavaExec) {
     dependsOn tasks.named('benchmarkClasses')
     classpath = sourceSets.benchmark.runtimeClasspath
     mainClass = 'org.jlinalg.benchmark.XwasFollowupBenchmark'
+    jvmArgs '-Xms64m', '-Xmx1g'
+}
+
+tasks.register('benchmarkRegressionInference', JavaExec) {
+    group = 'verification'
+    description = 'Times R-checked censored, ordinal, rare-event and survey regression fixtures.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.RegressionInferenceBenchmark'
     jvmArgs '-Xms64m', '-Xmx1g'
 }
 

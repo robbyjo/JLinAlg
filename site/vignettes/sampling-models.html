@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Separate coefficient and prevalence corrections, and model sampling weights, strata and PSUs explicitly."><title>Rare-event and survey inference · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Rare-event and survey inference</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Rare-event and survey inference</h1><p>Separate coefficient and prevalence corrections, and model sampling weights, strata and PSUs explicitly.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Build these source additions with <code>./gradlew executableJar</code> (Windows:
+<code>.\gradlew.bat executableJar</code>). The examples use a synthetic 240-row fixture.
+Input is CSV/TSV with explicit numeric predictors and complete finite outcomes.
+Both commands include an intercept and write coefficient, metadata and log files.</p>
+<h2 id="rare-event-logistic-coefficient-and-prevalence-corrections">Rare-event logistic coefficient and prevalence corrections</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar rare-events-logit --input src/test/resources/r-reference/regression-inference/survey.tsv --response rare --predictors c,z1 --out build/inference/rare-bias.tsv
+java -jar build/cli/jlinalg-0.3.6.jar rare-events-logit --input src/test/resources/r-reference/regression-inference/survey.tsv --response rare --predictors c,z1 --bias-correction false --prevalence 0.04 --out build/inference/rare-prior.tsv
+java -jar build/cli/jlinalg-0.3.6.jar rare-events-logit --input src/test/resources/r-reference/regression-inference/survey.tsv --response rare --predictors c,z1 --prevalence 0.04 --out build/inference/rare-both.tsv
+</code></pre></div>
+<p>Responses must be individual 0/1 observations. <code>--bias-correction true</code> is the
+default King–Zeng first-order coefficient correction. <code>--prevalence</code> separately
+specifies a known population event proportion for prior correction under
+case-control sampling. The intercept receives logit(population prevalence)
+minus logit(sample prevalence). If both corrections are requested, the bias
+equations incorporate case/control sampling weights before the prior shift.
+They do not fit a weighted pseudo-likelihood. Metadata records the sample
+prevalence, bias option and prior intercept shift.</p>
+<p>SEs are the underlying sample ML Fisher covariance, a first-order approximation.
+They do not propagate uncertainty in supplied prevalence or give a finite-sample
+coverage guarantee after bias correction. This is not iterative Firth fitting,
+a remedy for separation, or rare-variant group-tail calibration. The underlying
+logistic fit must converge at full rank. Both outcome classes are required.</p>
+<p>Java uses <code>RareEventsLogistic.fit(y, design, biasCorrection, prevalence)</code>.
+Supply a unit intercept as the first design column and <code>null</code> to omit prevalence
+adjustment. The result exposes the coefficient-bias vector and prior shift
+separately from the corrected coefficients.</p>
+<h2 id="survey-regression-with-weights-strata-and-psus">Survey regression with weights, strata and PSUs</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar survey-regression --input src/test/resources/r-reference/regression-inference/survey.tsv --response y --predictors c,z1 --weights weight --strata stratum --psu cluster --family gaussian --out build/inference/survey-gaussian.tsv
+java -jar build/cli/jlinalg-0.3.6.jar survey-regression --input src/test/resources/r-reference/regression-inference/survey.tsv --response rare --predictors c,z1 --weights weight --strata stratum --psu cluster --family logit --out build/inference/survey-logit.tsv
+</code></pre></div>
+<p>Here <code>weight</code> contains positive sampling weights; <code>stratum</code> identifies sampling
+strata and <code>cluster</code> identifies primary sampling units (PSUs). PSU labels are
+nested within strata. Each stratum must contain at least two observed PSUs;
+single-PSU strata fail rather than silently contributing zero variance.</p>
+<p>The coefficient fit uses sampling weights rescaled to mean one. Covariance
+aggregates linearized score contributions within PSU, centers those totals
+within each stratum, and applies the stratum's m/(m-1) multiplier. Multiplying
+every weight by a positive constant does not change estimates or covariance.</p>
+<p>Supported families: <code>gaussian</code> (default), <code>logit</code>, <code>probit</code>, and <code>poisson</code>.
+Binomial responses are individual 0/1 outcomes; sampling weights are not trial
+counts. Coefficient tests and intervals use <strong>PSUs minus strata</strong> t degrees of
+freedom, explicitly rather than <code>svyglm</code>'s default model-adjusted residual df.
+The metadata records the df and design counts.</p>
+<p>This is a with-replacement, one-stage Taylor design variance or an ultimate-PSU
+approximation. It does not implement finite population corrections, certainty
+PSUs, multistage variance, replicate weights, calibration/raking, or domain
+estimation by subsetting. Ordinary <code>--weights</code> in another regression command
+does not provide this design variance.</p>
+<p>Java:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>var sampling = new SurveyRegression.Design(weights, strata, psu);
+var fit = SurveyRegression.fit(y, design, GlmFamilies.gaussian(), sampling);
+double[] covariance = fit.covariance();
+int df = fit.degreesOfFreedom();
+</code></pre></div>
+<p>See <a href="../regression-inference-validation.html">validation</a> and
+<a href="../citations.html">method references</a>.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-sampling-models">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-sampling-models">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#king-zeng-2001">King (2001) — rare-events logistic regression</a></li><li><a href="../citations.html#king-zeng-isq-2001">King (2001) — case-control sampling</a></li><li><a href="../citations.html#lumley-survey-2004">Lumley (2004) — survey regression</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#rare-event-logistic-coefficient-and-prevalence-corrections">Rare-event logistic coefficient and prevalence corrections</a><a href="#survey-regression-with-weights-strata-and-psus">Survey regression with weights, strata and PSUs</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

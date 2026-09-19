@@ -15,7 +15,7 @@ final class CliRunLogging {
         "mr-xwas", "mr-estimate", "mr-mvmr", "mr-multivariate",
         "beta-regression", "penalized-regression",
         "ldsc", "twas", "pwas", "genomic-factor", "score-train", "score-apply",
-        "conditional-score");
+        "conditional-score", "censored-regression", "ordinal-regression", "rare-events-logit", "survey-regression");
 
     static boolean accepts(String command) { return COMMANDS.contains(command); }
 

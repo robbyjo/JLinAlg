@@ -1,3 +1,16 @@
+# Unreleased
+
+## Censored, ordinal, rare-event and survey regression
+
+- Added censored Gaussian, Weibull/lognormal/exponential AFT, cumulative-link
+  ordinal ML, King-Zeng coefficient/prior corrections, and stratified PSU Taylor
+  survey covariance through four logged CLI subcommands.
+- Added prediction exports, R fixtures, numerical and CLI checks, a reproducible
+  benchmark, two tutorials/vignettes, and citations in the existing reference page.
+- Completed the five remaining Zelig-inspired TODOs; eight research items remain
+  open. Existing probit, prediction, IV, xWAS and ARIMA APIs are preserved.
+  See [validation and boundaries](docs/regression-inference-validation.md).
+
 # JLinAlg 0.3.6
 
 ## Differential, regional, multiplicity, and imputation inference

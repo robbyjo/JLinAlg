@@ -51,6 +51,11 @@ links each method family to its primary publication.
 
 ## Numerical accuracy and performance
 
+The source build adds [Tobit, AFT and ordinal likelihoods](docs/vignettes/censored-ordinal.md)
+and [rare-event and survey inference](docs/vignettes/sampling-models.md).
+See [regression validation](docs/regression-inference-validation.md) and the
+[scientific reference page](docs/CITATIONS.md) for tested scope and assumptions.
+
 Validation includes independent R comparisons and analytic/reference fixtures.
 For example, tested SEM coefficient errors were below `7.4e-8`. A synthetic
 20,000-variant score meta-analysis ran about **2.46× faster than RAREMETAL**

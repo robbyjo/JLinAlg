@@ -32,6 +32,9 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && java.util.Set.of("censored-regression", "ordinal-regression",
+                "rare-events-logit", "survey-regression").contains(arguments[0]))
+            return InferenceCli.run(arguments[0], Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
         if (Arrays.asList(arguments).contains("--enrichment"))
             return EnrichmentCli.run(arguments, output, errorOutput);
         if (arguments.length > 0 && java.util.Set.of("ldsc", "twas", "pwas", "genomic-factor").contains(arguments[0]))
@@ -184,6 +187,10 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar censored-regression --help
+              java -jar jlinalg-<version>.jar ordinal-regression --help
+              java -jar jlinalg-<version>.jar rare-events-logit --help
+              java -jar jlinalg-<version>.jar survey-regression --help
               java -jar jlinalg-<version>.jar --enrichment GO:BP --enrichment-db DIRECTORY
                 --input results.csv --input-id probe_id --selection "FDR < 0.05" --out enrichment.tsv
               java -jar jlinalg-<version>.jar --enrichment GO --download NEW_DIRECTORY

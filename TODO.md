@@ -1,46 +1,27 @@
 # Development TODO
 
-Last reviewed: 2026-09-14.
+Last reviewed: 2026-09-19.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
-the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), and the
-[release notes](RELEASE_NOTES.md).
+the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), the
+[release notes](RELEASE_NOTES.md), and the
+[regression inference validation report](docs/regression-inference-validation.md).
 
 ## xWAS analysis additions
+
+Implemented differential, regional, multiplicity and imputation workflows are
+documented in [modern inference validation](docs/inference-workflows-validation.md).
 
 The first four follow-up workflows (unpartitioned LDSC, genetically predicted
 TWAS/PWAS, a single genetic factor with conditional SNP tests, and prediction
 score training/application/evaluation) are implemented in the source build.
 See [xWAS workflow validation and scope](docs/xwas-followup-validation.md).
 
-- [x] **Empirical-Bayes differential analysis.** Added cross-feature Gaussian
-  variance moderation, normalized voom precision weights, and a separate
-  median-ratio/negative-binomial dispersion-shrinkage contract. Frozen limma,
-  voom, edgeR and DESeq2 fixtures plus independent likelihood checks are in the
-  [validation report](docs/inference-workflows-validation.md).
-- [x] **Latent-confounder and batch-effect estimation.** Added PCA, standard
-  SVA, AutoSVA, dense PEER, and continuous-data ComBat with protected designs,
-  batch/design rank checks, deterministic artifacts, source-pinned fixtures,
-  and dedicated CLI workflows. See the
-  [vignette](docs/vignettes/latent-confounders-and-batch.md) and
-  [validation report](docs/latent-confounder-validation.md).
 - [ ] **Frozen confounder projection and count-aware adjustment.** Add
   fold-owned fit/freeze/apply artifacts for prediction, plus independently
   validated RUV and ComBat-Seq contracts. Do not refit preprocessing on held-
   out folds or apply Gaussian ComBat directly to raw counts.
-- [x] **Region-level EWAS analysis.** Added build-required coordinate runs,
-  signed Stouffer aggregation under an explicit exponential spatial covariance,
-  probe coverage/gap metadata, and complete-region BH.
-- [x] **Adaptive and hierarchical multiple testing.** Added cross-fitted
-  IHW-style weighting with an explicit null-independence acknowledgement and
-  hierarchy-gated weighted Bonferroni FWER. Complete families retain failures
-  as p=1. See the
-  [vignette](docs/vignettes/differential-regions-testing-imputation.md).
-- [x] **Multiple-imputation inference.** Added reproducible independent MICE
-  streams, continuous predictive mean matching, binary/categorical draws,
-  diagnostics, Rubin variance pooling and Barnard-Rubin pooled degrees of
-  freedom. This remains distinct from deterministic mean imputation.
 
 Further extensions of the new workflows remain explicit scope boundaries:
 partitioned/two-step/liability-scale LDSC and native summary munging; native
@@ -49,45 +30,6 @@ multiple genomic factors, robust DWLS and propagation of measurement-model
 uncertainty into SNP effects; LD-aware Bayesian PRS, logistic score training,
 grouped CV and absolute-risk calibration. Current methods do not claim full
 parity with LDSC, MetaXcan, GenomicSEM, or PRS software suites.
-
-## Zelig-inspired additions — high priority
-
-The original high-priority tranche is implemented in the source build:
-[binary probit plus unified predictions and contrasts](docs/vignettes/predictions-and-contrasts.md)
-and [individual-level IV/2SLS](docs/vignettes/instrumental-variable-regression.md).
-The prediction API distinguishes population averaging from average-covariate
-evaluation and mean uncertainty from future-outcome variation. IV inference
-uses the structural residuals, supports robust/cluster covariance, and reports
-identification and instrument-strength diagnostics.
-
-## Zelig-inspired additions — medium priority
-
-- [ ] **Rare-events logistic regression.** Implement King–Zeng coefficient-bias
-  correction and population-prevalence adjustments for case-control sampling.
-  Separate bias correction from prevalence correction and explicitly report
-  separation or failed underlying logistic fits.
-  Reference: [Zelig ReLogit source](https://github.com/IQSS/Zelig/blob/master/R/model-relogit.R).
-- [ ] **Tobit / censored Gaussian regression.** Add likelihood-based regression
-  for measurements censored at known limits. Expose latent-response means,
-  observed-response means, and censoring probabilities separately, with stable
-  tail calculations and covariance inference.
-  Reference: [Zelig Tobit](https://christophergandrud.github.io/Zelig/articles/zelig_tobit.html).
-- [ ] **Parametric survival regression.** Add Weibull, exponential, and lognormal
-  accelerated-failure-time models with censoring, survival-time predictions,
-  time ratios, and uncertainty estimates. Document distribution/scale
-  parameterizations and validate against `survival::survreg`.
-  References: [Zelig model catalog](https://github.com/IQSS/Zelig/tree/master/R),
-  [survreg documentation](https://stat.ethz.ch/R-manual/R-devel/RHOME/library/survival/html/survreg.html).
-- [ ] **Ordered logit/probit by maximum likelihood.** Add a dedicated
-  cumulative-link ordinal likelihood fitter with ordered thresholds, category
-  probabilities, and covariance inference. This extends the existing ordinal
-  GEE, adjacent-category logits, and ordinal SEM with a distinct estimator.
-  Reference: [ZeligChoice ordered logit](https://christophergandrud.github.io/Zelig/articles/zeligchoice_ologit.html).
-- [ ] **Survey-design inference.** Add an explicit sampling-design abstraction
-  and design-based regression inference, including sampling weights, strata,
-  and primary sampling units. Ordinary regression weights alone do not supply
-  survey-design variance estimates. Validate against the R `survey` package.
-  Reference: [survey GLM documentation](https://github.com/cran/survey/blob/master/man/svyglm.Rd).
 
 ## Rare-variant meta-analysis — further scope
 

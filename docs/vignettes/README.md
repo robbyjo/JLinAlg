@@ -25,6 +25,8 @@ testing, and multiple-imputation inference. Examples naming
 
 | Vignette | Features covered |
 | --- | --- |
+| [Censored and ordinal regression](censored-ordinal.md) | Tobit; Weibull, lognormal and exponential AFT; ordered logit/probit ML (source build) |
+| [Rare-event and survey inference](sampling-models.md) | King-Zeng/prior corrections and stratified PSU Taylor covariance (source build) |
 | [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (v0.3.6+) |
 | [Genetically predicted TWAS/PWAS](predicted-omics.md) | prediction weights, allele/LD alignment, molecular Z tests and joint tissue/model inference (v0.3.6+) |
 | [Shared genetic factors](genomic-factor.md) | full-WLS genetic measurement model and conditional SNP effects/heterogeneity (v0.3.6+) |

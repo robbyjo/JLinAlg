@@ -473,3 +473,29 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 <a id="wilkinson-rogers-1973"></a>
 - **G. N. Wilkinson and C. E. Rogers (1973).** Symbolic description of factorial models for analysis of variance. *Applied Statistics 22:392-399.* [DOI: 10.2307/2346786](https://doi.org/10.2307/2346786)
   - JLinAlg methods: statistical formulas, model matrices.
+
+## Censored, ordinal, and sampling models
+
+<a id="tobin-1958"></a>
+- **James Tobin (1958).** Estimation of Relationships for Limited Dependent Variables. *Econometrica 26:24-36.* [DOI: 10.2307/1907382](https://doi.org/10.2307/1907382)
+  - JLinAlg methods: Tobit, censored Gaussian regression.
+
+<a id="kalbfleisch-prentice-2002"></a>
+- **John D. Kalbfleisch and Ross L. Prentice (2002).** The Statistical Analysis of Failure Time Data, Second Edition. *Wiley Series in Probability and Statistics.* [DOI: 10.1002/9781118032985](https://doi.org/10.1002/9781118032985)
+  - JLinAlg methods: parametric survival regression, accelerated failure time, censored likelihood.
+
+<a id="mccullagh-1980"></a>
+- **Peter McCullagh (1980).** Regression Models for Ordinal Data. *Journal of the Royal Statistical Society Series B 42:109-142.* [DOI: 10.1111/j.2517-6161.1980.tb01109.x](https://doi.org/10.1111/j.2517-6161.1980.tb01109.x)
+  - JLinAlg methods: ordered logit, ordered probit, cumulative link models.
+
+<a id="king-zeng-2001"></a>
+- **Gary King and Langche Zeng (2001).** Logistic Regression in Rare Events Data. *Political Analysis 9:137-163.* [Primary source](https://gking.harvard.edu/files/0s.pdf)
+  - JLinAlg methods: rare-events logistic regression, coefficient-bias correction.
+
+<a id="king-zeng-isq-2001"></a>
+- **Gary King and Langche Zeng (2001).** Explaining Rare Events in International Relations. *International Studies Quarterly 45:693-715.* [Primary source](https://gking.harvard.edu/files/gking/files/baby0s.pdf)
+  - JLinAlg methods: case-control sampling, population-prevalence correction.
+
+<a id="lumley-survey-2004"></a>
+- **Thomas Lumley (2004).** Analysis of Complex Survey Samples. *Journal of Statistical Software 9(8):1-19.* [DOI: 10.18637/jss.v009.i08](https://doi.org/10.18637/jss.v009.i08)
+  - JLinAlg methods: survey regression, sampling weights, stratified PSU Taylor covariance.

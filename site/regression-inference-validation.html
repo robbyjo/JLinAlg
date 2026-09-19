@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Independent R fixtures, numerical checks, workload timings and estimator boundaries."><title>Regression inference validation · JLinAlg</title>
+<link rel="stylesheet" href="./assets/styles.css"><script src="./assets/app.js" defer></script></head>
+<body><site-header root="./"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="./index.html">Home</a><span>/</span><a href="./vignettes/index.html">Vignettes</a><span>/</span><span>Regression inference validation</span></div>
+<span class="eyebrow">Source build · Reproducible validation</span><h1>Regression inference validation</h1><p>Independent R fixtures, numerical checks, workload timings and estimator boundaries.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Date: 2026-09-19. These source-build additions finish the five remaining
+Zelig-inspired regression TODOs on the synchronized v0.3.6 code base.
+The previously published probit, prediction/contrast, IV, xWAS and ARIMA
+workflows retain their existing APIs. Eight research items remain open in
+<a href="https://github.com/robbyjo/JLinAlg/blob/main/TODO.md">TODO</a>; this change does not claim to complete that backlog.</p>
+<h2 id="numerical-references">Numerical references</h2>
+<p><code>src/test/resources/r-reference/generate-regression-inference.R</code> generates
+the checked-in tables and <code>reference.properties</code> under
+<code>src/test/resources/r-reference/regression-inference</code>. The deterministic seed
+is 20260919; each fixture has 240 rows. Versions used: R 4.6.1, survival 3.8-6,
+MASS 7.3-65, and survey 4.5. R is required only to regenerate references.
+The generator prepends <code>build/r-library</code> for optional local packages.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Independent comparison</th>
+<th>Absolute test tolerance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Censored Gaussian</td>
+<td><code>survival::survreg</code>, left/exact/right observations</td>
+<td>beta/scale 2e-6; covariance/log likelihood 2e-7</td>
+</tr>
+<tr>
+<td>Lognormal, Weibull, exponential AFT</td>
+<td><code>survival::survreg</code>, right censoring</td>
+<td>beta/scale 2e-6; covariance/log likelihood 2e-7</td>
+</tr>
+<tr>
+<td>Ordered logit/probit</td>
+<td><code>MASS::polr</code> with fitted ordered thresholds</td>
+<td>beta/threshold/covariance 3e-6; log likelihood 1e-7</td>
+</tr>
+<tr>
+<td>Rare-events logit</td>
+<td>Independent R King–Zeng weighted-bias and prior-shift equations; ordinary ML comparison</td>
+<td>coefficients/covariance 2e-7</td>
+</tr>
+<tr>
+<td>Survey-design regression</td>
+<td><code>survey::svyglm</code>, Gaussian/logit/probit/Poisson</td>
+<td>coefficients/covariance 2e-6</td>
+</tr>
+</tbody>
+</table>
+<p>These are fixture tolerances, not universal accuracy bounds. Zelig is a workflow
+reference; the tests use underlying estimators or separately implemented equations.
+The rare-event reference tests independently assembled correction equations,
+not a claimed full Zelig execution. Additional checks cover singleton-stratum
+rejection, survey weight-scale invariance, AFT time-unit equivariance,
+ordered-probability normalization, separated-fit rejection, and invalid data.
+CLI tests exercise every new command, prediction files, metadata, run logs,
+invalid controls and output-collision preservation. All 11 executable commands
+in the two tutorials were also run against the assembled source-build JAR.</p>
+<p>The full <code>check executableJar</code> gate passed on 2026-09-19: 873 tests discovered,
+870 passed, zero failures/errors, and three optional native CHOLMOD tests
+skipped because that backend was unavailable. The eight new test methods all
+passed. Website structure/link checks, citation-index consistency, Javadoc,
+and the regression benchmark also passed.</p>
+<p>Observed-information covariance for censored/ordinal ML differences the
+<strong>analytic score</strong>, checks two step sizes, requires positive-definite information,
+checks the inverse residual, and requires a small Newton step. It does not add a
+ridge or substitute a pseudoinverse for unidentified uncertainty.</p>
+<h2 id="reproduce">Reproduce</h2>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>&amp; 'C:/Program Files/R/R-4.6.1/bin/Rscript.exe' src/test/resources/r-reference/generate-regression-inference.R
+New-Item -ItemType Directory -Force build/regression-temp | Out-Null
+$env:JAVA_TOOL_OPTIONS='-Djava.io.tmpdir=E:/Projects/JLinAlg/build/regression-temp'
+$env:GRADLE_USER_HOME='E:/Projects/JLinAlg/build/validation-gradle-home'
+.\gradlew.bat --no-daemon check executableJar benchmarkRegressionInference
+</code></pre></div>
+<p>The workspace-specific temporary paths avoid Windows temporary-directory access
+failures observed on this host. Other installations can use their ordinary
+Gradle user home and JVM temporary directory. The usual portable gate is
+<code>./gradlew check executableJar benchmarkRegressionInference</code>.</p>
+<h2 id="measured-workload">Measured workload</h2>
+<p>CPU, Java 25 on Windows, 240 observations with two numeric predictors; fixtures
+are already in memory. Three warmups and median of seven repetitions per method,
+JVM heap 64 MiB initial / 1 GiB maximum. These measurements exclude CLI startup,
+file parsing and reference generation. They do not establish large-data scaling
+or a speed advantage over R.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th style="text-align: right;">Median milliseconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Censored Gaussian</td>
+<td style="text-align: right;">0.7083</td>
+</tr>
+<tr>
+<td>Lognormal AFT</td>
+<td style="text-align: right;">0.6404</td>
+</tr>
+<tr>
+<td>Weibull AFT</td>
+<td style="text-align: right;">0.4347</td>
+</tr>
+<tr>
+<td>Exponential AFT</td>
+<td style="text-align: right;">0.3692</td>
+</tr>
+<tr>
+<td>Ordered logit</td>
+<td style="text-align: right;">0.9015</td>
+</tr>
+<tr>
+<td>Ordered probit</td>
+<td style="text-align: right;">1.3342</td>
+</tr>
+<tr>
+<td>Rare-events coefficient/prior correction</td>
+<td style="text-align: right;">2.3124</td>
+</tr>
+<tr>
+<td>Survey Gaussian</td>
+<td style="text-align: right;">0.6201</td>
+</tr>
+</tbody>
+</table>
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+<li>Censored models support left, exact and right observations, with independent
+  censoring given covariates. No interval censoring, truncation, delayed entry,
+  frailty, observation weights or robust covariance are supplied here.</li>
+<li>Ordinal fits assume common slopes and nonempty prespecified categories.
+  Thresholds supply location, so the predictor design excludes an intercept.</li>
+<li>Rare-event correction requires a successful sample logistic ML fit. Fisher
+  covariance is first-order, with supplied population prevalence treated as
+  known. This is not finite-sample rare-variant tail calibration.</li>
+<li>Survey variance is with-replacement stratified PSU Taylor linearization, with
+  no finite population correction. Singleton strata fail. Tests explicitly use
+  PSUs minus strata df. Domain, replicate-weight and multistage inference remain
+  outside this contract.</li>
+</ul>
+<p>See <a href="vignettes/censored-ordinal.html">censored/ordinal tutorial</a>,
+<a href="vignettes/sampling-models.html">sampling-model tutorial</a>, and
+<a href="citations.html">method references</a>.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#numerical-references">Numerical references</a><a href="#reproduce">Reproduce</a><a href="#measured-workload">Measured workload</a><a href="#boundaries">Boundaries</a></aside></div>
+</main><site-footer root="./"></site-footer></body></html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Fit Tobit, parametric survival-time and ordered logit/probit likelihoods with validated covariance."><title>Censored and ordinal regression · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Censored and ordinal regression</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Censored and ordinal regression</h1><p>Fit Tobit, parametric survival-time and ordered logit/probit likelihoods with validated covariance.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>These source-build commands use maximum likelihood, analytic scores, and
+observed-information covariance. They require identifiable designs and a
+resolved score/Newton step. Failed convergence, unresolved information, and
+separation do not produce successful inference outputs. Build with
+<code>./gradlew executableJar</code> or <code>.\gradlew.bat executableJar</code> on Windows.</p>
+<h2 id="censored-gaussian-regression-tobit">Censored Gaussian regression (Tobit)</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar censored-regression --input src/test/resources/r-reference/regression-inference/censored.tsv --response tobit --censor cens --predictors c,z1 --distribution gaussian --predict src/test/resources/r-reference/regression-inference/censored.tsv --lower -0.4 --upper 2.5 --out build/inference/tobit.tsv
+</code></pre></div>
+<p>The synthetic table contains a normally distributed latent response censored
+at -0.4 and 2.5. The response column stores the observed value or censoring
+limit. Censor codes are <strong>-1 left, 0 exact, 1 right</strong>. A censored row contributes
+a tail probability, not a normal density at the limit. Limits may differ by row
+in fitting because each row supplies its actual limit.</p>
+<p>The coefficient table includes an intercept, slopes, and <code>log(scale)</code>.
+<code>scale</code> is the residual SD, not the variance. Prediction output separates:</p>
+<ul>
+<li><code>latent_mean</code>: the uncensored Gaussian location x beta;</li>
+<li><code>observed_mean</code>: E[clip(Y, lower, upper)];</li>
+<li>left and right censoring probabilities.</li>
+</ul>
+<p>Prediction limits are fixed by <code>--lower</code>/<code>--upper</code>; an omitted side is unbounded.
+Fitting does not infer censoring from equality with a limit: supply the codes.
+Do not use this model for truncation or for a structural point mass at zero.</p>
+<h2 id="parametric-accelerated-failure-time-models">Parametric accelerated-failure-time models</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar censored-regression --input src/test/resources/r-reference/regression-inference/censored.tsv --response time --censor censTime --predictors c,z1 --distribution weibull --predict src/test/resources/r-reference/regression-inference/censored.tsv --time 2 --out build/inference/weibull.tsv
+java -jar build/cli/jlinalg-0.3.6.jar censored-regression --input src/test/resources/r-reference/regression-inference/censored.tsv --response time --censor censTime --predictors c,z1 --distribution lognormal --out build/inference/lognormal.tsv
+java -jar build/cli/jlinalg-0.3.6.jar censored-regression --input src/test/resources/r-reference/regression-inference/censored.tsv --response time --censor censTime --predictors c,z1 --distribution exponential --out build/inference/exponential.tsv
+</code></pre></div>
+<p>Times and censoring limits must be positive. Here <code>censTime=1</code> means right
+censored, <strong>not an event</strong>; event indicators must be converted before use.
+All models have <code>log(T) = x beta + scale * error</code>. Lognormal errors are standard
+normal. Weibull errors have CDF <code>1-exp(-exp(error))</code>; therefore Weibull shape is
+<code>1/scale</code> and its conventional scale is <code>exp(x beta)</code>. Exponential fixes the
+log-time scale to one and estimates only regression coefficients.</p>
+<p>Prediction output contains the median time, a 95% confidence interval for that
+estimated median (including fitted scale uncertainty), and survival probability
+at <code>--time</code>. The median confidence interval is not a future survival-time
+prediction interval. A one-unit change in a direct predictor multiplies all
+time quantiles by <code>exp(beta)</code>; it is a time ratio rather than a hazard ratio.</p>
+<p>Java:</p>
+<div class="code-window"><div class="code-bar"><span>java</span></div><pre><code>CensoredRegression.Result fit = CensoredRegression.fit(time, design, censor,
+    CensoredRegression.Distribution.WEIBULL);
+double median = fit.timeQuantile(row, 0.5);
+double survival = fit.survival(row, 2.0);
+double[] medianCi = fit.timeQuantileInterval(row, 0.5, 0.95);
+double[] timeRatio = fit.timeRatio(scenarioA, scenarioB, 0.95);
+</code></pre></div>
+<p>Covariance order is coefficients followed by log(scale), except exponential.
+The Gaussian API additionally exposes <code>location</code>, <code>observedMean</code>, and
+<code>leftCensoringProbability</code>. No interval censoring, delayed entry, truncation,
+frailty, competing risks, robust sandwich covariance, or observation weights
+are supplied by this new fitter. Censoring must be independent conditional on
+the design. At least two exact observations are required; this does not alone
+guarantee identification.</p>
+<h2 id="ordered-logit-or-probit-by-maximum-likelihood">Ordered logit or probit by maximum likelihood</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar ordinal-regression --input src/test/resources/r-reference/regression-inference/ordinal.tsv --response ordinal --predictors c,z1 --categories 4 --link logit --predict src/test/resources/r-reference/regression-inference/ordinal.tsv --out build/inference/ordered-logit.tsv
+java -jar build/cli/jlinalg-0.3.6.jar ordinal-regression --input src/test/resources/r-reference/regression-inference/ordinal.tsv --response ordinal --predictors c,z1 --categories 4 --link probit --out build/inference/ordered-probit.tsv
+</code></pre></div>
+<p>Responses are prespecified integers 0 through K-1, with every category observed.
+The likelihood is <code>P(Y &lt;= k | x) = F(threshold[k] - x beta)</code>. Increasing a
+predictor with a positive coefficient shifts probability toward higher categories.
+The link is logistic or normal. Threshold gaps use positive exponential
+coordinates, and reported thresholds/covariance are transformed back to their
+original coordinates. Numeric predictors <strong>exclude an intercept</strong>: thresholds
+supply location. An intercept or constant in their span is rejected.</p>
+<p>The model assumes common slopes across category boundaries (proportional odds
+for logit). It differs from ordinal GEE, adjacent-category logits and ordinal
+SEM. The <code>.predictions.tsv</code> reports each category's probability in row order.
+Java uses <code>OrdinalRegression.fit(y, predictors, K, Link.LOGIT)</code> and
+<code>fit.probabilities(row)</code>; covariance order is slopes then thresholds.</p>
+<p>See <a href="../regression-inference-validation.html">validation</a> for <code>survival::survreg</code>
+and <code>MASS::polr</code> comparisons and <a href="../citations.html">references</a> for methods.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-censored-ordinal">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-censored-ordinal">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#tobin-1958">Tobin (1958) — Tobit</a></li><li><a href="../citations.html#kalbfleisch-prentice-2002">Kalbfleisch (2002) — parametric survival regression</a></li><li><a href="../citations.html#mccullagh-1980">McCullagh (1980) — ordered logit</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#censored-gaussian-regression-tobit">Censored Gaussian regression (Tobit)</a><a href="#parametric-accelerated-failure-time-models">Parametric accelerated-failure-time models</a><a href="#ordered-logit-or-probit-by-maximum-likelihood">Ordered logit or probit by maximum likelihood</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

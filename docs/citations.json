@@ -1421,6 +1421,87 @@
         "statistical formulas",
         "model matrices"
       ]
+    },
+    {
+      "id": "tobin-1958",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "James Tobin",
+      "year": 1958,
+      "title": "Estimation of Relationships for Limited Dependent Variables",
+      "venue": "Econometrica 26:24-36",
+      "url": "https://doi.org/10.2307/1907382",
+      "features": [
+        "Tobit",
+        "censored Gaussian regression"
+      ]
+    },
+    {
+      "id": "kalbfleisch-prentice-2002",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "John D. Kalbfleisch and Ross L. Prentice",
+      "year": 2002,
+      "title": "The Statistical Analysis of Failure Time Data, Second Edition",
+      "venue": "Wiley Series in Probability and Statistics",
+      "url": "https://doi.org/10.1002/9781118032985",
+      "features": [
+        "parametric survival regression",
+        "accelerated failure time",
+        "censored likelihood"
+      ]
+    },
+    {
+      "id": "mccullagh-1980",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "Peter McCullagh",
+      "year": 1980,
+      "title": "Regression Models for Ordinal Data",
+      "venue": "Journal of the Royal Statistical Society Series B 42:109-142",
+      "url": "https://doi.org/10.1111/j.2517-6161.1980.tb01109.x",
+      "features": [
+        "ordered logit",
+        "ordered probit",
+        "cumulative link models"
+      ]
+    },
+    {
+      "id": "king-zeng-2001",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "Gary King and Langche Zeng",
+      "year": 2001,
+      "title": "Logistic Regression in Rare Events Data",
+      "venue": "Political Analysis 9:137-163",
+      "url": "https://gking.harvard.edu/files/0s.pdf",
+      "features": [
+        "rare-events logistic regression",
+        "coefficient-bias correction"
+      ]
+    },
+    {
+      "id": "king-zeng-isq-2001",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "Gary King and Langche Zeng",
+      "year": 2001,
+      "title": "Explaining Rare Events in International Relations",
+      "venue": "International Studies Quarterly 45:693-715",
+      "url": "https://gking.harvard.edu/files/gking/files/baby0s.pdf",
+      "features": [
+        "case-control sampling",
+        "population-prevalence correction"
+      ]
+    },
+    {
+      "id": "lumley-survey-2004",
+      "category": "Censored, ordinal, and sampling models",
+      "authors": "Thomas Lumley",
+      "year": 2004,
+      "title": "Analysis of Complex Survey Samples",
+      "venue": "Journal of Statistical Software 9(8):1-19",
+      "url": "https://doi.org/10.18637/jss.v009.i08",
+      "features": [
+        "survey regression",
+        "sampling weights",
+        "stratified PSU Taylor covariance"
+      ]
     }
   ],
   "pages": {
@@ -1689,6 +1770,16 @@
       "bowden-weighted-median-2016",
       "hemani-mrbase-2018",
       "benjamini-hochberg-1995"
+    ],
+    "censored-ordinal": [
+      "tobin-1958",
+      "kalbfleisch-prentice-2002",
+      "mccullagh-1980"
+    ],
+    "sampling-models": [
+      "king-zeng-2001",
+      "king-zeng-isq-2001",
+      "lumley-survey-2004"
     ]
   },
   "markdownAliases": {

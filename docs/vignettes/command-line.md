@@ -1,5 +1,9 @@
 # Command-line-only workflows
 
+Source builds after v0.3.6 add [Tobit/AFT and ordinal likelihoods](censored-ordinal.md)
+and [rare-event and survey-design regression](sampling-models.md). These use
+explicit numeric tables and dedicated subcommands with `--help`.
+
 JLinAlg v0.3.6 additionally provides [LDSC](ldsc.md),
 [genetically predicted TWAS/PWAS](predicted-omics.md),
 [genetic factors and common-factor GWAS](genomic-factor.md), and
