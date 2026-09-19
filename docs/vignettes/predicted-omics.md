@@ -84,12 +84,23 @@ PredictedOmics.Association result = PredictedOmics.test(
     alignedGwasZ, rawDosageWeights, genotypeSd, ldCorrelation);
 PredictedOmics.JointAssociation joint = PredictedOmics.joint(
     alignedGwasZ, modelByVariantWeights, genotypeSd, ldCorrelation);
+
+// Reuse validation and LD products for multiple marginals and a joint test.
+var prepared = PredictedOmics.prepare(
+    alignedGwasZ, modelByVariantWeights, genotypeSd, ldCorrelation);
+var marginals = prepared.associations();
+var combined = prepared.joint();
 ```
 
 Import `org.jlinalg.xwas.PredictedOmics`. LD is row-major. Singular PSD LD is
 allowed for a single model if its variance is numerically supported. Invalid
 correlations, absent alleles and zero predicted variance fail explicitly.
 Dense reference validation is O(variants cubed), so use locus-sized matrices.
+The prepared API and CLI validate LD once and compute one LD product per model.
+The model correlation matrix is built only for joint inference. Dependent models
+can still yield marginal results; their joint test rejects. For `n` variants and
+`k` models, preparation costs O(n³ + kn²), with O(kn) retained storage beyond LD;
+the optional joint calculation adds O(k²n + k³).
 
 Reference: [MetaXcan framework](https://github.com/hakyimlab/MetaXcan).
 The [validation report](../xwas-followup-validation.md) distinguishes independent

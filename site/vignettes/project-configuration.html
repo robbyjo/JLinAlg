@@ -41,8 +41,13 @@ names equal their CLI subcommand, including <code>meta-analysis</code> and <code
 <p>Option names omit the leading <code>--</code>. Scalar values become one CLI option; lists
 become repeated options, for example <code>cohort: [A=cohort-a.tsv, B=cohort-b.tsv]</code>.
 Maps merge by key; lists replace earlier lists. A null value removes an inherited
-option. Boolean <code>help</code>, <code>overwrite</code>, <code>no-log</code>, <code>resume</code>, and <code>version</code> are switches;
-other booleans become explicit <code>true</code>/<code>false</code> values. Quote strings that YAML 1.1
+option. Presence-only CLI switches require YAML booleans: <code>true</code> emits the switch
+and <code>false</code> omits it, including when overriding an inherited <code>true</code>. This covers
+common switches such as <code>help</code> and <code>overwrite</code>, and command-specific switches
+such as <code>meta-regression.no-intercept</code>, <code>arima-regression.smooth</code>, and
+<code>rare-meta.leave-cohort-out</code>. Arity follows the command: <code>joint</code> is a switch for
+<code>mr-estimate</code>, but takes an explicit <code>true</code>/<code>false</code> value for <code>twas</code> and <code>pwas</code>.
+Other valued booleans retain their explicit values. Quote strings that YAML 1.1
 would interpret as booleans or numbers, such as <code>"on"</code> or <code>"001"</code>.</p>
 <p>Use <code>{path: relative/file.tsv}</code> for a path resolved relative to the configuration
 file defining it. Plain strings retain CLI semantics and are relative to the

@@ -11,11 +11,29 @@ public final class PredictedOmics {
     public record Association(double z, double pValue, double logPValue, double predictedVariance) { }
     public record JointAssociation(double chiSquare, int degreesOfFreedom, double pValue) { }
     public static Association test(double[] z, double[] dosageWeights, double[] genotypeSd, double[] ld) {
-        double[] a=standardized(dosageWeights,genotypeSd);
+        return prepare(z,new double[][]{dosageWeights},genotypeSd,ld).associations().get(0);
+    }
+    /** Validate shared LD once and retain one LD product per model. Inputs are
+     * not retained; marginal results remain available for dependent models. */
+    public static Prepared prepare(double[] z,double[][] dosageWeights,double[] genotypeSd,double[] ld) {
         SummaryMath.finite(z);
-        if(z.length!=a.length)throw new IllegalArgumentException("GWAS and model dimensions differ");
-        correlation(ld,a.length);
-        double variance=SummaryMath.dot(a,SummaryMath.multiply(ld,a));
+        if(dosageWeights==null||dosageWeights.length<1)throw new IllegalArgumentException("at least one model is required");
+        int k=dosageWeights.length;
+        double[][] a=new double[k][],products=new double[k][];
+        for(int i=0;i<k;i++) {
+            a[i]=standardized(dosageWeights[i],genotypeSd);
+            if(z.length!=a[i].length)throw new IllegalArgumentException("GWAS and model dimensions differ");
+        }
+        correlation(ld,z.length);
+        var fits=new java.util.ArrayList<Association>(k);
+        for(int i=0;i<k;i++) {
+            products[i]=SummaryMath.multiply(ld,a[i]);
+            fits.add(association(z,a[i],products[i]));
+        }
+        return new Prepared(a,products,java.util.List.copyOf(fits));
+    }
+    private static Association association(double[] z,double[] a,double[] product) {
+        double variance=SummaryMath.dot(a,product);
         if(!(variance>1e-12*SummaryMath.dot(a,a)))
             throw new IllegalArgumentException("predicted molecular variance is zero or numerically unresolved");
         double score=SummaryMath.dot(a,z)/Math.sqrt(variance);
@@ -24,17 +42,27 @@ public final class PredictedOmics {
     }
     /** Joint tissue/model test on the same complete SNP set; dependent models reject. */
     public static JointAssociation joint(double[] z,double[][] dosageWeights,double[] genotypeSd,double[] ld) {
-        int k=dosageWeights.length,n=z.length;
-        if(k<1)throw new IllegalArgumentException("at least one model is required");
-        double[][] a=new double[k][];double[] zs=new double[k],cov=new double[k*k],var=new double[k];
-        for(int i=0;i<k;i++) {
-            Association fit=test(z,dosageWeights[i],genotypeSd,ld);
-            zs[i]=fit.z();var[i]=fit.predictedVariance();a[i]=standardized(dosageWeights[i],genotypeSd);
+        return prepare(z,dosageWeights,genotypeSd,ld).joint();
+    }
+    /** Prepared marginal associations and optional joint test sharing the same LD. */
+    public static final class Prepared {
+        private final double[][] weights,products;
+        private final java.util.List<Association> associations;
+        private Prepared(double[][] weights,double[][] products,java.util.List<Association> associations) {
+            this.weights=weights;this.products=products;this.associations=associations;
         }
-        for(int i=0;i<k;i++)for(int j=0;j<k;j++)
-            cov[i*k+j]=SummaryMath.dot(a[i],SummaryMath.multiply(ld,a[j]))/Math.sqrt(var[i]*var[j]);
-        double q=SummaryMath.dot(zs,SummaryMath.multiply(SummaryMath.inverse(cov,k),zs));
-        return new JointAssociation(q,k,ChiSquare.cumulative(q,k,false,false));
+        public java.util.List<Association> associations(){return associations;}
+        /** Construct the model correlation matrix only when joint inference is requested. */
+        public JointAssociation joint() {
+            int k=associations.size();double[] zs=new double[k],cov=new double[k*k],sd=new double[k];
+            for(int i=0;i<k;i++) {
+                zs[i]=associations.get(i).z();sd[i]=Math.sqrt(associations.get(i).predictedVariance());
+            }
+            for(int i=0;i<k;i++)for(int j=0;j<k;j++)
+                cov[i*k+j]=SummaryMath.dot(weights[i],products[j])/sd[i]/sd[j];
+            double q=SummaryMath.dot(zs,SummaryMath.multiply(SummaryMath.inverse(cov,k),zs));
+            return new JointAssociation(q,k,ChiSquare.cumulative(q,k,false,false));
+        }
     }
     private static double[] standardized(double[] w,double[] sd) {
         SummaryMath.finite(w);SummaryMath.finite(sd);

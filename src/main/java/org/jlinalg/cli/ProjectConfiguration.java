@@ -69,7 +69,9 @@ final class ProjectConfiguration {
             if (explicit.contains(key) || entry.getValue()==null) continue;
             List<?> values=entry.getValue() instanceof List<?> list ? list : List.of(entry.getValue());
             for(Object value:values) {
-                if (Set.of("help","overwrite","no-log","resume","version").contains(key) && value instanceof Boolean flag) {
+                if (isSwitch(command,key)) {
+                    if(!(value instanceof Boolean flag))
+                        throw new IllegalArgumentException("Switch " + key + " requires a YAML boolean");
                     if(flag) forwarded.add("--"+key);
                 } else {
                     if(value instanceof Map<?,?> || value instanceof List<?>)
@@ -84,6 +86,22 @@ final class ProjectConfiguration {
         provenance.put("sources",sources); provenance.put("arguments",forwarded);
         if(show) provenance.put("configured_options",options);
         return new Resolved(show ? new String[]{"config"} : forwarded.toArray(String[]::new),provenance);
+    }
+    // Keep arity command-specific: e.g. --joint is a switch for mr-estimate
+    // but a valued boolean for twas/pwas. Unknown options remain parser errors.
+    private static boolean isSwitch(String command,String key) {
+        if(Set.of("help","overwrite","no-log","resume","version").contains(key))return true;
+        return switch(command) {
+            case "association" -> Set.of("conditional-gwas-summary","dry-run","explain").contains(key);
+            case "meta-analysis","meta-regression","iv-regression","glm-predict" -> key.equals("no-intercept");
+            case "arima-regression" -> Set.of("no-intercept","smooth","parameter-uncertainty").contains(key);
+            case "beta-regression","penalized-regression" -> Set.of("no-intercept","no-standardize").contains(key);
+            case "confounders","batch-adjust" -> Set.of("write-adjusted","center","no-center","scale","add-mean","nonparametric","mean-only").contains(key);
+            case "rare-meta" -> Set.of("leave-variant-out","leave-cohort-out","cohort-results").contains(key);
+            case "coloc" -> key.equals("no-trim");
+            case "mr-estimate" -> key.equals("joint");
+            default -> false;
+        };
     }
     private static void load(Path file, boolean required, Map<String,Object> merged,
             List<Map<String,String>> sources) throws IOException {

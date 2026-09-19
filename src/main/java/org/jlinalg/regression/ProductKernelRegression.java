@@ -38,6 +38,13 @@ public final class ProductKernelRegression {
             return true;
         }).toArray();
         if(stratum.length<=d+3)throw new IllegalArgumentException("insufficient rows in query stratum");
+        if(d==0) {
+            // Every local fit is the same stratum mean, with leverage 1/m.
+            int m=stratum.length;double estimate=0,ss=0;
+            for(int i:stratum)estimate+=y[i]/m;
+            for(int i:stratum)ss+=Math.pow(y[i]-estimate,2);
+            return inference(estimate,ss/((double)(m-1)*(m-1)),h,m,m,level);
+        }
         for(int j=0;j<h.length;j++)if(types[j]==Type.CONTINUOUS) {
             double[] column=new double[stratum.length];for(int i=0;i<column.length;i++)column[i]=x[stratum[i]][j];
             Arrays.sort(column);double mean=Arrays.stream(column).average().orElseThrow(),ss=0;
@@ -50,13 +57,20 @@ public final class ProductKernelRegression {
         }
         double[] influence=weights(x,query,types,h);double estimate=dot(influence,y),variance=0,sumSquares=dot(influence,influence);
         for(int i:stratum) {
+            // An underflowed query weight contributes exactly zero to HC3.
+            // Its auxiliary local fit can be singular without affecting inference.
+            if(influence[i]==0)continue;
             double[] row=weights(x,x[i],types,h);double residual=y[i]-dot(row,y),remaining=1-row[i];
             if(!(remaining>1e-8))throw new IllegalArgumentException("insufficient local support for HC3 inference");
             variance+=Math.pow(influence[i]*residual/remaining,2);
         }
+        return inference(estimate,variance,h,1/sumSquares,stratum.length,level);
+    }
+    private static Inference inference(double estimate,double variance,double[] h,
+            double effectiveSampleSize,int stratumSize,double level) {
         if(!(variance>0)||!Double.isFinite(variance))throw new IllegalArgumentException("unresolved local variance");
         double se=Math.sqrt(variance),critical=Normal.quantile(.5+level/2,0,1,true,false);
-        return new Inference(estimate,se,estimate-critical*se,estimate+critical*se,h,1/sumSquares,stratum.length,level);
+        return new Inference(estimate,se,estimate-critical*se,estimate+critical*se,h,effectiveSampleSize,stratumSize,level);
     }
     private static double[] weights(double[][] x,double[] query,Type[] types,double[] h) {
         int n=x.length,d=(int)Arrays.stream(types).filter(t->t==Type.CONTINUOUS).count(),p=d+1;

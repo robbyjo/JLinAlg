@@ -8,6 +8,114 @@
 <div class="container page-layout"><article class="prose"><p>Validated locally on 2026-09-19 after review of commits <code>812025d</code>, <code>8910094</code>,
 <code>6b1ede1</code>, <code>d8c7e9e</code>, <code>56fc927</code>, and <code>1242d93</code>. This change fixes all ten
 reported findings; it does not extend the previously documented scientific scope.</p>
+<h2 id="follow-up-audit-from-e89f5f5">Follow-up audit from e89f5f5</h2>
+<p>The remaining 18 previously unaudited commits from <code>e89f5f5</code> through <code>10befe5c</code>
+were reviewed at <code>1dfcabb</code>. Five further findings were corrected on 2026-09-19:</p>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Correction</th>
+<th>Regression evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phenotype units changed exported zero-information decisions</td>
+<td>Normalize the information check by the projection scale: inverse residual variance for OLS and the retained projection infinity norm for REML</td>
+<td>Export/read-back at response multipliers 1, 1e-12 and 1e12 preserves p-values and the expected score, effect and covariance scaling; constant and nuisance-confounded variants remain zero</td>
+</tr>
+<tr>
+<td>Isolated zero-weight observations broke kernel inference</td>
+<td>Skip exactly zero query influences before auxiliary local fitting</td>
+<td>An isolated x=100 observation no longer breaks an interior query; changing its response leaves inference unchanged; insufficient support at nonzero influence still rejects</td>
+</tr>
+<tr>
+<td>YAML emitted extra values for presence-only switches</td>
+<td>Command-specific switch arity; true enables, false omits, CLI overrides retain precedence</td>
+<td>Switch matrix, inherited overrides, valued TWAS/PWAS booleans and an actual configured meta-regression with and without an intercept</td>
+</tr>
+<tr>
+<td>Repeated LD validation and products across molecular models</td>
+<td>Prepared batch shared by marginal and joint CLI/API inference</td>
+<td>Analytic correlated joint test, immutable prepared state, existing reference fixtures, invalid-LD and dependent-model rejection</td>
+</tr>
+<tr>
+<td>Quadratic categorical-only kernel inference</td>
+<td>Compute exact stratum mean and HC3 variance in linear work</td>
+<td>Mixed ordered/unordered stratum matches SE = sqrt(sum squared residuals)/(m-1)</td>
+</tr>
+</tbody>
+</table>
+<p>The score degeneracy threshold is relative to the projection and genotype norm,
+consistent with the REML scan's numerical-information check. This corrects unit
+dependence; it does not promise inference for numerically unresolved directions.
+The related-export scaling regression uses an identity covariance with scaled
+optimizer bounds; the existing balanced random-intercept export test separately
+checks a nontrivial related covariance against ANOVA REML.</p>
+<p>Prepared molecular work costs O(n³ + kn²), plus O(k²n + k³) when joint inference
+is requested. Dense LD validation remains cubic. Continuous/mixed kernel HC3
+still uses auxiliary local fits; only categorical-only inference is linear.
+Statistical assumptions and unsupported extensions are unchanged.</p>
+<h3 id="follow-up-performance-and-reproduction">Follow-up performance and reproduction</h3>
+<p>Java 25, CPU, same Windows host and seeded diagnostic workloads. Single probe
+invocations before/after (including JVM warm-up effects) measured:</p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th style="text-align: right;">Before</th>
+<th style="text-align: right;">After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joint molecular test, 1,000 variants and 30 models</td>
+<td style="text-align: right;">13.578787 s</td>
+<td style="text-align: right;">0.411732 s</td>
+</tr>
+<tr>
+<td>Categorical kernel inference, 20,000 rows</td>
+<td style="text-align: right;">5.196117 s</td>
+<td style="text-align: right;">0.003189 s</td>
+</tr>
+</tbody>
+</table>
+<p>The molecular chi-square differed from the independent cached calculation by
+7.11e-15; categorical mean differed from direct sums by 3.47e-18 and SE agreed
+at double precision. These timings are local diagnostics, not JMH guarantees.
+The checked-in benchmark uses one warm-up and the median of three runs:</p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th style="text-align: right;">Median</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joint molecular test, 500 variants and 30 models</td>
+<td style="text-align: right;">0.035664 s</td>
+</tr>
+<tr>
+<td>Joint molecular test, 1,000 variants and 30 models</td>
+<td style="text-align: right;">0.386514 s</td>
+</tr>
+<tr>
+<td>Categorical kernel inference, 20,000 rows</td>
+<td style="text-align: right;">0.000594 s</td>
+</tr>
+</tbody>
+</table>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>.\gradlew.bat --no-daemon check javadoc executableJar --console=plain
+.\gradlew.bat --no-daemon benchmarkSummaryKernelAudit --console=plain
+</code></pre></div>
+<p>New regression classes are <code>GaussianScoreWriterTest</code>, <code>ProjectConfigurationFlagsTest</code>
+and <code>PredictedOmicsTest</code>; <code>NonparametricExtensionsTest</code> adds both kernel regressions.
+Existing <code>XwasWorkflowTest</code> and <code>RareScoreRelatedTest</code> check end-to-end integration.
+The full validation completed with 907 tests: 904 passed, three optional CHOLMOD
+checks skipped, no failures or errors. Javadoc, executable packaging, site links
+and the 117-reference citation index also passed.</p>
 <h2 id="correctness-gates">Correctness gates</h2>
 <table>
 <thead>
@@ -193,5 +301,5 @@ alpha &lt;- 0.04883002798420158
 se &lt;- sqrt(solve(crossprod(X, X * (mu/(1+alpha*mu))))[2,2])
 c(se=se, p=2*pnorm(abs(log(2)/se), lower.tail=FALSE))
 </code></pre></div></article>
-<aside class="toc"><strong>On this page</strong><a href="#correctness-gates">Correctness gates</a><a href="#bootstrap-imputation-contract">Bootstrap imputation contract</a><a href="#performance">Performance</a><a href="#reproduction">Reproduction</a></aside></div>
+<aside class="toc"><strong>On this page</strong><a href="#follow-up-audit-from-e89f5f5">Follow-up audit from e89f5f5</a><a href="#correctness-gates">Correctness gates</a><a href="#bootstrap-imputation-contract">Bootstrap imputation contract</a><a href="#performance">Performance</a><a href="#reproduction">Reproduction</a></aside></div>
 </main><site-footer root="./"></site-footer></body></html>

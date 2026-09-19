@@ -33,7 +33,7 @@ public final class GaussianScoreWriter {
         write(source,sampleOrder,model.observations(),py,g->{
             double[] pg=model.residualize(new double[][]{g})[0];
             for(int i=0;i<pg.length;i++)pg[i]/=variance;return pg;
-        },variance,"unrelated-Gaussian",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
+        },1/variance,variance,"unrelated-Gaussian",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
     }
     /** Export related-sample scores using the fitted REML projection P.
      * U=G'Py and V=G'PG; trait units remain original, disk covariance is V/N. */
@@ -45,10 +45,10 @@ public final class GaussianScoreWriter {
     public static void write(VariantSource source,int[] sampleOrder,org.jlinalg.gwas.RemlAssociationScanner model,
             long window,int maximumVariants,String genomeBuild,String traitId,String traitUnits,Path scoreFile,Path covarianceFile)throws IOException {
         write(source,sampleOrder,model.observations(),model.projectedResponse(),g->model.project(g,1),
-            Double.NaN,"related-Gaussian-REML",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
+            model.projectionInfinityNorm(),Double.NaN,"related-Gaussian-REML",window,maximumVariants,genomeBuild,traitId,traitUnits,scoreFile,covarianceFile);
     }
     private static void write(VariantSource source,int[] sampleOrder,int n,double[] residual,
-            java.util.function.UnaryOperator<double[]> projection,double variance,String nullModel,
+            java.util.function.UnaryOperator<double[]> projection,double projectionScale,double variance,String nullModel,
             long window,int maximumVariants,String genomeBuild,String traitId,String traitUnits,Path scoreFile,Path covarianceFile)throws IOException {
         if(window<1||maximumVariants<1||genomeBuild==null||genomeBuild.isBlank())throw new IllegalArgumentException("invalid score export options");
         if(!genomeBuild.equals(genomeBuild.trim())||genomeBuild.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException("genome build must not contain control characters or outer whitespace");
@@ -79,8 +79,12 @@ public final class GaussianScoreWriter {
                 for(int i=0;i<n;i++)if(!Double.isFinite(dosage[i]))dosage[i]=mean;
                 double[] projected=projection.apply(dosage);
                 double u=dot(dosage,residual),v=dot(dosage,projected);
-                // Exact monomorphic/imputed-constant variants have zero information.
-                if(called==0||mean==0||mean==2||v<1e-24*n){u=0;v=0;Arrays.fill(projected,0);}
+                // Compare information with the scale of P, so changing phenotype
+                // units cannot turn an informative variant into a degenerate one.
+                // This also removes roundoff for variants in the nuisance span.
+                if(called==0||mean==0||mean==2||v/projectionScale<=1e-12*dot(dosage,dosage)){
+                    u=0;v=0;Arrays.fill(projected,0);
+                }
                 String af=called==0?"NA":Double.toString(mean/2);
                 double p=v>0?org.jlinalg.settest.SummarySetTests.singleVariant("variant",u,v).pValue():Double.NaN;
                 String line=chr+"\t"+pos+"\t"+variant.referenceAllele()+"\t"+variant.alternateAllele()+"\t"+n+"\t"

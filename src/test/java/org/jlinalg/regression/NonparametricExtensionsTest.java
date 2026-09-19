@@ -4,6 +4,32 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 final class NonparametricExtensionsTest {
+    @Test void isolatedZeroInfluenceObservationDoesNotInvalidateQueryInference() {
+        double[][] x=new double[201][1];double[] y=new double[201];var random=new java.util.Random(19);
+        for(int i=0;i<200;i++){x[i][0]=-1+2.*i/199;y[i]=Math.sin(x[i][0])+.2*random.nextGaussian();}
+        x[200][0]=100;
+        var types=new ProductKernelRegression.Type[]{ProductKernelRegression.Type.CONTINUOUS};
+        var fit=ProductKernelRegression.infer(x,y,new double[]{0},types,.95);
+        assertTrue(Double.isFinite(fit.standardError()));assertTrue(fit.standardError()>0);
+        // At this bandwidth the outlier has exactly zero kernel influence.
+        assertEquals(0,Math.exp(-.5*Math.pow(100/fit.bandwidths()[0],2)));
+        y[200]=1e100;
+        var changed=ProductKernelRegression.infer(x,y,new double[]{0},types,.95);
+        assertEquals(fit.estimate(),changed.estimate());assertEquals(fit.standardError(),changed.standardError());
+        // An isolated point with nonzero influence must still fail HC3 support.
+        x[200][0]=3;
+        assertThrows(IllegalArgumentException.class,()->ProductKernelRegression.infer(x,y,new double[]{0},types,.95));
+    }
+    @Test void categoricalInferenceMatchesClosedFormHc3WithinJointStratum() {
+        double[][] x={{0,1},{0,1},{0,1},{0,1},{0,2},{1,1},{1,2},{1,2}};
+        double[] y={1,2,4,9,100,-100,50,30};
+        var types=new ProductKernelRegression.Type[]{ProductKernelRegression.Type.UNORDERED,ProductKernelRegression.Type.ORDERED};
+        var fit=ProductKernelRegression.infer(x,y,new double[]{0,1},types,.95);
+        assertEquals(4,fit.estimate(),1e-14);assertEquals(Math.sqrt(38)/3,fit.standardError(),1e-14);
+        assertEquals(4,fit.effectiveSampleSize());assertEquals(4,fit.stratumSize());assertArrayEquals(new double[2],fit.bandwidths());
+        assertThrows(IllegalArgumentException.class,()->ProductKernelRegression.infer(x,y,new double[]{0,2},types,.95));
+        assertThrows(IllegalArgumentException.class,()->ProductKernelRegression.infer(x,new double[8],new double[]{0,1},types,.95));
+    }
     @Test void automaticLocalInferenceMatchesIndependentWeightedMatrixCalculation() throws Exception {
         var lines=java.nio.file.Files.readAllLines(java.nio.file.Path.of("src/test/resources/estimator-extensions/kernel-data.tsv"));
         double[][] x=new double[lines.size()][2];double[] y=new double[lines.size()];

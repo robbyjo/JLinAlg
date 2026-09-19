@@ -4,6 +4,64 @@ Validated locally on 2026-09-19 after review of commits `812025d`, `8910094`,
 `6b1ede1`, `d8c7e9e`, `56fc927`, and `1242d93`. This change fixes all ten
 reported findings; it does not extend the previously documented scientific scope.
 
+## Follow-up audit from e89f5f5
+
+The remaining 18 previously unaudited commits from `e89f5f5` through `10befe5c`
+were reviewed at `1dfcabb`. Five further findings were corrected on 2026-09-19:
+
+| Finding | Correction | Regression evidence |
+|---|---|---|
+| Phenotype units changed exported zero-information decisions | Normalize the information check by the projection scale: inverse residual variance for OLS and the retained projection infinity norm for REML | Export/read-back at response multipliers 1, 1e-12 and 1e12 preserves p-values and the expected score, effect and covariance scaling; constant and nuisance-confounded variants remain zero |
+| Isolated zero-weight observations broke kernel inference | Skip exactly zero query influences before auxiliary local fitting | An isolated x=100 observation no longer breaks an interior query; changing its response leaves inference unchanged; insufficient support at nonzero influence still rejects |
+| YAML emitted extra values for presence-only switches | Command-specific switch arity; true enables, false omits, CLI overrides retain precedence | Switch matrix, inherited overrides, valued TWAS/PWAS booleans and an actual configured meta-regression with and without an intercept |
+| Repeated LD validation and products across molecular models | Prepared batch shared by marginal and joint CLI/API inference | Analytic correlated joint test, immutable prepared state, existing reference fixtures, invalid-LD and dependent-model rejection |
+| Quadratic categorical-only kernel inference | Compute exact stratum mean and HC3 variance in linear work | Mixed ordered/unordered stratum matches SE = sqrt(sum squared residuals)/(m-1) |
+
+The score degeneracy threshold is relative to the projection and genotype norm,
+consistent with the REML scan's numerical-information check. This corrects unit
+dependence; it does not promise inference for numerically unresolved directions.
+The related-export scaling regression uses an identity covariance with scaled
+optimizer bounds; the existing balanced random-intercept export test separately
+checks a nontrivial related covariance against ANOVA REML.
+
+Prepared molecular work costs O(n³ + kn²), plus O(k²n + k³) when joint inference
+is requested. Dense LD validation remains cubic. Continuous/mixed kernel HC3
+still uses auxiliary local fits; only categorical-only inference is linear.
+Statistical assumptions and unsupported extensions are unchanged.
+
+### Follow-up performance and reproduction
+
+Java 25, CPU, same Windows host and seeded diagnostic workloads. Single probe
+invocations before/after (including JVM warm-up effects) measured:
+
+| Workload | Before | After |
+|---|---:|---:|
+| Joint molecular test, 1,000 variants and 30 models | 13.578787 s | 0.411732 s |
+| Categorical kernel inference, 20,000 rows | 5.196117 s | 0.003189 s |
+
+The molecular chi-square differed from the independent cached calculation by
+7.11e-15; categorical mean differed from direct sums by 3.47e-18 and SE agreed
+at double precision. These timings are local diagnostics, not JMH guarantees.
+The checked-in benchmark uses one warm-up and the median of three runs:
+
+| Workload | Median |
+|---|---:|
+| Joint molecular test, 500 variants and 30 models | 0.035664 s |
+| Joint molecular test, 1,000 variants and 30 models | 0.386514 s |
+| Categorical kernel inference, 20,000 rows | 0.000594 s |
+
+```powershell
+.\gradlew.bat --no-daemon check javadoc executableJar --console=plain
+.\gradlew.bat --no-daemon benchmarkSummaryKernelAudit --console=plain
+```
+
+New regression classes are `GaussianScoreWriterTest`, `ProjectConfigurationFlagsTest`
+and `PredictedOmicsTest`; `NonparametricExtensionsTest` adds both kernel regressions.
+Existing `XwasWorkflowTest` and `RareScoreRelatedTest` check end-to-end integration.
+The full validation completed with 907 tests: 904 passed, three optional CHOLMOD
+checks skipped, no failures or errors. Javadoc, executable packaging, site links
+and the 117-reference citation index also passed.
+
 ## Correctness gates
 
 | Finding | Change | Independent or analytical regression gate |

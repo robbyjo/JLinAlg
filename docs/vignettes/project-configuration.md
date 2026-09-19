@@ -43,8 +43,13 @@ names equal their CLI subcommand, including `meta-analysis` and `variant-score`.
 Option names omit the leading `--`. Scalar values become one CLI option; lists
 become repeated options, for example `cohort: [A=cohort-a.tsv, B=cohort-b.tsv]`.
 Maps merge by key; lists replace earlier lists. A null value removes an inherited
-option. Boolean `help`, `overwrite`, `no-log`, `resume`, and `version` are switches;
-other booleans become explicit `true`/`false` values. Quote strings that YAML 1.1
+option. Presence-only CLI switches require YAML booleans: `true` emits the switch
+and `false` omits it, including when overriding an inherited `true`. This covers
+common switches such as `help` and `overwrite`, and command-specific switches
+such as `meta-regression.no-intercept`, `arima-regression.smooth`, and
+`rare-meta.leave-cohort-out`. Arity follows the command: `joint` is a switch for
+`mr-estimate`, but takes an explicit `true`/`false` value for `twas` and `pwas`.
+Other valued booleans retain their explicit values. Quote strings that YAML 1.1
 would interpret as booleans or numbers, such as `"on"` or `"001"`.
 
 Use `{path: relative/file.tsv}` for a path resolved relative to the configuration

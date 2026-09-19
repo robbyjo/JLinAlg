@@ -84,13 +84,15 @@ final class SummaryXwasCli {
             models.computeIfAbsent(model,k->new double[ids.size()])[i]=sign*XwasFiles.number(weights,row,"weight");
         }
         StringBuilder text=new StringBuilder("model\tvariants\tz\tp\tlog_p\tpredicted_variance\n");
+        var prepared=PredictedOmics.prepare(z,models.values().toArray(double[][]::new),sd,ld);
+        int modelIndex=0;
         for(var entry:models.entrySet()) {
-            var fit=PredictedOmics.test(z,entry.getValue(),sd,ld);
+            var fit=prepared.associations().get(modelIndex++);
             text.append(entry.getKey()).append('\t').append(seen.get(entry.getKey()).size()).append('\t').append(fit.z()).append('\t').append(fit.pValue()).append('\t').append(fit.logPValue()).append('\t').append(fit.predictedVariance()).append('\n');
         }
         Path output=XwasFiles.path(o,"--out");Map<Path,String> files=new LinkedHashMap<>();files.put(output,text.toString());
         if(Boolean.parseBoolean(o.getOrDefault("--joint","false"))) {
-            var joint=PredictedOmics.joint(z,models.values().toArray(double[][]::new),sd,ld);
+            var joint=prepared.joint();
             files.put(Path.of(output+".joint.tsv"),"chi_square\tdf\tp\n"+joint.chiSquare()+"\t"+joint.degreesOfFreedom()+"\t"+joint.pValue()+"\n");
         }
         files.put(Path.of(output+".metadata.tsv"),"key\tvalue\nweight_scale\traw effect-allele dosage\nld_scale\tcorrelation in reference ea orientation\ncoverage\tcomplete reference and model coverage required\nstrand\texact forward-strand match or swap; no complement inference\n");
