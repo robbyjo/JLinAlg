@@ -113,8 +113,8 @@ public final class RegionLevelEwas {
             EwasProbe probe = probes.get(left);
             double probability = Math.max(1e-300,
                 Math.min(1.0 - 1e-16, probe.pValue()));
-            double magnitude = Normal.quantile(1.0 - probability / 2.0,
-                0.0, 1.0, true, false);
+            double magnitude = Normal.quantile(probability / 2.0,
+                0.0, 1.0, false, false);
             sumZ += Math.signum(probe.effect()) * magnitude;
             effect += probe.effect() / count;
             if (left > 0) maximumGap = Math.max(maximumGap,

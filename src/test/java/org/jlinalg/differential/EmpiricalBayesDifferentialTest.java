@@ -7,6 +7,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 final class EmpiricalBayesDifferentialTest {
+    @Test void exactCountFitsUseUnscaledInformationAndFailedFitsSuppressInference() {
+        var fit = EmpiricalBayesDifferential.fitNegativeBinomial(new double[][] {
+            {10,10,10,10,10,10}, {20,20,20,20,20,20},
+            {20,20,20,40,40,40}, {0,0,0,0,0,0}}, DESIGN, CONTRAST);
+        var changed = fit.results().get(2);
+        // Base-R inverse X'WX at the fitted dispersion, not residual-scaled OLS.
+        assertEquals(.23990279696049335, changed.standardError(), 1e-12);
+        assertEquals(.0038612085215580121, changed.pValue(), 1e-13);
+        var zero = fit.results().get(3);
+        assertTrue(!zero.converged());
+        assertTrue(Double.isNaN(zero.standardError()));
+        assertTrue(Double.isNaN(zero.statistic()));
+        assertTrue(Double.isNaN(zero.pValue()));
+    }
+
+    @Test void voomAcceptsTwoFeatures() {
+        var fit = EmpiricalBayesDifferential.fitVoom(new double[][] {
+            {10,20,15,25}, {20,30,25,35}},
+            new double[][] {{1,0},{1,0},{1,1},{1,1}}, CONTRAST);
+        assertEquals(2, fit.results().size());
+        assertTrue(fit.results().stream().allMatch(r -> Double.isFinite(r.pValue())));
+    }
+
+    @Test void exactGaussianFeatureStillReceivesModeratedPriorUncertainty() {
+        var fit = EmpiricalBayesDifferential.fitContinuous(new double[][] {
+            {1,1,1,3,3,3}, {2,3,1,3,4,2}, {4,6,2,7,9,5}}, DESIGN, CONTRAST);
+        var row = fit.results().get(0);
+        assertEquals(Math.sqrt((2.0/3) * row.moderatedVariance()), row.standardError(), 1e-12);
+        assertTrue(row.standardError() > 1e-6);
+    }
     private static final double[][] DESIGN = {
         {1, 0}, {1, 0}, {1, 0}, {1, 1}, {1, 1}, {1, 1}
     };

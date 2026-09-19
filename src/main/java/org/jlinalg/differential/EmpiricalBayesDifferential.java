@@ -8,6 +8,8 @@ import java.util.List;
 import jdistlib.Normal;
 import jdistlib.T;
 import org.jlinalg.compute.BackendPolicy;
+import org.jlinalg.compute.BackendContext;
+import org.jlinalg.internal.LeastSquaresSolver;
 import org.jlinalg.ols.Ols;
 import org.jlinalg.ols.OlsOptions;
 import org.jlinalg.ols.OlsResult;
@@ -66,11 +68,12 @@ public final class EmpiricalBayesDifferential {
         }
         FeatureFit[] fits = new FeatureFit[counts.length];
         double[] raw = new double[counts.length];
+        VoomTrend trendFit = new VoomTrend(average, squareRootDeviation,
+            Arrays.stream(initial).flatMapToDouble(f -> Arrays.stream(f.fitted)).toArray());
         for (int feature = 0; feature < counts.length; feature++) {
             double[] weights = new double[dimensions.observations];
             for (int sample = 0; sample < weights.length; sample++) {
-                double trend = localTrend(initial[feature].fitted[sample],
-                    average, squareRootDeviation);
+                double trend = trendFit.at(initial[feature].fitted[sample]);
                 weights[sample] = 1.0 / Math.max(MINIMUM_VARIANCE,
                     trend * trend * trend * trend);
             }
@@ -115,12 +118,12 @@ public final class EmpiricalBayesDifferential {
             double dispersion = Math.exp(logDispersion);
             NegativeBinomialFit fit = negativeBinomial(counts[feature], design,
                 contrast, sizeFactors, dispersion);
-            double statistic = fit.effect / fit.standardError;
-            double pValue = Math.min(1.0, 2.0 * Normal.cumulative(
-                Math.abs(statistic), 0.0, 1.0, false, false));
+            double statistic = fit.converged ? fit.effect / fit.standardError : Double.NaN;
+            double pValue = fit.converged ? Math.min(1.0, 2.0 * Normal.cumulative(
+                Math.abs(statistic), 0.0, 1.0, false, false)) : Double.NaN;
             results.add(new DifferentialResult(feature, fit.effect,
                 fit.effect / LOG_TWO, fit.standardError, statistic,
-                Double.POSITIVE_INFINITY, pValue, baseMean[feature],
+                fit.converged ? Double.POSITIVE_INFINITY : Double.NaN, pValue, baseMean[feature],
                 rawDispersion[feature], dispersion, dispersion, Double.NaN,
                 fit.converged, fit.iterations));
         }
@@ -159,6 +162,17 @@ public final class EmpiricalBayesDifferential {
         double[] covariance = fit.covariance();
         double variance = Math.max(fit.residualVariance(), MINIMUM_VARIANCE);
         double unscaled = quadratic(contrast, covariance) / variance;
+        if (fit.residualVariance() < MINIMUM_VARIANCE) {
+            int columns = design[0].length;
+            double[] weighted = new double[design.length * columns];
+            for (int row = 0; row < design.length; row++) for (int j = 0; j < columns; j++)
+                weighted[row * columns + j] = design[row][j] * Math.sqrt(weights == null ? 1 : weights[row]);
+            try (BackendContext context = BackendContext.select(BackendPolicy.CPU)) {
+                unscaled = quadratic(contrast, LeastSquaresSolver.solve(weighted,
+                    new double[design.length], design.length, columns, false,
+                    context.backend()).unscaledCovariance());
+            }
+        }
         double mean = Arrays.stream(response).average().orElseThrow();
         double meanWeight = weights == null ? 1.0
             : Arrays.stream(weights).average().orElseThrow();
@@ -203,9 +217,27 @@ public final class EmpiricalBayesDifferential {
             if (change < 1e-8) { converged = true; iteration++; break; }
         }
         double effect = dot(contrast, beta);
-        double residualVariance = Math.max(last.residualVariance(), MINIMUM_VARIANCE);
-        double standardError = Math.sqrt(Math.max(MINIMUM_VARIANCE,
-            quadratic(contrast, last.covariance()) / residualVariance));
+        double standardError = Double.NaN;
+        if (converged) {
+            int columns = beta.length;
+            double[] weightedDesign = new double[observations * columns];
+            for (int row = 0; row < observations; row++) {
+                double eta = offset[row] + dot(design[row], beta);
+                if (!Double.isFinite(eta) || Math.abs(eta) >= 30) { converged = false; break; }
+                double mean = Math.exp(eta);
+                double rootWeight = Math.sqrt(mean / (1 + dispersion * mean));
+                for (int column = 0; column < columns; column++)
+                    weightedDesign[row * columns + column] = rootWeight * design[row][column];
+            }
+            if (converged) try (BackendContext context = BackendContext.select(BackendPolicy.CPU)) {
+                double[] inverseInformation = LeastSquaresSolver.solve(weightedDesign,
+                    new double[observations], observations, columns, false,
+                    context.backend()).unscaledCovariance();
+                standardError = Math.sqrt(quadratic(contrast, inverseInformation));
+                if (!(standardError > 0) || !Double.isFinite(standardError)) converged = false;
+            }
+        }
+        if (!converged) standardError = Double.NaN;
         return new NegativeBinomialFit(effect, standardError,
             converged, iteration);
     }
@@ -264,28 +296,6 @@ public final class EmpiricalBayesDifferential {
         double geometric = geometricMean(factors);
         for (int sample = 0; sample < samples; sample++) factors[sample] /= geometric;
         return factors;
-    }
-
-    private static double localTrend(double x, double[] location, double[] value) {
-        int neighbors = Math.max(3, Math.min(location.length,
-            (int) Math.ceil(location.length * 0.5)));
-        double[] distance = new double[location.length];
-        for (int index = 0; index < distance.length; index++)
-            distance[index] = Math.abs(location[index] - x);
-        double[] ordered = distance.clone();
-        Arrays.sort(ordered);
-        double radius = Math.max(1e-12, ordered[neighbors - 1]);
-        double sumWeight = 0.0;
-        double sum = 0.0;
-        for (int index = 0; index < location.length; index++) {
-            double ratio = distance[index] / radius;
-            if (ratio > 1.0) continue;
-            double weight = Math.pow(1.0 - ratio * ratio * ratio, 3.0);
-            sumWeight += weight;
-            sum += weight * value[index];
-        }
-        return sumWeight > 0.0 ? Math.max(1e-6, sum / sumWeight)
-            : Math.max(1e-6, Arrays.stream(value).average().orElseThrow());
     }
 
     private static Dimensions validate(double[][] features, double[][] design,

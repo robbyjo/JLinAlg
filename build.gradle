@@ -522,6 +522,14 @@ tasks.register('benchmarkAssociation', JavaExec) {
     }
 }
 
+tasks.register('benchmarkInferenceAudit', JavaExec) {
+    group = 'benchmark'
+    description = 'Runs voom and complete SVA/AutoSVA audit scaling probes.'
+    dependsOn tasks.named('benchmarkClasses')
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'org.jlinalg.benchmark.InferenceAuditBenchmark'
+}
+
 tasks.register('benchmarkAcat', JavaExec) {
     group = 'benchmark'
     description = 'Runs the fused-versus-composed ACAT-O score benchmark.'

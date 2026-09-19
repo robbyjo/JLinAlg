@@ -77,13 +77,37 @@ race over <code>build/</code>:</p>
 <div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>.\gradlew.bat test --tests &quot;org.jlinalg.differential.*&quot; --tests &quot;org.jlinalg.ewas.*&quot; --tests &quot;org.jlinalg.multipletesting.*&quot; --tests &quot;org.jlinalg.imputation.*&quot; --tests &quot;org.jlinalg.cli.XwasInferenceCliTest&quot; --no-daemon --no-parallel
 .\gradlew.bat clean check assemble --no-daemon --no-parallel
 </code></pre></div>
+<h2 id="audit-fixes-validated-on-2026-09-19">Audit fixes validated on 2026-09-19</h2>
+<ul>
+<li>Exact-fit negative-binomial inference uses final weighted-design inverse
+  information: the independent R audit example has SE 0.23990279696049335
+  and p 0.0038612085215580121. Failed/boundary fits publish NaN inference;
+  CLI BH retains their place in the family with internal p=1 and outputs NaN.
+  Exact Gaussian fits likewise retain the unscaled covariance before moderation.</li>
+<li>Bootstrap MI tests cover unequal category frequencies, tied donors under row
+  reversal, and observed-data uncertainty for binary and continuous means.
+  The 100-observed/900-missing binary example now has pooled SE 0.0489
+  (observed-data reference 0.05), rather than 0.0212.</li>
+<li>EWAS signed upper-tail quantiles retain finite p=1e-20 inputs and allow
+  opposite signs to cancel. Voom accepts its documented two-feature minimum.</li>
+<li>Independent direct-trend comparisons bound precision-weight discrepancy at
+  0.2% on the seeded regression workload. Existing limma/voom/NB fixtures pass.</li>
+</ul>
+<p>Run <code>gradlew test --tests '*MultipleImputationTest' --tests '*VoomTrendTest'
+--tests '*EmpiricalBayesDifferentialTest' --tests '*RegionLevelEwasTest'
+--tests '*XwasInferenceCliTest'</code> for these regression gates. Run
+<code>gradlew benchmarkInferenceAudit</code> for deterministic CPU scaling probes.
+See <a href="audit-fixes-validation.html">audit-fix validation</a> for timings, tail checks,
+reproduction details and remaining inferential limits.</p>
 <h2 id="supported-scope-and-non-equivalence-boundaries">Supported scope and non-equivalence boundaries</h2>
 <ul>
 <li><code>limma</code> uses a common scaled-inverse-chi-square residual-variance prior.
   Robust/winsorized priors, duplicate correlation, array weights, treat-style
   fold-change testing, and arbitrary contrast matrices in the CLI are outside
   this first interface.</li>
-<li><code>voom</code> uses median-ratio library scaling and a direct local precision trend.
+<li><code>voom</code> uses median-ratio library scaling and a span-0.5 local precision trend.
+  The sorted trend is interpolated at up to 2,049 query quantiles for more than
+  128 features; small feature sets use exact evaluation.
   It does not claim exact TMM or lowess identity with limma/edgeR for every
   workload. The separate NB path must be used for count likelihood inference.</li>
 <li>The NB path uses fixed shrunken dispersions in model-based Wald inference.
@@ -97,8 +121,12 @@ race over <code>build/</code>:</p>
 <li>IHW requires a covariate independent of null p-values and independent folds.
   The compact cross-fitted bin estimator is not the complete IHW convex
   optimizer. Hierarchical output controls FWER, not FDR.</li>
-<li>MICE uses predictive mean matching, binary logistic draws, and categorical
-  probability draws for numeric or CLI-encoded categories. It does not include
+<li>MICE resamples observed rows for every conditional update. Continuous
+  variables use PMM within the bootstrap donor sample, with randomized ties;
+  binary and categorical variables use a joint baseline-category multinomial
+  logistic fit to the bootstrap sample. Nominal predictors use dummy columns.
+  This is bootstrap MI, not an exact Bayesian posterior sampler or numerical
+  clone of R mice. The resampling propagates parameter uncertainty. It does not include
   multilevel random effects, passive formulas, survey weights, or MNAR models.
   Chain summaries are diagnostics, not proof of convergence or correct MAR
   specification.</li>
@@ -122,5 +150,5 @@ race over <code>build/</code>:</p>
 </ul>
 <p><a href="https://robbyjo.github.io/JLinAlg/citations.html">Search the complete scientific bibliography</a>.</p>
 <!-- SCIENTIFIC-CITATIONS:END --></article>
-<aside class="toc"><strong>On this page</strong><a href="#executed-numerical-gates">Executed numerical gates</a><a href="#reproduce">Reproduce</a><a href="#supported-scope-and-non-equivalence-boundaries">Supported scope and non-equivalence boundaries</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+<aside class="toc"><strong>On this page</strong><a href="#executed-numerical-gates">Executed numerical gates</a><a href="#reproduce">Reproduce</a><a href="#audit-fixes-validated-on-2026-09-19">Audit fixes validated on 2026-09-19</a><a href="#supported-scope-and-non-equivalence-boundaries">Supported scope and non-equivalence boundaries</a><a href="#scientific-citations">Scientific citations</a></aside></div>
 </main><site-footer root="./"></site-footer></body></html>

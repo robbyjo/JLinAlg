@@ -82,8 +82,12 @@ final class XwasInferenceCli {
             default -> throw new IllegalArgumentException(
                 "--method must be limma, voom, or negative-binomial");
         };
+        // Retain the full tested family conservatively; unavailable tests enter
+        // adjustment as one, but remain NaN in the published inference columns.
         double[] adjusted = WeightedBenjaminiHochberg.adjust(fit.results().stream()
-            .mapToDouble(DifferentialResult::pValue).toArray());
+            .mapToDouble(row -> Double.isFinite(row.pValue()) ? row.pValue() : 1.0).toArray());
+        for (int i = 0; i < adjusted.length; i++)
+            if (!Double.isFinite(fit.results().get(i).pValue())) adjusted[i] = Double.NaN;
         StringBuilder results = new StringBuilder(
             "feature_id\teffect\tlog2_fold_change\tse\tstatistic\tdf\tp\tfdr_bh"
             + "\tbase_mean\traw_variance\tmoderated_variance\tdispersion"
@@ -349,6 +353,9 @@ final class XwasInferenceCli {
             + "\niterations\t" + miceOptions.iterations()
             + "\npredictive_mean_donors\t" + miceOptions.predictiveMeanDonors()
             + "\nseed\t" + miceOptions.seed()
+            + "\nconditional_models\tbootstrap PMM and baseline-category multinomial logistic"
+            + "\nridge\t" + miceOptions.ridge()
+            + "\ndonor_ties\treshuffled per missing cell within bootstrap donor pool"
             + "\nstreams\tindependent deterministic split streams\n");
         XwasFiles.publish(files);
         output.printf(Locale.ROOT, "rows=%d variables=%d imputations=%d seed=%d%n",

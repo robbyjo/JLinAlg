@@ -17,7 +17,9 @@ class AcatTestsTest {
     @Test void genericCombinationMatchesReferenceAndStabilizesTails() {
         Acat.Result result = Acat.combine(
             new double[] {.02, .0004, .2, .1, .8});
-        assertEquals(0.0019534044057701767, result.pValue(), 2e-18);
+        // 90-digit mpmath cotangent calculation; the former tangent-based
+        // fixture inherited cancellation at pi/2.
+        assertEquals(0.001953404405770000045, result.pValue(), 2e-18);
         assertEquals(5, result.components());
 
         Acat.Result tail = Acat.combine(
@@ -27,6 +29,19 @@ class AcatTestsTest {
             () -> Acat.combine(new double[] {0, 1}));
         assertThrows(IllegalArgumentException.class,
             () -> Acat.combine(new double[] {.1, .2}, new double[] {0, 0}));
+    }
+
+    @Test void cotangentTailsPreserveIdentityAndWeightedSubnormalInputs() {
+        for (double p : new double[] {Double.MIN_VALUE, 1e-310, 1e-300,
+                1e-16, 1e-15, 1e-14, 1e-12, 1e-8, .01, .5, .99, Math.nextDown(1.0)}) {
+            double actual = Acat.combine(new double[] {p}).pValue();
+            assertEquals(p, actual, Math.max(4 * Math.ulp(p), 5e-15 * p));
+        }
+        assertEquals(1.0000000001e-300,
+            Acat.combine(new double[] {1e-310, .5}, new double[] {1e-10, 1}).pValue(), 1e-314);
+        assertEquals(.5, Acat.combine(new double[] {.125, .875}).pValue(), 1e-15);
+        assertEquals(Math.atan(Math.PI) / Math.PI, Acat.combine(
+            new double[] {Double.MIN_VALUE, .5}, new double[] {Double.MIN_VALUE, 1}).pValue(), 1e-15);
     }
 
     @Test void acatVAndCanonicalAcatOMatchIndependentRFixtures()

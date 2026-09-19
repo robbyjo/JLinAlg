@@ -10,6 +10,17 @@ import jdistlib.Normal;
 import org.junit.jupiter.api.Test;
 
 final class RegionLevelEwasTest {
+    @Test void finiteExtremeTailsAndOppositeSignsRemainWellDefined() {
+        var options = new RegionLevelEwas.Options(500, 2, 200);
+        for (double sign : new double[] {1, -1}) {
+            var region = RegionLevelEwas.scan(List.of(
+                new EwasProbe("a", "1", 100, 1, 1e-20),
+                new EwasProbe("b", "1", 200, sign, 1e-20)), "GRCh38", options).get(0);
+            assertEquals(sign == 1 ? 10.416778225085585 : 0, region.statistic(), 1e-13);
+            assertEquals(sign == 1 ? 2.078759535665973e-25 : 1, region.pValue(),
+                sign == 1 ? 1e-37 : 0);
+        }
+    }
     @Test void signedStoufferUsesDeclaredSpatialCovarianceAndCoverage() {
         List<EwasProbe> probes = List.of(
             new EwasProbe("a", "1", 100, 0.2, 0.01),

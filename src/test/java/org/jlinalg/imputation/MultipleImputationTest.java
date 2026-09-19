@@ -9,6 +9,52 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 final class MultipleImputationTest {
+    @Test void binaryBootstrapRetainsObservedDataUncertainty() {
+        double[][] data = new double[1000][2];
+        for (int i=0;i<data.length;i++) { data[i][0]=i<50?0:i<100?1:Double.NaN; data[i][1]=7; }
+        var completed=MiceImputer.impute(data,new VariableType[]{VariableType.BINARY,VariableType.CONTINUOUS},
+            new MiceOptions(500,1,5,271828,1e-6)).datasets();
+        var pooled=poolMeans(completed);
+        // Observed n=100 Bernoulli(.5) information: variance .25/100.
+        assertEquals(.0025,pooled.totalVariance(),.0004);
+        assertEquals(.5,pooled.estimate(),.01);
+    }
+
+    @Test void multinomialBootstrapPreservesUnequalCategoryProbabilities() {
+        double[][] data=new double[300][2];
+        for(int i=0;i<data.length;i++)data[i][0]=i<60?0:i<90?1:i<100?2:Double.NaN;
+        var completed=MiceImputer.impute(data,new VariableType[]{VariableType.CATEGORICAL,VariableType.CONTINUOUS},
+            new MiceOptions(300,1,5,271828,1e-6)).datasets();
+        double[] probability=new double[3];
+        for(var matrix:completed)for(int i=100;i<data.length;i++)probability[(int)matrix[i][0]]+=1.0/(200*completed.size());
+        assertArrayEquals(new double[]{.6,.3,.1},probability,.015);
+    }
+
+    @Test void tiedDonorsPreserveMarginalMeanAndContinuousUncertainty() {
+        for(boolean reverse:new boolean[]{false,true}) {
+            double[][] data=new double[200][2];
+            for(int i=0;i<data.length;i++)data[i][0]=i<100?(reverse?100-i:i+1):Double.NaN;
+            var completed=MiceImputer.impute(data,new VariableType[]{VariableType.CONTINUOUS,VariableType.CONTINUOUS},
+                new MiceOptions(300,1,5,271828,1e-6)).datasets();
+            double mean=0;double min=100,max=1;
+            for(var matrix:completed)for(int i=100;i<data.length;i++) {
+                mean+=matrix[i][0]/(100*completed.size());min=Math.min(min,matrix[i][0]);max=Math.max(max,matrix[i][0]);
+            }
+            assertEquals(50.5,mean,1.0);assertEquals(1,min);assertEquals(100,max);
+            // Sample variance of 1..100 divided by the 100 observed values.
+            assertEquals(8.416666666666666,poolMeans(completed).totalVariance(),1.7);
+        }
+    }
+
+    private static RubinPooling.Estimate poolMeans(java.util.List<double[][]> completed) {
+        double[] mean=new double[completed.size()],variance=mean.clone();
+        for(int k=0;k<mean.length;k++) {
+            var data=completed.get(k);int n=data.length;
+            for(var row:data)mean[k]+=row[0]/n;
+            for(var row:data)variance[k]+=Math.pow(row[0]-mean[k],2)/(n*(n-1.0));
+        }
+        return RubinPooling.pool(mean,variance,Double.POSITIVE_INFINITY);
+    }
     @Test void mixedChainsAreReproducibleAndPreserveObservedCells() {
         double missing = Double.NaN;
         double[][] data = {

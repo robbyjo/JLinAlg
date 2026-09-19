@@ -7,7 +7,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.SplittableRandom;
 
-/** Stochastic chained-equations imputation for mixed numeric data. */
+/** Bootstrap chained-equations imputation for mixed numeric data.
+ * Each update resamples observed rows before fitting its conditional model;
+ * PMM also samples donors from that bootstrap, preserving marginal uncertainty.
+ * Binary and categorical responses use a joint multinomial logistic model.
+ * Rubin inference remains conditional on suitable MAR and model assumptions. */
 public final class MiceImputer {
     private MiceImputer() { }
 
@@ -29,11 +33,9 @@ public final class MiceImputer {
                     if (!anyMissing(missing, column)) continue;
                     switch (types[column]) {
                         case CONTINUOUS -> continuous(current, data, missing,
-                            column, options, random);
-                        case BINARY -> binary(current, data, missing,
-                            column, options.ridge(), random);
-                        case CATEGORICAL -> categorical(current, data, missing,
-                            column, options.ridge(), random);
+                            column, types, options, random);
+                        case BINARY, CATEGORICAL -> categorical(current, data, missing,
+                            column, types, options.ridge(), random);
                     }
                 }
             }
@@ -44,10 +46,10 @@ public final class MiceImputer {
     }
 
     private static void continuous(double[][] current, double[][] original,
-            boolean[][] missing, int target, MiceOptions options,
+            boolean[][] missing, int target, VariableType[] types, MiceOptions options,
             SplittableRandom random) {
-        double[][] design = design(current, target);
-        int[] observed = rows(missing, target, false);
+        double[][] design = design(current, target, types);
+        int[] observed = bootstrap(rows(missing, target, false), random);
         int[] absent = rows(missing, target, true);
         double[] response = new double[observed.length];
         double[][] x = new double[observed.length][];
@@ -64,93 +66,49 @@ public final class MiceImputer {
             double predicted = dot(design[row], coefficients);
             Integer[] order = new Integer[observed.length];
             for (int index = 0; index < order.length; index++) order[index] = index;
-            Arrays.sort(order, (left, right) -> {
-                int comparison = Double.compare(
-                    Math.abs(predictedObserved[left] - predicted),
-                    Math.abs(predictedObserved[right] - predicted));
-                return comparison != 0 ? comparison : Integer.compare(left, right);
-            });
+            // A stable distance sort after shuffling randomizes all ties,
+            // including the boundary of the k-nearest donor pool.
+            for (int i = order.length - 1; i > 0; i--) {
+                int j = random.nextInt(i + 1);
+                Integer swap = order[i]; order[i] = order[j]; order[j] = swap;
+            }
+            Arrays.sort(order, (left, right) -> Double.compare(
+                Math.abs(predictedObserved[left] - predicted),
+                Math.abs(predictedObserved[right] - predicted)));
             int donor = observed[order[random.nextInt(donors)]];
             current[row][target] = original[donor][target];
         }
     }
 
-    private static void binary(double[][] current, double[][] original,
-            boolean[][] missing, int target, double ridge,
-            SplittableRandom random) {
-        double[][] design = design(current, target);
-        int[] observed = rows(missing, target, false);
-        int[] absent = rows(missing, target, true);
-        double[] response = new double[observed.length];
-        double[][] x = new double[observed.length][];
-        for (int index = 0; index < observed.length; index++) {
-            response[index] = original[observed[index]][target];
-            x[index] = design[observed[index]];
-        }
-        double[] coefficients = logistic(x, response, ridge);
-        for (int row : absent) {
-            double probability = logistic(dot(design[row], coefficients));
-            current[row][target] = random.nextDouble() < probability ? 1.0 : 0.0;
-        }
-    }
-
     private static void categorical(double[][] current, double[][] original,
-            boolean[][] missing, int target, double ridge,
+            boolean[][] missing, int target, VariableType[] types, double ridge,
             SplittableRandom random) {
         double[] categories = categories(original, missing, target);
-        if (categories.length == 2) {
-            double[][] design = design(current, target);
-            int[] observed = rows(missing, target, false);
-            int[] absent = rows(missing, target, true);
-            double[] response = new double[observed.length];
-            double[][] x = new double[observed.length][];
-            for (int index = 0; index < observed.length; index++) {
-                response[index] = original[observed[index]][target]
-                    == categories[1] ? 1.0 : 0.0;
-                x[index] = design[observed[index]];
-            }
-            double[] coefficients = logistic(x, response, ridge);
-            for (int row : absent) {
-                double probability = logistic(dot(design[row], coefficients));
-                current[row][target] = random.nextDouble() < probability
-                    ? categories[1] : categories[0];
-            }
-            return;
+        double[][] design = design(current, target, types);
+        int[] observed = bootstrap(rows(missing, target, false), random);
+        double[][] x = new double[observed.length][];
+        int[] response = new int[observed.length];
+        for (int i = 0; i < observed.length; i++) {
+            x[i] = design[observed[i]];
+            response[i] = Arrays.binarySearch(categories, original[observed[i]][target]);
         }
-        double[][] design = design(current, target);
-        int[] observed = rows(missing, target, false);
-        int[] absent = rows(missing, target, true);
-        double[][] coefficients = new double[categories.length][];
-        for (int category = 0; category < categories.length; category++) {
-            double[] response = new double[observed.length];
-            double[][] x = new double[observed.length][];
-            for (int index = 0; index < observed.length; index++) {
-                response[index] = original[observed[index]][target]
-                    == categories[category] ? 1.0 : 0.0;
-                x[index] = design[observed[index]];
-            }
-            coefficients[category] = logistic(x, response, ridge);
-        }
-        for (int row : absent) {
-            double[] probability = new double[categories.length];
-            double maximum = Double.NEGATIVE_INFINITY;
-            for (int category = 0; category < categories.length; category++) {
-                probability[category] = dot(design[row], coefficients[category]);
-                maximum = Math.max(maximum, probability[category]);
-            }
-            double sum = 0.0;
-            for (int category = 0; category < probability.length; category++) {
-                probability[category] = Math.exp(probability[category] - maximum);
-                sum += probability[category];
-            }
-            double draw = random.nextDouble() * sum;
+        double[] coefficients = multinomial(x, response, categories.length, ridge);
+        for (int row : rows(missing, target, true)) {
+            double[] probability = probabilities(design[row], coefficients, categories.length);
+            double draw = random.nextDouble();
             int selected = probability.length - 1;
             for (int category = 0; category < probability.length; category++) {
                 draw -= probability[category];
-                if (draw <= 0.0) { selected = category; break; }
+                if (draw <= 0) { selected = category; break; }
             }
             current[row][target] = categories[selected];
         }
+    }
+
+    private static int[] bootstrap(int[] observed, SplittableRandom random) {
+        int[] result = new int[observed.length];
+        for (int i = 0; i < result.length; i++) result[i] = observed[random.nextInt(observed.length)];
+        return result;
     }
 
     private static double[][] initialize(double[][] data, boolean[][] missing,
@@ -165,24 +123,38 @@ public final class MiceImputer {
         return result;
     }
 
-    private static double[][] design(double[][] data, int target) {
+    private static double[][] design(double[][] data, int target, VariableType[] types) {
         int rows = data.length;
-        int columns = data[0].length;
-        double[][] result = new double[rows][columns];
-        for (int row = 0; row < rows; row++) result[row][0] = 1.0;
-        int output = 1;
-        for (int column = 0; column < columns; column++) {
+        List<double[]> columns = new ArrayList<>();
+        double[] intercept = new double[rows]; Arrays.fill(intercept, 1); columns.add(intercept);
+        for (int column = 0; column < data[0].length; column++) {
             if (column == target) continue;
-            double mean = 0.0;
-            for (double[] row : data) mean += row[column] / rows;
-            double variance = 0.0;
-            for (double[] row : data) variance += (row[column] - mean) * (row[column] - mean);
-            double scale = Math.sqrt(variance / Math.max(1, rows - 1));
-            if (!(scale > 0.0)) scale = 1.0;
-            for (int row = 0; row < rows; row++)
-                result[row][output] = (data[row][column] - mean) / scale;
-            output++;
+            if (types[column] == VariableType.CATEGORICAL) {
+                final int index = column;
+                double[] levels = Arrays.stream(data).mapToDouble(r -> r[index]).distinct().sorted().toArray();
+                for (int k = 1; k < levels.length; k++) {
+                    double[] dummy = new double[rows];
+                    for (int row = 0; row < rows; row++) dummy[row] = data[row][column] == levels[k] ? 1 : 0;
+                    columns.add(dummy);
+                }
+            } else {
+                boolean constant = true;
+                for (double[] row : data) constant &= row[column] == data[0][column];
+                if (constant) continue;
+                double mean = 0;
+                for (double[] row : data) mean += row[column] / rows;
+                double variance = 0;
+                for (double[] row : data) variance += Math.pow(row[column] - mean, 2);
+                if (variance == 0) continue;
+                double scale = Math.sqrt(variance / (rows - 1));
+                double[] values = new double[rows];
+                for (int row = 0; row < rows; row++) values[row] = (data[row][column] - mean) / scale;
+                columns.add(values);
+            }
         }
+        double[][] result = new double[rows][columns.size()];
+        for (int row = 0; row < rows; row++) for (int c = 0; c < columns.size(); c++)
+            result[row][c] = columns.get(c)[row];
         return result;
     }
 
@@ -204,36 +176,73 @@ public final class MiceImputer {
         return solve(cross, target);
     }
 
-    private static double[] logistic(double[][] design, double[] response,
-            double ridge) {
-        double[] coefficients = new double[design[0].length];
-        for (int iteration = 0; iteration < 50; iteration++) {
-            double[][] cross = new double[coefficients.length][coefficients.length];
-            double[] target = new double[coefficients.length];
-            for (int row = 0; row < design.length; row++) {
-                double eta = dot(design[row], coefficients);
-                double mean = logistic(eta);
-                double weight = Math.max(1e-6, mean * (1.0 - mean));
-                double working = eta + (response[row] - mean) / weight;
-                for (int left = 0; left < coefficients.length; left++) {
-                    target[left] = Math.fma(weight * design[row][left], working,
-                        target[left]);
-                    for (int right = 0; right < coefficients.length; right++)
-                        cross[left][right] = Math.fma(weight * design[row][left],
-                            design[row][right], cross[left][right]);
+    // Baseline-category multinomial likelihood, with one joint information
+    // matrix. A weak ridge keeps bootstrap samples with separation finite.
+    private static double[] multinomial(double[][] x, int[] y, int categories, double ridge) {
+        int p = x[0].length, size = p * (categories - 1);
+        double[] beta = new double[size];
+        for (int iteration = 0; iteration < 200; iteration++) {
+            double[][] information = new double[size][size];
+            double[] score = new double[size];
+            for (int row = 0; row < x.length; row++) {
+                double[] probability = probabilities(x[row], beta, categories);
+                for (int a = 0; a < categories - 1; a++) for (int j = 0; j < p; j++) {
+                    int left = a * p + j;
+                    score[left] += x[row][j] * ((y[row] == a ? 1 : 0) - probability[a]);
+                    for (int b = 0; b < categories - 1; b++) for (int k = 0; k < p; k++)
+                        information[left][b * p + k] += x[row][j] * x[row][k]
+                            * probability[a] * ((a == b ? 1 : 0) - probability[b]);
                 }
             }
-            for (int column = 1; column < coefficients.length; column++)
-                cross[column][column] += ridge;
-            cross[0][0] += ridge * 1e-3;
-            double[] updated = solve(cross, target);
-            double change = 0.0;
-            for (int column = 0; column < coefficients.length; column++)
-                change = Math.max(change, Math.abs(updated[column] - coefficients[column]));
-            coefficients = updated;
-            if (change < 1e-8) break;
+            double maxScore = 0;
+            for (int j = 0; j < size; j++) {
+                double penalty = ridge * (j % p == 0 ? 1e-3 : 1);
+                information[j][j] += penalty; score[j] -= penalty * beta[j];
+                maxScore = Math.max(maxScore, Math.abs(score[j]));
+            }
+            if (maxScore < 1e-8) return beta;
+            double[] step = solve(information, score);
+            double old = objective(x, y, beta, categories, ridge);
+            double fraction = 1; boolean accepted = false;
+            for (int search = 0; search < 40; search++, fraction *= .5) {
+                double[] candidate = beta.clone();
+                for (int j = 0; j < size; j++) candidate[j] += fraction * step[j];
+                if (objective(x, y, candidate, categories, ridge) <= old + 1e-12) {
+                    beta = candidate; accepted = true; break;
+                }
+            }
+            if (!accepted) throw new IllegalArgumentException("imputation multinomial line search failed");
         }
-        return coefficients;
+        throw new IllegalArgumentException("imputation multinomial model did not converge");
+    }
+
+    private static double[] probabilities(double[] x, double[] beta, int categories) {
+        double[] logits = new double[categories]; double maximum = 0;
+        for (int k = 0; k < categories - 1; k++) {
+            for (int j = 0; j < x.length; j++) logits[k] += x[j] * beta[k * x.length + j];
+            maximum = Math.max(maximum, logits[k]);
+        }
+        double sum = 0;
+        for (int k = 0; k < categories; k++) { logits[k] = Math.exp(logits[k] - maximum); sum += logits[k]; }
+        for (int k = 0; k < categories; k++) logits[k] /= sum;
+        return logits;
+    }
+
+    private static double objective(double[][] x, int[] y, double[] beta, int categories, double ridge) {
+        double value = 0;
+        for (int i = 0; i < x.length; i++) {
+            double[] logits = new double[categories]; double max = 0;
+            for (int k = 0; k < categories - 1; k++) {
+                for (int j = 0; j < x[i].length; j++) logits[k] += x[i][j] * beta[k * x[i].length + j];
+                max = Math.max(max, logits[k]);
+            }
+            double sum = 0;
+            for (double logit : logits) sum += Math.exp(logit - max);
+            value += max - logits[y[i]] + Math.log(sum);
+        }
+        for (int j = 0; j < beta.length; j++)
+            value += .5 * ridge * (j % x[0].length == 0 ? 1e-3 : 1) * beta[j] * beta[j];
+        return value;
     }
 
     private static double[] solve(double[][] matrix, double[] right) {
@@ -309,11 +318,6 @@ public final class MiceImputer {
     private static boolean anyMissing(boolean[][] missing, int column) {
         for (boolean[] row : missing) if (row[column]) return true;
         return false;
-    }
-
-    private static double logistic(double value) {
-        if (value >= 0.0) { double exponential = Math.exp(-value); return 1.0 / (1.0 + exponential); }
-        double exponential = Math.exp(value); return exponential / (1.0 + exponential);
     }
 
     private static double dot(double[] left, double[] right) {

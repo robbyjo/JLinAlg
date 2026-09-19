@@ -71,9 +71,15 @@ count, design columns, convergence, seed and backend policy in its manifest.
 
 - Inputs are normalized continuous measurements, not raw counts.
 - RUV and ComBat-Seq are separate estimators and are not aliases.
-- Standard SVA local-FDR density evaluation is a direct Gaussian KDE port; the
-  frozen tests gate posterior behavior and resulting factor subspaces rather
-  than promising byte identity with R's platform-specific smoothing spline.
+- SVA/AutoSVA local-FDR density uses linear binning, zero-padded FFT Gaussian
+  convolution and interpolation, with spacing at most bandwidth/32. Inputs of
+  at most 256 features use direct evaluation; constant inputs take linear work.
+  Grids above 131,072 intervals are rejected explicitly rather than silently
+  changing the bandwidth. Direct-kernel comparisons check relative error below
+  0.05% on the seeded multimodal/tail fixture. Frozen tests still gate posterior
+  behavior and factor subspaces, not byte identity with R's smoothing spline.
+- Run `gradlew benchmarkInferenceAudit` for complete SVA and AutoSVA schedules.
+  See [audit-fix validation](audit-fixes-validation.md) for measured results.
 - Frozen application to new samples and fold-owned prediction preprocessing
   remain open; factors must currently be fitted within each training dataset.
 - PEER sparse prior-guided factor analysis is not implemented.

@@ -6,7 +6,6 @@ package org.jlinalg.settest;
 
 /** Numerically stable aggregated Cauchy association test (ACAT). */
 public final class Acat {
-    private static final double SMALL_P = 1e-15;
     private static final double LOG_10 = Math.log(10);
 
     private Acat() { }
@@ -47,21 +46,29 @@ public final class Acat {
             return new Result(Double.NEGATIVE_INFINITY, 1, 0,
                 positive(normalized));
 
+        // Scale extreme tails before division, retaining a representable p even
+        // when the corresponding Cauchy statistic exceeds Double.MAX_VALUE.
+        double scale = 1;
+        for (int i = 0; i < pValues.length; i++) if (normalized[i] > 0
+                && normalized[i] / Math.min(pValues[i], 1 - pValues[i]) > 1e150)
+            scale = 1e-300;
         // Neumaier summation matters when moderately extreme tails oppose.
         double sum = 0, correction = 0;
         for (int index = 0; index < pValues.length; index++) {
             if (normalized[index] == 0) continue;
-            double term = normalized[index] * transform(pValues[index]);
+            double term = transform(pValues[index], normalized[index], scale);
             double next = sum + term;
             correction += Math.abs(sum) >= Math.abs(term)
                 ? (sum - next) + term : (term - next) + sum;
             sum = next;
         }
-        double statistic = sum + correction;
+        double scaled = sum + correction;
+        double statistic = scaled / scale;
         if (Double.isNaN(statistic))
             throw new IllegalArgumentException(
                 "ACAT statistic is unresolved because opposing tails overflow");
-        double pValue = survival(statistic);
+        double pValue = scaled > 0 ? Math.atan(scale / scaled) / Math.PI
+            : scaled < 0 ? 1 - Math.atan(-scale / scaled) / Math.PI : 0.5;
         double log10 = pValue > 0 ? Math.log(pValue) / LOG_10
             : Double.NEGATIVE_INFINITY;
         return new Result(statistic, pValue, log10, positive(normalized));
@@ -96,19 +103,20 @@ public final class Acat {
         return result;
     }
 
-    private static double transform(double pValue) {
-        if (pValue < SMALL_P) return 1 / (Math.PI * pValue);
+    private static double transform(double pValue, double weight, double scale) {
+        if (pValue < 1e-8) return scaledReciprocal(weight, pValue, scale) / Math.PI;
         double upper = 1 - pValue;
-        if (upper < SMALL_P) return -1 / (Math.PI * upper);
-        return Math.tan(Math.PI * (0.5 - pValue));
+        if (upper < 1e-8) return -scaledReciprocal(weight, upper, scale) / Math.PI;
+        if (pValue < 0.25) return weight * (scale / Math.tan(Math.PI * pValue));
+        if (pValue > 0.75) return -weight * (scale / Math.tan(Math.PI * upper));
+        return weight * scale * Math.tan(Math.PI * (0.5 - pValue));
     }
 
-    private static double survival(double statistic) {
-        if (statistic == Double.POSITIVE_INFINITY) return 0;
-        if (statistic == Double.NEGATIVE_INFINITY) return 1;
-        if (statistic > 0) return Math.atan(1 / statistic) / Math.PI;
-        if (statistic < 0) return 1 - Math.atan(-1 / statistic) / Math.PI;
-        return 0.5;
+    private static double scaledReciprocal(double weight, double probability, double scale) {
+        double ratio = weight / probability;
+        // Taking weight/probability first also preserves subnormal weights
+        // attached to subnormal p-values when their ratio is ordinary sized.
+        return Double.isInfinite(ratio) ? (scale / probability) * weight : ratio * scale;
     }
 
     /** ACAT statistic and its standard-Cauchy upper-tail probability. */

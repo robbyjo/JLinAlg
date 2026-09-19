@@ -156,9 +156,13 @@ java -jar $jar multiple-impute --input incomplete.tsv --id sample_id `
   --out build/imputed/cohort
 ```
 
-Continuous variables use stochastic predictive mean matching from observed
-donors, binary variables use logistic probability draws, and integer-encoded
-categories use categorical probability draws. Each completed data set uses an
+Every conditional update first bootstraps its observed rows, propagating
+model-parameter uncertainty. Continuous variables use predictive mean matching
+within that bootstrap donor sample, randomizing ties for each missing cell.
+Binary and categorical responses use one joint multinomial logistic model;
+nominal predictor categories use dummy columns. This bootstrap MI method uses
+weak ridge regularization for separated bootstrap samples and stops if a
+conditional fit fails to converge. Each completed data set uses an
 independent deterministic stream derived from the recorded seed. The command
 writes `OUT.impN.tsv`, chain mean/variance diagnostics for originally missing
 cells, and run metadata. Observed cells are never replaced.

@@ -72,3 +72,6 @@ render(ROOT / "docs/regression-inference-validation.md", ROOT / "site/regression
 render(ROOT / "docs/inference-workflows-validation.md", ROOT / "site/inference-workflows-validation.html",
        "Modern inference workflow validation", "Frozen Bioconductor comparisons, independent formula checks, reproducible commands, and explicit estimator boundaries.", "./",
        "Source audit · Reproducible validation")
+render(ROOT / "docs/audit-fixes-validation.md", ROOT / "site/audit-fixes-validation.html",
+       "Statistical audit fixes", "Regression checks, bootstrap imputation contracts and measured smoothing performance.", "./",
+       "Source audit · Reproducible validation")

@@ -50,13 +50,38 @@ race over `build/`:
 .\gradlew.bat clean check assemble --no-daemon --no-parallel
 ```
 
+## Audit fixes validated on 2026-09-19
+
+- Exact-fit negative-binomial inference uses final weighted-design inverse
+  information: the independent R audit example has SE 0.23990279696049335
+  and p 0.0038612085215580121. Failed/boundary fits publish NaN inference;
+  CLI BH retains their place in the family with internal p=1 and outputs NaN.
+  Exact Gaussian fits likewise retain the unscaled covariance before moderation.
+- Bootstrap MI tests cover unequal category frequencies, tied donors under row
+  reversal, and observed-data uncertainty for binary and continuous means.
+  The 100-observed/900-missing binary example now has pooled SE 0.0489
+  (observed-data reference 0.05), rather than 0.0212.
+- EWAS signed upper-tail quantiles retain finite p=1e-20 inputs and allow
+  opposite signs to cancel. Voom accepts its documented two-feature minimum.
+- Independent direct-trend comparisons bound precision-weight discrepancy at
+  0.2% on the seeded regression workload. Existing limma/voom/NB fixtures pass.
+
+Run `gradlew test --tests '*MultipleImputationTest' --tests '*VoomTrendTest'
+--tests '*EmpiricalBayesDifferentialTest' --tests '*RegionLevelEwasTest'
+--tests '*XwasInferenceCliTest'` for these regression gates. Run
+`gradlew benchmarkInferenceAudit` for deterministic CPU scaling probes.
+See [audit-fix validation](audit-fixes-validation.md) for timings, tail checks,
+reproduction details and remaining inferential limits.
+
 ## Supported scope and non-equivalence boundaries
 
 - `limma` uses a common scaled-inverse-chi-square residual-variance prior.
   Robust/winsorized priors, duplicate correlation, array weights, treat-style
   fold-change testing, and arbitrary contrast matrices in the CLI are outside
   this first interface.
-- `voom` uses median-ratio library scaling and a direct local precision trend.
+- `voom` uses median-ratio library scaling and a span-0.5 local precision trend.
+  The sorted trend is interpolated at up to 2,049 query quantiles for more than
+  128 features; small feature sets use exact evaluation.
   It does not claim exact TMM or lowess identity with limma/edgeR for every
   workload. The separate NB path must be used for count likelihood inference.
 - The NB path uses fixed shrunken dispersions in model-based Wald inference.
@@ -70,8 +95,12 @@ race over `build/`:
 - IHW requires a covariate independent of null p-values and independent folds.
   The compact cross-fitted bin estimator is not the complete IHW convex
   optimizer. Hierarchical output controls FWER, not FDR.
-- MICE uses predictive mean matching, binary logistic draws, and categorical
-  probability draws for numeric or CLI-encoded categories. It does not include
+- MICE resamples observed rows for every conditional update. Continuous
+  variables use PMM within the bootstrap donor sample, with randomized ties;
+  binary and categorical variables use a joint baseline-category multinomial
+  logistic fit to the bootstrap sample. Nominal predictors use dummy columns.
+  This is bootstrap MI, not an exact Bayesian posterior sampler or numerical
+  clone of R mice. The resampling propagates parameter uncertainty. It does not include
   multilevel random effects, passive formulas, survey weights, or MNAR models.
   Chain summaries are diagnostics, not proof of convergence or correct MAR
   specification.

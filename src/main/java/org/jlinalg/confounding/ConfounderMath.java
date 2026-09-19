@@ -182,14 +182,9 @@ final class ConfounderMath {
         }
         double bandwidth = 1.5 * bandwidthNrd0(x);
         double[] lfdr = new double[n];
-        double normalizer = n * bandwidth * Math.sqrt(2.0 * Math.PI);
+        double[] densities = GaussianKde.atObservations(x, bandwidth);
         for (int i = 0; i < n; i++) {
-            double density = 0.0;
-            for (double value : x) {
-                double z = (x[i] - value) / bandwidth;
-                if (Math.abs(z) < 38.0) density += Math.exp(-0.5 * z * z);
-            }
-            density /= normalizer;
+            double density = densities[i];
             double nullDensity = Math.exp(-0.5 * x[i] * x[i]) / Math.sqrt(2.0 * Math.PI);
             lfdr[i] = Math.min(1.0, pi0 * nullDensity / Math.max(density, Double.MIN_NORMAL));
         }

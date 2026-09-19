@@ -14,6 +14,24 @@ import org.junit.jupiter.api.io.TempDir;
 final class XwasInferenceCliTest {
     @TempDir Path temporaryDirectory;
 
+    @Test void failedCountFitsKeepUnavailableInferenceAndFullBhFamily() throws Exception {
+        Path omics=temporaryDirectory.resolve("counts.tsv"),pheno=temporaryDirectory.resolve("groups.tsv");
+        Files.writeString(omics,"feature\ts1\ts2\ts3\ts4\ts5\ts6\n"
+            +"a\t10\t10\t10\t10\t10\t10\n"
+            +"b\t20\t20\t20\t20\t20\t20\n"
+            +"c\t20\t20\t20\t40\t40\t40\n"
+            +"zero\t0\t0\t0\t0\t0\t0\n");
+        Files.writeString(pheno,"sample\tgroup\ns1\tcontrol\ns2\tcontrol\ns3\tcontrol\ns4\tcase\ns5\tcase\ns6\tcase\n");
+        Path out=temporaryDirectory.resolve("result.tsv");
+        assertEquals(0,JLinAlgCli.run(new String[]{"differential","--method","nb","--omics",omics.toString(),
+            "--pheno",pheno.toString(),"--id","sample","--group","group","--out",out.toString()}));
+        var lines=Files.readAllLines(out);
+        String[] changed=lines.get(3).split("\t"),zero=lines.get(4).split("\t");
+        assertEquals(4*Double.parseDouble(changed[6]),Double.parseDouble(changed[7]),1e-12);
+        assertEquals("NaN",zero[3]);assertEquals("NaN",zero[6]);assertEquals("NaN",zero[7]);
+        assertEquals("false",zero[13]);
+    }
+
     @Test void newCommandsAreDispatchedAndAdvertiseHelp() {
         for (String command : new String[] {"differential", "ewas-regions",
                 "multiple-test", "multiple-impute", "mi-pool"}) {
