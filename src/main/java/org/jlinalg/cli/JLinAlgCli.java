@@ -24,6 +24,48 @@ public final class JLinAlgCli {
 
     static int run(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        try {
+            ProjectConfiguration.Resolved config = ProjectConfiguration.resolve(arguments,
+                java.nio.file.Path.of("").toAbsolutePath(), java.nio.file.Path.of(System.getProperty("user.home")));
+            arguments = config.arguments();
+            if (arguments.length == 1 && arguments[0].equals("config")) {
+                output.print(new org.yaml.snakeyaml.Yaml().dump(config.provenance()));
+                return 0;
+            }
+            java.nio.file.Path record = null;
+            boolean auditConfig = !((java.util.List<?>)config.provenance().get("sources")).isEmpty()
+                || arguments.length>0 && java.util.Set.of("network","variant-db","variant-annotate","variant-consequence","variant-score").contains(arguments[0]);
+            if (auditConfig && !Arrays.asList(arguments).contains("--help")) {
+                for (int i=0;i+1<arguments.length;i++) if(arguments[i].equals("--out"))
+                    record=java.nio.file.Path.of(arguments[i+1]+".config.yaml");
+            }
+            // Existing commands retain their overwrite semantics; configuration never overwrites inputs.
+            if(record!=null && Files.exists(record) && !Arrays.asList(arguments).contains("--overwrite"))
+                throw new IOException("Configuration output already exists: "+record);
+            if(record!=null && Files.exists(record)) for(Object source:(java.util.List<?>)config.provenance().get("sources")) {
+                String path=String.valueOf(((java.util.Map<?,?>)source).get("path"));
+                if(Files.isSameFile(record,java.nio.file.Path.of(path)))
+                    throw new IOException("Configuration output aliases a source configuration");
+            }
+            if(record!=null) for(String value:arguments) {
+                if(value.startsWith("--"))continue;
+                try { if(Files.exists(record) && Files.exists(java.nio.file.Path.of(value))
+                        && Files.isSameFile(record,java.nio.file.Path.of(value)))
+                    throw new IOException("Configuration output aliases an input"); }
+                catch(java.nio.file.InvalidPathException ignored) { }
+            }
+            int status = runConfigured(arguments,output,errorOutput);
+            if(status==0 && record!=null) {
+                Files.createDirectories(record.toAbsolutePath().getParent());
+                Files.writeString(record,new org.yaml.snakeyaml.Yaml().dump(config.provenance()));
+            }
+            return status;
+        } catch (IOException | RuntimeException exception) {
+            errorOutput.println("jlinalg: "+exception.getMessage()); return 2;
+        }
+    }
+
+    private static int runConfigured(String[] arguments, PrintStream output, PrintStream errorOutput) {
         if (arguments.length > 0 && CliRunLogging.accepts(arguments[0]))
             return CliRunLogging.run(arguments, errorOutput,
                 forwarded -> dispatch(forwarded, output, errorOutput));
@@ -32,6 +74,10 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if(arguments.length>0 && java.util.Set.of("variant-db","variant-annotate","variant-consequence","variant-score").contains(arguments[0]))
+            return VariantFollowupCli.run(arguments[0],Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
+        if(arguments.length>0 && arguments[0].equals("network"))
+            return NetworkCli.run(Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
         if (arguments.length > 0 && java.util.Set.of("censored-regression", "ordinal-regression",
                 "rare-events-logit", "survey-regression").contains(arguments[0]))
             return InferenceCli.run(arguments[0], Arrays.copyOfRange(arguments, 1, arguments.length), output, errorOutput);
@@ -187,6 +233,14 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar config --command COMMAND
+              java -jar jlinalg-<version>.jar variant-db --help
+              java -jar jlinalg-<version>.jar variant-annotate --help
+              java -jar jlinalg-<version>.jar variant-consequence --help
+              java -jar jlinalg-<version>.jar variant-score --help
+              java -jar jlinalg-<version>.jar network --help
+              All commands: [--local-config FILE] [--config FILE | --no-config]
+              Precedence: built-in defaults < ~/.jlinalg/config.yaml < ./jlinalg.yaml < CLI
               java -jar jlinalg-<version>.jar censored-regression --help
               java -jar jlinalg-<version>.jar ordinal-regression --help
               java -jar jlinalg-<version>.jar rare-events-logit --help

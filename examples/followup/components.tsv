@@ -1,0 +1,4 @@
+column	weight	minimum	maximum	direction
+pip	2	0	1	higher
+functional_score	1	0	1	higher
+coloc_h4	1	0	1	higher

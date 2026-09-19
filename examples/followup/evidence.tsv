@@ -1,0 +1,4 @@
+variant_id	gene	transcript	pip	functional_score	coloc_h4
+GRCh38:1:101:A:G	G01	TX1	0.8	0.8	0.9
+GRCh38:1:101:A:G	G01	TX2	0.8	0.4	0.9
+GRCh38:1:202:C:T	G02	NA	0.2	NA	0.1

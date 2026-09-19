@@ -1,0 +1,3 @@
+genome_build	chrom	pos	ref	alt
+GRCh38	1	101	A	G
+GRCh38	1	202	C	T

@@ -1,0 +1,3 @@
+genome_build	chrom	pos	ref	alt	gene	transcript	functional_score
+GRCh38	1	101	A	G	G01	TX1	0.8
+GRCh38	1	101	A	G	G01	TX2	0.4

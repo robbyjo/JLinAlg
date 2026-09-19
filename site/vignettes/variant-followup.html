@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Local snapshots, POST/API lookup, VEP/ANNOVAR adapters and transparent evidence integration."><title>Variant annotation and scoring · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Variant annotation and scoring</span></div>
+<span class="eyebrow">CLI · Source build</span><h1>Variant annotation and scoring</h1><p>Local snapshots, POST/API lookup, VEP/ANNOVAR adapters and transparent evidence integration.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>These source-build commands implement three distinct operations: annotation
+lookup, consequence prediction/import, and transparent evidence integration.
+They require no LLM. All <code>--out</code> arguments name fresh directories. Examples are
+synthetic; the coordinates and annotations do not assert actual biology.</p>
+<h2 id="inputs-and-variant-identity">Inputs and variant identity</h2>
+<p>Canonical TSV/CSV inputs contain <code>genome_build</code>, <code>chrom</code>, <code>pos</code>, <code>ref</code>, <code>alt</code>.
+Use GRCh37 or GRCh38 and positive, one-based <strong>VCF</strong> coordinates. Alleles must be
+distinct biallelic A/C/G/T sequences. Symbolic alleles and unsplit multiallelic
+records are rejected. The optional <code>variant_id</code> must equal
+<code>GRCh38:1:101:A:G</code>, including build and alleles. A lowercase <code>chr</code> prefix is
+removed and alleles are uppercased for identity matching. rsIDs alone are not keys.</p>
+<p>Normalize indels against the chosen reference before importing, for example with
+<code>bcftools norm -f reference.fa -m -any</code>. This workflow does not left-align, liftover,
+infer strand, validate a REF allele against FASTA during local lookup, or repair
+incompatible representations. Different representations do not silently match.
+Keep transcript-level records: several annotations for one variant are legitimate.</p>
+<h2 id="1-install-and-query-a-local-annotation-snapshot">1. Install and query a local annotation snapshot</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-db --source-file examples/followup/annotations.tsv --genome-build GRCh38 --release synthetic-1 --license CC0 --out build/followup/annotation-db
+java -jar build/cli/jlinalg-0.3.6.jar variant-annotate --input examples/followup/variants.tsv --genome-build GRCh38 --database build/followup/annotation-db --out build/followup/annotated
+</code></pre></div>
+<p>Inspect <code>annotations.tsv</code>: the first example variant retains both transcripts;
+the second has <code>not_found</code>. Missing annotation is not a benign classification.
+Annotation columns are prefixed with <code>annotation.</code>. The join does not collapse
+genes/transcripts or automatically merge observational association statistics.</p>
+<p><code>variant-db --source-url URL --source-sha256 SHA256</code> downloads instead of copying
+a local source. Supply the provider's exact release URL and independently obtained
+SHA256, <code>--release</code>, <code>--license</code>, and <code>--genome-build</code>. <code>--compression gzip</code>
+decompresses gzip/BGZF sources. A canonical source is a TSV with the five key
+columns and any additional annotation/score columns.</p>
+<p>For other TSV schemas, use <code>--format table --chrom-column '#chr' --pos-column
+'pos(1-based)' --ref-column ref --alt-column alt</code> with names from the actual file.
+This supports precomputed-score tables such as a suitably selected dbNSFP release;
+check which assembly its position column represents. Original fields are retained
+as <code>source.*</code>. <code>--format vcf</code> imports a normalized, biallelic VCF and retains its
+ID and INFO string. It does not interpret INFO arrays as independent scores.
+Restricted databases are user-supplied; provider licensing and access conditions
+still apply, including commercial-use differences among score collections.</p>
+<p>The current backend validates and <strong>streams the entire local TSV</strong>, retaining
+only query matches. It is not a genome-scale index: use a regional/preselected
+snapshot for frequent small queries against very large resources. Installation
+requires disk space for both the download and normalized table. Checksums are
+verified before analysis, adding another sequential read.</p>
+<h2 id="remote-post-and-provider-apis">Remote POST and provider APIs</h2>
+<p>For a controlled service that implements the canonical TSV contract:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-annotate --input examples/followup/variants.tsv --genome-build GRCh38 --backend post --endpoint https://YOUR-SERVICE/annotations --out build/followup/remote
+</code></pre></div>
+<p>Replace the example URL with an actual service. JLinAlg posts <strong>only the five
+canonical variant columns</strong> as <code>text/tab-separated-values</code>, expects a canonical
+annotation TSV, and stores request/response files. This is a documented service
+contract, not a claim that arbitrary web forms accept TSV. There is no browser
+automation. HTTP errors, redirects, malformed rows and build mismatches fail the
+run. Use a final URL, <code>--timeout</code>, <code>--max-download-mb</code>, and, if needed,
+<code>--token-env NAME</code> for bearer authentication. No implicit switch to remote occurs.</p>
+<p>The <code>vep-rest</code> consequence backend implements the actual Ensembl JSON POST API,
+in batches of at most 200 variants. It chooses the GRCh37 endpoint for GRCh37,
+checks the returned assembly and input identities, and retains raw JSON. It
+requires network access and sends coordinates/alleles to the selected service:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-consequence --input REAL_VARIANTS.tsv --genome-build GRCh38 --engine vep-rest --out build/followup/vep-rest
+</code></pre></div>
+<p>The hosted service can change releases. Archived response hashes make the
+performed lookup auditable; rerunning against a live endpoint need not reproduce
+an older release. Use local VEP/cache versions when that matters.</p>
+<h2 id="2-consequence-prediction-or-import">2. Consequence prediction or import</h2>
+<p>Import the runnable synthetic VEP result:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-consequence --input examples/followup/variants.tsv --genome-build GRCh38 --engine import --annotations examples/followup/vep.tsv --format vep --out build/followup/consequences
+</code></pre></div>
+<p>Supported imports are canonical TSV, VEP tab output beginning with
+<code>#Uploaded_variation</code>, and ANNOVAR's <code>*_multianno.vcf</code> (<code>--format annovar-vcf</code>).
+VEP Uploaded_variation / VCF ID must preserve the canonical variant ID supplied
+by JLinAlg. Imported files must have been generated for the declared build; a
+VEP text file without explicit assembly metadata cannot independently prove it.
+The ANNOVAR import additionally verifies coordinates and REF/ALT. VEP transcripts
+are retained; ANNOVAR aggregated gene fields/INFO remain aggregated and the
+transcript is <code>NA</code> when it is not explicitly available.</p>
+<p>Run an installed VEP with a compatible local cache and FASTA:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-consequence --input REAL_VARIANTS.tsv --genome-build GRCh38 --engine vep --executable /path/to/vep --cache /path/to/cache --cache-version VERSION --fasta /path/to/GRCh38.fa --out build/followup/vep-local
+</code></pre></div>
+<p>JLinAlg writes VCF IDs, invokes VEP with <code>--offline --cache --tab --everything</code>,
+and imports the resulting transcript records. Choose an executable matching your
+platform; an external Perl environment is still required by VEP.</p>
+<p>Run a separately installed ANNOVAR:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-consequence --input REAL_VARIANTS.tsv --genome-build GRCh38 --engine annovar --executable /path/to/table_annovar.pl --perl /path/to/perl --database /path/to/humandb --protocol refGene --operation g --out build/followup/annovar
+</code></pre></div>
+<p>The adapter uses <code>-vcfinput</code>, hg38/hg19 as appropriate, and reads the resulting
+multianno VCF. Protocols/operations are explicit comma-separated ANNOVAR options.
+Install compatible databases using ANNOVAR's downloader. JLinAlg does not bundle
+or automatically register for ANNOVAR. External commands use argument arrays,
+not a shell. Failed processes/timeouts do not publish partial results.</p>
+<h2 id="3-integrate-evidence-without-disguising-uncertainty">3. Integrate evidence without disguising uncertainty</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar variant-score --input examples/followup/evidence.tsv --components examples/followup/components.tsv --out build/followup/scores
+</code></pre></div>
+<p><code>components.tsv</code> specifies <code>column</code>, positive <code>weight</code>, <code>minimum</code>, <code>maximum</code>, and
+<code>direction</code> (<code>higher</code> or <code>lower</code>). A component is linearly scaled to [0,1] using
+those <strong>predeclared</strong> bounds, reversed for <code>lower</code>, and multiplied by its normalized
+weight. <code>priority_score</code> is the sum of contributions. Values outside the bounds
+are rejected rather than silently clipped. All original fields and component
+contributions remain in the output; rows retain input order, with no transcript
+or gene aggregation.</p>
+<p><code>NA</code>, empty or <code>.</code> component values produce a missing contribution and an <code>NA</code>
+total score. <code>weight_coverage</code> reports available weight; there is no automatic
+reweighting that rewards poorly annotated variants. Other nonfinite values fail.</p>
+<p>This is a user-defined prioritization index, <strong>not</strong> a pathogenicity/causality
+probability or a published combined test. PIP and coloc evidence may overlap;
+weights do not make them independent. Avoid counting multiple correlated
+functional predictors as separate corroboration. Select candidates with the
+underlying evidence, tissue context and sensitivity to weights visible.</p>
+<h2 id="validation-and-supported-scope">Validation and supported scope</h2>
+<p>Automated tests cover YAML precedence, checksum failure, duplicate/mismatched
+variants, transcript-preserving lookup, missing evidence, score arithmetic,
+local HTTP POST/VEP JSON fixtures, VEP/ANNOVAR imports and atomic failure.
+The live public VEP smoke check on 2026-09-19 was unavailable (direct HTTPS POST
+returned HTTP 503; Java's connection ended before a response). Live-service
+success is therefore unverified on this host; local protocol fixtures passed.
+Installed VEP/ANNOVAR execution requires the user's tool and database setup.
+Their local full-cache execution is not established by the import/HTTP tests.</p>
+<p>See <a href="project-configuration.html">configuration</a> and <a href="network-followup.html">network follow-up</a>.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-variant-followup">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-variant-followup">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#wang-annovar-2010">Wang (2010) — ANNOVAR consequence adapter</a></li><li><a href="../citations.html#mclaren-vep-2016">McLaren et al. (2016) — VEP consequence annotation</a></li><li><a href="../citations.html#sandve-reproducibility-2013">Sandve et al. (2013) — Configuration provenance</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#inputs-and-variant-identity">Inputs and variant identity</a><a href="#1-install-and-query-a-local-annotation-snapshot">1. Install and query a local annotation snapshot</a><a href="#remote-post-and-provider-apis">Remote POST and provider APIs</a><a href="#2-consequence-prediction-or-import">2. Consequence prediction or import</a><a href="#3-integrate-evidence-without-disguising-uncertainty">3. Integrate evidence without disguising uncertainty</a><a href="#validation-and-supported-scope">Validation and supported scope</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

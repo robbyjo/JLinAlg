@@ -1502,6 +1502,133 @@
         "sampling weights",
         "stratified PSU Taylor covariance"
       ]
+    },
+    {
+      "id": "sandve-reproducibility-2013",
+      "category": "Reproducible omics follow-up",
+      "authors": "Geir Kjetil Sandve et al.",
+      "year": 2013,
+      "title": "Ten Simple Rules for Reproducible Computational Research",
+      "venue": "PLoS Computational Biology 9:e1003285",
+      "url": "https://doi.org/10.1371/journal.pcbi.1003285",
+      "features": [
+        "Configuration provenance",
+        "Reproducible workflows"
+      ]
+    },
+    {
+      "id": "wang-annovar-2010",
+      "category": "Reproducible omics follow-up",
+      "authors": "Kai Wang, Mingyao Li, and Hakon Hakonarson",
+      "year": 2010,
+      "title": "ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data",
+      "venue": "Nucleic Acids Research 38:e164",
+      "url": "https://doi.org/10.1093/nar/gkq603",
+      "features": [
+        "ANNOVAR consequence adapter"
+      ]
+    },
+    {
+      "id": "mclaren-vep-2016",
+      "category": "Reproducible omics follow-up",
+      "authors": "William McLaren et al.",
+      "year": 2016,
+      "title": "The Ensembl Variant Effect Predictor",
+      "venue": "Genome Biology 17:122",
+      "url": "https://doi.org/10.1186/s13059-016-0974-4",
+      "features": [
+        "VEP consequence annotation",
+        "Variant consequence import"
+      ]
+    },
+    {
+      "id": "langfelder-wgcna-2008",
+      "category": "Reproducible omics follow-up",
+      "authors": "Peter Langfelder and Steve Horvath",
+      "year": 2008,
+      "title": "WGCNA: an R package for weighted correlation network analysis",
+      "venue": "BMC Bioinformatics 9:559",
+      "url": "https://doi.org/10.1186/1471-2105-9-559",
+      "features": [
+        "Signed coexpression modules",
+        "Module eigengenes and hubs"
+      ]
+    },
+    {
+      "id": "langfelder-preservation-2011",
+      "category": "Reproducible omics follow-up",
+      "authors": "Peter Langfelder et al.",
+      "year": 2011,
+      "title": "Is My Network Module Preserved and Reproducible?",
+      "venue": "PLoS Computational Biology 7:e1001057",
+      "url": "https://doi.org/10.1371/journal.pcbi.1001057",
+      "features": [
+        "WGCNA module preservation"
+      ]
+    },
+    {
+      "id": "meinshausen-networks-2006",
+      "category": "Reproducible omics follow-up",
+      "authors": "Nicolai Meinshausen and Peter Buhlmann",
+      "year": 2006,
+      "title": "High-dimensional graphs and variable selection with the Lasso",
+      "venue": "Annals of Statistics 34:1436-1462",
+      "url": "https://doi.org/10.1214/009053606000000281",
+      "features": [
+        "Gaussian neighborhood selection",
+        "Sparse conditional association"
+      ]
+    },
+    {
+      "id": "huynh-thu-genie3-2010",
+      "category": "Reproducible omics follow-up",
+      "authors": "Vân Anh Huynh-Thu et al.",
+      "year": 2010,
+      "title": "Inferring Regulatory Networks from Expression Data Using Tree-Based Methods",
+      "venue": "PLoS ONE 5:e12776",
+      "url": "https://doi.org/10.1371/journal.pone.0012776",
+      "features": [
+        "GENIE3 regulatory networks"
+      ]
+    },
+    {
+      "id": "liu-carnival-2019",
+      "category": "Reproducible omics follow-up",
+      "authors": "Anika Liu et al.",
+      "year": 2019,
+      "title": "From expression footprints to causal pathways: contextualizing large signaling networks with CARNIVAL",
+      "venue": "npj Systems Biology and Applications 5:40",
+      "url": "https://doi.org/10.1038/s41540-019-0118-z",
+      "features": [
+        "Inverse CARNIVAL",
+        "Contextual signaling networks"
+      ]
+    },
+    {
+      "id": "fisher-correlation-1921",
+      "category": "Reproducible omics follow-up",
+      "authors": "R. A. Fisher",
+      "year": 1921,
+      "title": "On the probable error of a coefficient of correlation deduced from a small sample",
+      "venue": "Metron 1:3-32",
+      "url": "https://digital.library.adelaide.edu.au/dspace/handle/2440/15169",
+      "features": [
+        "Fisher correlation transformation",
+        "Independent-group differential correlation"
+      ]
+    },
+    {
+      "id": "brin-pagerank-1998",
+      "category": "Reproducible omics follow-up",
+      "authors": "Sergey Brin and Lawrence Page",
+      "year": 1998,
+      "title": "The anatomy of a large-scale hypertextual Web search engine",
+      "venue": "Computer Networks and ISDN Systems 30:107-117",
+      "url": "https://snap.stanford.edu/class/cs224w-readings/Brin98Anatomy.pdf",
+      "features": [
+        "Random walk with restart",
+        "Network propagation"
+      ]
     }
   ],
   "pages": {
@@ -1780,6 +1907,24 @@
       "king-zeng-2001",
       "king-zeng-isq-2001",
       "lumley-survey-2004"
+    ],
+    "project-configuration": [
+      "sandve-reproducibility-2013"
+    ],
+    "variant-followup": [
+      "wang-annovar-2010",
+      "mclaren-vep-2016",
+      "sandve-reproducibility-2013"
+    ],
+    "network-followup": [
+      "langfelder-wgcna-2008",
+      "langfelder-preservation-2011",
+      "meinshausen-networks-2006",
+      "huynh-thu-genie3-2010",
+      "liu-carnival-2019",
+      "fisher-correlation-1921",
+      "brin-pagerank-1998",
+      "benjamini-hochberg-1995"
     ]
   },
   "markdownAliases": {

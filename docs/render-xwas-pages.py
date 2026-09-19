@@ -10,6 +10,9 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "project-configuration": ("Project configuration", "Project-over-local YAML precedence and reproducible CLI runs.", "CLI · Source build"),
+    "variant-followup": ("Variant annotation and scoring", "Local snapshots, POST/API lookup, VEP/ANNOVAR adapters and transparent evidence integration.", "CLI · Source build"),
+    "network-followup": ("Networks and candidate regulators", "Reference networks, WGCNA, sparse and differential associations, GENIE3 and CARNIVAL.", "CLI + Java/R · Source build"),
     "censored-ordinal": ("Censored and ordinal regression", "Fit Tobit, parametric survival-time and ordered logit/probit likelihoods with validated covariance.", "CLI + Java · Source build"),
     "sampling-models": ("Rare-event and survey inference", "Separate coefficient and prevalence corrections, and model sampling weights, strata and PSUs explicitly.", "CLI + Java · Source build"),
     "acat-rare-variants": ("ACAT rare-variant tests", "Run ACAT-V and canonical six-component ACAT-O from pooled scores or participant-level null models.", "CLI + Java · v0.3.6"),

@@ -1,0 +1,14 @@
+schema_version: 1
+commands:
+  network:
+    method: sparse
+    matrix: {path: discovery.tsv}
+    lambda: 0.15
+    rule: and
+    seed: 19
+  variant-annotate:
+    input: {path: variants.tsv}
+    genome-build: GRCh38
+  variant-score:
+    input: {path: evidence.tsv}
+    components: {path: components.tsv}

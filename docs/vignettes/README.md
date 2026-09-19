@@ -1,5 +1,10 @@
 # JLinAlg vignettes
 
+New source-build follow-up workflows: [project configuration](project-configuration.md),
+[variant annotation and scoring](variant-followup.md), and
+[networks and candidate regulators](network-followup.md). Each includes runnable
+CLI examples, references, data contracts and validation boundaries.
+
 These worked examples start with small in-memory arrays so the statistical
 model is visible. Replace those arrays with your own columnar or file-backed
 data preparation; the fitting APIs consume primitive Java arrays and do not

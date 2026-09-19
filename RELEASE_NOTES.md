@@ -1,5 +1,20 @@
 # Unreleased
 
+## Configured variant and network follow-up
+
+- Added safe YAML configuration with built-in < local < project < CLI precedence,
+  explicit path values, effective-config sidecars and a `config` inspection command.
+- Added `variant-db`, `variant-annotate`, `variant-consequence` and `variant-score`:
+  hashed local snapshots and schema imports, streaming lookup, canonical TSV POST,
+  Ensembl VEP REST, VEP/ANNOVAR execution/import adapters and explicit evidence weights.
+- Added `network` reference propagation/candidate-driver tests, neighborhood LASSO,
+  independent-group differential correlation, and WGCNA/GENIE3/CARNIVAL adapters.
+  Outputs include typed tables, GraphML and manifests; R engines retain session versions.
+- Added synthetic examples, independent R numerical fixtures, an adapter validation
+  script, three tutorials/site pages and scientific references. LLM integration is deferred.
+  See [network scope](docs/vignettes/network-followup.md) and
+  [variant scope](docs/vignettes/variant-followup.md) for explicit limits.
+
 ## Censored, ordinal, rare-event and survey regression
 
 - Added censored Gaussian, Weibull/lognormal/exponential AFT, cumulative-link

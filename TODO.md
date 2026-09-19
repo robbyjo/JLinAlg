@@ -10,6 +10,19 @@ the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), the
 
 ## xWAS analysis additions
 
+Configuration, variant follow-up and all six network method categories are now
+available in the [follow-up tutorials](docs/vignettes/network-followup.md).
+Further scope remains explicit:
+
+- [ ] Native indexed whole-genome annotation stores and provider-specific catalog
+  discovery; current snapshots use streaming TSV lookup with explicit schema mapping.
+- [ ] Additional regulatory adapters (SCENIC/SCENIC+, GRNBoost2), covariate/cluster-aware
+  network inference, paired differential networks and larger sparse/out-of-core matrices.
+- [ ] Full real-data validation of local VEP/ANNOVAR installations, CBC/CPLEX solver
+  adapters and biological target prioritization; do not generalize synthetic checks.
+- [ ] Integrated workflow scheduling, a cross-provider lockfile manager, and drug-target
+  dossiers. LLM integration is deliberately deferred pending design decisions.
+
 Implemented differential, regional, multiplicity and imputation workflows are
 documented in [modern inference validation](docs/inference-workflows-validation.md).
 

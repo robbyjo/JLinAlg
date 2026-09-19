@@ -118,6 +118,7 @@ tasks.register('nativeCholmodJar', Jar) {
 }
 
 dependencies {
+    implementation 'org.yaml:snakeyaml:2.5'
     api files(jdistlibJar)
     api 'com.github.samtools:htsjdk:5.0.0'
     api 'com.github.luben:zstd-jni:1.5.7-16'

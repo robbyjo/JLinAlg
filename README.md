@@ -51,6 +51,12 @@ links each method family to its primary publication.
 
 ## Numerical accuracy and performance
 
+The source build adds [project-over-local YAML configuration](docs/vignettes/project-configuration.md),
+[variant annotation, consequence adapters and evidence scoring](docs/vignettes/variant-followup.md),
+and [six network workflows](docs/vignettes/network-followup.md), including WGCNA,
+GENIE3 and CARNIVAL adapters. These use explicit local/remote data sources and
+audited outputs; no LLM integration is included.
+
 The source build adds [Tobit, AFT and ordinal likelihoods](docs/vignettes/censored-ordinal.md)
 and [rare-event and survey inference](docs/vignettes/sampling-models.md).
 See [regression validation](docs/regression-inference-validation.md) and the

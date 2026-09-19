@@ -1,0 +1,7 @@
+source	target	sign
+I1	N1	1
+I2	N2	-1
+N1	M1	1
+N1	M2	1
+N2	M1	1
+N2	M2	-1

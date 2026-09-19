@@ -1,0 +1,3 @@
+##VEP=synthetic_fixture
+#Uploaded_variation	Gene	Feature	Consequence	Extra
+GRCh38:1:101:A:G	G01	TX1	missense_variant	IMPACT=MODERATE

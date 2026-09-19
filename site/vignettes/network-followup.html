@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Reference networks, WGCNA, sparse and differential associations, GENIE3 and CARNIVAL."><title>Networks and candidate regulators · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Networks and candidate regulators</span></div>
+<span class="eyebrow">CLI + Java/R · Source build</span><h1>Networks and candidate regulators</h1><p>Reference networks, WGCNA, sparse and differential associations, GENIE3 and CARNIVAL.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>Six CLI methods connect completed omics results to reference networks, molecular
+modules, conditional associations, regulatory predictions, signaling hypotheses
+and differential connectivity. They do not label inferred hubs as proven causal
+drivers. These are source-build additions; build <code>./gradlew check executableJar</code>.
+Every <code>--out</code> is a <strong>new directory</strong>. No LLM is involved.</p>
+<p>Every method exports <code>network.graphml</code> for Cytoscape/GraphML viewers as well as
+TSV tables. Edge attributes retain their names and meanings; matrix-based graphs
+include measured features even when no selected/exported edge touches them.
+GraphML attributes are strings so missing inference values remain explicit.</p>
+<h2 id="choose-the-input-that-answers-the-question">Choose the input that answers the question</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Inputs</th>
+<th>Engine and interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reference</code></td>
+<td>Typed edge table, selected genes</td>
+<td>Native weighted propagation and degree-matched candidate-driver enrichment</td>
+</tr>
+<tr>
+<td><code>wgcna</code></td>
+<td>Normalized molecular matrix; optional phenotype and replication</td>
+<td>WGCNA signed coexpression modules, eigengenes, membership/connectivity and preservation</td>
+</tr>
+<tr>
+<td><code>sparse</code></td>
+<td>Normalized molecular matrix</td>
+<td>Native Gaussian neighborhood LASSO; conditional associations</td>
+</tr>
+<tr>
+<td><code>regulatory</code></td>
+<td>Expression matrix and candidate transcription factors</td>
+<td>GENIE3; directed predictive feature-importance edges, unknown activation/inhibition</td>
+</tr>
+<tr>
+<td><code>signaling</code></td>
+<td>Signed directed prior and regulator activities</td>
+<td>Inverse CARNIVAL; networks compatible with measured regulator activity</td>
+</tr>
+<tr>
+<td><code>differential</code></td>
+<td>Two independent cohorts with the same features</td>
+<td>Native Pearson-correlation differences and Fisher-z inference</td>
+</tr>
+</tbody>
+</table>
+<p>Results-only inputs support <code>reference</code>; appropriately derived regulator activity
+summaries can support <code>signaling</code>. Association betas and p-values cannot reconstruct
+a coexpression network. Matrix inputs have <code>sample_id</code> first, then numerical
+feature columns, one independent biological sample per row. This orientation is
+explicit and can differ from upstream JLinAlg feature-by-sample outputs: transpose
+those before use, preserving IDs. All features must be finite and variable.</p>
+<p>Normalize and handle batch/covariates before network construction, preserving
+the biological contrast of interest. Raw RNA-seq counts are not accepted as a
+statistically appropriate substitute for transformed expression. Do not select
+only differential hits before WGCNA; overlay discovery results on modules built
+from an appropriately filtered measured universe. Repeated visits/cells from one
+donor do not become independent samples by giving them new IDs. Single-cell
+donor inference needs an appropriate aggregation/design outside these commands.</p>
+<p>The current matrix implementation accepts at most 2,000 features and defaults to
+10,000 samples, with an additional 20-million-cell bound. <code>--max-features</code> can
+lower that limit; <code>--max-samples</code> can raise the sample limit within the cell bound.
+These are bounded follow-up workflows, not a validated 30,000-gene dense engine.
+Filter by an outcome-blind rule and document the feature universe.</p>
+<h2 id="reference-networks-and-candidate-key-drivers">Reference networks and candidate key drivers</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method reference --edges examples/followup/edges.tsv --hits examples/followup/hits.tsv --permutations 999 --seed 19 --out build/followup/reference
+</code></pre></div>
+<p>Edges require <code>source,target,weight,type</code>, with positive weights, distinct nodes,
+and no duplicate pair. Delimit fields with tabs. Set <code>--directed true</code> for directed
+graphs; otherwise edges are undirected. Choose/aggregate an evidence layer
+explicitly: duplicate evidence records are not automatically summed. Extra input
+columns survive in <code>edges.tsv</code>. STRING functional associations are not all direct
+physical interactions; select and label the desired resource/network layer.</p>
+<p>Hits require a unique <code>gene</code> column using the same namespace. <code>unmapped.tsv</code>
+records selected genes absent from the network; they are not treated as negatives.
+The network universe consists of nodes appearing in edges; isolated measured genes
+are not automatically added. At least one selected gene must map.</p>
+<p><code>nodes.tsv</code> reports degree, seed status, propagation rank and candidate-driver
+tests. Propagation is a weighted random walk with restart (default 0.5), starting
+from equal mass on mapped hits. Dangling-node mass returns to that seed distribution.
+It uses edge magnitudes and does <strong>not</strong> propagate activation/inhibition signs.</p>
+<p>Candidate-driver enrichment counts selected genes in each node's outgoing
+neighborhood (undirected neighborhood by default), excluding the candidate itself.
+<code>--radius</code> is 1 by default and at most 3. Seed labels are permuted within degree
+bins: degree 0, degree 1, degrees 2–3, 4–7, etc. Each permutation preserves the
+number of seeds in every bin. The empirical one-sided p-value is <code>(exceedances+1)/
+(permutations+1)</code>. BH covers <strong>all</strong> network nodes; overlapping neighborhoods can
+induce dependence, so BH is not a blanket guarantee under arbitrary dependence.
+<code>--permutations 0</code> disables tests and reports NA. Small bins can make the null
+uninformative; this is a documented coarse degree-matched null, not an exact test
+of biological causation. The minimum p-value is 1/(B+1).</p>
+<p>The graph is limited to 100,000 nodes/1,000,000 edges, and neighborhood permutation
+work to 100 million visits. Propagation must converge within <code>--iterations</code> at the
+specified <code>--tolerance</code>; otherwise the run fails.</p>
+<h2 id="wgcna-modules-hubs-phenotype-association-and-preservation">WGCNA modules, hubs, phenotype association and preservation</h2>
+<p>Install R packages separately, into a chosen library if desired:</p>
+<div class="code-window"><div class="code-bar"><span>r</span></div><pre><code>install.packages(&quot;BiocManager&quot;)
+BiocManager::install(c(&quot;WGCNA&quot;, &quot;GENIE3&quot;, &quot;CARNIVAL&quot;), ask=FALSE, update=FALSE)
+</code></pre></div>
+<p>Specify the Rscript executable through CLI or local configuration. On Windows,
+use a quoted absolute path such as <code>C:/Program Files/R/R-4.6.1/bin/Rscript.exe</code>.
+<code>--r-library DIRECTORY</code> prepends a separately installed library; no package
+installation or source download happens during analysis.</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method wgcna --matrix examples/followup/discovery.tsv --power 6 --min-module-size 5 --pheno examples/followup/phenotype.tsv --trait trait --reference-matrix examples/followup/replication.tsv --permutations 100 --rscript Rscript --out build/followup/wgcna
+</code></pre></div>
+<p>This calls WGCNA <code>blockwiseModules</code> with signed Pearson adjacency and signed TOM,
+one block and one thread. Soft-threshold power is <strong>required</strong>, not selected to
+maximize disease association. Inspect network diagnostics and justify it for your
+data. The example uses small synthetic modules; the default minimum module size
+is 30, and merge cut height is 0.25. At least 15 independent samples are required;
+20+ is recommended and neither threshold guarantees adequate power.</p>
+<p>Outputs include <code>modules.tsv</code> (module, signed eigengene membership, within-module
+adjacency connectivity), <code>eigengenes.tsv</code>, and <code>edges.tsv</code> (adjacency above
+<code>--edge-threshold</code>, default 0.1). The edge threshold changes the exported graph,
+not module discovery. Grey/unassigned genes have no within-module hub score.
+Eigengene signs are arbitrary: retain them consistently within a run.</p>
+<p>Optional phenotype input uses <code>sample_id</code> and a complete variable numeric trait.
+It is aligned to matrix rows; <code>module-trait.tsv</code> contains unadjusted Pearson
+associations, Student-t p-values and BH across tested eigengenes. Covariate/cluster
+adjustment must be handled upstream; selecting modules/features using the same
+phenotype makes subsequent p-values exploratory.</p>
+<p>An independent <code>--reference-matrix</code> must have exactly the same feature set;
+columns are reordered by ID and overlapping sample IDs are rejected. WGCNA
+<code>modulePreservation</code> writes <code>preservation.tsv</code> plus the full <code>preservation.rds</code>.
+Its <code>gold</code> row is WGCNA's random reference module, not a discovered biological
+module. Preservation Z summaries are not association p-values. Permutation count
+and random seed are explicit; the small test fixture uses 10 permutations only
+to exercise the interface, not as an adequate scientific analysis.</p>
+<h2 id="sparse-conditional-association-networks">Sparse conditional-association networks</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method sparse --matrix examples/followup/discovery.tsv --lambda 0.15 --rule and --bootstraps 20 --seed 19 --out build/followup/sparse
+</code></pre></div>
+<p>Every feature is centered/scaled to population variance one and regressed on the
+remaining features with Gaussian LASSO. Positive lambda is required and should be
+chosen without optimizing a desired biological finding. <code>and</code> retains an edge
+when both neighborhood fits select it; <code>or</code> requires either fit. <code>edges.tsv</code>
+retains both directed regression coefficients, their mean absolute magnitude
+and optional bootstrap selection frequency. Coefficients are not partial
+correlations; an edge is undirected conditional-association evidence.</p>
+<p>No p-values are fabricated after selection. Bootstrap frequency is stability,
+not posterior probability. A nonconverged fit or degenerate bootstrap matrix
+fails the run rather than dropping inconvenient replicates. Work is bounded by
+500 million sample-feature-pair visits over the requested fits; that count does
+not include coordinate-descent iterations and is not a runtime guarantee.
+The public Java API is <code>org.jlinalg.network.NetworkAnalysis.neighborhoodLasso</code>.</p>
+<h2 id="regulatory-networks-with-genie3">Regulatory networks with GENIE3</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method regulatory --matrix examples/followup/discovery.tsv --regulators examples/followup/regulators.tsv --trees 1000 --seed 19 --rscript Rscript --out build/followup/regulatory
+</code></pre></div>
+<p>The regulator file has a unique <code>gene</code> column; every candidate regulator must be
+measured. The adapter transposes to GENIE3's feature-by-sample orientation and
+uses one core for seeded reproducibility. Weights are predictive importances,
+not p-values or causality probabilities. Edge signs remain <code>unknown</code>; importance
+does not infer activation/inhibition. <code>weights.rds</code> preserves the full result.
+This adapter is GENIE3, not a claim of SCENIC motif pruning, SCENIC+ multiome
+support, or GRNBoost2 equivalence. Those are separate future adapters.</p>
+<h2 id="contextual-signaling-with-inverse-carnival">Contextual signaling with inverse CARNIVAL</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method signaling --edges examples/followup/signaling.tsv --activities examples/followup/activities.tsv --solver lpSolve --rscript Rscript --out build/followup/signaling
+</code></pre></div>
+<p>The prior has <code>source,target,sign</code>, sign +1/-1, unique directed pairs, and no self
+loops. The activity table has <code>gene,activity</code>, with discretized regulator activity
++1/-1; it must not substitute raw expression fold changes for regulatory activity
+without justification. Every measured regulator must appear in the prior.</p>
+<p>The adapter calls <code>runInverseCarnival</code>, suitable when perturbation targets are
+unknown. lpSolve is useful for small examples. For larger networks, supply
+<code>--solver cbc</code> or <code>cplex</code> and <code>--solver-path EXECUTABLE</code>; users install those solvers
+separately. The current validation used lpSolve; CBC/CPLEX execution is not
+established by that test. <code>--timeout</code> bounds the external process.</p>
+<p><code>edges.tsv</code> contains selected biological edges with canonical source/target/sign,
+solution frequency divided by 100, and type <code>contextual_signaling</code>. Frequencies
+are across returned solver solutions, not calibrated causal probabilities.
+Artificial <code>Perturbation</code> edges are separated into <code>proposed-perturbations.tsv</code>.
+<code>weightedSIF.tsv</code>, <code>nodes.tsv</code>, <code>solution.rds</code>, and solver files preserve the
+unfiltered engine evidence. An inferred upstream regulator is a hypothesis for
+perturbation follow-up, not an experimentally established driver.</p>
+<h2 id="differential-connectivity">Differential connectivity</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar network --method differential --matrix examples/followup/discovery.tsv --matrix-b examples/followup/replication.tsv --out build/followup/differential
+</code></pre></div>
+<p>This example compares independent synthetic cohorts. A biological application
+would use appropriately matched conditions/cohorts. Matrices must contain the
+same feature set and disjoint sample IDs; at least four independent samples per
+group are required, with larger samples preferable for the approximation.</p>
+<p>For each feature pair, z = <code>(atanh(r_a)-atanh(r_b))/sqrt(1/(n_a-3)+1/(n_b-3))</code>.
+Two-sided normal p-values assume approximately bivariate-normal independent
+observations. <code>edges.tsv</code> contains both correlations, their difference, z, p and
+BH. Perfect/nearly perfect correlations are marked <code>degenerate_correlation</code>
+with NA inference and count at p=1 in the complete pairwise correction family.
+This is differential <strong>marginal correlation</strong>, not differential precision-matrix
+inference, paired analysis or a test of causal rewiring.</p>
+<h2 id="reproducible-validation-and-publication">Reproducible validation and publication</h2>
+<p><code>tools/generate_followup_examples.py</code> regenerates the seeded synthetic examples.
+<code>tools/generate_network_reference.R</code> generates independent glmnet neighborhood
+coefficients and base-R Fisher-z/BH fixtures in <code>src/test/resources/network-reference</code>.
+<code>FollowupWorkflowTest</code> checks native methods against them, plus analytic LASSO,
+propagation conservation, input alignment and failure boundaries.</p>
+<p>All three actual R adapters were run on the synthetic examples using WGCNA 1.74,
+GENIE3 1.34.0 and CARNIVAL 2.22.0 with lpSolve. Session files record exact package
+versions. This validates the exercised adapters, not biological accuracy or
+performance on whole-transcriptome datasets. Run <code>tools/validate_followup.py</code> with
+the executable JAR, Rscript and optional R library to repeat the adapter checks.</p>
+<p>For a paper, archive manifests, configuration sidecars, node/edge tables and the
+R session information. Gene/module/variant scores remain separate evidence
+dimensions. Networks can feed <a href="enrichment.html">enrichment</a> or target follow-up, but
+they do not replace <a href="mendelian-randomization.html">MR</a>, <a href="colocalization.html">colocalization</a>,
+functional validation or target-safety assessment.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-network-followup">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-network-followup">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#langfelder-wgcna-2008">Langfelder (2008) — Signed coexpression modules</a></li><li><a href="../citations.html#langfelder-preservation-2011">Langfelder et al. (2011) — WGCNA module preservation</a></li><li><a href="../citations.html#meinshausen-networks-2006">Meinshausen (2006) — Gaussian neighborhood selection</a></li><li><a href="../citations.html#huynh-thu-genie3-2010">Huynh-Thu et al. (2010) — GENIE3 regulatory networks</a></li><li><a href="../citations.html#liu-carnival-2019">Liu et al. (2019) — Inverse CARNIVAL</a></li><li><a href="../citations.html#fisher-correlation-1921">Fisher (1921) — Fisher correlation transformation</a></li><li><a href="../citations.html#brin-pagerank-1998">Brin (1998) — Random walk with restart</a></li><li><a href="../citations.html#benjamini-hochberg-1995">Benjamini (1995) — Benjamini-Hochberg FDR</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#choose-the-input-that-answers-the-question">Choose the input that answers the question</a><a href="#reference-networks-and-candidate-key-drivers">Reference networks and candidate key drivers</a><a href="#wgcna-modules-hubs-phenotype-association-and-preservation">WGCNA modules, hubs, phenotype association and preservation</a><a href="#sparse-conditional-association-networks">Sparse conditional-association networks</a><a href="#regulatory-networks-with-genie3">Regulatory networks with GENIE3</a><a href="#contextual-signaling-with-inverse-carnival">Contextual signaling with inverse CARNIVAL</a><a href="#differential-connectivity">Differential connectivity</a><a href="#reproducible-validation-and-publication">Reproducible validation and publication</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

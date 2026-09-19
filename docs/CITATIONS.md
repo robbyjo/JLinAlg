@@ -499,3 +499,45 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 <a id="lumley-survey-2004"></a>
 - **Thomas Lumley (2004).** Analysis of Complex Survey Samples. *Journal of Statistical Software 9(8):1-19.* [DOI: 10.18637/jss.v009.i08](https://doi.org/10.18637/jss.v009.i08)
   - JLinAlg methods: survey regression, sampling weights, stratified PSU Taylor covariance.
+
+## Reproducible omics follow-up
+
+<a id="sandve-reproducibility-2013"></a>
+- **Geir Kjetil Sandve et al. (2013).** Ten Simple Rules for Reproducible Computational Research. *PLoS Computational Biology 9:e1003285.* [DOI: 10.1371/journal.pcbi.1003285](https://doi.org/10.1371/journal.pcbi.1003285)
+  - JLinAlg methods: Configuration provenance, Reproducible workflows.
+
+<a id="wang-annovar-2010"></a>
+- **Kai Wang, Mingyao Li, and Hakon Hakonarson (2010).** ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data. *Nucleic Acids Research 38:e164.* [DOI: 10.1093/nar/gkq603](https://doi.org/10.1093/nar/gkq603)
+  - JLinAlg methods: ANNOVAR consequence adapter.
+
+<a id="mclaren-vep-2016"></a>
+- **William McLaren et al. (2016).** The Ensembl Variant Effect Predictor. *Genome Biology 17:122.* [DOI: 10.1186/s13059-016-0974-4](https://doi.org/10.1186/s13059-016-0974-4)
+  - JLinAlg methods: VEP consequence annotation, Variant consequence import.
+
+<a id="langfelder-wgcna-2008"></a>
+- **Peter Langfelder and Steve Horvath (2008).** WGCNA: an R package for weighted correlation network analysis. *BMC Bioinformatics 9:559.* [DOI: 10.1186/1471-2105-9-559](https://doi.org/10.1186/1471-2105-9-559)
+  - JLinAlg methods: Signed coexpression modules, Module eigengenes and hubs.
+
+<a id="langfelder-preservation-2011"></a>
+- **Peter Langfelder et al. (2011).** Is My Network Module Preserved and Reproducible?. *PLoS Computational Biology 7:e1001057.* [DOI: 10.1371/journal.pcbi.1001057](https://doi.org/10.1371/journal.pcbi.1001057)
+  - JLinAlg methods: WGCNA module preservation.
+
+<a id="meinshausen-networks-2006"></a>
+- **Nicolai Meinshausen and Peter Buhlmann (2006).** High-dimensional graphs and variable selection with the Lasso. *Annals of Statistics 34:1436-1462.* [DOI: 10.1214/009053606000000281](https://doi.org/10.1214/009053606000000281)
+  - JLinAlg methods: Gaussian neighborhood selection, Sparse conditional association.
+
+<a id="huynh-thu-genie3-2010"></a>
+- **Vân Anh Huynh-Thu et al. (2010).** Inferring Regulatory Networks from Expression Data Using Tree-Based Methods. *PLoS ONE 5:e12776.* [DOI: 10.1371/journal.pone.0012776](https://doi.org/10.1371/journal.pone.0012776)
+  - JLinAlg methods: GENIE3 regulatory networks.
+
+<a id="liu-carnival-2019"></a>
+- **Anika Liu et al. (2019).** From expression footprints to causal pathways: contextualizing large signaling networks with CARNIVAL. *npj Systems Biology and Applications 5:40.* [DOI: 10.1038/s41540-019-0118-z](https://doi.org/10.1038/s41540-019-0118-z)
+  - JLinAlg methods: Inverse CARNIVAL, Contextual signaling networks.
+
+<a id="fisher-correlation-1921"></a>
+- **R. A. Fisher (1921).** On the probable error of a coefficient of correlation deduced from a small sample. *Metron 1:3-32.* [Primary source](https://digital.library.adelaide.edu.au/dspace/handle/2440/15169)
+  - JLinAlg methods: Fisher correlation transformation, Independent-group differential correlation.
+
+<a id="brin-pagerank-1998"></a>
+- **Sergey Brin and Lawrence Page (1998).** The anatomy of a large-scale hypertextual Web search engine. *Computer Networks and ISDN Systems 30:107-117.* [Primary source](https://snap.stanford.edu/class/cs224w-readings/Brin98Anatomy.pdf)
+  - JLinAlg methods: Random walk with restart, Network propagation.
