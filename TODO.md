@@ -18,7 +18,8 @@ separate future scope. LLM integration remains deferred.
 
 - [ ] **Pipeline families.** Define profiles for bulk single-source omics;
   specialized RNA (miRNA, lincRNA/other lncRNA and extracellular RNA);
-  multiple-source/multimodal omics; single-cell RNA/protein; and spatial omics.
+  multiple-source/multimodal omics; single-cell RNA/protein; spatial omics; and
+  microbiome taxonomic/functional profiles.
   Distinguish cell-resolved spatial assays from mixed-cell spots. Evaluate coverage
   against representative studies rather than promising a fixed coverage percentage.
 - [ ] **Required source and study metadata.** Record tissue/biofluid, anatomical
@@ -223,6 +224,127 @@ tissue coordinates. The following are new spatial workflow capabilities.
   coordinate-aware maps, graphs, effects and uncertainty with reproducible scales;
   retain source annotations for downstream pathway/genetic/network follow-up.
 
+## Microbiome analyses — beyond zero-inflated models
+
+Extend the shared source/design and phenotype-family contracts to microbial
+communities. Existing count, mixed and zero-inflated estimators are components,
+not a complete microbiome workflow. Initial inputs are quantified feature tables,
+taxonomy, functional annotations and optional phylogenies/load measurements;
+raw-read denoising, assembly and taxonomic profiling remain external operations.
+
+- [ ] **Assay and source contracts.** Distinguish 16S/ITS amplicons, shotgun
+  metagenomics and metatranscriptomics; ASVs/OTUs, taxa, strains and gene/pathway
+  profiles; bacterial, archaeal, fungal and viral measurements. Require body site/
+  environmental source, donor/subject, visit, collection/storage, extraction and
+  sequencing batch, assay/database version and relevant exposure covariates such
+  as antibiotics or diet. Keep read counts, proportions and calibrated loads distinct.
+- [ ] **Interchange and taxonomy/phylogeny alignment.** Import BIOM or explicit
+  count tables, taxonomy mappings, sample metadata and Newick trees, with adapters
+  to phyloseq/TreeSummarizedExperiment or equivalent objects. Validate tree tips,
+  branch lengths and feature identity; preserve unclassified taxa and prevent
+  double counting parents together with their descendants. Harmonize databases
+  and taxonomic ranks before replication or cross-study aggregation.
+- [ ] **QC and contamination.** Report library size, prevalence, abundance,
+  sample coverage and sequencing/extraction effects. Add negative-control and
+  concentration-aware contamination assessment (for example decontam), mock
+  community checks and low-biomass sensitivity. Separate removal rules from
+  biological absence; record exclusions and avoid outcome-selected filtering.
+- [ ] **Compositional transformations and estimands.** Add explicit reference
+  log-ratios, CLR/ILR and interpretable balances with stored denominators/bases.
+  Diagnose singular CLR covariance; declare zero replacement/pseudocount policies
+  and sensitivity. A sequencing zero need not mean biological absence, and changing
+  relative abundance need not mean changing absolute abundance.
+- [ ] **Absolute microbial load.** Integrate compatible qPCR/dPCR, spike-in or
+  cell-count measurements with units, calibration and uncertainty. Distinguish
+  measured load from model-inferred scale, accounting for relevant copy-number/
+  assay biases. Do not claim absolute changes from uncalibrated proportions alone
+  without declaring the identifying assumptions of the chosen model.
+- [ ] **Alpha diversity.** Implement observed richness, Shannon/Simpson and Hill
+  diversity, plus phylogenetic diversity when a valid tree exists. Report sampling
+  depth/coverage, uncertainty and supported standardization/rarefaction options.
+  Compare diversity using covariate- and donor-aware models; rarefaction must not
+  silently become the input to every differential-abundance analysis.
+- [ ] **Beta diversity and ordination.** Add Bray-Curtis, presence/absence Jaccard,
+  Aitchison and weighted/unweighted UniFrac where their input assumptions hold.
+  Support PCoA/NMDS and constrained ordination with explicit scaling, zero handling,
+  negative-eigenvalue treatment and NMDS diagnostics. Separate visualization from
+  inferential evidence; benchmark large distance matrices and memory limits.
+- [ ] **Community-level association.** Add PERMANOVA/distance-based models with
+  declared sequential versus marginal hypotheses, effect sizes, covariates and
+  dispersion diagnostics. Support design-appropriate restricted permutations for
+  paired/clustered/longitudinal studies, including between-subject exposures that
+  cannot be tested by permuting only within subjects. Report permutation resolution
+  and multiplicity; dispersion differences can complicate location interpretation.
+- [ ] **Differential abundance and prevalence.** Add composition-aware per-feature
+  comparisons, continuous exposures, multigroup contrasts and supported repeated
+  measures. Evaluate ANCOM-BC2 and ALDEx2 adapters against independent fixtures;
+  declare each method's estimand, assumptions and stochastic settings rather than
+  treating them as interchangeable. Report effects, uncertainty, adjusted tests,
+  reference/scale sensitivity and prevalence/detection separately from abundance.
+- [ ] **Taxonomic/functional multiplicity.** Define feature universes and testing
+  families across ranks, pathways, phenotypes and contrasts. Add validated
+  hierarchical/group testing where useful; a taxon and its parent or overlapping
+  pathways do not provide independent corroboration. Preserve nonsignificant and
+  filtered features in audit outputs.
+- [ ] **Longitudinal and intervention studies.** Model within-subject changes,
+  treatment-by-time effects, irregular visits, temporal dependence and paired body
+  sites. Add community turnover/stability and perturbation/recovery summaries with
+  uncertainty. Separate person-level and within-person effects, and handle missing
+  visits and time-varying exposures under stated assumptions.
+- [ ] **Functional profiling.** Import measured metagenomic gene-family/pathway
+  abundances (for example HUMAnN outputs), pathway coverage and taxon-stratified
+  contributions. Extend to resistome/virulence annotations with reference versions.
+  Keep amplicon-predicted function distinct from measured functional profiles and
+  DNA functional potential distinct from RNA activity; account for abundance when
+  interpreting matched metatranscriptomic changes.
+- [ ] **Host-microbiome and phenotype-family integration.** Relate community
+  summaries, balances, taxa and functions to lipid/lung/kidney/other phenotype
+  families and matched host RNA/protein/metabolite data. Support separate and joint
+  tests, donor matching, covariates and held-out validation; preserve direction and
+  distinguish association from mechanistic mediation or causal effects.
+- [ ] **Compositional networks.** Evaluate specialized sparse association methods
+  such as SPIEC-EASI, stability selection, donor-aware resampling and differential
+  network assessment. Do not apply ordinary correlations or the generic network
+  command directly to proportions and label edges ecological interactions. Report
+  sensitivity to filtering, zero handling and reference choices.
+- [ ] **Prediction and reproducible signatures.** Add taxon/function/balance-based
+  prediction with donor/site/cohort-grouped validation, training-only preprocessing
+  and feature selection, calibration and external-cohort evaluation. Quantify
+  stability and transportability; avoid presenting a universal dysbiosis score.
+- [ ] **Community types and source/strain analyses.** Later assess community-state
+  clustering with stability and continuous-gradient alternatives, microbial source
+  tracking with unknown-source uncertainty, and supplied strain-resolution profiles
+  for colonization/sharing analyses. Similarity alone does not establish transmission
+  direction; source panels, longitudinal design and resolution constrain conclusions.
+- [ ] **Causal and genetic follow-up.** Connect suitable microbial QTL/host genetic
+  findings to existing MR, colocalization and mediation only when harmonization,
+  instrument validity, composition, sample overlap and confounding assumptions are
+  supported. Cross-sectional taxon-metabolite associations do not establish a pathway.
+- [ ] **Replication and reporting.** Produce diversity/community summaries,
+  differential-feature tables, taxonomic/functional maps and evidence-linked
+  reports. Compare harmonized effects across cohorts and sources with explicit
+  estimands, overlap and heterogeneity; retain database versions, transformations,
+  controls, seeds and tested method boundaries in CLI manifests and vignettes.
+- [ ] **Delivery and validation.** First deliver table/taxonomy/QC contracts,
+  compositional transforms, diversity/ordination, community tests and one validated
+  differential-abundance path; then longitudinal, functional and host-integration
+  workflows, followed by network/source/strain extensions. Use independent vegan,
+  ANCOM-BC2/ALDEx2 or other appropriate fixtures, public replicated cohorts and
+  synthetic nulls varying depth, load, zeros, contamination, dispersion, taxonomy
+  aggregation and subject dependence. Check effect recovery, null calibration,
+  FDR/coverage, seed reproducibility and memory/runtime; method agreement alone
+  does not establish correctness.
+
+Method references and candidate adapter documentation:
+
+- [Compositional reference frames](https://www.nature.com/articles/s41467-019-10656-5).
+- [ANCOM-BC2: multigroup and repeated-measure analysis](https://www.nature.com/articles/s41592-023-02092-7).
+- [ALDEx2 method and supported interfaces](https://bioconductor.org/packages/release/bioc/manuals/ALDEx2/man/ALDEx2.pdf).
+- [vegan PERMANOVA and interpretation](https://vegandevs.github.io/vegan/reference/adonis.html).
+- [decontam controls and contamination assessment](https://benjjneb.github.io/decontam/).
+- [HUMAnN functional profiling](https://huttenhower.sph.harvard.edu/humann/).
+- [SPIEC-EASI compositional network inference](https://pubmed.ncbi.nlm.nih.gov/25950956/).
+
 ## Delivery order and validation for the new omics workflows
 
 - [ ] **Milestone 1 — shared contracts and phenotype families.** Deliver source/design
@@ -237,6 +359,9 @@ tissue coordinates. The following are new spatial workflow capabilities.
 - [ ] **Milestone 4 — advanced designs.** Add mixed-outcome joint tests, multivariate
   mixed models and joint replication; then validated trajectories, perturbation,
   scATAC, regulatory/signaling and multi-modal/spatial extensions.
+- [ ] **Microbiome delivery track.** Reuse Milestone 1's source/design and phenotype
+  contracts, then follow the ordered microbiome delivery plan above. Shared count
+  models do not substitute for compositional and community-level method validation.
 - [ ] **Acceptance fixtures.** Validate coefficients/covariances and joint tests
   against independent R/Python implementations; test null calibration, interval
   coverage and multiplicity under correlated traits, redundant outcomes, mixed
