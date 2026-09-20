@@ -13,6 +13,13 @@ public final class SampleInference {
     /** Design rows follow input order; the tested minus reference coefficient is column one. */
     public record Design(double[][] matrix, List<String> terms, int donors) { }
 
+    /** Bound dense design allocation and QR work before allocating a sample design. */
+    public static void checkWork(int rows,int columns) {
+        if(rows<1 || columns<1 || columns>256 || (long)rows*columns>1_000_000
+                || (long)rows*columns*columns>100_000_000)
+            throw new IllegalArgumentException("Design exceeds 256 columns, one million entries or 100 million QR work units");
+    }
+
     /** Numeric covariates must be explicitly encoded; paired designs use donor fixed effects. */
     public static Design design(String[] donors, String[] conditions, String reference,
             String tested, double[][] covariates, List<String> names, boolean paired) {
@@ -42,6 +49,9 @@ public final class SampleInference {
         List<String> ids=new ArrayList<>(groups.keySet());
         if(paired)for(int i=1;i<ids.size();i++)terms.add("donor:"+ids.get(i));
         if(n<=terms.size())throw new IllegalArgumentException("No residual degrees of freedom");
+        checkWork(n,terms.size());
+        if(names.stream().anyMatch(s->s==null||s.isBlank()) || new HashSet<>(terms).size()!=terms.size())
+            throw new IllegalArgumentException("Design term names must be nonblank and unique, including generated terms");
         double[][] x=new double[n][terms.size()];
         for(int i=0;i<n;i++) {
             x[i][0]=1;x[i][1]=conditions[i].equals(tested)?1:0;

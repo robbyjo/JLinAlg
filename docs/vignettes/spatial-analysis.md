@@ -76,6 +76,8 @@ C = (n-1) * sum_edges((y_i-y_j)^2) / (2*m * sum_i(z_i^2))
 
 Isolates remain in the section universe and denominator. Fewer than three
 observations, no edges or constant values give an explicit unavailable status.
+Centered values are scaled before products to avoid overflow/underflow; constant
+decimal measurements are detected before rounding in the mean can mimic variation.
 `--feature-list` requires a `feature_id` column; otherwise all measured genes are
 requested. Prefer a prespecified feature family when permutations would be large.
 
@@ -151,6 +153,11 @@ known, and condition effects can reflect other distance-correlated cell mixtures
 Nonlinear trends, section-specific slopes and uncertainty in interfaces need a
 different model and remain open.
 
+Slope calculations center and scale both inputs. Constant responses have slope
+zero; a slope outside the representable numeric range requires rescaling physical
+units. Sample-level uncertainty follows the zero-residual-variance rule in the
+[single-cell tutorial](single-cell.md).
+
 ## Limits and reproducibility
 
 The shared input bounds apply. Graph construction is bounded at 25 million
@@ -160,6 +167,11 @@ tests allow at most 50 cell labels. Gradient evaluation allows 20 million
 observation-feature visits. Graph search is bounded quadratic, not an atlas-scale
 spatial index. The counts stay sparse until a requested operation requires a
 bounded representation or aggregate.
+The one-million-edge cap also applies to supplied adjacency. Hypothesis/summary
+tables allow 250,000 rows; donor-level comparisons follow the shared design and
+total fitting-work limits. Radius search evaluates each unordered pair once;
+kNN retains only its best k candidates, and section operations reuse partitioned
+edges. Permutations reuse centered values and their fixed sum of squares.
 
 Every run writes QC, original metadata, hashes, effective configuration, graph
 parameters and null/estimand definitions. Seeds reproduce Java permutation results

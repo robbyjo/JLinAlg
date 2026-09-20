@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CellSpatialCliTest {
     @TempDir Path temp;
+    @Test void exactlyFittedSampleResponseHasNoSpuriousPValue() {
+        var design=org.jlinalg.singlecell.SampleInference.design(new String[]{"1","2","3","4","5","6","7","8"},
+            new String[]{"a","a","a","a","b","b","b","b"},"a","b",new double[8][0],List.of(),false);
+        String[] row=SingleCellCli.fitRow("type","gene",new double[]{.2,.2,.2,.2,.4,.4,.4,.4},design);
+        assertEquals("NA",row[8]);
+    }
     private List<String> args(String command,String method,Path out) {
         List<String> a=new ArrayList<>(List.of(command,"--no-config","--method",method,"--out",out.toString()));
         for(String f:List.of("counts","cells","samples","features"))a.addAll(List.of("--"+f,"examples/cell-spatial/"+f+".tsv"));
@@ -61,5 +67,36 @@ class CellSpatialCliTest {
         var a=args("single-cell","qc",temp.resolve("qc"));a.set(a.indexOf("--counts")+1,file.toString());a.addAll(List.of("--max-mito","0.5"));assertEquals(0,run(a));
         var table=DelimitedData.read(temp.resolve("qc/cell-qc.tsv"));assertEquals(320,table.rows().size());
         assertTrue(table.rows().get(0)[7].contains("high_mitochondrial"));assertTrue(table.rows().get(1)[7].contains("zero_library"));
+    }
+    @Test void partiallyNestedPairedBatchesKeepOnlyIdentifiableNuisanceBasis() throws IOException {
+        Path input=temp.resolve("paired.tsv");var sheet=DelimitedData.read(Path.of("examples/cell-spatial/paired-samples.tsv"));
+        String[] batch={"A","A","C","C","B","A","C","C"};List<String[]> rows=new ArrayList<>();
+        for(int i=0;i<8;i++){String[] r=sheet.rows().get(i).clone();r[sheet.column("batch")]=batch[i];rows.add(r);}
+        FollowupSupport.table(input,sheet.header(),rows);
+        var a=args("single-cell","abundance",temp.resolve("nested"));a.set(a.indexOf("--samples")+1,input.toString());a.addAll(List.of("--reference","control","--tested","case","--paired","true"));
+        assertEquals(0,run(a));var design=DelimitedData.read(temp.resolve("nested/design.tsv"));
+        assertTrue(design.header().contains("batch:B"));assertFalse(design.header().contains("batch:C"));
+        for(int i=0;i<8;i++)rows.get(i)[sheet.column("batch")]=i<4?"A":"B";
+        FollowupSupport.table(input,sheet.header(),rows);
+        a.set(a.indexOf("--out")+1,temp.resolve("confounded-pairs").toString());assertEquals(2,run(a));
+    }
+    @Test void invalidOptionsAndPathwaysCannotHideBehindUntestablePopulations() throws IOException {
+        for(String[] invalid:List.of(new String[]{"--paired","maybe"},new String[]{"--covariates","absent"},new String[]{"--covariates","sample_id"})) {
+            Path out=temp.resolve("invalid-"+invalid[1]);var a=args("single-cell","state",out);
+            a.addAll(List.of("--reference","control","--tested","case","--min-cells","10000","--rscript","unused"));a.addAll(List.of(invalid));
+            assertEquals(2,run(a));assertFalse(Files.exists(out));
+        }
+        Path bad=temp.resolve("bad-sets.tsv");Files.writeString(bad,"gene_set\tfeature_id\ns\tGENE01\ns\tGENE01\n");
+        var a=args("single-cell","pathways",temp.resolve("invalid-pathway"));a.addAll(List.of("--reference","control","--tested","case","--min-cells","10000","--gene-sets",bad.toString()));assertEquals(2,run(a));
+    }
+    @Test void missingDomainLabelsAreRejectedForAbundance() throws IOException {
+        var cells=DelimitedData.read(Path.of("examples/cell-spatial/cells.tsv"));List<String> header=new ArrayList<>(cells.header());header.add("domain");List<String[]> rows=new ArrayList<>();
+        for(String[] cell:cells.rows()){String[] row=Arrays.copyOf(cell,cell.length+1);row[cell.length]="";rows.add(row);}
+        Path input=temp.resolve("blank-domain.tsv");FollowupSupport.table(input,header,rows);
+        var a=args("single-cell","abundance",temp.resolve("domain-run"));a.set(a.indexOf("--cells")+1,input.toString());a.addAll(List.of("--reference","control","--tested","case","--group-column","domain"));assertEquals(2,run(a));
+    }
+    @Test void resultCardinalityBoundsRejectBeforeAllocation() {
+        assertThrows(IllegalArgumentException.class,()->CellData.checkOutputSize(250001));
+        CellData.checkOutputSize(250000);
     }
 }

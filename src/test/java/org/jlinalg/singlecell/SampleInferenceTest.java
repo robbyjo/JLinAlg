@@ -31,4 +31,10 @@ class SampleInferenceTest {
         for(int b=0;b<400;b++){double[] y=new double[8];for(int i=0;i<8;i++)y[i]=random.nextGaussian();if(SampleInference.fit(y,design).pValues()[1]<.05)rejected++;}
         assertTrue(rejected>=7&&rejected<=36,"Gaussian null rejections: "+rejected);
     }
+    @Test void oversizedDesignsAndDuplicateTermNamesRejectBeforeFitting() {
+        assertThrows(IllegalArgumentException.class,()->SampleInference.checkWork(10000,1000));
+        assertThrows(IllegalArgumentException.class,()->SampleInference.checkWork(10000,200));
+        assertThrows(IllegalArgumentException.class,()->SampleInference.design(new String[]{"1","2","3","4","5","6","7","8"},
+            condition,"a","b",new double[8][1],List.of("intercept"),false));
+    }
 }

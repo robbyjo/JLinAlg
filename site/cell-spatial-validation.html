@@ -130,6 +130,78 @@ is not an independent reimplementation of limma's estimator.</p>
 <li>Mixed-spot cell-label neighborhood inference rejects. Existing outputs are
   preserved; failed jobs do not publish a partial result directory.</li>
 </ul>
+<h2 id="correctness-and-performance-audit-2026-09-20">Correctness and performance audit, 2026-09-20</h2>
+<p>The follow-up audit reproduced and fixed these defects against the first delivery:</p>
+<ul>
+<li>R type inference changed numeric-looking sample/observation IDs and literal
+  <code>NA</code> feature IDs; unquoted output could damage embedded quotes. Explicit character
+  parsing and quoted UTF-8 output now preserve identities. The old adapter failed
+  its count/design alignment check on leading-zero sample IDs. Java also verifies
+  the returned feature schema and ordering.</li>
+<li>An exactly fitted native sample response produced a spurious p-value near
+  <code>1.4e-91</code> from numerical residuals. Residual RMS at the floating-point floor now
+  produces unavailable inference. Constant decimal spatial values, extreme scales
+  (<code>1e-200</code>, <code>1e200</code>, and opposite-sign <code>1e308</code>), and tiny physical units have
+  explicit regression coverage; centered/scaled products preserve the estimand.</li>
+<li>Chained distance rounding omitted some three-dimensional pairs exactly on an
+  inclusive radius boundary. Independent all-pair fixtures now cover radius and
+  union kNN, ties, compartments and small distances.</li>
+<li>Partially donor-nested batch indicators could reject identifiable paired
+  designs. Batch basis selection now removes only dependence on donor effects and
+  other batch indicators; genuine condition/batch confounding still rejects.</li>
+<li>Invalid covariates and gene sets are validated before population eligibility
+  can mask an error. Empty test families receive accurate status and group-directory
+  mappings. Dense designs, output tables, total fitting work and PCA now have
+  explicit limits before costly allocations or decompositions.</li>
+</ul>
+<p>The audited version passed <strong>18 end-to-end invocations</strong>, including identifier
+round trips, unchanged numerical results after renaming, and all-filtered genes.
+The repository-wide gate found <strong>929 tests: 926 passed, no failures/errors, and
+3 optional CHOLMOD skips</strong>. Javadoc and executable packaging passed. The full
+suite uses the same CPU validation workaround described above; optional GPU
+backends remain outside this validation.</p>
+<p>Reproduce the standalone kernel benchmark with:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>python tools/benchmark_cell_spatial.py --javac /path/to/javac
+</code></pre></div>
+<p>The script compiles frozen baseline commit <code>3a8b4f12eee31db935efbada15150bdbd94e9830</code>
+and current spatial code in separate JVMs, checks graph counts/checksums and numerical
+agreement, and saves raw timings and medians. The following host measurements use
+Java 25, three warmups, seven measurements and <code>-Xms256m -Xmx1g</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th style="text-align: right;">Baseline median</th>
+<th style="text-align: right;">Revised median</th>
+<th style="text-align: right;">Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Radius: 600 nodes, 179,700 edges</td>
+<td style="text-align: right;">183.10 ms</td>
+<td style="text-align: right;">7.49 ms</td>
+<td style="text-align: right;">24.45x</td>
+</tr>
+<tr>
+<td>Union kNN: 600 nodes, k=6, dense candidates</td>
+<td style="text-align: right;">36.53 ms</td>
+<td style="text-align: right;">5.21 ms</td>
+<td style="text-align: right;">7.01x</td>
+</tr>
+<tr>
+<td>5,000 permutations: 800 nodes, 799 edges</td>
+<td style="text-align: right;">41.01 ms</td>
+<td style="text-align: right;">30.49 ms</td>
+<td style="text-align: right;">1.34x</td>
+</tr>
+</tbody>
+</table>
+<p>These are bounded synthetic kernel timings, not general end-to-end speedups or
+atlas-scale memory/throughput validation. Timing is reported rather than asserted
+as a test threshold and varies with host load and JVM behavior. Section edge
+partitioning, cached feature lookups and gene-set
+parsing also remove repeated scans without changing scientific units.</p>
 <h2 id="open-scientific-and-engineering-work">Open scientific and engineering work</h2>
 <p>The tests do <strong>not</strong> constitute a public multi-donor acceptance study. Real-cohort
 replication, RNA null/FDR/coverage under heterogeneous donors, rare-population
@@ -160,5 +232,5 @@ not causal signaling; extra cells/sections are not extra independent donors.</p>
 </ul>
 <p><a href="https://robbyjo.github.io/JLinAlg/citations.html">Search the complete scientific bibliography</a>.</p>
 <!-- SCIENTIFIC-CITATIONS:END --></article>
-<aside class="toc"><strong>On this page</strong><a href="#delivered-operations">Delivered operations</a><a href="#reproduce-the-independent-comparisons">Reproduce the independent comparisons</a><a href="#statistical-and-failure-fixtures">Statistical and failure fixtures</a><a href="#open-scientific-and-engineering-work">Open scientific and engineering work</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+<aside class="toc"><strong>On this page</strong><a href="#delivered-operations">Delivered operations</a><a href="#reproduce-the-independent-comparisons">Reproduce the independent comparisons</a><a href="#statistical-and-failure-fixtures">Statistical and failure fixtures</a><a href="#correctness-and-performance-audit-2026-09-20">Correctness and performance audit, 2026-09-20</a><a href="#open-scientific-and-engineering-work">Open scientific and engineering work</a><a href="#scientific-citations">Scientific citations</a></aside></div>
 </main><site-footer root="./"></site-footer></body></html>

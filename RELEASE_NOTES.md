@@ -12,6 +12,11 @@
 - Validated with independent raw-input R refits, NumPy and exact small-graph
   calculations. The broader protein/ATAC/trajectory/deconvolution/imaging roadmap
   remains open; see [delivered scope and validation](docs/cell-spatial-validation.md).
+- Audited identifier round trips, paired batch identifiability, constant and
+  extreme-scale spatial measurements, inclusive radius boundaries and zero-residual
+  inference. Added regression fixtures, upfront input/workload checks and accurate
+  population status/directory mapping. Reduced graph sorting, permutation allocation
+  and repeated section/gene-set scans; added a reproducible baseline benchmark.
 
 ## Configured variant and network follow-up
 

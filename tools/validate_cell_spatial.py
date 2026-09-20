@@ -34,9 +34,11 @@ def main():
     design=["--reference","control","--tested","case"]
     geometry=["--units","micrometer","--coordinate-system","synthetic-v1","--resolution","cell","--radius","10.1"]
     timings={}
-    def run(name,command,method,*extra,paired=False):
+    def run(name,command,method,*extra,paired=False,inputs_root=None):
         dest=output/name
         inputs=list(common)
+        if inputs_root:
+            for f in ("counts","cells","samples","features"): inputs[inputs.index("--"+f)+1]=str(inputs_root/(f+".tsv"))
         if paired: inputs[inputs.index("--samples")+1]=str(example/"paired-samples.tsv")
         cmd=["java","-jar",str((ROOT/args.jar).resolve()),command,"--no-config","--method",method,*inputs,*map(str,extra),"--out",str(dest)]
         start=time.perf_counter()
@@ -140,6 +142,31 @@ capture.output(sessionInfo(),file=file.path(dest,"reference-session.txt"))
         np.testing.assert_allclose([float(actual[r["population"]][key]) for key in ("effect","se","p")],[float(r[key]) for key in ("effect","se","p")],rtol=1e-8,atol=1e-11)
     assert len(read(rep/"embedding.tsv"))==len(cells)
     assert any(r["feature_id"]=="GENE01" and r["population"]=="T" and float(r["effect"])>0 for r in read(state/"results.tsv"))
+
+    # Identifier round trip through both R branches, including values R ordinarily coerces.
+    unusual=output/"unusual-identifiers"; unusual.mkdir()
+    feature_map={g:g for g in genes}; feature_map.update({genes[0]:"NA",genes[1]:"001",genes[2]:"1",genes[3]:'gene"quoted'})
+    sample_map={f"S{i}":f"{i:03}" for i in range(1,9)}
+    cell_map={oid:f"{i:05}" for i,oid in enumerate(cells)}
+    for f in ("counts","cells","samples","features"):
+        rows=read(example/(f+".tsv"))
+        for r in rows:
+            if "feature_id" in r:r["feature_id"]=feature_map[r["feature_id"]]
+            if "obs_id" in r:r["obs_id"]=cell_map[r["obs_id"]]
+            if "sample_id" in r:r["sample_id"]=sample_map[r["sample_id"]]
+        with (unusual/(f+".tsv")).open("w",encoding="utf-8",newline="") as f:
+            w=csv.DictWriter(f,fieldnames=list(rows[0]),delimiter="\t",lineterminator="\n");w.writeheader();w.writerows(rows)
+    renamed=run("identifier-state","single-cell","state",*design,*rargs,inputs_root=unusual)
+    renamed_rep=run("identifier-representation","single-cell","representation",*rargs,"--components",6,"--clusters",3,inputs_root=unusual)
+    renamed_results={(r["population"],r["feature_id"]):r for r in read(renamed/"results.tsv")}
+    for r in read(state/"results.tsv"):
+        actual=renamed_results[r["population"],feature_map[r["feature_id"]]]
+        np.testing.assert_allclose([float(actual[k]) for k in ("effect","se","p")],[float(r[k]) for k in ("effect","se","p")],rtol=1e-12,atol=1e-13)
+    assert [r["obs_id"] for r in read(renamed_rep/"embedding.tsv")]==list(cell_map.values())
+    assert {r["feature_id"] for r in read(renamed_rep/"variable-features.tsv")}==set(feature_map.values())
+    filtered=run("no-eligible-genes","single-cell","state",*design,*rargs,"--min-gene-samples",9)
+    assert all(r["status"]=="low_counts" and r["p"]=="NA" for r in read(filtered/"results.tsv"))
+    assert all(r["status"]=="not_tested" and r["output_directory"]!="NA" for r in read(filtered/"population-status.tsv"))
     report={"operations":len(timings),"observations":len(cells),"samples":8,"features":len(genes),"seconds":timings,"validation":"raw aggregation, independent limma refits (independent and paired), NumPy/R abundance, dense-W spatial statistics"}
     (output/"validation.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(report,indent=2));print(output)

@@ -80,7 +80,9 @@ final class SpatialCli {
                 Integer s=index.get(a),t=index.get(b);if(s==null||t==null)continue; // audit QC output explains removed nodes
                 if(!g.compartment[s].equals(g.compartment[t]))throw new IllegalArgumentException("Adjacency edge crosses section/compartment");
                 double d=0;for(int j=0;j<g.xyz[s].length;j++)d=Math.hypot(d,g.xyz[s][j]-g.xyz[t][j]);
+                if(!Double.isFinite(d))throw new IllegalArgumentException("Adjacency distance overflows; rescale coordinates");
                 result.add(new Edge(Math.min(s,t),Math.max(s,t),d));
+                if(result.size()>1_000_000)throw new IllegalArgumentException("Graph exceeds one million edges");
             }
             return result;
         }
@@ -91,34 +93,44 @@ final class SpatialCli {
         String units=required(o,"units"),resolution=required(o,"resolution");required(o,"coordinate-system");
         if(!Set.of("micrometer","millimeter").contains(units)||!Set.of("cell","spot").contains(resolution))throw new IllegalArgumentException("Require physical units micrometer/millimeter and cell/spot resolution");
         if(Set.of("neighborhoods","compare").contains(method)&&!resolution.equals("cell"))throw new IllegalArgumentException("Neighborhood cell-label inference requires cell-resolved observations");
-        CellData data=CellData.read(o);boolean[] keep=data.qc(o,dir,manifest);Geometry g=geometry(data,keep);
+        CellData data=CellData.read(o);
+        if(Set.of("compare","gradient").contains(method))CellDesign.validate(data,o);
+        boolean[] keep=data.qc(o,dir,manifest);Geometry g=geometry(data,keep);
         if(g.original.size()<3)throw new IllegalArgumentException("Fewer than three retained spatial observations");
         manifest.put("spatial_contract",Map.of("units",units,"resolution",resolution,"coordinate_system",o.get("coordinate-system"),"registration","supplied, no transformation estimated","boundary_policy","no cross-section or cross-compartment edges; radius caps gaps; interior masks require supplied adjacency"));
         if(method.equals("gradient")){gradient(data,g,o,dir,manifest);return;}
-        List<Edge> edges=graph(data,g,o);writeGraph(data,g,edges,dir,units);
+        List<Edge> edges=graph(data,g,o);Map<String,List<Edge>> sectionEdges=partitionEdges(g,edges);
         manifest.put("graph",Map.of("method",o.getOrDefault("graph","radius"),"edges",edges.size(),"observations",g.original.size(),"weight","binary symmetric, each unordered pair exported once"));
         switch(method) {
-            case "autocorrelation" -> autocorrelation(data,g,edges,o,dir,manifest);
-            case "neighborhoods" -> neighborhoods(data,g,edges,o,dir,manifest);
+            case "autocorrelation" -> autocorrelation(data,g,edges,sectionEdges,o,dir,manifest);
+            case "neighborhoods" -> neighborhoods(data,g,edges,sectionEdges,o,dir,manifest);
             case "compare" -> compare(data,g,edges,o,dir,manifest);
             default -> { }
         }
+        writeGraph(data,g,edges,sectionEdges,dir,units);
     }
     private static List<Integer> features(CellData data,Map<String,String> o) throws IOException {
         if(!o.containsKey("feature-list")){List<Integer> result=new ArrayList<>();for(int j=0;j<data.genes.size();j++)result.add(j);return result;}
         DelimitedData table=CellData.bounded(Path.of(o.get("feature-list")));Map<String,Integer> unique=CellData.unique(table,"feature_id");List<Integer> out=new ArrayList<>();
-        for(String name:unique.keySet()){int j=data.genes.indexOf(name);if(j<0)throw new IllegalArgumentException("Feature not measured: "+name);out.add(j);}return out;
+        for(String name:unique.keySet()){int j=data.featureIndex.getOrDefault(name,-1);if(j<0)throw new IllegalArgumentException("Feature not measured: "+name);out.add(j);}return out;
     }
     private static Map<String,List<Integer>> sections(Geometry g) {
         Map<String,List<Integer>> groups=new LinkedHashMap<>();for(int i=0;i<g.section.length;i++)groups.computeIfAbsent(g.section[i],s->new ArrayList<>()).add(i);return groups;
     }
-    private static void autocorrelation(CellData data,Geometry g,List<Edge> edges,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
+    private static Map<String,List<Edge>> partitionEdges(Geometry g,List<Edge> edges) {
+        Map<String,List<Edge>> result=new HashMap<>();
+        for(String section:g.section)result.computeIfAbsent(section,key->new ArrayList<>());
+        for(Edge edge:edges)result.get(g.section[edge.source()]).add(edge);
+        return result;
+    }
+    private static void autocorrelation(CellData data,Geometry g,List<Edge> edges,Map<String,List<Edge>> sectionEdges,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
         List<Integer> features=features(data,o);int b=integer(o,"permutations",999,1,100000),seed=integer(o,"seed",1,0,Integer.MAX_VALUE);
+        CellData.checkOutputSize((long)sectionEdges.size()*features.size());
         if((long)(edges.size()+g.original.size())*features.size()*b>100_000_000)throw new IllegalArgumentException("Spatial feature permutations exceed 100 million visits; select features or reduce permutations");
         List<String[]> rows=new ArrayList<>();List<Double> pv=new ArrayList<>();
         for(var entry:sections(g).entrySet()) {
             List<Integer> nodes=entry.getValue();Map<Integer,Integer> index=new HashMap<>();for(int i=0;i<nodes.size();i++)index.put(nodes.get(i),i);
-            List<Edge> local=edges.stream().filter(e->index.containsKey(e.source())).map(e->new Edge(index.get(e.source()),index.get(e.target()),e.distance())).toList();
+            List<Edge> local=sectionEdges.get(entry.getKey()).stream().map(e->new Edge(index.get(e.source()),index.get(e.target()),e.distance())).toList();
             String[] strata=nodes.stream().map(i->g.strata[i]).toArray(String[]::new);
             for(int j:features) {
                 double[] values=nodes.stream().mapToDouble(i->data.normalized(g.original.get(i),j)).toArray();
@@ -141,18 +153,20 @@ final class SpatialCli {
     private static int[] pairCounts(double[] labels,List<Edge> edges,int k) {
         int[] counts=new int[k*k];for(Edge e:edges){int a=(int)labels[e.source()],b=(int)labels[e.target()];counts[Math.min(a,b)*k+Math.max(a,b)]++;}return counts;
     }
-    private static void neighborhoods(CellData data,Geometry g,List<Edge> edges,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
+    private static void neighborhoods(CellData data,Geometry g,List<Edge> edges,Map<String,List<Edge>> sectionEdges,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
         List<String> types=types(data,g);int k=types.size(),b=integer(o,"permutations",999,1,100000),seed=integer(o,"seed",1,0,Integer.MAX_VALUE);
+        CellData.checkOutputSize((long)sectionEdges.size()*k*(k+1)/2);
         if((long)(g.original.size()+edges.size()+sections(g).size()*k*k)*b>100_000_000)throw new IllegalArgumentException("Neighborhood permutations exceed 100 million visits");
         List<String[]> rows=new ArrayList<>();List<Double> pv=new ArrayList<>();Random random=new Random(seed);
         for(var section:sections(g).entrySet()) {
             List<Integer> nodes=section.getValue();Map<Integer,Integer> index=new HashMap<>();for(int i=0;i<nodes.size();i++)index.put(nodes.get(i),i);
-            List<Edge> local=edges.stream().filter(e->index.containsKey(e.source())).map(e->new Edge(index.get(e.source()),index.get(e.target()),e.distance())).toList();
+            List<Edge> local=sectionEdges.get(section.getKey()).stream().map(e->new Edge(index.get(e.source()),index.get(e.target()),e.distance())).toList();
             double[] labels=nodes.stream().mapToDouble(i->types.indexOf(data.cell(g.original.get(i),"cell_type"))).toArray();
             var strata=SpatialStatistics.groups(nodes.stream().map(i->g.strata[i]).toArray(String[]::new));
             int[] observed=pairCounts(labels,local,k),up=new int[k*k],down=new int[k*k];double[] mean=new double[k*k];
+            double[] shuffled=new double[labels.length];
             for(int iteration=0;iteration<b;iteration++) {
-                double[] shuffled=labels.clone();SpatialStatistics.shuffle(shuffled,strata,random);int[] counts=pairCounts(shuffled,local,k);
+                System.arraycopy(labels,0,shuffled,0,labels.length);SpatialStatistics.shuffle(shuffled,strata,random);int[] counts=pairCounts(shuffled,local,k);
                 for(int i=0;i<counts.length;i++){mean[i]+=(double)counts[i]/b;if(counts[i]>=observed[i])up[i]++;if(counts[i]<=observed[i])down[i]++;}
             }
             for(int a=0;a<k;a++)for(int c=a;c<k;c++) {
@@ -173,6 +187,8 @@ final class SpatialCli {
         }
         if(totals.values().stream().anyMatch(n->n==0))throw new IllegalArgumentException("Every analyzed sample must have edges; zero-edge samples cannot supply a spatial fraction");
         List<String> ids=new ArrayList<>(counts.keySet());SampleInference.Design design=CellDesign.create(data,ids,o);CellDesign.write(design,ids,dir.resolve("design.tsv"));
+        CellData.checkOutputSize((long)ids.size()*k*(k+1)/2);
+        CellDesign.fitWork(design,(long)k*(k+1)/2);
         List<String[]> rows=new ArrayList<>(),results=new ArrayList<>();
         for(int a=0;a<k;a++)for(int b=a;b<k;b++) {
             double[] y=new double[ids.size()];
@@ -187,17 +203,20 @@ final class SpatialCli {
     }
     private static void gradient(CellData data,Geometry g,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
         String column=required(o,"distance-column");List<Integer> features=features(data,o);Map<String,List<Integer>> groups=new LinkedHashMap<>();
-        for(int i:g.original){double d=finite(data.cell(i,column),"distance");if(d<0)throw new IllegalArgumentException("Distance must be nonnegative physical units");groups.computeIfAbsent(data.cell(i,"sample_id"),s->new ArrayList<>()).add(i);}
+        double[] distances=new double[data.ids.size()];
+        for(int i:g.original){double d=finite(data.cell(i,column),"distance");if(d<0)throw new IllegalArgumentException("Distance must be nonnegative physical units");distances[i]=d;groups.computeIfAbsent(data.cell(i,"sample_id"),s->new ArrayList<>()).add(i);}
         if((long)g.original.size()*features.size()>20_000_000)throw new IllegalArgumentException("Gradient exceeds 20 million observation-feature visits");
         List<String> ids=new ArrayList<>(groups.keySet());SampleInference.Design design=CellDesign.create(data,ids,o);CellDesign.write(design,ids,dir.resolve("design.tsv"));
+        CellData.checkOutputSize((long)ids.size()*features.size());
+        CellDesign.fitWork(design,features.size());
         List<String[]> rows=new ArrayList<>(),results=new ArrayList<>();
         for(int j:features) {
             double[] slopes=new double[ids.size()];
             for(int s=0;s<ids.size();s++) {
                 var nodes=groups.get(ids.get(s));if(nodes.size()<3)throw new IllegalArgumentException("Gradient needs >=3 observations/sample");
-                double dx=0,dy=0;for(int i:nodes){dx+=finite(data.cell(i,column),"distance")/nodes.size();dy+=data.normalized(i,j)/nodes.size();}
-                double xx=0,xy=0;for(int i:nodes){double x=finite(data.cell(i,column),"distance")-dx;xx+=x*x;xy+=x*(data.normalized(i,j)-dy);}
-                if(!(xx>0))throw new IllegalArgumentException("Distance has no within-sample variation");slopes[s]=xy/xx;
+                double[] x=new double[nodes.size()],y=new double[nodes.size()];
+                for(int i=0;i<nodes.size();i++){x[i]=distances[nodes.get(i)];y[i]=data.normalized(nodes.get(i),j);}
+                slopes[s]=SpatialStatistics.linearSlope(x,y);
                 rows.add(new String[]{ids.get(s),data.genes.get(j),Integer.toString(nodes.size()),Double.toString(slopes[s])});
             }
             results.add(SingleCellCli.fitRow("distance_slope",data.genes.get(j),slopes,design));
@@ -205,7 +224,7 @@ final class SpatialCli {
         table(dir.resolve("sample-slopes.tsv"),List.of("sample_id","feature_id","observations","slope_per_physical_unit"),rows);SingleCellCli.adjustWrite(dir.resolve("results.tsv"),results);
         manifest.put("estimand","Tested minus reference mean sample-specific linear log1p-normalized expression/distance slope. All section observations pooled within sample; spatially correlated observations only define descriptive slopes, with no cell-level p values. Gaussian independent-sample slope errors assumed. Supplied boundaries treated as fixed; no nonlinear/interface uncertainty model.");
     }
-    private static void writeGraph(CellData data,Geometry g,List<Edge> edges,Path dir,String units) throws IOException {
+    private static void writeGraph(CellData data,Geometry g,List<Edge> edges,Map<String,List<Edge>> sectionEdges,Path dir,String units) throws IOException {
         List<String[]> rows=new ArrayList<>();int[] degrees=new int[g.original.size()];
         for(Edge e:edges){degrees[e.source()]++;degrees[e.target()]++;rows.add(new String[]{data.ids.get(g.original.get(e.source())),data.ids.get(g.original.get(e.target())),Double.toString(e.distance()),g.section[e.source()]});}
         table(dir.resolve("edges.tsv"),List.of("source","target","distance_"+units,"section_id"),rows);rows=new ArrayList<>();
@@ -217,10 +236,11 @@ final class SpatialCli {
             String name="section-"+(++count)+".svg";maps.add(new String[]{section.getKey(),name});var nodes=section.getValue();
             double xmin=Double.POSITIVE_INFINITY,xmax=Double.NEGATIVE_INFINITY,ymin=xmin,ymax=xmax;
             for(int i:nodes){xmin=Math.min(xmin,g.xyz[i][0]);xmax=Math.max(xmax,g.xyz[i][0]);ymin=Math.min(ymin,g.xyz[i][1]);ymax=Math.max(ymax,g.xyz[i][1]);}
+            if(!Double.isFinite(xmax-xmin)||!Double.isFinite(ymax-ymin))throw new IllegalArgumentException("Coordinate extent overflows; rescale physical units");
             double scale=500/Math.max(1,Math.max(xmax-xmin,ymax-ymin));
             try(var out=Files.newBufferedWriter(dir.resolve(name))) {
                 out.write("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 560 580\"><rect width=\"560\" height=\"580\" fill=\"white\"/><text x=\"20\" y=\"20\">"+xml(section.getKey())+" (XY projection)</text>");
-                for(Edge e:edges)if(g.section[e.source()].equals(section.getKey()))out.write("<line stroke=\"#ccc\" x1=\""+(30+(g.xyz[e.source()][0]-xmin)*scale)+"\" y1=\""+(40+(g.xyz[e.source()][1]-ymin)*scale)+"\" x2=\""+(30+(g.xyz[e.target()][0]-xmin)*scale)+"\" y2=\""+(40+(g.xyz[e.target()][1]-ymin)*scale)+"\"/>");
+                for(Edge e:sectionEdges.get(section.getKey()))out.write("<line stroke=\"#ccc\" x1=\""+(30+(g.xyz[e.source()][0]-xmin)*scale)+"\" y1=\""+(40+(g.xyz[e.source()][1]-ymin)*scale)+"\" x2=\""+(30+(g.xyz[e.target()][0]-xmin)*scale)+"\" y2=\""+(40+(g.xyz[e.target()][1]-ymin)*scale)+"\"/>");
                 for(int i:nodes)out.write("<circle fill=\""+(degrees[i]==0?"#d94a38":"#236b8e")+"\" r=\"3\" cx=\""+(30+(g.xyz[i][0]-xmin)*scale)+"\" cy=\""+(40+(g.xyz[i][1]-ymin)*scale)+"\"><title>"+xml(data.ids.get(g.original.get(i)))+"; "+xml(data.cell(g.original.get(i),"cell_type"))+"</title></circle>");
                 out.write("<text x=\"20\" y=\"565\">x: "+xmin+" to "+xmax+"; y: "+ymin+" to "+ymax+" "+units+"</text></svg>");
             }

@@ -56,34 +56,52 @@ final class SingleCellCli {
         Raw counts and exploratory representations remain separate. See single-cell vignette for limits.
         """;}
     private static void execute(String method,Map<String,String> o,Path dir,Map<String,Object> manifest) throws Exception {
-        CellData data=CellData.read(o);boolean[] keep=data.qc(o,dir,manifest);
+        CellData data=CellData.read(o);
+        if(Set.of("state","abundance","pathways").contains(method))CellDesign.validate(data,o);
+        if(method.equals("state")) {
+            required(o,"rscript");integer(o,"timeout",3600,1,86400);integer(o,"min-gene-count",10,1,1000000000);integer(o,"min-gene-samples",2,1,10000);
+            if(data.sampleIndex.containsKey("feature_id"))throw new IllegalArgumentException("sample_id feature_id conflicts with the wide count-matrix header");
+        }
+        Pathways pathways=method.equals("pathways")?readPathways(data,o):null;
+        boolean[] keep=data.qc(o,dir,manifest);
         manifest.put("measurement","quantified raw RNA counts; supplied labels; omitted sparse entries are observed zeros");
         manifest.put("multiplicity","BH over all returned hypotheses, including failed/filtered rows as p=1 internally; such rows retain NA results. Populations with no retained observations are absent and listed in the input/QC audit.");
         if(method.equals("qc"))return;
         if(method.equals("representation")){representation(data,keep,o,dir,manifest);return;}
         String group=o.getOrDefault("group-column","cell_type");
+        data.validateGroup(group);
         if(method.equals("abundance")){abundance(data,keep,group,o,dir,manifest);return;}
         int min=integer(o,"min-cells",10,1,100000);List<CellData.Aggregate> all=data.aggregate(keep,group);data.writeAggregates(all,dir,min);
         manifest.put("aggregation",Map.of("group_column",group,"min_cells",min,"unit","biological sample; all sections within a sample summed"));
         if(method.equals("pseudobulk"))return;
         LinkedHashSet<String> groups=new LinkedHashSet<>();all.forEach(a->groups.add(a.type()));
-        List<String[]> statuses=new ArrayList<>(),results=new ArrayList<>();int counter=0;
+        CellData.checkOutputSize((long)groups.size()*(method.equals("state")?data.genes.size():pathways.groups.size()));
+        if(pathways!=null) {
+            CellData.checkOutputSize((long)all.size()*pathways.groups.size());
+            long members=pathways.groups.values().stream().mapToLong(Set::size).sum();
+            if(members*all.size()>100_000_000)throw new IllegalArgumentException("Pathway scoring exceeds 100 million aggregate-member visits");
+        }
+        List<String[]> statuses=new ArrayList<>(),results=new ArrayList<>();int counter=0;long fittingWork=0;
         for(String type:groups) {
             List<CellData.Aggregate> selected=all.stream().filter(a->a.type().equals(type)&&a.cells()>=min).toList();
             List<String> ids=selected.stream().map(CellData.Aggregate::sample).toList();
             SampleInference.Design design;
             try{design=CellDesign.create(data,ids,o);}catch(IllegalArgumentException unsupported){
-                statuses.add(new String[]{type,"not_tested",unsupported.getMessage()});
-                List<String> hypotheses=method.equals("state")?data.genes:pathwayNames(o);
+                statuses.add(new String[]{type,"not_tested",unsupported.getMessage(),"NA"});
+                List<String> hypotheses=method.equals("state")?data.genes:new ArrayList<>(pathways.groups.keySet());
                 for(String feature:hypotheses)results.add(new String[]{type,feature,"NA","NA","NA","NA","NA","NA","NA","NA","unsupported_design_or_insufficient_samples"});
                 continue;
             }
+            fittingWork+=CellDesign.fitWork(design,method.equals("state")?data.genes.size():pathways.groups.size());
+            if(fittingWork>100_000_000)throw new IllegalArgumentException("Inference exceeds 100 million response-design work units across populations");
             Path local=Files.createDirectory(dir.resolve("group-"+(++counter)));CellDesign.write(design,ids,local.resolve("design.tsv"));
+            int start=results.size();
             if(method.equals("state"))state(data,selected,type,design,o,local,results);
-            else pathways(data,selected,type,design,o,local,results);
-            statuses.add(new String[]{type,"tested",Integer.toString(design.donors())+" donors"});
+            else pathways(selected,type,design,pathways,local,results);
+            boolean tested=results.subList(start,results.size()).stream().anyMatch(r->r[10].equals("tested"));
+            statuses.add(new String[]{type,tested?"tested":"not_tested",Integer.toString(design.donors())+" donors"+(tested?"":"; no eligible feature tests"),local.getFileName().toString()});
         }
-        table(dir.resolve("population-status.tsv"),List.of("population","status","detail"),statuses);
+        table(dir.resolve("population-status.tsv"),List.of("population","status","detail","output_directory"),statuses);
         adjustWrite(dir.resolve("results.tsv"),results);
         manifest.put("engine",method.equals("state")?"R limma voom with library-size normalization, empirical Bayes t inference":"Native sample-level OLS of prespecified mean log2 CPM scores");
         manifest.put("supported_design","independent donors or complete two-condition pairs; batch and supplied numeric covariates; no arbitrary longitudinal/random-effects model");
@@ -91,13 +109,15 @@ final class SingleCellCli {
     }
     private static void state(CellData data,List<CellData.Aggregate> selected,String type,SampleInference.Design design,
             Map<String,String> o,Path dir,List<String[]> results) throws Exception {
-        int count=integer(o,"min-gene-count",10,1,1000000000),samples=integer(o,"min-gene-samples",2,1,selected.size());
+        int count=integer(o,"min-gene-count",10,1,1000000000),samples=integer(o,"min-gene-samples",2,1,10000);
         try(var w=Files.newBufferedWriter(dir.resolve("counts.tsv"))) {
             List<String> h=new ArrayList<>(List.of("feature_id"));selected.forEach(a->h.add(a.sample()));row(w,h.toArray(String[]::new));
             for(int j=0;j<data.genes.size();j++){String[] r=new String[selected.size()+1];r[0]=data.genes.get(j);for(int i=0;i<selected.size();i++)r[i+1]=Double.toString(selected.get(i).values()[j]);row(w,r);}
         }
         adapter("state",o,dir,List.of(Integer.toString(count),Integer.toString(samples)));
         DelimitedData output=DelimitedData.read(dir.resolve("fit.tsv"));
+        if(!output.header().equals(List.of("feature_id","effect","se","lower","upper","df","statistic","p","status"))
+                || !output.rows().stream().map(r->r[0]).toList().equals(data.genes))throw new IOException("Adapter changed the result schema or feature identities/order");
         for(String[] r:output.rows())results.add(new String[]{type,r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],"NA",r[8]});
         if(!Files.isRegularFile(dir.resolve("session.txt")))throw new IOException("Adapter did not record its session");
     }
@@ -117,18 +137,24 @@ final class SingleCellCli {
     }
     static String[] fitRow(String group,String feature,double[] y,SampleInference.Design design) {
         OlsResult fit=SampleInference.fit(y,design);double se=fit.standardErrors()[1];
-        if(!(se>0) || !Double.isFinite(se))return new String[]{group,feature,Double.toString(fit.coefficients()[1]),"NA","NA","NA",Integer.toString(fit.residualDegreesOfFreedom()),"NA","NA","NA","zero_residual_variance"};
+        double scale=0;for(double value:y)scale=Math.max(scale,Math.abs(value));
+        double rounding=32*fit.parameters()*Math.ulp(scale);
+        if(!(se>0) || !Double.isFinite(se) || Math.sqrt(fit.residualSumOfSquares()/y.length)<=rounding)
+            return new String[]{group,feature,Double.toString(fit.coefficients()[1]),"NA","NA","NA",Integer.toString(fit.residualDegreesOfFreedom()),"NA","NA","NA","zero_or_numerically_zero_residual_variance"};
         return new String[]{group,feature,Double.toString(fit.coefficients()[1]),Double.toString(se),Double.toString(fit.confidenceLower()[1]),Double.toString(fit.confidenceUpper()[1]),Integer.toString(fit.residualDegreesOfFreedom()),Double.toString(fit.tStatistics()[1]),Double.toString(fit.pValues()[1]),"NA","tested"};
     }
     private static void abundance(CellData data,boolean[] keep,String group,Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
         Map<String,Map<String,Integer>> counts=new LinkedHashMap<>();Set<String> types=new TreeSet<>();
         for(int i=0;i<keep.length;i++)if(keep[i]){String t=data.cell(i,group);types.add(t);counts.computeIfAbsent(data.cell(i,"sample_id"),s->new HashMap<>()).merge(t,1,Integer::sum);}
         List<String> ids=new ArrayList<>(counts.keySet());SampleInference.Design design=CellDesign.create(data,ids,o);CellDesign.write(design,ids,dir.resolve("design.tsv"));
+        CellData.checkOutputSize((long)types.size()*ids.size());
+        CellDesign.fitWork(design,types.size());
+        Map<String,Integer> totals=new HashMap<>();for(var e:counts.entrySet())totals.put(e.getKey(),e.getValue().values().stream().mapToInt(Integer::intValue).sum());
         List<String[]> rows=new ArrayList<>(),results=new ArrayList<>();
         for(String t:types) {
             double[] y=new double[ids.size()];
             for(int i=0;i<ids.size();i++) {
-                int n=counts.get(ids.get(i)).values().stream().mapToInt(Integer::intValue).sum(),k=counts.get(ids.get(i)).getOrDefault(t,0);
+                int n=totals.get(ids.get(i)),k=counts.get(ids.get(i)).getOrDefault(t,0);
                 double proportion=(double)k/n;y[i]=Math.asin(Math.sqrt(proportion));
                 rows.add(new String[]{ids.get(i),t,Integer.toString(k),Integer.toString(n),Double.toString(proportion),Double.toString(y[i])});
             }
@@ -137,17 +163,21 @@ final class SingleCellCli {
         table(dir.resolve("proportions.tsv"),List.of("sample_id","population","population_cells","total_retained_cells","proportion","asin_sqrt"),rows);adjustWrite(dir.resolve("results.tsv"),results);
         manifest.put("estimand","Tested minus reference arcsine-square-root relative cell proportion; all retained cell labels including unknown define the denominator; samples equally weighted, not pooled cells. Gaussian sample-level errors assumed.");
     }
-    private static void pathways(CellData data,List<CellData.Aggregate> selected,String type,SampleInference.Design design,
-            Map<String,String> o,Path dir,List<String[]> results) throws IOException {
+    private record Pathways(Map<String,Set<Integer>> groups,List<String[]> mapping) { }
+    private static Pathways readPathways(CellData data,Map<String,String> o) throws IOException {
         DelimitedData sets=CellData.bounded(Path.of(required(o,"gene-sets")));int sc=sets.column("gene_set"),fc=sets.column("feature_id");
         Map<String,Set<Integer>> groups=new LinkedHashMap<>();List<String[]> mapping=new ArrayList<>();Set<List<String>> seen=new HashSet<>();
         for(String[] r:sets.rows()) {
-            if(r[sc].isBlank() || r[fc].isBlank() || !seen.add(List.of(r[sc],r[fc])))throw new IllegalArgumentException("Blank/duplicate gene-set member");
-            int j=data.genes.indexOf(r[fc]);groups.computeIfAbsent(r[sc],s->new LinkedHashSet<>());if(j>=0)groups.get(r[sc]).add(j);
+            if(r[sc].isBlank() || r[fc].isBlank() || r[sc].chars().anyMatch(Character::isISOControl) || r[fc].chars().anyMatch(Character::isISOControl) || !seen.add(List.of(r[sc],r[fc])))throw new IllegalArgumentException("Invalid/duplicate gene-set member");
+            int j=data.featureIndex.getOrDefault(r[fc],-1);groups.computeIfAbsent(r[sc],s->new LinkedHashSet<>());if(j>=0)groups.get(r[sc]).add(j);
             mapping.add(new String[]{r[sc],r[fc],j>=0?"measured":"outside_panel"});
         }
+        return new Pathways(groups,mapping);
+    }
+    private static void pathways(List<CellData.Aggregate> selected,String type,SampleInference.Design design,
+            Pathways input,Path dir,List<String[]> results) throws IOException {
         List<String[]> scores=new ArrayList<>();
-        for(var e:groups.entrySet()) {
+        for(var e:input.groups.entrySet()) {
             if(e.getValue().size()<2){results.add(new String[]{type,e.getKey(),"NA","NA","NA","NA","NA","NA","NA","NA","fewer_than_two_measured_members"});continue;}
             double[] y=new double[selected.size()];
             for(int i=0;i<y.length;i++) {
@@ -157,16 +187,13 @@ final class SingleCellCli {
             }
             results.add(fitRow(type,e.getKey(),y,design));
         }
-        table(dir.resolve("gene-set-members.tsv"),List.of("gene_set","feature_id","status"),mapping);
+        table(dir.resolve("gene-set-members.tsv"),List.of("gene_set","feature_id","status"),input.mapping);
         table(dir.resolve("scores.tsv"),List.of("sample_id","gene_set","mean_log2_cpm","measured_members"),scores);
-    }
-    private static List<String> pathwayNames(Map<String,String> o) throws IOException {
-        DelimitedData sets=CellData.bounded(Path.of(required(o,"gene-sets")));int col=sets.column("gene_set");
-        return sets.rows().stream().map(r->r[col]).distinct().toList();
     }
     private static void representation(CellData data,boolean[] keep,Map<String,String> o,Path dir,Map<String,Object> manifest) throws Exception {
         int n=0;for(boolean b:keep)if(b)n++;
         if(n<3 || (long)n*data.genes.size()>2_000_000)throw new IllegalArgumentException("Exploratory representation requires >=3 cells and <=2 million dense entries");
+        if(data.featureIndex.containsKey("obs_id"))throw new IllegalArgumentException("feature_id obs_id conflicts with the wide representation header");
         try(var w=Files.newBufferedWriter(dir.resolve("normalized.tsv"))) {
             List<String> header=new ArrayList<>(List.of("obs_id"));header.addAll(data.genes);row(w,header.toArray(String[]::new));
             for(int i=0;i<keep.length;i++)if(keep[i]){String[] r=new String[data.genes.size()+1];r[0]=data.ids.get(i);for(int j=0;j<data.genes.size();j++)r[j+1]=Double.toString(data.normalized(i,j));row(w,r);}

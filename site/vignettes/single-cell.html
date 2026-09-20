@@ -54,6 +54,9 @@ All metadata columns are preserved, including supplied annotation provenance,
 reference version, confidence, segmentation quality and collection information.
 Preservation does not validate those annotations. Blank labels, duplicate IDs,
 unknown count IDs, fractional counts, negative counts and nonfinite values fail.
+Identifiers retain leading zeros, literal <code>NA</code> and embedded quotes across the R
+adapter. For wide-matrix interchange, state rejects sample ID <code>feature_id</code>, and
+representation rejects feature ID <code>obs_id</code>, because those collide with axis headers.
 Do not encode missing/unmeasured proteins as sparse zeros or use this RNA branch
 for antibody, mass-spectrometry, cytometry or accessibility measurements.</p>
 <p>For real studies, choose sample IDs at the biological sample/visit level. Record
@@ -97,7 +100,8 @@ indicators, and donor fixed effects for pairs. At least two donors per group or
 two complete pairs are required, with positive residual degrees of freedom.
 Two donors is an identifiability minimum, not a power recommendation. Batch
 effects constant within a donor pair are absorbed by donor effects. A batch that
-changes within pairs is modeled explicitly. Redundant or confounded designs fail
+changes within pairs is modeled using a basis independent of donor effects;
+redundant batch indicators are omitted. Other redundant or confounded designs fail
 that population with a recorded status. Source and assay must be identical within
 each modeled population. Exactly two declared conditions are supported.</p>
 <p>For paired designs, each retained donor must have exactly one sample per condition.
@@ -122,7 +126,10 @@ BH assumes its usual independence/positive-dependence conditions; it is not a
 guarantee under arbitrary cross-gene dependence.</p>
 <p>Each <code>group-N</code> directory records its actual design, counts, full library sizes,
 log2 CPM values, precision weights, R session, adapter source and external log.
-<code>population-status.tsv</code> maps labels to tested or unsupported populations. Failed
+<code>population-status.tsv</code> maps labels to tested or unsupported populations and their
+actual <code>output_directory</code>. A population with no eligible feature tests is
+<code>not_tested</code>; a gene-count sample threshold greater than its sample count produces
+filtered rows rather than aborting the study. Failed
 R execution aborts publication; it never falls back to a different estimator.</p>
 <h2 id="relative-population-abundance-and-functional-scores">Relative population abundance and functional scores</h2>
 <div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar single-cell --method abundance --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --reference control --tested case --out build/cell-demo/abundance
@@ -145,6 +152,10 @@ replication and within-set gene correlation through aggregation. Missing panel
 members are reported. Scores represent prespecified mean expression, not inferred
 regulator activity, GSEA, competitive enrichment or pathway activation probabilities.
 Overlapping gene sets are dependent. Use fixed, independently specified sets.</p>
+<p>For all native sample-level Gaussian contrasts, zero or numerically negligible
+residual variation produces <code>zero_or_numerically_zero_residual_variance</code> with
+unavailable uncertainty and p-values. Roundoff from an exactly fitted response
+must not supply artificial evidence.</p>
 <p>For hit-based <a href="enrichment.html">enrichment</a>, select one population and contrast,
 use <code>status == 'tested'</code> as eligibility, retain all eligible nonsignificant genes
 in the measured background, and select hits using the reported BH column. For
@@ -172,7 +183,12 @@ input/output SHA-256 hashes, effective options and declared assumptions;
 universes are copied into the result. R versions are recorded per adapter run.</p>
 <p>Limits: 100,000 observations; 50,000 genes; 10,000 samples; two million sparse
 entries; 32 MB per metadata table; ten million dense aggregate entries. Exploratory
-PCA is limited to two million dense cell-by-feature entries. These are enforced
+PCA is limited to two million dense cell-by-feature entries and 100 million
+SVD work units (<code>observations * selected_features * min(observations, selected_features)</code>).
+Result/summary tables are capped at 250,000 rows. Designs allow at most 256 columns,
+one million dense entries and 100 million QR work units (<code>samples * columns^2</code>);
+the same 100 million bound applies across all response fits. Gene-set scoring
+allows 100 million aggregate-member visits. These are enforced
 bounds, not demonstrated maximum-scale benchmarks. Sparse TSV interchange is
 supported; native H5AD/MuData/QFeatures import, resumability and distributed execution
 remain future work.</p>

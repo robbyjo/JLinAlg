@@ -11,7 +11,7 @@ import static org.jlinalg.cli.FollowupSupport.*;
 final class CellData {
     final DelimitedData cells,samples,features;
     final List<String> ids,genes;
-    final Map<String,Integer> sampleIndex;
+    final Map<String,Integer> sampleIndex,featureIndex;
     final List<Map<Integer,Double>> counts;
     final double[] libraries,mitochondrial;
     final int[] detected;
@@ -19,7 +19,8 @@ final class CellData {
             List<String> ids,List<String> genes,Map<String,Integer> sampleIndex,
             List<Map<Integer,Double>> counts,double[] libraries,double[] mitochondrial,int[] detected) {
         this.cells=cells;this.samples=samples;this.features=features;this.ids=ids;this.genes=genes;
-        this.sampleIndex=sampleIndex;this.counts=counts;this.libraries=libraries;this.mitochondrial=mitochondrial;this.detected=detected;
+        this.sampleIndex=sampleIndex;this.featureIndex=new HashMap<>();for(int j=0;j<genes.size();j++)featureIndex.put(genes.get(j),j);
+        this.counts=counts;this.libraries=libraries;this.mitochondrial=mitochondrial;this.detected=detected;
     }
     static Map<String,Integer> unique(DelimitedData data,String column) {
         int c=data.column(column);Map<String,Integer> result=new LinkedHashMap<>();
@@ -82,6 +83,12 @@ final class CellData {
     String sample(String id,String col){return samples.rows().get(sampleIndex.get(id))[samples.column(col)];}
     double value(int i,int j){return counts.get(i).getOrDefault(j,0.0);}
     double normalized(int i,int j){return libraries[i]>0?Math.log1p(10000*value(i,j)/libraries[i]):0;}
+    static void checkOutputSize(long rows) {
+        if(rows>250_000)throw new IllegalArgumentException("Result/summary table exceeds 250000 rows; select a smaller hypothesis family");
+    }
+    void validateGroup(String column) {
+        int c=cells.column(column);for(String[] row:cells.rows())if(row[c].isBlank())throw new IllegalArgumentException("Blank population/domain label in "+column);
+    }
 
     boolean[] qc(Map<String,String> o,Path dir,Map<String,Object> manifest) throws IOException {
         int minFeatures=integer(o,"min-features",1,0,50000);double minCounts=number(o,"min-counts",1),maxMito=number(o,"max-mito",1);

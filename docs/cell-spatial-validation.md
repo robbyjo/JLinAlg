@@ -96,6 +96,61 @@ is not an independent reimplementation of limma's estimator.
 - Mixed-spot cell-label neighborhood inference rejects. Existing outputs are
   preserved; failed jobs do not publish a partial result directory.
 
+## Correctness and performance audit, 2026-09-20
+
+The follow-up audit reproduced and fixed these defects against the first delivery:
+
+- R type inference changed numeric-looking sample/observation IDs and literal
+  `NA` feature IDs; unquoted output could damage embedded quotes. Explicit character
+  parsing and quoted UTF-8 output now preserve identities. The old adapter failed
+  its count/design alignment check on leading-zero sample IDs. Java also verifies
+  the returned feature schema and ordering.
+- An exactly fitted native sample response produced a spurious p-value near
+  `1.4e-91` from numerical residuals. Residual RMS at the floating-point floor now
+  produces unavailable inference. Constant decimal spatial values, extreme scales
+  (`1e-200`, `1e200`, and opposite-sign `1e308`), and tiny physical units have
+  explicit regression coverage; centered/scaled products preserve the estimand.
+- Chained distance rounding omitted some three-dimensional pairs exactly on an
+  inclusive radius boundary. Independent all-pair fixtures now cover radius and
+  union kNN, ties, compartments and small distances.
+- Partially donor-nested batch indicators could reject identifiable paired
+  designs. Batch basis selection now removes only dependence on donor effects and
+  other batch indicators; genuine condition/batch confounding still rejects.
+- Invalid covariates and gene sets are validated before population eligibility
+  can mask an error. Empty test families receive accurate status and group-directory
+  mappings. Dense designs, output tables, total fitting work and PCA now have
+  explicit limits before costly allocations or decompositions.
+
+The audited version passed **18 end-to-end invocations**, including identifier
+round trips, unchanged numerical results after renaming, and all-filtered genes.
+The repository-wide gate found **929 tests: 926 passed, no failures/errors, and
+3 optional CHOLMOD skips**. Javadoc and executable packaging passed. The full
+suite uses the same CPU validation workaround described above; optional GPU
+backends remain outside this validation.
+
+Reproduce the standalone kernel benchmark with:
+
+```shell
+python tools/benchmark_cell_spatial.py --javac /path/to/javac
+```
+
+The script compiles frozen baseline commit `3a8b4f12eee31db935efbada15150bdbd94e9830`
+and current spatial code in separate JVMs, checks graph counts/checksums and numerical
+agreement, and saves raw timings and medians. The following host measurements use
+Java 25, three warmups, seven measurements and `-Xms256m -Xmx1g`:
+
+| Workload | Baseline median | Revised median | Ratio |
+|---|---:|---:|---:|
+| Radius: 600 nodes, 179,700 edges | 183.10 ms | 7.49 ms | 24.45x |
+| Union kNN: 600 nodes, k=6, dense candidates | 36.53 ms | 5.21 ms | 7.01x |
+| 5,000 permutations: 800 nodes, 799 edges | 41.01 ms | 30.49 ms | 1.34x |
+
+These are bounded synthetic kernel timings, not general end-to-end speedups or
+atlas-scale memory/throughput validation. Timing is reported rather than asserted
+as a test threshold and varies with host load and JVM behavior. Section edge
+partitioning, cached feature lookups and gene-set
+parsing also remove repeated scans without changing scientific units.
+
 ## Open scientific and engineering work
 
 The tests do **not** constitute a public multi-donor acceptance study. Real-cohort
