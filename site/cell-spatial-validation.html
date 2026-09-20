@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Independent RNA and tissue workflow fixtures, scientific units and explicit remaining roadmap."><title>Single-cell and spatial validation · JLinAlg</title>
+<link rel="stylesheet" href="./assets/styles.css"><script src="./assets/app.js" defer></script></head>
+<body><site-header root="./"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="./index.html">Home</a><span>/</span><a href="./vignettes/index.html">Vignettes</a><span>/</span><span>Single-cell and spatial validation</span></div>
+<span class="eyebrow">Source build · Reproducible validation</span><h1>Single-cell and spatial validation</h1><p>Independent RNA and tissue workflow fixtures, scientific units and explicit remaining roadmap.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>The source build provides <code>single-cell</code> and <code>spatial</code> workflows for <strong>quantified,
+annotated RNA counts</strong>. These are a tested first delivery of the large roadmap,
+not completion of all protein, epigenetic, trajectory or imaging analysis suites.
+The <a href="vignettes/single-cell.html">single-cell tutorial</a> and
+<a href="vignettes/spatial-analysis.html">spatial tutorial</a> specify schemas, estimands and
+unsupported designs. Unimplemented branches remain explicit in <a href="https://github.com/robbyjo/JLinAlg/blob/main/TODO.md">TODO.md</a>.</p>
+<h2 id="delivered-operations">Delivered operations</h2>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Scientific unit and supported behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>QC</td>
+<td>Sparse raw RNA counts, library/detection/mitochondrial metrics, imported exclusions, complete metadata and measured panel</td>
+</tr>
+<tr>
+<td>Pseudobulk</td>
+<td>Exact counts summed by biological sample and supplied population/domain; cells and sections remain nested</td>
+</tr>
+<tr>
+<td>Differential state</td>
+<td>R limma voom, independent donors or complete two-condition pairs, numeric covariates and batch, joint feature/population BH</td>
+</tr>
+<tr>
+<td>Relative abundance</td>
+<td>Equal-sample Gaussian inference for arcsine-square-root population proportions with explicit denominators</td>
+</tr>
+<tr>
+<td>Functional scores</td>
+<td>Prespecified measured gene-set mean log2 CPM and sample-level contrasts</td>
+</tr>
+<tr>
+<td>Representation</td>
+<td>Library normalization, variance selection, centered PCA and seeded k-means; exploratory</td>
+</tr>
+<tr>
+<td>Spatial graph</td>
+<td>Physical 2D/3D radius, gap-capped union kNN or supplied adjacency; section/compartment restrictions; SVG maps</td>
+</tr>
+<tr>
+<td>Autocorrelation</td>
+<td>Within-section Moran I / Geary C and restricted random-label permutations</td>
+</tr>
+<tr>
+<td>Neighborhoods</td>
+<td>Label-pair enrichment/depletion with anatomical strata and fixed geometry</td>
+</tr>
+<tr>
+<td>Replicated relationships</td>
+<td>Edge-pair fraction per sample; independent or paired donor comparison</td>
+</tr>
+<tr>
+<td>Spatial gradients</td>
+<td>Descriptive sample-specific linear slopes followed by donor-level condition comparison</td>
+</tr>
+</tbody>
+</table>
+<p>All commands preserve supplied annotations and hierarchy, write hashes and effective
+configuration, and stage a new output directory before publishing. No implicit
+package installation, remote annotation, estimator fallback or embedded LLM is used.</p>
+<h2 id="reproduce-the-independent-comparisons">Reproduce the independent comparisons</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>python tools/generate_cell_spatial_examples.py
+./gradlew test --tests '*SpatialStatisticsTest' --tests '*SampleInferenceTest' --tests '*CellSpatialCliTest' executableJar
+python tools/validate_cell_spatial.py --rscript Rscript --r-library /path/to/R/library
+./gradlew check executableJar
+</code></pre></div>
+<p>On Windows use <code>gradlew.bat</code>; Python requires NumPy, and R requires limma. The
+validation script creates a fresh timestamped <code>build/cell-spatial-*</code> directory,
+with every command's console log, outputs, runtime, independent reference script,
+reference results and R session. It never overwrites an existing audit directory.</p>
+<p>The initial 2026-09-20 validation used Java on Windows 11, R 4.6.1, limma 3.68.5
+and statmod 1.5.2. Fifteen end-to-end invocations passed, covering independent and
+paired state/abundance, all three graph modes, and every documented operation.
+The fixture has 320 observations, 8 samples, 16 sections, 31 measured genes and
+9,920 nonzero entries. Each invocation took approximately 0.22–0.82 seconds on the
+tested host, including process startup; this is a small example, not an atlas-scale
+throughput or memory benchmark.</p>
+<p>The repository-wide gate discovered <strong>919 tests: 916 passed, 0 failures/errors,
+3 optional CHOLMOD skips</strong>. The executable JAR, Javadoc, website structural/link
+checks and generated-citation consistency checks also passed. The ordinary full
+test run stalled in <code>OpenClComputeBackend.initialize</code> / <code>CL.clBuildProgram</code>, as
+confirmed by a JVM thread dump. It was stopped and the suite rerun with a temporary
+test-classpath copy of JDistlib omitting only
+<code>META-INF/services/jdistlib.accelerator.ComputeBackend</code>, so optional accelerator
+discovery could not block CPU validation. Production dependency bytes and the
+executable JAR retain their normal accelerator configuration. This run therefore
+does not claim validation of those optional GPU backends.</p>
+<p>Independent checks reconstruct the count aggregation directly from sparse raw
+inputs. They refit both independent and paired state models directly in R from
+raw counts and metadata, using <code>xtabs</code> and <code>model.matrix</code> rather than the Java
+aggregate/design files. Effects, SEs and p-values agree within <code>rtol=1e-8</code> and
+<code>atol=1e-11</code>. Agreement checks adapter correctness and design alignment, not
+biological validity of the model assumptions.</p>
+<p>Abundance coefficients and SEs also match a separate NumPy least-squares solution;
+R <code>lm</code> supplies an independent check of Student t p-values. Moran/Geary values
+match an independent dense adjacency-matrix calculation for every requested
+section/feature (<code>rtol=1e-10</code>, <code>atol=1e-12</code>). Monte Carlo permutation results are
+seed reproducible. The production command and reference both call limma, so this
+is not an independent reimplementation of limma's estimator.</p>
+<h2 id="statistical-and-failure-fixtures">Statistical and failure fixtures</h2>
+<ul>
+<li>The four-node path has independently calculated Moran I = 1/3 and Geary C = 0.3.
+  All 24 assignments are enumerated separately; seeded Monte Carlo tails agree
+  with the exhaustive distribution within sampling tolerance.</li>
+<li>Independent two-group and complete-pair estimates and uncertainty match hand
+  calculations. A 400-replicate iid Gaussian null checks broad calibration of the
+  reused sample-level model; it does not establish calibration for rare cell types,
+  heterogeneous sequencing depth or biological single-cell datasets.</li>
+<li>Duplicate observations/features/count entries, invalid counts, missing IDs,
+  unknown options and inappropriate per-method arguments reject.</li>
+<li>Repeated donors in independent designs, incomplete pairs, condition/batch
+  confounding, insufficient residual degrees of freedom and mixed sources/assays
+  reject or receive an explicit unsupported-population status.</li>
+<li>Count totals survive aggregation. Zero-library and high-mitochondrial cells
+  retain exclusion reasons. The full assayed feature universe survives QC.</li>
+<li>Overlapping numeric coordinates never connect independent sections. Three-
+  dimensional distance, gap limits, compartment restrictions, isolates, constant
+  features and singleton permutation strata are exercised.</li>
+<li>Mixed-spot cell-label neighborhood inference rejects. Existing outputs are
+  preserved; failed jobs do not publish a partial result directory.</li>
+</ul>
+<h2 id="open-scientific-and-engineering-work">Open scientific and engineering work</h2>
+<p>The tests do <strong>not</strong> constitute a public multi-donor acceptance study. Real-cohort
+replication, RNA null/FDR/coverage under heterogeneous donors, rare-population
+stress tests, imperfect references, extensive scale/memory benchmarks and
+annotation/segmentation sensitivity remain necessary. Current constraints and
+outcomes are deliberately distinguished from these unperformed validations.</p>
+<p>The broader roadmap still includes automatic ambient/doublet assessment, reference
+annotation and marker discovery, neighborhood DA/Milo, multi-phenotype covariance,
+CITE-seq/totalVI, mass-spectrometry/QFeatures, cytometry, ATAC/Signac, trajectories,
+velocity, perturbations, regulatory/communication models and integrated genetic
+follow-up. Spatial remainder includes deconvolution/cell2location, domain discovery,
+nonlinear covariate-adjusted spatial processes, image features, registration,
+uncertain interfaces, multi-section reconstruction and multimodal reporting.</p>
+<p>These are not implemented by merely exporting tables or naming a candidate adapter.
+The native table paths are not claimed equivalent to complete Scanpy, Squidpy,
+muscat or Seurat installations. Library-size normalization is not TMM; pathway
+mean-expression scores are not regulator activity; spatial edge composition is
+not causal signaling; extra cells/sections are not extra independent donors.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<h2 id="scientific-citations">Scientific citations</h2>
+<p>These are the primary sources for the methods used in this workflow. Cite the relevant paper as well as JLinAlg when reporting results.</p>
+<ul>
+<li><a href="citations.html#crowell-muscat-2020">Helena L. Crowell et al. (2020) — muscat detects subpopulation-specific state transitions from multi-sample multi-condition single-cell transcriptomics data</a> — <a href="https://pubmed.ncbi.nlm.nih.gov/33257685/">PMID: 33257685</a></li>
+<li><a href="citations.html#squair-pseudoreplication-2021">Jordan W. Squair et al. (2021) — Confronting false discoveries in single-cell differential expression</a> — <a href="https://pubmed.ncbi.nlm.nih.gov/34584091/">PMID: 34584091</a></li>
+<li><a href="citations.html#smyth-limma-2004">Gordon K. Smyth (2004) — Linear models and empirical Bayes methods for assessing differential expression in microarray experiments</a> — <a href="https://pubmed.ncbi.nlm.nih.gov/16646809/">PMID: 16646809</a></li>
+<li><a href="citations.html#law-voom-2014">Charity W. Law, Yunshun Chen, Wei Shi, and Gordon K. Smyth (2014) — voom: precision weights unlock linear model analysis tools for RNA-seq read counts</a> — <a href="https://pubmed.ncbi.nlm.nih.gov/24485249/">PMID: 24485249</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4053721/">PMCID: PMC4053721</a></li>
+<li><a href="citations.html#benjamini-hochberg-1995">Yoav Benjamini and Yosef Hochberg (1995) — Controlling the false discovery rate: a practical and powerful approach to multiple testing</a></li>
+</ul>
+<p><a href="https://robbyjo.github.io/JLinAlg/citations.html">Search the complete scientific bibliography</a>.</p>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#delivered-operations">Delivered operations</a><a href="#reproduce-the-independent-comparisons">Reproduce the independent comparisons</a><a href="#statistical-and-failure-fixtures">Statistical and failure fixtures</a><a href="#open-scientific-and-engineering-work">Open scientific and engineering work</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="./"></site-footer></body></html>

@@ -1,0 +1,18 @@
+schema_version: 1
+commands:
+  single-cell:
+    counts: {path: counts.tsv}
+    cells: {path: cells.tsv}
+    samples: {path: samples.tsv}
+    features: {path: features.tsv}
+    min-features: 5
+    max-mito: 0.2
+  spatial:
+    counts: {path: counts.tsv}
+    cells: {path: cells.tsv}
+    samples: {path: samples.tsv}
+    features: {path: features.tsv}
+    units: micrometer
+    coordinate-system: synthetic-v1
+    resolution: cell
+    radius: 10.1

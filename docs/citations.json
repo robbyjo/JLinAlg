@@ -1629,6 +1629,73 @@
         "Random walk with restart",
         "Network propagation"
       ]
+    },
+    {
+      "id": "crowell-muscat-2020",
+      "category": "Single-cell and spatial omics",
+      "authors": "Helena L. Crowell et al.",
+      "year": 2020,
+      "title": "muscat detects subpopulation-specific state transitions from multi-sample multi-condition single-cell transcriptomics data",
+      "venue": "Nature Communications 11:6077",
+      "url": "https://doi.org/10.1038/s41467-020-19894-4",
+      "pmid": "33257685",
+      "features": [
+        "Biological-replicate pseudobulk design",
+        "Differential state interpretation"
+      ]
+    },
+    {
+      "id": "squair-pseudoreplication-2021",
+      "category": "Single-cell and spatial omics",
+      "authors": "Jordan W. Squair et al.",
+      "year": 2021,
+      "title": "Confronting false discoveries in single-cell differential expression",
+      "venue": "Nature Communications 12:5692",
+      "url": "https://doi.org/10.1038/s41467-021-25960-2",
+      "pmid": "34584091",
+      "features": [
+        "Donor-aware single-cell inference",
+        "Pseudoreplication limits"
+      ]
+    },
+    {
+      "id": "palla-squidpy-2022",
+      "category": "Single-cell and spatial omics",
+      "authors": "Giovanni Palla et al.",
+      "year": 2022,
+      "title": "Squidpy: a scalable framework for spatial omics analysis",
+      "venue": "Nature Methods 19:171-178",
+      "url": "https://doi.org/10.1038/s41592-021-01358-2",
+      "pmcid": "PMC8828470",
+      "features": [
+        "Spatial graph and neighborhood analysis context",
+        "Spatial omics workflow design"
+      ]
+    },
+    {
+      "id": "moran-1950",
+      "category": "Single-cell and spatial omics",
+      "authors": "P. A. P. Moran",
+      "year": 1950,
+      "title": "Notes on continuous stochastic phenomena",
+      "venue": "Biometrika 37:17-23",
+      "url": "https://doi.org/10.1093/biomet/37.1-2.17",
+      "pmid": "15420245",
+      "features": [
+        "Moran spatial autocorrelation"
+      ]
+    },
+    {
+      "id": "geary-1954",
+      "category": "Single-cell and spatial omics",
+      "authors": "R. C. Geary",
+      "year": 1954,
+      "title": "The Contiguity Ratio and Statistical Mapping",
+      "venue": "The Incorporated Statistician 5(3)",
+      "url": "https://doi.org/10.2307/2986645",
+      "features": [
+        "Geary spatial autocorrelation"
+      ]
     }
   ],
   "pages": {
@@ -1924,6 +1991,20 @@
       "liu-carnival-2019",
       "fisher-correlation-1921",
       "brin-pagerank-1998",
+      "benjamini-hochberg-1995"
+    ],
+    "single-cell": [
+      "crowell-muscat-2020",
+      "squair-pseudoreplication-2021",
+      "smyth-limma-2004",
+      "law-voom-2014",
+      "benjamini-hochberg-1995"
+    ],
+    "spatial-analysis": [
+      "moran-1950",
+      "geary-1954",
+      "palla-squidpy-2022",
+      "squair-pseudoreplication-2021",
       "benjamini-hochberg-1995"
     ]
   },

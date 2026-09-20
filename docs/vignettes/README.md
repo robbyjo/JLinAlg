@@ -1,5 +1,9 @@
 # JLinAlg vignettes
 
+New RNA workflows: [replicated single-cell analysis](single-cell.md) and
+[physical spatial analysis](spatial-analysis.md), with complete CLI examples and
+[independent validation](../cell-spatial-validation.md).
+
 New source-build follow-up workflows: [project configuration](project-configuration.md),
 [variant annotation and scoring](variant-followup.md), and
 [networks and candidate regulators](network-followup.md). Each includes runnable

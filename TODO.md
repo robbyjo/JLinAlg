@@ -1,6 +1,6 @@
 # Development TODO
 
-Last reviewed: 2026-09-19.
+Last reviewed: 2026-09-20.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
@@ -112,19 +112,34 @@ phenotype-family inference and reporting workflow.
 
 ## Single-cell analyses
 
-Current [network methods](docs/vignettes/network-followup.md) accept suitable
-independent-sample molecular inputs or reference graphs. Dedicated single-cell
-preparation, annotation and donor-aware workflow integration remain open work.
-Use established external engines through versioned adapters where appropriate.
+The [single-cell RNA workflow](docs/vignettes/single-cell.md) now implements
+quantified/annotated-input QC, sparse count aggregation, independent/paired donor
+state analysis through limma voom, sample-level relative abundance, prespecified
+gene-set scores and exploratory PCA/k-means. See the
+[validation report](docs/cell-spatial-validation.md). The following broad roadmap
+items remain unchecked where their full assay/design scope is not implemented.
+
+- [x] **Annotated replicated RNA delivery.** CLI, strict sparse counts and measured
+  panel, complete sample/donor metadata, QC/exclusion reports, pseudobulk with cell
+  counts and library sizes, independent/paired designs, batch/numeric covariates,
+  limma version/source provenance, joint BH, tutorials and independent numerical
+  checks. This does not implement arbitrary longitudinal models or other assays.
+- [x] **Bounded RNA exploration and sample summaries.** Library normalization,
+  variance-selected PCA/k-means, relative population abundance and prespecified
+  mean-expression gene-set scores, with explicit models and limits.
 
 - [ ] **Cell/sample QC.** Add assay-aware library/feature coverage and mitochondrial
   metrics, empty-droplet/ambient-RNA assessment, doublet detection and explicit
   filtering reports. Check donor representation and low-information populations;
   support annotated-input workflows without rerunning irrelevant preprocessing.
+  RNA library/feature/mitochondrial metrics and imported exclusions are delivered;
+  automatic empty-droplet, ambient-RNA and doublet assessment remains open.
 - [ ] **Representation and clustering.** Add normalization, variable-feature
   selection, PCA, nearest-neighbor graphs, clustering and visualization adapters.
   Keep integration/embedding values separate from measurements used for inference;
   assess preservation of biology and batch/condition confounding.
+  Library normalization, variance selection, PCA and k-means are delivered;
+  neighbor-based clustering, integration and their biological validation remain open.
 - [ ] **Annotation and markers.** Support marker discovery, reference mapping,
   hierarchical cell labels, confidence/unknown labels and manual annotation import.
   Preserve reference versions and distinguish cluster markers from between-condition
@@ -134,10 +149,14 @@ Use established external engines through versioned adapters where appropriate.
   Fit donor-aware case-control, paired, longitudinal and covariate-adjusted models
   within supported designs. Report insufficient cells/donors instead of creating
   artificial replicates; add validated cell-level hierarchical alternatives later.
+  Independent donors and complete two-condition pairs with numeric covariates and
+  batch are delivered. Longitudinal and cell-level hierarchical extensions remain open.
 - [ ] **Differential cellular abundance.** Analyze sample-level population counts
   with compositional/denominator-aware inference and biological replication.
   Add neighborhood differential-abundance adapters (for example Milo) for continuous
   states; distinguish relative composition from absolute abundance.
+  Equal-sample transformed-proportion inference is delivered; compositional joint
+  models, rare-population calibration and Milo adapters remain open.
 - [ ] **Cell-specific phenotype families.** Connect each cell type/state to the
   separate and joint phenotype-family operations above, preserving donor covariance
   and multiplicity across genes/proteins, cell types and phenotypes.
@@ -179,25 +198,44 @@ Use established external engines through versioned adapters where appropriate.
 
 ## Spatial transcriptomics and proteomics
 
-Existing regional EWAS analysis concerns distance along the genome, not physical
-tissue coordinates. The following are new spatial workflow capabilities.
+Existing regional EWAS concerns genomic distance. The new
+[physical spatial RNA workflow](docs/vignettes/spatial-analysis.md) adds the
+following quantified-input capabilities. Unchecked items retain their broader
+unimplemented scope; none imply completed protein/imaging/deconvolution support.
+
+- [x] **Bounded physical graphs and pattern tests.** Explicit units and supplied
+  coordinates, section/compartment restrictions, radius/union-kNN/adjacency,
+  2D/3D distances, SVG section maps, Moran I/Geary C, stratified random-label tests,
+  neighborhood enrichment/depletion and global testing families.
+- [x] **Replicated spatial RNA summaries.** Supplied domain expression/pathway/
+  abundance via the shared RNA commands, sample-level edge composition and linear
+  distance-slope comparisons with independent/paired donor designs. CLI, tutorials,
+  numerical fixtures and citations are delivered within documented limits.
 
 - [ ] **Spatial input/QC contract.** Import cell-resolved, subcellular or mixed-spot
   measurements with physical units, coordinate transforms, masks, image references,
   segmentation IDs/quality and donor/specimen/section hierarchy. Preserve measured
   gene-panel limits and flag uncertain cell assignments or tissue/background mixing.
+  Explicit RNA tables, panel, hierarchy, supplied metadata and exclusions are
+  delivered; native image/mask/transform import and subcellular assignment remain open.
 - [ ] **Spatial graphs.** Build radius, k-nearest-neighbor and appropriate
   adjacency graphs with explicit scales, tissue boundaries/gaps and 2D/3D support.
   Do not connect separate specimens or unregistered sections merely because their
   numeric coordinates overlap. Validate scale and graph-construction sensitivity.
+  Native radius/kNN and supplied adjacency are delivered; atlas-scale indexing,
+  automatic mask intersection and biological scale-sensitivity studies remain open.
 - [ ] **Spatially variable features.** Add Moran's I/Geary's C and suitable spatial
   expression/activity models, covariate adjustment, multiple-testing correction
   and declared null models. Distinguish within-specimen spatial pattern tests from
   reproducible between-condition effects across independent specimens.
+  Moran/Geary with declared random-label nulls are delivered; covariate-adjusted
+  spatial processes and real-cohort calibration remain open.
 - [ ] **Neighborhood relationships.** Add neighborhood enrichment, distance-dependent
   co-occurrence and spatial distribution statistics using justified permutations
   within exchangeable anatomical/sample strata. Preserve population abundance and
   boundary effects appropriate to each null; assess multiple spatial scales.
+  Stratified label-pair enrichment/depletion is delivered; additional distance-
+  distribution statistics and multi-scale validation remain open.
 - [ ] **Domains and niches.** Identify and characterize compartments and local
   cell communities; support pathology annotations and marker/pathway summaries.
   Assess stability and cross-sample correspondence; separate exploratory domain
@@ -210,9 +248,13 @@ tissue coordinates. The following are new spatial workflow capabilities.
   niche abundance and spatial relationships across conditions with donor/section
   dependence and spatial autocorrelation represented in the model. Support paired
   samples and replication; extra spots/sections cannot manufacture donor replication.
+  Independent/paired donor summary comparisons are delivered; richer section-level
+  dependence models and public replication studies remain open.
 - [ ] **Spatial gradients and interfaces.** Model distances to vessels, lesions,
   tumor margins or other annotated structures, with nonlinear effects, covariates,
   sample variation and uncertainty in boundaries. Test condition-by-distance effects.
+  Sample-specific linear slopes and donor-level slope contrasts are delivered;
+  nonlinear covariate-adjusted trends and uncertain interfaces remain open.
 - [ ] **Spatial signaling.** Combine proximity, ligand-receptor evidence and
   downstream activity into explicit hypotheses; compare against appropriate
   abundance/anatomy-aware nulls. Proximity alone is not evidence of causal signaling.

@@ -19,6 +19,7 @@ HTML_OUTPUT = ROOT / "site" / "citations.html"
 HTML_START = "<!-- SCIENTIFIC-CITATIONS:START -->"
 HTML_END = "<!-- SCIENTIFIC-CITATIONS:END -->"
 ROOT_DOCS = {
+    "cell-spatial-validation.md": "single-cell",
     "additive-models.md": "additive-models",
     "beta-regression.md": "beta-regression",
     "gee.md": "predictions-and-contrasts",

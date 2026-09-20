@@ -1,5 +1,18 @@
 # Unreleased
 
+## Replicated single-cell and physical spatial RNA
+
+- Added `single-cell` QC, raw-count pseudobulk, R limma-voom differential state,
+  sample-level relative abundance, prespecified gene-set scores and PCA/k-means.
+- Added `spatial` radius/kNN/adjacency graphs, Moran/Geary permutations, neighborhood
+  enrichment/depletion, replicated relationship comparisons and distance slopes.
+- Preserved donor/sample/specimen/section structure, raw counts, measured panels,
+  supplied annotations, exclusions, seeds, R versions, hashes and configuration.
+  Added SVG section maps, runnable examples, two tutorials and primary references.
+- Validated with independent raw-input R refits, NumPy and exact small-graph
+  calculations. The broader protein/ATAC/trajectory/deconvolution/imaging roadmap
+  remains open; see [delivered scope and validation](docs/cell-spatial-validation.md).
+
 ## Configured variant and network follow-up
 
 - Added safe YAML configuration with built-in < local < project < CLI precedence,

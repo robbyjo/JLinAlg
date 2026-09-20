@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Tissue graphs, Moran and Geary tests, neighborhoods, sample-aware comparisons and distance gradients."><title>Physical spatial RNA analysis · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Physical spatial RNA analysis</span></div>
+<span class="eyebrow">CLI + Java · Source build</span><h1>Physical spatial RNA analysis</h1><p>Tissue graphs, Moran and Geary tests, neighborhoods, sample-aware comparisons and distance gradients.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>The <code>spatial</code> command operates on quantified RNA measurements and supplied physical
+coordinates. It builds graphs, tests within-section spatial patterns and label
+relationships, compares sample-level spatial composition across conditions, and
+compares distance gradients. This is distinct from regional EWAS, whose distance
+is along a chromosome. See <a href="single-cell.html">single-cell inputs</a> and the
+<a href="../cell-spatial-validation.html">validation report</a>.</p>
+<h2 id="input-geometry-and-qc">Input, geometry and QC</h2>
+<p>Use the same four count/cell/sample/feature tables as <code>single-cell</code>. Add these
+columns to the cell table:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>specimen_id</code></td>
+<td>Belongs to exactly one biological sample.</td>
+</tr>
+<tr>
+<td><code>section_id</code></td>
+<td>Globally unique; belongs to exactly one specimen.</td>
+</tr>
+<tr>
+<td><code>compartment</code></td>
+<td>Supplied anatomical boundary group; graphs do not cross it.</td>
+</tr>
+<tr>
+<td><code>stratum</code></td>
+<td>Exchangeability group for label permutations within compartment.</td>
+</tr>
+<tr>
+<td><code>x,y</code> and optional <code>z</code></td>
+<td>Finite physical coordinates in one declared coordinate system.</td>
+</tr>
+</tbody>
+</table>
+<p>Specify <code>--units micrometer</code> or <code>millimeter</code>, <code>--coordinate-system</code> with a versioned
+coordinate-frame description, and <code>--resolution cell</code> or <code>spot</code>. Coordinates must
+already have their intended transformation applied. Preserve image references,
+segmentation IDs/quality, mask provenance and transform metadata in extra columns.
+QC exclusions use the same RNA metrics and optional imported <code>exclude</code> flag as
+the single-cell command. Subcellular molecules must be assigned/quantified upstream.</p>
+<p>The implementation does not register images, segment cells, estimate transforms,
+read pixel masks or infer cell mixtures. Separate sections remain disconnected
+even when their numeric coordinates overlap or when z values suggest adjacency.
+To respect irregular holes, use a reviewed supplied adjacency graph or explicitly
+partition the compartment labels. A radius alone cannot detect a hole crossed by
+a short straight edge.</p>
+<h2 id="build-graphs-and-inspect-tissue-maps">Build graphs and inspect tissue maps</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar spatial --method graph --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --units micrometer --coordinate-system synthetic-v1 --resolution cell --graph radius --radius 10.1 --out build/spatial-demo/graph
+</code></pre></div>
+<p>Radius edges connect observations at Euclidean distance &lt;= the radius within the
+same section and compartment. Two- and three-dimensional distances are supported.
+Use <code>--graph knn --k 6 --radius 30</code> for an undirected <strong>union</strong> kNN graph with a
+hard maximum gap: an edge exists if either endpoint selects the other. Ties follow
+input row order. Graph construction is deterministic for the same input order.</p>
+<p>Alternatively use <code>--graph adjacency --edges reviewed-edges.tsv</code>, omitting radius
+and k. The edge table requires <code>source,target</code> observation IDs; duplicate undirected
+pairs, self-edges and cross-compartment/section edges fail. Nodes excluded by QC
+are removed, with their exclusions retained in <code>cell-qc.tsv</code>. Supplied edges are
+unweighted; measured distances are exported for auditing.</p>
+<p><code>edges.tsv</code> contains each unordered pair once. <code>nodes.tsv</code> records degree and
+isolates. <code>maps.tsv</code> maps each section ID to a separate SVG; circles include cell
+ID/type tooltips, and isolated nodes are red. Three-dimensional inputs are shown
+as explicitly labeled XY projections. Axes preserve aspect ratio; each map states
+its original coordinate range and physical units. Compare radius/k choices and
+compartment annotations before interpreting a graph.</p>
+<h2 id="spatially-variable-features">Spatially variable features</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar spatial --method autocorrelation --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --units micrometer --coordinate-system synthetic-v1 --resolution cell --radius 10.1 --feature-list examples/cell-spatial/selected-features.tsv --permutations 999 --seed 19 --out build/spatial-demo/autocorrelation
+</code></pre></div>
+<p>For each section and requested feature, the response is
+<code>log1p(10000*count/library)</code>. Moran's I and Geary's C use symmetric binary graph
+weights. With n section observations, m undirected edges and centered values z:</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>I = n * sum_edges(z_i*z_j) / (m * sum_i(z_i^2))
+C = (n-1) * sum_edges((y_i-y_j)^2) / (2*m * sum_i(z_i^2))
+</code></pre></div>
+<p>Isolates remain in the section universe and denominator. Fewer than three
+observations, no edges or constant values give an explicit unavailable status.
+<code>--feature-list</code> requires a <code>feature_id</code> column; otherwise all measured genes are
+requested. Prefer a prespecified feature family when permutations would be large.</p>
+<p>Random-label permutations operate within section/compartment/stratum, holding
+geometry fixed. Tests use the fixed two-sided statistics <code>abs(I+1/(n-1))</code> and
+<code>abs(C-1)</code>. Those centers are unrestricted random-label expectations; restricted
+null distributions can have different means, but permutation validity uses the
+same statistic for observed and permuted data. Exchangeability must hold within
+each supplied stratum. A specimen with singleton strata has no permutation power.</p>
+<p>The reported Monte Carlo p-value is <code>(exceedances+1)/(B+1)</code>, with minimum resolution
+<code>1/(B+1)</code>. BH covers both statistics, all requested genes and all sections together;
+unavailable rows contribute p=1 internally. This tests within-section pattern,
+not population-level differential expression or a condition effect. It is not a
+covariate-adjusted spatial process model. Mixed spots may use this pattern test,
+but spot variation also reflects mixtures and technical properties.</p>
+<h2 id="neighborhood-enrichment-and-replicated-comparisons">Neighborhood enrichment and replicated comparisons</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar spatial --method neighborhoods --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --units micrometer --coordinate-system synthetic-v1 --resolution cell --radius 10.1 --permutations 999 --seed 19 --out build/spatial-demo/neighborhoods
+java -jar build/cli/jlinalg-0.3.6.jar spatial --method compare --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --units micrometer --coordinate-system synthetic-v1 --resolution cell --radius 10.1 --reference control --tested case --out build/spatial-demo/compare
+</code></pre></div>
+<p>Neighborhood tests permute cell-type labels within the same exchangeability
+groups. This preserves observed label counts within each stratum and graph
+geometry/boundaries. Each unordered type pair receives its observed edge count,
+permutation mean, enrichment and depletion p-values. Both tails, all pairs and all
+sections enter one BH family. Labels absent from a section remain in the family.
+Zero-edge sections have no test. These tests require cell-resolved inputs; a
+dominant cell-type label on a mixed spot is not a measured cell identity.</p>
+<p>The replicated comparison first pools edge counts from all sections of each
+biological sample. For every type pair it computes the fraction of all sample
+edges belonging to that pair, transforms it by <code>asin(sqrt(fraction))</code>, and fits
+the donor-aware sample-level model. Extra sections or edges never increase the
+number of independent samples. Samples must have at least one edge. Use
+<code>--paired true</code> with the paired sample sheet for complete donor pairs; numeric
+covariates and batch handling follow the single-cell workflow.</p>
+<p>This effect is relative edge composition. It can change because of population
+abundance, tissue geometry or sampling, and is not an abundance-adjusted interaction
+coefficient. Gaussian sample-level errors are assumed. Spatial autocorrelation is
+kept inside the sample summary rather than supplying thousands of independent
+edge-level observations to a condition test. Proximity and expression compatibility
+do not establish causal signaling.</p>
+<h2 id="domains-niches-and-gradients">Domains, niches and gradients</h2>
+<p>Pathology/domain labels can be supplied in a cell metadata column. Use
+<code>single-cell --method state --group-column domain</code> to aggregate RNA by sample and
+domain, or <code>single-cell --method abundance --group-column domain</code> for relative
+domain abundance. <code>--method pathways --group-column domain</code> provides mean measured
+gene-set expression. This is an annotated-domain workflow; exploratory domain
+discovery, stability assessment and cross-sample domain registration are not yet
+implemented. Labels must mean the same thing across samples. Testing the same
+features used to discover a domain is exploratory without independent validation.</p>
+<p>For a prespecified distance to an anatomical structure, provide a nonnegative
+cell-level distance column in the declared physical units:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar spatial --method gradient --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --units micrometer --coordinate-system synthetic-v1 --resolution cell --distance-column distance --feature-list examples/cell-spatial/selected-features.tsv --reference control --tested case --out build/spatial-demo/gradient
+</code></pre></div>
+<p>The command calculates a descriptive linear slope of normalized expression versus
+distance within each biological sample, pooling that sample's sections. It then
+compares sample slopes using the donor-aware condition model; <code>sample-slopes.tsv</code>
+contains the intermediate values. There are no spot-level significance claims.
+Each sample needs &gt;=3 retained observations and nonconstant distances. Unequal
+precision of sample slopes is not modeled, distances/boundaries are treated as
+known, and condition effects can reflect other distance-correlated cell mixtures.
+Nonlinear trends, section-specific slopes and uncertainty in interfaces need a
+different model and remain open.</p>
+<h2 id="limits-and-reproducibility">Limits and reproducibility</h2>
+<p>The shared input bounds apply. Graph construction is bounded at 25 million
+within-compartment distance evaluations and one million edges. Permutation work
+is bounded at 100 million observation/edge/pair visits per invocation; neighborhood
+tests allow at most 50 cell labels. Gradient evaluation allows 20 million
+observation-feature visits. Graph search is bounded quadratic, not an atlas-scale
+spatial index. The counts stay sparse until a requested operation requires a
+bounded representation or aggregate.</p>
+<p>Every run writes QC, original metadata, hashes, effective configuration, graph
+parameters and null/estimand definitions. Seeds reproduce Java permutation results
+for the same inputs. Record label definitions, physical scales, panel coverage,
+upstream segmentation and registration versions, and sensitivity analyses.</p>
+<p>Mixed-spot reference deconvolution, RNA/protein/ATAC integration, histology features,
+image registration, 3D reconstruction, ligand-receptor activity inference and
+uncertain-boundary modeling are still open <a href="https://github.com/robbyjo/JLinAlg/blob/main/TODO.md">roadmap items</a>.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-spatial-analysis">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-spatial-analysis">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#moran-1950">Moran (1950) — Moran spatial autocorrelation</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/15420245/">PMID: 15420245</a>)</span></li><li><a href="../citations.html#geary-1954">Geary (1954) — Geary spatial autocorrelation</a></li><li><a href="../citations.html#palla-squidpy-2022">Palla et al. (2022) — Spatial graph and neighborhood analysis context</a> <span class="citation-inline-identifiers">(<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8828470/">PMCID: PMC8828470</a>)</span></li><li><a href="../citations.html#squair-pseudoreplication-2021">Squair et al. (2021) — Donor-aware single-cell inference</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/34584091/">PMID: 34584091</a>)</span></li><li><a href="../citations.html#benjamini-hochberg-1995">Benjamini (1995) — Benjamini-Hochberg FDR</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#input-geometry-and-qc">Input, geometry and QC</a><a href="#build-graphs-and-inspect-tissue-maps">Build graphs and inspect tissue maps</a><a href="#spatially-variable-features">Spatially variable features</a><a href="#neighborhood-enrichment-and-replicated-comparisons">Neighborhood enrichment and replicated comparisons</a><a href="#domains-niches-and-gradients">Domains, niches and gradients</a><a href="#limits-and-reproducibility">Limits and reproducibility</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

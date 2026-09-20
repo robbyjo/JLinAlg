@@ -541,3 +541,25 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 <a id="brin-pagerank-1998"></a>
 - **Sergey Brin and Lawrence Page (1998).** The anatomy of a large-scale hypertextual Web search engine. *Computer Networks and ISDN Systems 30:107-117.* [Primary source](https://snap.stanford.edu/class/cs224w-readings/Brin98Anatomy.pdf)
   - JLinAlg methods: Random walk with restart, Network propagation.
+
+## Single-cell and spatial omics
+
+<a id="crowell-muscat-2020"></a>
+- **Helena L. Crowell et al. (2020).** muscat detects subpopulation-specific state transitions from multi-sample multi-condition single-cell transcriptomics data. *Nature Communications 11:6077.* [DOI: 10.1038/s41467-020-19894-4](https://doi.org/10.1038/s41467-020-19894-4) · [PMID: 33257685](https://pubmed.ncbi.nlm.nih.gov/33257685/)
+  - JLinAlg methods: Biological-replicate pseudobulk design, Differential state interpretation.
+
+<a id="squair-pseudoreplication-2021"></a>
+- **Jordan W. Squair et al. (2021).** Confronting false discoveries in single-cell differential expression. *Nature Communications 12:5692.* [DOI: 10.1038/s41467-021-25960-2](https://doi.org/10.1038/s41467-021-25960-2) · [PMID: 34584091](https://pubmed.ncbi.nlm.nih.gov/34584091/)
+  - JLinAlg methods: Donor-aware single-cell inference, Pseudoreplication limits.
+
+<a id="palla-squidpy-2022"></a>
+- **Giovanni Palla et al. (2022).** Squidpy: a scalable framework for spatial omics analysis. *Nature Methods 19:171-178.* [DOI: 10.1038/s41592-021-01358-2](https://doi.org/10.1038/s41592-021-01358-2) · [PMCID: PMC8828470](https://pmc.ncbi.nlm.nih.gov/articles/PMC8828470/)
+  - JLinAlg methods: Spatial graph and neighborhood analysis context, Spatial omics workflow design.
+
+<a id="moran-1950"></a>
+- **P. A. P. Moran (1950).** Notes on continuous stochastic phenomena. *Biometrika 37:17-23.* [DOI: 10.1093/biomet/37.1-2.17](https://doi.org/10.1093/biomet/37.1-2.17) · [PMID: 15420245](https://pubmed.ncbi.nlm.nih.gov/15420245/)
+  - JLinAlg methods: Moran spatial autocorrelation.
+
+<a id="geary-1954"></a>
+- **R. C. Geary (1954).** The Contiguity Ratio and Statistical Mapping. *The Incorporated Statistician 5(3).* [DOI: 10.2307/2986645](https://doi.org/10.2307/2986645)
+  - JLinAlg methods: Geary spatial autocorrelation.

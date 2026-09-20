@@ -10,6 +10,8 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "single-cell": ("Replicated single-cell RNA analysis", "Sparse QC, pseudobulk, donor-aware state and abundance, functional scores and exploratory representations.", "CLI + Java/R · Source build"),
+    "spatial-analysis": ("Physical spatial RNA analysis", "Tissue graphs, Moran and Geary tests, neighborhoods, sample-aware comparisons and distance gradients.", "CLI + Java · Source build"),
     "project-configuration": ("Project configuration", "Project-over-local YAML precedence and reproducible CLI runs.", "CLI · Source build"),
     "variant-followup": ("Variant annotation and scoring", "Local snapshots, POST/API lookup, VEP/ANNOVAR adapters and transparent evidence integration.", "CLI · Source build"),
     "network-followup": ("Networks and candidate regulators", "Reference networks, WGCNA, sparse and differential associations, GENIE3 and CARNIVAL.", "CLI + Java/R · Source build"),
@@ -75,3 +77,6 @@ render(ROOT / "docs/inference-workflows-validation.md", ROOT / "site/inference-w
 render(ROOT / "docs/audit-fixes-validation.md", ROOT / "site/audit-fixes-validation.html",
        "Statistical audit fixes", "Regression checks, bootstrap imputation contracts and measured smoothing performance.", "./",
        "Source audit · Reproducible validation")
+render(ROOT / "docs/cell-spatial-validation.md", ROOT / "site/cell-spatial-validation.html",
+       "Single-cell and spatial validation", "Independent RNA and tissue workflow fixtures, scientific units and explicit remaining roadmap.", "./",
+       "Source build · Reproducible validation")

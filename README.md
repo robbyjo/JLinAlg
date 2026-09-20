@@ -51,6 +51,11 @@ links each method family to its primary publication.
 
 ## Numerical accuracy and performance
 
+Source builds add [replicated single-cell RNA](docs/vignettes/single-cell.md) and
+[physical spatial RNA workflows](docs/vignettes/spatial-analysis.md), with sparse
+QC, pseudobulk, donor-aware inference, tissue graphs and spatial tests. See the
+[validation and remaining scope](docs/cell-spatial-validation.md).
+
 The source build adds [project-over-local YAML configuration](docs/vignettes/project-configuration.md),
 [variant annotation, consequence adapters and evidence scoring](docs/vignettes/variant-followup.md),
 and [six network workflows](docs/vignettes/network-followup.md), including WGCNA,

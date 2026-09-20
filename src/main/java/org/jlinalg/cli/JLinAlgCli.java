@@ -34,7 +34,7 @@ public final class JLinAlgCli {
             }
             java.nio.file.Path record = null;
             boolean auditConfig = !((java.util.List<?>)config.provenance().get("sources")).isEmpty()
-                || arguments.length>0 && java.util.Set.of("network","variant-db","variant-annotate","variant-consequence","variant-score").contains(arguments[0]);
+                || arguments.length>0 && java.util.Set.of("single-cell","spatial","network","variant-db","variant-annotate","variant-consequence","variant-score").contains(arguments[0]);
             if (auditConfig && !Arrays.asList(arguments).contains("--help")) {
                 for (int i=0;i+1<arguments.length;i++) if(arguments[i].equals("--out"))
                     record=java.nio.file.Path.of(arguments[i+1]+".config.yaml");
@@ -74,6 +74,10 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if(arguments.length>0 && arguments[0].equals("single-cell"))
+            return SingleCellCli.run(Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
+        if(arguments.length>0 && arguments[0].equals("spatial"))
+            return SpatialCli.run(Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
         if(arguments.length>0 && java.util.Set.of("variant-db","variant-annotate","variant-consequence","variant-score").contains(arguments[0]))
             return VariantFollowupCli.run(arguments[0],Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
         if(arguments.length>0 && arguments[0].equals("network"))
@@ -239,6 +243,8 @@ public final class JLinAlgCli {
               java -jar jlinalg-<version>.jar variant-consequence --help
               java -jar jlinalg-<version>.jar variant-score --help
               java -jar jlinalg-<version>.jar network --help
+              java -jar jlinalg-<version>.jar single-cell --help
+              java -jar jlinalg-<version>.jar spatial --help
               All commands: [--local-config FILE] [--config FILE | --no-config]
               Precedence: built-in defaults < ~/.jlinalg/config.yaml < ./jlinalg.yaml < CLI
               java -jar jlinalg-<version>.jar censored-regression --help

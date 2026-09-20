@@ -62,7 +62,7 @@ final class FollowupSupport {
             manifest.put("schema_version",1); manifest.put("operation",operation); manifest.put("jlinalg_version",JLinAlgCli.version());
             manifest.put("started_at",java.time.Instant.now().toString()); manifest.put("options",options);
             Map<String,String> hashes=new LinkedHashMap<>();
-            for(String key:List.of("input","edges","hits","matrix","matrix-b","pheno","regulators","activities","source-file","script","fasta","annotations","components","reference-matrix","executable","rscript","perl","solver-path")) {
+            for(String key:List.of("input","counts","cells","samples","features","feature-list","gene-sets","edges","hits","matrix","matrix-b","pheno","regulators","activities","source-file","script","fasta","annotations","components","reference-matrix","executable","rscript","perl","solver-path")) {
                 if(options.containsKey(key) && Files.isRegularFile(Path.of(options.get(key)))) hashes.put(key,hash(Path.of(options.get(key))));
             }
             manifest.put("input_sha256",hashes);

@@ -1,0 +1,9 @@
+sample_id	donor_id	condition	batch	source	assay	visit	age
+S1	P1	control	B0	cortex	scRNA	pre	30
+S2	P2	control	B1	cortex	scRNA	pre	34
+S3	P3	control	B0	cortex	scRNA	pre	38
+S4	P4	control	B1	cortex	scRNA	pre	39
+S5	P1	case	B0	cortex	scRNA	post	43
+S6	P2	case	B1	cortex	scRNA	post	47
+S7	P3	case	B0	cortex	scRNA	post	48
+S8	P4	case	B1	cortex	scRNA	post	52

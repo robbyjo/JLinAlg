@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Sparse QC, pseudobulk, donor-aware state and abundance, functional scores and exploratory representations."><title>Replicated single-cell RNA analysis · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Replicated single-cell RNA analysis</span></div>
+<span class="eyebrow">CLI + Java/R · Source build</span><h1>Replicated single-cell RNA analysis</h1><p>Sparse QC, pseudobulk, donor-aware state and abundance, functional scores and exploratory representations.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>The <code>single-cell</code> command connects quantified, annotated RNA counts to QC,
+pseudobulk, differential state, relative population abundance, gene-set scores,
+and exploratory PCA/clustering. Biological samples, not cells, determine the
+replication used for condition inference. This is a source-build addition;
+build <code>./gradlew check executableJar</code> (Windows: <code>.\gradlew.bat check executableJar</code>).</p>
+<p>These operations implement the replicated, annotated-input RNA branch of the
+roadmap. The complete protein, ATAC, trajectory, reference-annotation and
+perturbation suites remain open in <a href="https://github.com/robbyjo/JLinAlg/blob/main/TODO.md">TODO.md</a>. See the
+<a href="../cell-spatial-validation.html">validation report</a> for exactly what was tested.</p>
+<h2 id="four-explicit-input-tables">Four explicit input tables</h2>
+<p>The runnable synthetic fixture in <code>examples/cell-spatial</code> has eight samples,
+320 cells, 31 genes, two annotated populations and two tissue sections per sample.
+Its values are artificial and demonstrate file contracts and effect recovery.</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Required columns</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--counts</code></td>
+<td><code>obs_id,feature_id,count</code></td>
+<td>TSV in exactly this order; nonnegative integer raw RNA counts, unique cell/gene pairs. Omitted entries are measured zeros.</td>
+</tr>
+<tr>
+<td><code>--cells</code></td>
+<td><code>obs_id,sample_id,cell_type</code></td>
+<td>Unique observation IDs, exactly matched samples; explicit <code>unknown</code> labels are allowed. Optional <code>exclude</code> must be <code>true</code> or <code>false</code>.</td>
+</tr>
+<tr>
+<td><code>--samples</code></td>
+<td><code>sample_id,donor_id,condition,batch,source,assay,visit</code></td>
+<td>Unique sample IDs. Assay is <code>scRNA</code> or <code>spatialRNA</code>. Numeric covariates may be added.</td>
+</tr>
+<tr>
+<td><code>--features</code></td>
+<td><code>feature_id,mitochondrial</code></td>
+<td>Complete measured feature universe; mitochondrial flag is <code>true</code> or <code>false</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Counts are read as sparse entries without expanding the cell-by-gene matrix.
+All metadata columns are preserved, including supplied annotation provenance,
+reference version, confidence, segmentation quality and collection information.
+Preservation does not validate those annotations. Blank labels, duplicate IDs,
+unknown count IDs, fractional counts, negative counts and nonfinite values fail.
+Do not encode missing/unmeasured proteins as sparse zeros or use this RNA branch
+for antibody, mass-spectrometry, cytometry or accessibility measurements.</p>
+<p>For real studies, choose sample IDs at the biological sample/visit level. Record
+donor IDs even when several specimens, sections or visits have different sample
+IDs. A repeated donor cannot enter an independent-sample condition comparison.</p>
+<h2 id="qc-and-aggregation-tutorial">QC and aggregation tutorial</h2>
+<p>Every output path must be a fresh directory. Run from the repository root:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar single-cell --method qc --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --min-features 5 --max-mito 0.2 --out build/cell-demo/qc
+java -jar build/cli/jlinalg-0.3.6.jar single-cell --method pseudobulk --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --min-cells 10 --out build/cell-demo/pseudobulk
+</code></pre></div>
+<p><code>cell-qc.tsv</code> records library counts, detected features, mitochondrial fraction,
+retention and every applied exclusion reason. <code>sample-qc.tsv</code> reports retained
+observations and donor identity. Zero libraries always fail QC. Defaults are
+<code>--min-counts 1 --min-features 1 --max-mito 1</code>; these permissive defaults are not
+a universal biological QC recommendation. Each operation reapplies its own stated
+QC thresholds; use identical arguments or project configuration for comparable runs.</p>
+<p>Empty droplets, ambient RNA and doublets require appropriate upstream assessment.
+Import the reviewed decision through <code>exclude</code> and preserve method/version/score
+columns. The command does not estimate those quantities or silently call another
+engine. Inspect donor representation and rare populations before inference.</p>
+<p>Aggregation sums retained raw counts within <code>(sample_id,cell_type)</code>; all sections
+of one sample contribute to one aggregate. <code>pseudobulk-counts.tsv</code> is feature-major,
+and <code>pseudobulk-samples.tsv</code> supplies the aggregate-to-sample/donor mapping, cell
+counts, library counts and eligibility. No pseudocount is added to this export.
+<code>--group-column domain</code> uses a supplied <code>domain</code> column instead of cell type.
+Counts are conserved over retained observations. Absent populations are absent
+aggregates; they never become zero-expression artificial replicates.</p>
+<h2 id="differential-state-independent-or-paired-donors">Differential state: independent or paired donors</h2>
+<p>Install R and limma separately in a chosen library, for example using
+<code>BiocManager::install("limma")</code> in R. The CLI does not install packages or contact
+the network. Supply the executable and library paths appropriate to your host:</p>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar single-cell --method state --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --reference control --tested case --rscript Rscript --out build/cell-demo/state
+java -jar build/cli/jlinalg-0.3.6.jar single-cell --method state --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/paired-samples.tsv --features examples/cell-spatial/features.tsv --reference control --tested case --paired true --rscript Rscript --out build/cell-demo/paired-state
+</code></pre></div>
+<p>On the validated Windows host, the executable was
+<code>"C:/Program Files/R/R-4.6.1/bin/Rscript.exe"</code> and the optional library argument
+was <code>--r-library E:/Projects/JLinAlg/build/r-library</code>. These are host-specific paths.</p>
+<p>Each population is modeled separately. The design includes an intercept, tested
+minus reference indicator, optional numeric <code>--covariates age,sex_numeric</code>, batch
+indicators, and donor fixed effects for pairs. At least two donors per group or
+two complete pairs are required, with positive residual degrees of freedom.
+Two donors is an identifiability minimum, not a power recommendation. Batch
+effects constant within a donor pair are absorbed by donor effects. A batch that
+changes within pairs is modeled explicitly. Redundant or confounded designs fail
+that population with a recorded status. Source and assay must be identical within
+each modeled population. Exactly two declared conditions are supported.</p>
+<p>For paired designs, each retained donor must have exactly one sample per condition.
+Incomplete pairs are reported as unsupported; the tool does not silently discard
+unmatched samples. Arbitrary longitudinal data, multiple same-condition visits,
+multi-level random effects and cell-level hierarchical inference remain unsupported.
+Between-donor covariates that are redundant with paired donor effects must not be
+included as separate columns.</p>
+<p>The RNA engine is <strong>limma voom</strong>, followed by <code>lmFit</code> and <code>eBayes</code>. It uses total
+assayed-library normalization, retaining the full library size after feature
+filtering. No TMM or composition-factor normalization is applied. Global expression
+or composition shifts can therefore affect the estimand; assess that assumption
+before applying this path. Genes require count &gt;=10 in at least two eligible
+samples by default (<code>--min-gene-count</code>, <code>--min-gene-samples</code>). At least two retained
+genes are needed for voom; small panels give limited mean/variance information.</p>
+<p><code>results.tsv</code> contains every feature/population hypothesis, log2-scale effect,
+SE, 95% interval, moderated degrees of freedom, statistic, p-value, BH value and
+status. BH spans populations and genes together. Filtered or unavailable tests
+enter the family conservatively as p=1, while their public inference columns stay
+<code>NA</code>. Entire populations with zero retained cells appear only in the input/QC audit.
+BH assumes its usual independence/positive-dependence conditions; it is not a
+guarantee under arbitrary cross-gene dependence.</p>
+<p>Each <code>group-N</code> directory records its actual design, counts, full library sizes,
+log2 CPM values, precision weights, R session, adapter source and external log.
+<code>population-status.tsv</code> maps labels to tested or unsupported populations. Failed
+R execution aborts publication; it never falls back to a different estimator.</p>
+<h2 id="relative-population-abundance-and-functional-scores">Relative population abundance and functional scores</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar single-cell --method abundance --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --reference control --tested case --out build/cell-demo/abundance
+java -jar build/cli/jlinalg-0.3.6.jar single-cell --method pathways --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --reference control --tested case --gene-sets examples/cell-spatial/gene-sets.tsv --out build/cell-demo/pathways
+</code></pre></div>
+<p>Abundance computes each sample's population count divided by <strong>all retained cells</strong>,
+including <code>unknown</code> labels. Missing labels in an otherwise observed sample have
+zero population counts. It fits sample-level Gaussian models of
+<code>asin(sqrt(proportion))</code> with the same design rules; samples receive equal weight.
+The effect is on this transformed relative-composition scale, not a log odds ratio
+or absolute cell abundance. <code>proportions.tsv</code> retains numerator and denominator.
+This is not Milo or a multinomial/Dirichlet model. Few cells, rare populations,
+heterogeneous sampling precision and boundary-heavy proportions need sensitivity
+analysis; a Gaussian error model may be unsuitable.</p>
+<p>Pathway inputs have unique <code>gene_set,feature_id</code> memberships in the same namespace
+as the measured panel. A score is the mean of
+<code>log2((pseudobulk_count+0.5)*1e6/(full_library+1))</code> over at least two measured members.
+The sample-level score is tested with Gaussian regression, preserving donor
+replication and within-set gene correlation through aggregation. Missing panel
+members are reported. Scores represent prespecified mean expression, not inferred
+regulator activity, GSEA, competitive enrichment or pathway activation probabilities.
+Overlapping gene sets are dependent. Use fixed, independently specified sets.</p>
+<p>For hit-based <a href="enrichment.html">enrichment</a>, select one population and contrast,
+use <code>status == 'tested'</code> as eligibility, retain all eligible nonsignificant genes
+in the measured background, and select hits using the reported BH column. For
+<a href="meta-analysis.html">replication/meta-analysis</a>, harmonize population definitions,
+contrast direction, units and measured features, then export <code>feature_id</code>, <code>beta</code>
+(the state effect) and <code>se</code> separately for each independent cohort. Cohort overlap,
+different tissues or unmatched assay scales require additional models. Do not pool
+cell numbers or sections as if they were independent studies.</p>
+<h2 id="exploratory-representation">Exploratory representation</h2>
+<div class="code-window"><div class="code-bar"><span>shell</span></div><pre><code>java -jar build/cli/jlinalg-0.3.6.jar single-cell --method representation --counts examples/cell-spatial/counts.tsv --cells examples/cell-spatial/cells.tsv --samples examples/cell-spatial/samples.tsv --features examples/cell-spatial/features.tsv --rscript Rscript --variable-features 20 --components 6 --clusters 3 --seed 1 --out build/cell-demo/representation
+</code></pre></div>
+<p>This branch uses <code>log1p(10000*count/library)</code>, selects features by sample variance
+across cells, centers without scaling, computes PCA, and fits seeded k-means with
+20 starts. It exports normalized values, selected features, loadings, PCA variance,
+embedding and cluster assignments. It does not estimate batch integration, UMAP,
+nearest-neighbor clustering, reference labels or marker p-values. Check batch and
+condition representation before interpreting clusters. Never use these embedding
+coordinates as raw counts in the differential-state command. Analyses selected
+using the same clusters/features are exploratory.</p>
+<h2 id="provenance-and-resource-limits">Provenance and resource limits</h2>
+<p>Project-over-local configuration is shared with every other command. Each result
+directory is staged and published only on success, with <code>manifest.yaml</code> containing
+input/output SHA-256 hashes, effective options and declared assumptions;
+<code>OUT.config.yaml</code> records resolved configuration. Original metadata and feature
+universes are copied into the result. R versions are recorded per adapter run.</p>
+<p>Limits: 100,000 observations; 50,000 genes; 10,000 samples; two million sparse
+entries; 32 MB per metadata table; ten million dense aggregate entries. Exploratory
+PCA is limited to two million dense cell-by-feature entries. These are enforced
+bounds, not demonstrated maximum-scale benchmarks. Sparse TSV interchange is
+supported; native H5AD/MuData/QFeatures import, resumability and distributed execution
+remain future work.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-single-cell">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-single-cell">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#crowell-muscat-2020">Crowell et al. (2020) — Biological-replicate pseudobulk design</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/33257685/">PMID: 33257685</a>)</span></li><li><a href="../citations.html#squair-pseudoreplication-2021">Squair et al. (2021) — Donor-aware single-cell inference</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/34584091/">PMID: 34584091</a>)</span></li><li><a href="../citations.html#smyth-limma-2004">Smyth (2004) — moderated differential analysis</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/16646809/">PMID: 16646809</a>)</span></li><li><a href="../citations.html#law-voom-2014">Law (2014) — voom mean-variance precision weights</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/24485249/">PMID: 24485249</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4053721/">PMCID: PMC4053721</a>)</span></li><li><a href="../citations.html#benjamini-hochberg-1995">Benjamini (1995) — Benjamini-Hochberg FDR</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END --></article>
+<aside class="toc"><strong>On this page</strong><a href="#four-explicit-input-tables">Four explicit input tables</a><a href="#qc-and-aggregation-tutorial">QC and aggregation tutorial</a><a href="#differential-state-independent-or-paired-donors">Differential state: independent or paired donors</a><a href="#relative-population-abundance-and-functional-scores">Relative population abundance and functional scores</a><a href="#exploratory-representation">Exploratory representation</a><a href="#provenance-and-resource-limits">Provenance and resource limits</a><a href="#scientific-citations">Scientific citations</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

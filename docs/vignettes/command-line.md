@@ -1,5 +1,10 @@
 # Command-line-only workflows
 
+Source builds also provide `single-cell --help` and `spatial --help` for
+[replicated single-cell RNA](single-cell.md) and [physical spatial RNA](spatial-analysis.md).
+Both accept explicit quantified-count and metadata tables; differential state
+and exploratory representations use an explicitly supplied R executable.
+
 Source builds after v0.3.6 add [Tobit/AFT and ordinal likelihoods](censored-ordinal.md)
 and [rare-event and survey-design regression](sampling-models.md). These use
 explicit numeric tables and dedicated subcommands with `--help`.
