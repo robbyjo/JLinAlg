@@ -85,6 +85,8 @@ def load_registry() -> tuple[list[dict], dict[str, list[str]], dict[str, str]]:
 
 
 def short_author(ref: dict) -> str:
+    if ref.get("short_author"):
+        return ref["short_author"]
     authors = ref["authors"]
     if " et al." in authors:
         return authors.split(" et al.", 1)[0].split()[-1] + " et al."

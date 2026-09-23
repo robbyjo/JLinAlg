@@ -62,6 +62,11 @@ and [six network workflows](docs/vignettes/network-followup.md), including WGCNA
 GENIE3 and CARNIVAL adapters. These use explicit local/remote data sources and
 audited outputs; no LLM integration is included.
 
+The [auditable omics research pipeline design](docs/vignettes/auditable-omics-pipeline.md)
+specifies the planned minimal study contract, progress status, immutable
+amendments, evidence lineage, and future LLM-assisted drafting. It is roadmap
+scope rather than a current CLI feature.
+
 The source build adds [Tobit, AFT and ordinal likelihoods](docs/vignettes/censored-ordinal.md)
 and [rare-event and survey inference](docs/vignettes/sampling-models.md).
 See [regression validation](docs/regression-inference-validation.md) and the

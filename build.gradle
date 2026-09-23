@@ -220,6 +220,7 @@ tasks.register('checkWebsite') {
             'cell-spatial-validation.html',
             'vignettes/single-cell.html',
             'vignettes/spatial-analysis.html',
+            'vignettes/auditable-omics-pipeline.html',
             'regression-inference-validation.html',
             'vignettes/censored-ordinal.html',
             'vignettes/sampling-models.html',

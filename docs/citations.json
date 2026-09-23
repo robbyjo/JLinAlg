@@ -1517,6 +1517,34 @@
       ]
     },
     {
+      "id": "w3c-prov-o-2013",
+      "category": "Reproducible omics follow-up",
+      "authors": "W3C Provenance Working Group",
+      "short_author": "W3C",
+      "year": 2013,
+      "title": "PROV-O: The PROV Ontology",
+      "venue": "W3C Recommendation",
+      "url": "https://www.w3.org/TR/prov-o/",
+      "features": [
+        "Evidence provenance graph",
+        "Entity-activity-agent lineage"
+      ]
+    },
+    {
+      "id": "fda-electronic-records-2024",
+      "category": "Reproducible omics follow-up",
+      "authors": "U.S. Food and Drug Administration",
+      "short_author": "FDA",
+      "year": 2024,
+      "title": "Electronic Systems, Electronic Records, and Electronic Signatures in Clinical Investigations: Questions and Answers",
+      "venue": "Final Guidance, October 2024",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/electronic-systems-electronic-records-and-electronic-signatures-clinical-investigations-questions",
+      "features": [
+        "Electronic audit trails",
+        "Searchable electronic records"
+      ]
+    },
+    {
       "id": "wang-annovar-2010",
       "category": "Reproducible omics follow-up",
       "authors": "Kai Wang, Mingyao Li, and Hakon Hakonarson",
@@ -1977,6 +2005,11 @@
     ],
     "project-configuration": [
       "sandve-reproducibility-2013"
+    ],
+    "auditable-omics-pipeline": [
+      "sandve-reproducibility-2013",
+      "w3c-prov-o-2013",
+      "fda-electronic-records-2024"
     ],
     "variant-followup": [
       "wang-annovar-2010",

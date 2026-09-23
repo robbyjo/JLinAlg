@@ -9,6 +9,11 @@ New source-build follow-up workflows: [project configuration](project-configurat
 [networks and candidate regulators](network-followup.md). Each includes runnable
 CLI examples, references, data contracts and validation boundaries.
 
+The [auditable omics research pipeline design](auditable-omics-pipeline.md)
+specifies the planned minimal `study.yaml`, materialized project status,
+immutable amendments, evidence lineage, research notebook, and guarded future
+LLM assistance. It is roadmap documentation, not a current CLI feature.
+
 These worked examples start with small in-memory arrays so the statistical
 model is visible. Replace those arrays with your own columnar or file-backed
 data preparation; the fitting APIs consume primitive Java arrays and do not
@@ -34,6 +39,7 @@ testing, and multiple-imputation inference. Examples naming
 
 | Vignette | Features covered |
 | --- | --- |
+| [Auditable omics research pipeline design](auditable-omics-pipeline.md) | Minimal study contract, defaults, result-first entry, `project-status.yaml`, `amendment-XXX.yaml`, hypothesis evolution, provenance, evidence lineage, and future LLM-assisted drafting (roadmap) |
 | [Censored and ordinal regression](censored-ordinal.md) | Tobit; Weibull, lognormal and exponential AFT; ordered logit/probit ML (source build) |
 | [Rare-event and survey inference](sampling-models.md) | King-Zeng/prior corrections and stratified PSU Taylor covariance (source build) |
 | [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (v0.3.6+) |

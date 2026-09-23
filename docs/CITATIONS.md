@@ -506,6 +506,14 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 - **Geir Kjetil Sandve et al. (2013).** Ten Simple Rules for Reproducible Computational Research. *PLoS Computational Biology 9:e1003285.* [DOI: 10.1371/journal.pcbi.1003285](https://doi.org/10.1371/journal.pcbi.1003285)
   - JLinAlg methods: Configuration provenance, Reproducible workflows.
 
+<a id="w3c-prov-o-2013"></a>
+- **W3C Provenance Working Group (2013).** PROV-O: The PROV Ontology. *W3C Recommendation.* [Primary source](https://www.w3.org/TR/prov-o/)
+  - JLinAlg methods: Evidence provenance graph, Entity-activity-agent lineage.
+
+<a id="fda-electronic-records-2024"></a>
+- **U.S. Food and Drug Administration (2024).** Electronic Systems, Electronic Records, and Electronic Signatures in Clinical Investigations: Questions and Answers. *Final Guidance, October 2024.* [Primary source](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/electronic-systems-electronic-records-and-electronic-signatures-clinical-investigations-questions)
+  - JLinAlg methods: Electronic audit trails, Searchable electronic records.
+
 <a id="wang-annovar-2010"></a>
 - **Kai Wang, Mingyao Li, and Hakon Hakonarson (2010).** ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data. *Nucleic Acids Research 38:e164.* [DOI: 10.1093/nar/gkq603](https://doi.org/10.1093/nar/gkq603)
   - JLinAlg methods: ANNOVAR consequence adapter.
