@@ -62,7 +62,7 @@ public final class StudyValidator {
         "id", "between", "type", "statement", "source", "review_status",
         "metadata");
     private static final Set<String> GOALS = Set.of(
-        "association", "discovery_replication", "meta_analysis",
+        "association", "effect_comparison", "discovery_replication", "meta_analysis",
         "gene_ontology", "pathway_enrichment", "variant_scoring",
         "fine_mapping", "colocalization", "mendelian_randomization",
         "genetic_support", "literature_support", "candidate_prioritization",

@@ -1,0 +1,9 @@
+axis,value,series
+speed,0.80,A
+power,0.60,A
+range,0.90,A
+comfort,0.70,A
+speed,0.50,B
+power,0.90,B
+range,0.40,B
+comfort,0.85,B

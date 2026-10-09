@@ -219,6 +219,9 @@ public final class StudyEvidenceIndex {
         }
         if (operationType.equals("meta_analysis"))
             return associationFindings(operationDirectory.resolve("meta-analysis.tsv"));
+        if (operationType.equals("effect_comparison"))
+            return topRows(operationDirectory.resolve("effect-comparisons.tsv"),
+                100, List.of());
         if (operationType.equals("discovery_replication"))
             return topRows(operationDirectory.resolve("replication.tsv"), 20, List.of());
         if (operationType.equals("diagnostic_review")) {

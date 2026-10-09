@@ -25,6 +25,44 @@ class StudyPipelineCliTest {
     private String stdout;
     private String stderr;
 
+    @Test void effectComparisonLabelsTwoPhenotypesFromOneCohortAndFormatsCorrelation()
+            throws Exception {
+        Path upstream = directory.resolve("same-cohort-input");
+        Path standard = upstream.resolve("standard-results");
+        Path output = directory.resolve("same-cohort-output");
+        Files.createDirectories(standard);
+        Files.createDirectories(output);
+        Files.writeString(standard.resolve("bmi.tsv"), """
+            feature_id\tbeta\tse\tp_value
+            A\t1\t.1\t.01
+            B\t2\t.1\t.01
+            C\t3\t.1\t.01
+            """);
+        Files.writeString(standard.resolve("waist.tsv"), """
+            feature_id\tbeta\tse\tp_value
+            A\t2\t.1\t.01
+            B\t4\t.1\t.01
+            C\t6\t.1\t.01
+            """);
+        Map<String, Object> study = Map.of("datasets", List.of(
+            Map.of("id", "bmi", "cohort", "FHS"),
+            Map.of("id", "waist", "cohort", "FHS")));
+        var context = new org.jlinalg.study.StudyOperationExecutor.Context(
+            directory, output, Map.of("type", "effect_comparison"), study,
+            Map.of(), Map.of("harmonized", upstream));
+        var result = new StudyCliExecutor().execute(context);
+        assertEquals(org.jlinalg.study.StudyOperationExecutor.State.COMPLETE,
+            result.state());
+        String comparison = Files.readString(output.resolve(
+            "effect-comparisons.tsv"));
+        assertTrue(comparison.contains("FHS\tFHS\twithin_cohort\t3\t1.0\t1.0000"),
+            comparison);
+        assertTrue(Files.isRegularFile(output.resolve(
+            "effect-scatterplots/01-bmi-vs-waist.png")));
+        assertTrue(Files.isRegularFile(output.resolve(
+            "effect-scatterplots/01-bmi-vs-waist.pdf")));
+    }
+
     @Test void candidatePrioritizationIgnoresStudyLevelEvidenceRowsWithoutFeatures()
             throws Exception {
         Path meta = directory.resolve("meta"), literature = directory.resolve("literature");
@@ -94,7 +132,62 @@ class StudyPipelineCliTest {
         assertNotEquals(fixed, random);
         assertEquals(0, run("study", "verify", "--project", project.toString()), stderr);
         assertEquals(0, run("study", "auto", study.toString(), "--offline"), stderr);
-        assertTrue(stdout.contains("reused: 5"), stdout);
+        assertTrue(stdout.contains("reused: 6"), stdout);
+    }
+
+    @Test void automaticLeaveOneCohortOutFlagsJointReplicationAndHeterogeneityImprovement()
+            throws Exception {
+        Path project = directory.resolve("automatic-odd-cohort");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("discovery.tsv"), """
+            feature_id\tbeta\tse\tp_value
+            GENE1\t1.0\t0.1\t0.001
+            GENE2\t1.0\t0.1\t0.001
+            """);
+        Files.writeString(project.resolve("replication.tsv"), """
+            feature_id\tbeta\tse\tp_value
+            GENE1\t0.9\t0.1\t0.001
+            GENE2\t1.1\t0.1\t0.001
+            """);
+        Files.writeString(project.resolve("odd.tsv"), """
+            feature_id\tbeta\tse\tp_value
+            GENE1\t-2.0\t0.1\t0.001
+            GENE2\t-2.0\t0.1\t0.001
+            """);
+        Path study = project.resolve("study.yaml");
+        Files.writeString(study, """
+            schema_version: 1
+            project: {id: automatic-odd-cohort, title: Influence fixture, description: Detect an influential discordant cohort.}
+            resources: {downloads: deny}
+            cohorts:
+              - {id: discovery}
+              - {id: replication}
+              - {id: odd}
+            cohort_relationships:
+              - {between: [discovery, replication], type: independent}
+              - {between: [discovery, odd], type: independent}
+              - {between: [replication, odd], type: independent}
+            datasets:
+              - {id: d1, cohort: discovery, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: discovery.tsv}}
+              - {id: d2, cohort: replication, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: replication.tsv}}
+              - {id: d3, cohort: odd, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: odd.tsv}}
+            hypotheses:
+              - id: H1
+                description: Compare discovery with two replication cohorts.
+                inputs: {discovery: [d1], replication: [d2, d3]}
+                analysis: {mode: manual, goals: [discovery_replication, meta_analysis]}
+            """);
+        assertEquals(0, run("study", "auto", study.toString(), "--offline"), stderr);
+        Path comparison = find(project.resolve("runs"), "sensitivity-comparison.tsv");
+        String table = Files.readString(comparison);
+        assertTrue(table.contains("leave_one_cohort_out\todd\t"), table);
+        assertTrue(table.contains("\ttrue\tfeature_in_sensitivity_section_primary_unchanged"), table);
+        String decision = Files.readString(comparison.getParent().resolve("decision.yaml"));
+        assertTrue(decision.contains("omitted_cohort: odd"), decision);
+        assertTrue(decision.contains("primary results unchanged"), decision);
+        assertTrue(Files.isRegularFile(comparison.getParent()
+            .resolve("leave_one_cohort_out/analysis-3/replication.tsv")));
+        assertEquals(0, run("study", "verify", "--project", project.toString()), stderr);
     }
 
     @Test void automaticColocalizationPlansPhenotypeAdviceBeforeGwasDiscovery() throws Exception {
@@ -409,6 +502,18 @@ class StudyPipelineCliTest {
         assertTrue(Files.readString(replication).contains(
             "gene-c\tdiscovery-data\treplication-data\t0.1\t0.8"));
         assertTrue(Files.readString(replication).contains("\tfalse\ttrue\tfalse"));
+        Path comparisons = find(run, "effect-comparisons.tsv");
+        assertTrue(Files.readString(comparisons).contains("pearson_r_display"));
+        assertTrue(Files.readString(comparisons).matches("(?s).*\\t-?\\d+\\.\\d{4}\\R.*"));
+        assertTrue(Files.isRegularFile(find(run, "replication-venn.tsv")));
+        try (var paths = Files.walk(run)) {
+            assertTrue(paths.anyMatch(path -> path.toString().contains("effect-scatterplots")
+                && path.toString().endsWith(".pdf")));
+        }
+        try (var paths = Files.walk(run)) {
+            assertTrue(paths.anyMatch(path -> path.toString().contains("replication-venn")
+                && path.toString().endsWith(".png")));
+        }
         Path meta = find(run, "meta-analysis.tsv");
         assertTrue(Files.readString(meta).contains("gene-a"));
         String diagnostics = Files.readString(find(run, "diagnostics.yaml"));
@@ -428,7 +533,7 @@ class StudyPipelineCliTest {
 
         assertEquals(0, run("study", "run", "--project", project.toString(),
             "--resume", "--actor-id", "scientist-1"));
-        assertTrue(stdout.contains("reused: 5"));
+        assertTrue(stdout.contains("reused: 6"));
         assertEquals("completed", StudyProject.status(project).get("state"));
     }
 

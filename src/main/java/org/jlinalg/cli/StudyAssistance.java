@@ -409,7 +409,7 @@ final class StudyAssistance {
             }
             if (operation.equals("literature_search"))
                 literatureQueries.addAll(list(map(StudyEvidenceIndex.keyFindings(directory, operation)).get("evidence")));
-            if (Set.of("discovery_replication", "diagnostic_review", "gene_ontology", "pathway_enrichment", "mendelian_randomization", "colocalization", "fine_mapping").contains(operation)) {
+            if (Set.of("effect_comparison", "discovery_replication", "diagnostic_review", "sensitivity_analysis", "gene_ontology", "pathway_enrichment", "mendelian_randomization", "colocalization", "fine_mapping").contains(operation)) {
                 List<Object> numbers = new ArrayList<>();
                 collectObserved(StudyEvidenceIndex.keyFindings(directory, operation), "", numbers, 0);
                 observedPatterns.add(Map.of("operation", operation, "state", source.getOrDefault("state", "unknown"), "numeric_previews", numbers));
@@ -472,7 +472,7 @@ final class StudyAssistance {
         if (raw instanceof Map<?, ?> values) for (var item : values.entrySet()) {
             String key = text(item.getKey());
             if (!key.matches("[A-Za-z][A-Za-z0-9_]{0,59}")) continue;
-            if (Set.of("p_value", "FDR", "BH_FDR", "beta", "se", "i_squared", "fold_enrichment_unweighted", "tested_features", "selected_features", "replicated_features", "effect_correlation", "slope", "pearson_r", "pp_h4", "pp_h3").contains(key) && numeric(item.getValue()))
+            if (Set.of("p_value", "FDR", "BH_FDR", "beta", "se", "i_squared", "mean_i_squared", "mean_i_squared_delta", "high_i_squared_fraction", "fold_enrichment_unweighted", "tested_features", "selected_features", "replicated_features", "replication_fraction", "replication_fraction_delta", "common_features", "effect_correlation", "slope", "pearson_r", "pp_h4", "pp_h3").contains(key) && numeric(item.getValue()))
                 rows.add(Map.of("field", key, "value", item.getValue()));
             else if (item.getValue() instanceof Map<?, ?> || item.getValue() instanceof List<?>) collectObserved(item.getValue(), pointer + "/" + key, rows, depth + 1);
         } else if (raw instanceof List<?> values) for (Object item : values.stream().limit(10).toList()) collectObserved(item, pointer, rows, depth + 1);

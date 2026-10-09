@@ -1,8 +1,9 @@
 # Auditable result-first study example
 
 This small project starts from two supplied association-result tables. It runs
-input validation and standardization, discovery/replication comparison,
-fixed-effect meta-analysis, deterministic diagnostics, and a traceable report.
+input validation and standardization, a cross-cohort effect scatterplot with
+four-decimal Pearson correlation, discovery/replication comparison and Venn
+diagram, fixed-effect meta-analysis, deterministic diagnostics, and a traceable report.
 The explicit cohort relationship avoids a pending default assumption. This tiny
 offline teaching fixture uses `analysis.mode: manual` so it does not download
 public annotation or enrichment resources.
@@ -29,6 +30,13 @@ to verify and reuse completed operation artifacts and retry unfinished work.
 Each invocation keeps a separate immutable attempt; use `--rerun` to recompute
 everything without deleting earlier evidence, or `--offline` to prohibit built-in
 network requests. The index defaults to the latest attempt.
+
+The run's operation directories include `effect-comparisons.tsv` and
+`effect-scatterplots/*.png|pdf`, plus `replication-venn.tsv` and
+`replication-venn/*.png|pdf`. In a hypothesis with several result datasets,
+every pair is plotted. Reusing one cohort ID for two phenotype-specific result
+datasets labels that pair `within_cohort`; distinct cohort IDs label it
+`cross_cohort`.
 
 When a supported rule needs scientist input, the run also creates `QUESTIONS.md`
 and `state/questions.yaml`, with the exact questions and answers reflected in the

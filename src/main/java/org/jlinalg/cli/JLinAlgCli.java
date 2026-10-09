@@ -77,6 +77,13 @@ public final class JLinAlgCli {
 
     private static int dispatch(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
+        if (arguments.length > 0 && arguments[0].equals("plot"))
+            try {
+                return PlotCli.run(Arrays.copyOfRange(
+                    arguments, 1, arguments.length), output, errorOutput);
+            } catch (IOException exception) {
+                throw new IllegalArgumentException(exception.getMessage(), exception);
+            }
         if(arguments.length>0 && arguments[0].equals("single-cell"))
             return SingleCellCli.run(Arrays.copyOfRange(arguments,1,arguments.length),output,errorOutput);
         if(arguments.length>0 && arguments[0].equals("spatial"))
@@ -240,6 +247,7 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar plot --help
               java -jar jlinalg-<version>.jar study --help
               java -jar jlinalg-<version>.jar config --command COMMAND
               java -jar jlinalg-<version>.jar variant-db --help

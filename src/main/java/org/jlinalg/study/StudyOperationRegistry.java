@@ -61,6 +61,10 @@ public final class StudyOperationRegistry {
             Set.of("raw_quantified", "quantified_matrix", "processed_matrix"),
             BULK_ASSOCIATION_MODALITIES, List.of("association results"),
             List.of("sample alignment", "model convergence", "tested family"));
+        add(result, "effect_comparison", "jlinalg",
+            Set.of("association_results", "annotated_results"),
+            ALL_MODALITIES, List.of("pairwise effect scatterplots", "effect correlations"),
+            List.of("Pearson correlation", "effect-scale agreement", "matched features"));
         add(result, "discovery_replication", "jlinalg",
             Set.of("association_results", "annotated_results"),
             ALL_MODALITIES, List.of("replication comparison"),

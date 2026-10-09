@@ -43,6 +43,24 @@ java -jar build/cli/jlinalg-0.3.6.jar --pheno examples/quickstart/phenotype.tsv 
 The result contains coefficient estimates, standard errors, and p-values,
 with a companion run log. Choose a fresh output path for another run.
 
+## Draw a plot
+
+The `plot` command reads CSV/TSV columns and writes PNG, JPEG, BMP, GIF, TIFF,
+SVG, EPS, or PDF. It supports grouped scatter, line, connected-scatter, area,
+step, bubble, histogram, density, dot, box, violin, bar, pie, donut, clustered
+heatmap, spider/radar, circular bar, parallel-coordinate, dendrogram, treemap,
+network, chord, bundled-edge, Sankey, and two-set Venn diagrams. Palettes, line widths and
+patterns, marker shapes, and point sizes are configurable from the CLI.
+
+```powershell
+java -jar build/cli/jlinalg-0.3.6.jar plot `
+  --type scatter --input results.csv --x estimate --y negative_log10_p `
+  --group cohort --title "Association results" --out associations.pdf
+```
+
+See the [command-line plotting guide](docs/plotting.md) for mappings, themes,
+axis and legend controls, missing-value behavior, and chart-specific examples.
+
 Visit the **[JLinAlg website](https://robbyjo.github.io/JLinAlg/)** for the
 complete feature guide, **[tutorials and vignettes](https://robbyjo.github.io/JLinAlg/vignettes/)**,
 and Java/CLI examples, including [GRM construction](https://robbyjo.github.io/JLinAlg/vignettes/grm.html).
@@ -79,6 +97,18 @@ and explicitly enabled HTML manuscript drafts extend the same provenance chain. 
 fine-mapping, colocalization, MR, or literature inputs become explicit indexed
 blockers while independent evidence branches continue. Autonomous LLM orchestration
 and certified submission workflows remain future work.
+
+For hypotheses with two or more result tables, the study pipeline automatically
+creates every pairwise effect scatterplot as PNG and PDF, with the Pearson
+correlation shown to four decimals in the legend. Pairs sharing a cohort ID are
+labeled within-cohort phenotype comparisons; pairs from different cohorts are
+labeled cross-cohort comparisons. Discovery/replication operations also create
+two-set Venn diagrams. With at least three named cohorts and a completed
+meta-analysis, JLinAlg automatically reruns leave-one-cohort-out replication and
+meta-analysis. An omission that raises the pairwise replication fraction and
+lowers mean I-squared is featured as a labeled sensitivity result; the complete
+all-cohort analysis remains primary unless a prespecified rationale or reviewed
+amendment says otherwise.
 The [bioinformatics evidence workflow](docs/vignettes/bioinformatics-evidence.md)
 adds audited public-source discovery, reviewed regional fine-mapping/colocalization/MR,
 protein and reference-sequence investigation, non-LLM literature search, per-feature

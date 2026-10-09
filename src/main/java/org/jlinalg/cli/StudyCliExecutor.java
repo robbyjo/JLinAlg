@@ -4,6 +4,7 @@
  */
 package org.jlinalg.cli;
 
+import java.awt.Color;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -22,6 +23,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.jlinalg.plot.DiagramPlots;
+import org.jlinalg.plot.LegendPosition;
+import org.jlinalg.plot.PlotOptions;
+import org.jlinalg.plot.Plots;
 import org.jlinalg.study.StudyOperationExecutor;
 import org.jlinalg.study.StudyNeed;
 import org.yaml.snakeyaml.Yaml;
@@ -45,6 +50,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
         return switch (type) {
             case "validate_harmonize" -> harmonize(context);
             case "association" -> association(context);
+            case "effect_comparison" -> effectComparison(context);
             case "discovery_replication" -> replication(context);
             case "meta_analysis" -> meta(context);
             case "diagnostic_review" -> diagnostics(context);
@@ -258,7 +264,11 @@ final class StudyCliExecutor implements StudyOperationExecutor {
     }
 
     private Result replication(Context context) throws IOException {
-        Map<String, Path> results = results(context);
+        return replication(context, results(context));
+    }
+
+    private Result replication(Context context, Map<String, Path> results)
+            throws IOException {
         Map<String, Object> roles = map(
             context.operation().get("roles"), "operation.roles");
         List<String> discovery = role(roles, "discovery");
@@ -306,6 +316,15 @@ final class StudyCliExecutor implements StudyOperationExecutor {
         probability(discoveryAlpha, "discovery_alpha");
         probability(replicationAlpha, "replication_alpha");
         Path output = context.outputDirectory().resolve("replication.tsv");
+        Path vennDirectory = context.outputDirectory().resolve("replication-venn");
+        Files.createDirectories(vennDirectory);
+        List<String> outputs = new ArrayList<>(List.of("replication.tsv"));
+        StringBuilder vennSummary = new StringBuilder(
+            "discovery_dataset\treplication_dataset\tdiscovery_only"
+                + "\treplicated_overlap\treplication_criterion_only"
+                + "\tdiscovery_set_size\treplication_criterion_set_size"
+                + "\tadjustment_scope\trequire_same_sign\n");
+        int vennIndex = 0;
         try (BufferedWriter writer = Files.newBufferedWriter(output)) {
             writer.write("feature_id\tdiscovery_dataset\treplication_dataset"
                 + "\tdiscovery_beta\tdiscovery_p\tdiscovery_adjusted_p"
@@ -334,6 +353,8 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                     }
                     Map<String, Double> rightAdjusted = adjusted(
                         adjustmentFamily, method);
+                    Set<String> replicationCriterion = new LinkedHashSet<>();
+                    Set<String> replicatedFeatures = new LinkedHashSet<>();
                     for (Map.Entry<String, Estimate> row : left.entrySet()) {
                         Estimate other = right.get(row.getKey());
                         if (other == null) continue;
@@ -347,8 +368,11 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                             == Math.signum(other.beta);
                         boolean replicationSelected = significant(replicationQ,
                             replicationAlpha, strictThreshold);
+                        if (replicationSelected && (!requireSameSign || same))
+                            replicationCriterion.add(row.getKey());
                         boolean replicated = discoverySelected
                             && replicationSelected && (!requireSameSign || same);
+                        if (replicated) replicatedFeatures.add(row.getKey());
                         writer.write(row.getKey() + "\t" + discoveryId + "\t"
                             + replicationId + "\t" + first.beta + "\t"
                             + value(first.p) + "\t" + value(discoveryQ) + "\t"
@@ -356,11 +380,149 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                             + value(replicationQ) + "\t" + discoverySelected + "\t"
                             + same + "\t" + replicated + "\n");
                     }
+                    Set<String> discoveryOnly = new LinkedHashSet<>(selected);
+                    discoveryOnly.removeAll(replicationCriterion);
+                    Set<String> replicationOnly = new LinkedHashSet<>(replicationCriterion);
+                    replicationOnly.removeAll(selected);
+                    vennSummary.append(discoveryId).append('\t')
+                        .append(replicationId).append('\t')
+                        .append(discoveryOnly.size()).append('\t')
+                        .append(replicatedFeatures.size()).append('\t')
+                        .append(replicationOnly.size()).append('\t')
+                        .append(selected.size()).append('\t')
+                        .append(replicationCriterion.size()).append('\t')
+                        .append(adjustmentScope).append('\t')
+                        .append(requireSameSign).append('\n');
+                    if (!selected.isEmpty() || !replicationCriterion.isEmpty()) {
+                        String stem = String.format(Locale.ROOT, "%02d-%s-vs-%s",
+                            ++vennIndex, fileToken(discoveryId),
+                            fileToken(replicationId));
+                        PlotOptions plotOptions = PlotOptions.builder().size(850, 620)
+                            .title("Discovery and replication overlap")
+                            .build();
+                        var venn = DiagramPlots.venn(new DiagramPlots.VennData(
+                            discoveryId + " selected", replicationId
+                                + " replication criterion",
+                            discoveryOnly.size(), replicatedFeatures.size(),
+                            replicationOnly.size()), plotOptions);
+                        Path png = vennDirectory.resolve(stem + ".png");
+                        Path pdf = vennDirectory.resolve(stem + ".pdf");
+                        venn.save(png);
+                        venn.save(pdf);
+                        outputs.add(context.outputDirectory().relativize(png)
+                            .toString().replace('\\', '/'));
+                        outputs.add(context.outputDirectory().relativize(pdf)
+                            .toString().replace('\\', '/'));
+                    }
                 }
             }
         }
-        return Result.complete("Compared discovery and replication effects",
-            List.of("replication.tsv"));
+        Files.writeString(context.outputDirectory().resolve("replication-venn.tsv"),
+            vennSummary, StandardCharsets.UTF_8);
+        outputs.add(1, "replication-venn.tsv");
+        return Result.complete("Compared discovery and replication effects and generated overlap diagrams",
+            outputs);
+    }
+
+    private Result effectComparison(Context context) throws IOException {
+        Map<String, Path> resultPaths = results(context);
+        if (resultPaths.size() < 2)
+            return new Result(State.NOT_APPLICABLE,
+                "Effect comparison requires at least two result tables",
+                List.of(), Map.of("available_result_tables", resultPaths.size()));
+        Map<String, Map<String, Object>> described = datasets(context.study());
+        List<String> ids = new ArrayList<>(resultPaths.keySet());
+        List<String> outputs = new ArrayList<>();
+        List<Object> comparisons = new ArrayList<>();
+        Path plotDirectory = context.outputDirectory().resolve("effect-scatterplots");
+        Files.createDirectories(plotDirectory);
+        StringBuilder summary = new StringBuilder(
+            "left_dataset\tright_dataset\tleft_cohort\tright_cohort"
+                + "\tcomparison_type\tcommon_features\tpearson_r"
+                + "\tpearson_r_display\n");
+        int plotIndex = 0;
+        for (int leftIndex = 0; leftIndex < ids.size(); leftIndex++) {
+            String leftId = ids.get(leftIndex);
+            Map<String, Estimate> left = estimates(resultPaths.get(leftId));
+            for (int rightIndex = leftIndex + 1; rightIndex < ids.size(); rightIndex++) {
+                String rightId = ids.get(rightIndex);
+                Map<String, Estimate> right = estimates(resultPaths.get(rightId));
+                List<Double> xValues = new ArrayList<>(), yValues = new ArrayList<>();
+                Moment moment = new Moment();
+                for (Map.Entry<String, Estimate> entry : left.entrySet()) {
+                    Estimate other = right.get(entry.getKey());
+                    if (other == null) continue;
+                    xValues.add(entry.getValue().beta);
+                    yValues.add(other.beta);
+                    moment.add(entry.getValue().beta, other.beta, false, false);
+                }
+                String leftCohort = cohort(described.get(leftId));
+                String rightCohort = cohort(described.get(rightId));
+                String comparisonType = leftCohort.equals(rightCohort)
+                    ? "within_cohort" : "cross_cohort";
+                double correlation = moment.correlation();
+                summary.append(leftId).append('\t').append(rightId).append('\t')
+                    .append(leftCohort).append('\t').append(rightCohort).append('\t')
+                    .append(comparisonType).append('\t').append(moment.n).append('\t')
+                    .append(value(correlation)).append('\t')
+                    .append(Double.isFinite(correlation)
+                        ? String.format(Locale.ROOT, "%.4f", correlation) : "NA")
+                    .append('\n');
+                Map<String, Object> comparison = new LinkedHashMap<>();
+                comparison.put("left_dataset", leftId);
+                comparison.put("right_dataset", rightId);
+                comparison.put("left_cohort", leftCohort);
+                comparison.put("right_cohort", rightCohort);
+                comparison.put("comparison_type", comparisonType);
+                comparison.put("common_features", moment.n);
+                comparison.put("pearson_r", Double.isFinite(correlation)
+                    ? correlation : "NA");
+                if (!xValues.isEmpty()) {
+                    String stem = String.format(Locale.ROOT, "%02d-%s-vs-%s",
+                        ++plotIndex, fileToken(leftId), fileToken(rightId));
+                    Path png = plotDirectory.resolve(stem + ".png");
+                    Path pdf = plotDirectory.resolve(stem + ".pdf");
+                    double[] x = xValues.stream().mapToDouble(Double::doubleValue).toArray();
+                    double[] y = yValues.stream().mapToDouble(Double::doubleValue).toArray();
+                    double[] bounds = commonBounds(x, y);
+                    String legend = "Pearson r = " + (Double.isFinite(correlation)
+                        ? String.format(Locale.ROOT, "%.4f", correlation) : "NA")
+                        + " (n = " + x.length + ")";
+                    PlotOptions options = PlotOptions.builder().size(850, 700)
+                        .title((comparisonType.equals("within_cohort")
+                            ? "Within-cohort" : "Cross-cohort")
+                            + " effect comparison")
+                        .xLabel(leftId + " effect").yLabel(rightId + " effect")
+                        .legend(LegendPosition.RIGHT).markerSize(7)
+                        .xRange(bounds[0], bounds[1]).yRange(bounds[0], bounds[1])
+                        .build();
+                    var plot = Plots.xy().options(options)
+                        .points(legend, x, y, new Color(0x00, 0x72, 0xB2))
+                        .line("Identity (y = x)",
+                            new double[] {bounds[0], bounds[1]},
+                            new double[] {bounds[0], bounds[1]}, Color.DARK_GRAY)
+                        .build();
+                    plot.save(png);
+                    plot.save(pdf);
+                    String pngRelative = context.outputDirectory().relativize(png)
+                        .toString().replace('\\', '/');
+                    String pdfRelative = context.outputDirectory().relativize(pdf)
+                        .toString().replace('\\', '/');
+                    outputs.add(pngRelative);
+                    outputs.add(pdfRelative);
+                    comparison.put("plot_png", pngRelative);
+                    comparison.put("plot_pdf", pdfRelative);
+                }
+                comparisons.add(comparison);
+            }
+        }
+        Path table = context.outputDirectory().resolve("effect-comparisons.tsv");
+        Files.writeString(table, summary, StandardCharsets.UTF_8);
+        outputs.add(0, "effect-comparisons.tsv");
+        return new Result(State.COMPLETE,
+            "Generated " + comparisons.size() + " pairwise effect comparison(s)",
+            outputs, Map.of("effect_comparisons", comparisons,
+                "correlation_display", "Pearson correlation is shown to four decimal places in each plot legend"));
     }
 
     private Result meta(Context context) throws IOException {
@@ -417,28 +579,57 @@ final class StudyCliExecutor implements StudyOperationExecutor {
 
     private Result sensitivity(Context context) throws IOException {
         Map<String, Path> results = results(context);
-        Map<String, Object> config = optionalMap(context.study().get("assistance"), "assistance");
+        Map<String, Object> assistance = optionalMap(
+            context.study().get("assistance"), "assistance");
+        Map<String, Object> configuration = optionalMap(
+            context.operation().get("configuration"), "operation.configuration");
+        Set<String> actions = new LinkedHashSet<>(
+            strings(assistance.get("allow_analyses")));
+        if (Boolean.TRUE.equals(configuration.get(
+                "automatic_leave_one_cohort_out")))
+            actions.add("leave_one_cohort_out");
         List<Object> dispositions = new ArrayList<>();
         List<String> outputs = new ArrayList<>();
         boolean incomplete = false;
-        // These are supplementary analyses explicitly authorized by the study,
-        // never a replacement for the primary model or an AI-selected hypothesis.
+        // These are supplementary influence diagnostics, never a silent
+        // replacement for the all-cohort primary analysis.
         boolean primaryReady = false;
+        Path primaryMeta = null;
+        Path primaryReplication = null;
         for (Path dependency : context.dependencyDirectories().values()) {
-            if (!Files.isRegularFile(dependency.resolve("meta-analysis.tsv"))) continue;
-            try (var reader = Files.newBufferedReader(dependency.resolve("manifest.yaml"))) {
-                primaryReady |= "complete".equals(map(new Yaml().load(reader), "manifest").get("state"));
+            if (Files.isRegularFile(dependency.resolve("replication.tsv")))
+                primaryReplication = dependency.resolve("replication.tsv");
+            if (Files.isRegularFile(dependency.resolve("meta-analysis.tsv"))) {
+                primaryMeta = dependency.resolve("meta-analysis.tsv");
+                try (var reader = Files.newBufferedReader(
+                        dependency.resolve("manifest.yaml"))) {
+                    primaryReady |= "complete".equals(map(new Yaml().load(reader),
+                        "manifest").get("state"));
+                }
             }
         }
+        ReplicationMetrics primaryReplicationMetrics = replicationMetrics(
+            primaryReplication);
+        MetaMetrics primaryMetaMetrics = metaMetrics(primaryMeta);
         Map<String, Map<String, Object>> described = datasets(context.study());
         Map<String, List<String>> cohorts = new LinkedHashMap<>();
         boolean unambiguous = true;
         for (String id : results.keySet()) {
-            Object cohort = described.get(id).get("cohort");
+            Map<String, Object> dataset = described.get(id);
+            Object cohort = dataset == null ? null : dataset.get("cohort");
             if (!(cohort instanceof String name) || name.isBlank()) { unambiguous = false; continue; }
             cohorts.computeIfAbsent((String) cohort, ignored -> new ArrayList<>()).add(id);
         }
-        for (String action : strings(config.get("allow_analyses"))) {
+        StringBuilder comparisonTable = new StringBuilder(
+            "action\tomitted_cohort\tincluded_datasets"
+                + "\tprimary_replication_fraction\tsensitivity_replication_fraction"
+                + "\treplication_fraction_delta\tprimary_mean_i_squared"
+                + "\tsensitivity_mean_i_squared\tmean_i_squared_delta"
+                + "\tprimary_high_i_squared_fraction"
+                + "\tsensitivity_high_i_squared_fraction"
+                + "\todd_one_candidate\tmanuscript_disposition\n");
+        List<Object> improvementCandidates = new ArrayList<>();
+        for (String action : actions) {
             if (!primaryReady || results.size() < 2 || action.equals("leave_one_cohort_out") && (!unambiguous || cohorts.size() < 3)) {
                 incomplete = true;
                 dispositions.add(Map.of("action", action, "status", "waiting_for_input", "required_input",
@@ -467,14 +658,109 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 operation.put("configuration", settings);
                 Result result = meta(new Context(context.project(), folder, operation, context.study(), context.plan(), context.dependencyDirectories()), selected);
                 for (String output : result.outputs()) outputs.add(context.outputDirectory().relativize(folder.resolve(output)).toString().replace('\\', '/'));
-                dispositions.add(Map.of("action", action, "variant", variant, "status", "complete",
-                    "result", context.outputDirectory().relativize(folder.resolve("meta-analysis.tsv")).toString().replace('\\', '/'),
-                    "included_datasets", new ArrayList<>(selected.keySet())));
+                Path replicationOutput = null;
+                if (action.equals("leave_one_cohort_out")) {
+                    Map<String, Object> sourceHypothesis = hypothesis(context.study(),
+                        text(operation.get("hypothesis")));
+                    Map<String, Object> sourceRoles = optionalMap(
+                        sourceHypothesis.get("inputs"), "hypothesis.inputs");
+                    Map<String, Object> filteredRoles = new LinkedHashMap<>();
+                    for (Map.Entry<String, Object> role : sourceRoles.entrySet()) {
+                        List<String> retained = strings(role.getValue()).stream()
+                            .filter(selected::containsKey).toList();
+                        if (!retained.isEmpty()) filteredRoles.put(role.getKey(), retained);
+                    }
+                    if (!role(filteredRoles, "discovery").isEmpty()
+                            && !role(filteredRoles, "replication").isEmpty()) {
+                        Map<String, Object> replicationOperation = new LinkedHashMap<>(operation);
+                        replicationOperation.put("type", "discovery_replication");
+                        replicationOperation.put("roles", filteredRoles);
+                        Result replicationResult = replication(new Context(
+                            context.project(), folder, replicationOperation,
+                            context.study(), context.plan(),
+                            context.dependencyDirectories()), selected);
+                        for (String output : replicationResult.outputs()) {
+                            String relative = context.outputDirectory().relativize(
+                                folder.resolve(output)).toString().replace('\\', '/');
+                            if (!outputs.contains(relative)) outputs.add(relative);
+                        }
+                        replicationOutput = folder.resolve("replication.tsv");
+                    }
+                }
+                MetaMetrics sensitivityMeta = metaMetrics(
+                    folder.resolve("meta-analysis.tsv"));
+                ReplicationMetrics sensitivityReplication = replicationMetrics(
+                    replicationOutput);
+                double replicationDelta = difference(
+                    sensitivityReplication.fraction(),
+                    primaryReplicationMetrics.fraction());
+                double heterogeneityDelta = difference(
+                    sensitivityMeta.meanISquared(),
+                    primaryMetaMetrics.meanISquared());
+                boolean replicationImproved = Double.isFinite(replicationDelta)
+                    && replicationDelta > 1e-12;
+                boolean heterogeneityImproved = Double.isFinite(heterogeneityDelta)
+                    && heterogeneityDelta < -1e-12;
+                boolean oddOneCandidate = action.equals("leave_one_cohort_out")
+                    && replicationImproved && heterogeneityImproved;
+                String manuscriptDisposition = oddOneCandidate
+                    ? "feature_in_sensitivity_section_primary_unchanged"
+                    : "retain_in_supplementary_sensitivity_results";
+                Map<String, Object> disposition = new LinkedHashMap<>();
+                disposition.put("action", action);
+                disposition.put("variant", variant);
+                disposition.put("status", "complete");
+                disposition.put("result", context.outputDirectory().relativize(
+                    folder.resolve("meta-analysis.tsv")).toString().replace('\\', '/'));
+                disposition.put("included_datasets", new ArrayList<>(selected.keySet()));
+                disposition.put("primary_metrics", metrics(
+                    primaryReplicationMetrics, primaryMetaMetrics));
+                disposition.put("sensitivity_metrics", metrics(
+                    sensitivityReplication, sensitivityMeta));
+                disposition.put("replication_fraction_delta", numeric(replicationDelta));
+                disposition.put("mean_i_squared_delta", numeric(heterogeneityDelta));
+                disposition.put("replication_improved", replicationImproved);
+                disposition.put("heterogeneity_improved", heterogeneityImproved);
+                disposition.put("odd_one_candidate", oddOneCandidate);
+                disposition.put("manuscript_disposition", manuscriptDisposition);
+                dispositions.add(disposition);
+                if (oddOneCandidate) improvementCandidates.add(Map.of(
+                    "omitted_cohort", variant,
+                    "replication_fraction_delta", replicationDelta,
+                    "mean_i_squared_delta", heterogeneityDelta,
+                    "manuscript_disposition", manuscriptDisposition));
+                comparisonTable.append(action).append('\t')
+                    .append(action.equals("leave_one_cohort_out") ? variant : "")
+                    .append('\t').append(String.join(",", selected.keySet()))
+                    .append('\t').append(value(primaryReplicationMetrics.fraction()))
+                    .append('\t').append(value(sensitivityReplication.fraction()))
+                    .append('\t').append(value(replicationDelta))
+                    .append('\t').append(value(primaryMetaMetrics.meanISquared()))
+                    .append('\t').append(value(sensitivityMeta.meanISquared()))
+                    .append('\t').append(value(heterogeneityDelta))
+                    .append('\t').append(value(primaryMetaMetrics.highISquaredFraction()))
+                    .append('\t').append(value(sensitivityMeta.highISquaredFraction()))
+                    .append('\t').append(oddOneCandidate)
+                    .append('\t').append(manuscriptDisposition).append('\n');
             }
         }
-        Map<String, Object> decision = Map.of("analyses", dispositions,
-            "authorization", "assistance.allow_analyses in the scientist-approved plan",
-            "interpretation", "Exploratory sensitivity analyses; primary results unchanged. No correction of effect scales, selective cohort exclusion, or new hypotheses is inferred");
+        Files.writeString(context.outputDirectory().resolve(
+            "sensitivity-comparison.tsv"), comparisonTable, StandardCharsets.UTF_8);
+        outputs.add(0, "sensitivity-comparison.tsv");
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("analyses", dispositions);
+        decision.put("primary_metrics", metrics(primaryReplicationMetrics,
+            primaryMetaMetrics));
+        decision.put("odd_one_candidates", improvementCandidates);
+        decision.put("automatic_rule",
+            "Flag an omission only when its replication fraction increases and its mean I-squared decreases versus the unchanged all-cohort primary analysis");
+        decision.put("authorization",
+            "Automatic leave-one-cohort-out influence diagnostics are part of the approved deterministic plan; other analyses require assistance.allow_analyses");
+        decision.put("manuscript_guidance", improvementCandidates.isEmpty()
+            ? "No omission improved both registered criteria; retain all-cohort primary results and report the complete sensitivity table in supplementary material."
+            : "Feature flagged omissions in a labeled sensitivity subsection with exact deltas and full-cohort primary results alongside them. Promotion to a primary analysis requires a prespecified rationale or a reviewed study amendment; outcome-selected exclusion is not automatic.");
+        decision.put("interpretation",
+            "Exploratory influence diagnostics; primary results unchanged. Every cohort omission is retained, and no effect-scale correction, selective exclusion, or new hypothesis is inferred.");
         Files.writeString(context.outputDirectory().resolve("decision.yaml"), new Yaml().dump(decision));
         outputs.add("decision.yaml");
         return new Result(incomplete ? State.WAITING_FOR_INPUT : State.COMPLETE,
@@ -1556,6 +1842,107 @@ final class StudyCliExecutor implements StudyOperationExecutor {
         return result;
     }
 
+    private static String cohort(Map<String, Object> dataset) {
+        if (dataset == null || dataset.get("cohort") == null
+                || String.valueOf(dataset.get("cohort")).isBlank())
+            return "unspecified";
+        return String.valueOf(dataset.get("cohort"));
+    }
+
+    private static String fileToken(String value) {
+        String token = value.toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9._-]+", "-")
+            .replaceAll("^-+|-+$", "");
+        return token.isEmpty() ? "dataset" : token;
+    }
+
+    private static double[] commonBounds(double[] left, double[] right) {
+        double minimum = Double.POSITIVE_INFINITY;
+        double maximum = Double.NEGATIVE_INFINITY;
+        for (double value : left) {
+            minimum = Math.min(minimum, value);
+            maximum = Math.max(maximum, value);
+        }
+        for (double value : right) {
+            minimum = Math.min(minimum, value);
+            maximum = Math.max(maximum, value);
+        }
+        minimum = Math.min(minimum, 0.0);
+        maximum = Math.max(maximum, 0.0);
+        double spread = maximum - minimum;
+        if (!(spread > 0.0)) spread = Math.max(1.0, Math.abs(maximum) * 0.2);
+        double padding = spread * 0.06;
+        return new double[] {minimum - padding, maximum + padding};
+    }
+
+    private static ReplicationMetrics replicationMetrics(Path path)
+            throws IOException {
+        if (path == null || !Files.isRegularFile(path))
+            return new ReplicationMetrics(0, 0, Double.NaN);
+        DelimitedData table = DelimitedData.read(path);
+        int selectedColumn = table.column("discovery_selected");
+        int replicatedColumn = table.column("replicated");
+        int selected = 0, replicated = 0;
+        for (String[] row : table.rows()) {
+            if (Boolean.parseBoolean(row[selectedColumn])) selected++;
+            if (Boolean.parseBoolean(row[replicatedColumn])) replicated++;
+        }
+        return new ReplicationMetrics(selected, replicated,
+            selected == 0 ? Double.NaN : replicated / (double) selected);
+    }
+
+    private static MetaMetrics metaMetrics(Path path) throws IOException {
+        if (path == null || !Files.isRegularFile(path))
+            return new MetaMetrics(0, 0, Double.NaN, Double.NaN);
+        DelimitedData table = DelimitedData.read(path);
+        int feature = table.column("feature_id");
+        int p = table.column("p_value");
+        int iSquared = table.header().contains("i_squared")
+            ? table.column("i_squared") : -1;
+        Map<String, Double> pValues = new LinkedHashMap<>();
+        double iSquaredSum = 0.0;
+        int iSquaredCount = 0, highISquared = 0;
+        for (String[] row : table.rows()) {
+            if (!missing(row[p])) pValues.putIfAbsent(row[feature],
+                probability(row[p], path));
+            if (iSquared >= 0 && !missing(row[iSquared])) {
+                double value = finite(row[iSquared], "i_squared", path);
+                iSquaredSum += value;
+                iSquaredCount++;
+                if (value >= 50.0) highISquared++;
+            }
+        }
+        int significant = (int) bh(pValues).values().stream()
+            .filter(value -> value <= 0.05).count();
+        return new MetaMetrics(pValues.size(), significant,
+            iSquaredCount == 0 ? Double.NaN : iSquaredSum / iSquaredCount,
+            iSquaredCount == 0 ? Double.NaN
+                : highISquared / (double) iSquaredCount);
+    }
+
+    private static Map<String, Object> metrics(ReplicationMetrics replication,
+            MetaMetrics meta) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("discovery_selected_pairwise_tests", replication.selected());
+        result.put("replicated_pairwise_tests", replication.replicated());
+        result.put("replication_fraction", numeric(replication.fraction()));
+        result.put("meta_tested_features", meta.tested());
+        result.put("meta_BH_FDR_0_05_features", meta.significant());
+        result.put("mean_i_squared", numeric(meta.meanISquared()));
+        result.put("high_i_squared_fraction", numeric(
+            meta.highISquaredFraction()));
+        return result;
+    }
+
+    private static double difference(double value, double reference) {
+        return Double.isFinite(value) && Double.isFinite(reference)
+            ? value - reference : Double.NaN;
+    }
+
+    private static Object numeric(double value) {
+        return Double.isFinite(value) ? value : "NA";
+    }
+
     private static Map<String, Object> hypothesis(Map<String, Object> study,
             String id) {
         for (Object value : list(study.get("hypotheses"), "hypotheses")) {
@@ -1705,6 +2092,12 @@ final class StudyCliExecutor implements StudyOperationExecutor {
     }
 
     private record Estimate(double beta, double se, double p) { }
+
+    private record ReplicationMetrics(int selected, int replicated,
+            double fraction) { }
+
+    private record MetaMetrics(int tested, int significant,
+            double meanISquared, double highISquaredFraction) { }
 
     private record GeneMapping(String ensembl, String symbol) { }
 

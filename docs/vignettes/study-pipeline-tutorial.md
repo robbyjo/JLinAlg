@@ -125,8 +125,10 @@ not a negative search. Explicit `analysis.operations` adapters remain available.
 Diagnostics write `next-steps.yaml` with each proposal's trigger, required
 inputs, and source artifact. Current rules propose scale/model audits for
 effect-scale mismatches, uncertainty and power review for near-zero replication,
-and fixed/random-effects plus leave-one-cohort-out sensitivity analysis for
-widespread heterogeneity. Confirm comparable estimands before pooling; fitting
+and fixed/random-effects review for widespread heterogeneity. With at least
+three explicitly identified cohorts and a completed primary meta-analysis,
+leave-one-cohort-out replication and meta-analysis run automatically as
+registered influence diagnostics. Confirm comparable estimands before pooling; fitting
 a between-cohort slope is not a justified way to correct measurement scales.
 These are proposals, not completed analyses. Record the selected change through
 an `analysis_requests` amendment, specify the operation or execute externally
@@ -231,14 +233,20 @@ provider charges. Repeating a timed-out request can incur another charge if the
 provider processed it before the local timeout. There is no browser scraping,
 login automation, provider fallback, or execution of model-generated code.
 
-The two registered sensitivity analyses run locally when explicitly listed in
-`allow_analyses`, even with `enabled: false` or an unavailable LLM. They preserve
-the primary analysis: fixed/random comparison uses both pooled models;
-leave-one-cohort-out removes each declared cohort in turn, retaining the primary
-meta-analysis configuration. It needs at least three explicitly identified
-cohorts and a completed primary meta-analysis. Missing prerequisites appear in
-the index. These remain exploratory, not new confirmatory findings; comparability
-of effects and valid cohort dependence assumptions are still required.
+The registered fixed/random comparison runs locally when explicitly listed in
+`allow_analyses`, even with `enabled: false` or an unavailable LLM. Leave-one-
+cohort-out influence analysis is automatic for a hypothesis with at least three
+explicitly identified cohorts and a completed primary meta-analysis. It removes
+each cohort in turn, reruns the approved meta-analysis and, where discovery and
+replication roles remain, reruns replication and its plots. The resulting
+`sensitivity-comparison.tsv` records the full set of omissions, replication-rate
+and mean-I-squared deltas. A cohort is an `odd_one_candidate` only when omission
+improves both available criteria. That candidate is featured in a labeled
+sensitivity subsection, never silently substituted for the all-cohort primary
+analysis. Promotion to primary requires a prespecified rationale or a reviewed
+study amendment. Missing prerequisites appear in the index. These remain
+exploratory influence diagnostics; comparable effects and valid cohort-dependence
+assumptions are still required.
 
 Other AI suggestions receive `requires_scientist_amendment` or
 `unsupported_requires_scientist_review`. New phenotypes, hypotheses and changes

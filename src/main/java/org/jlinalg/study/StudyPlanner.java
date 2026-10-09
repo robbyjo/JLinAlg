@@ -75,6 +75,14 @@ public final class StudyPlanner {
                     resultOperations.add("dataset:" + datasetId);
                 }
             }
+            String effectComparison = null;
+            if (selected.size() > 1) {
+                Map<String, Object> operation = operation(counter,
+                    "effect_comparison", hypothesisId, selected,
+                    dependencies(harmonize, resultOperations));
+                operations.add(operation);
+                effectComparison = String.valueOf(operation.get("id"));
+            }
             String comparison = null;
             if (goals.contains("discovery_replication")) {
                 Map<String, Object> operation = operation(counter,
@@ -190,6 +198,9 @@ public final class StudyPlanner {
                     reviewDependencies.add(result);
             if (comparison != null && !reviewDependencies.contains(comparison))
                 reviewDependencies.add(comparison);
+            if (effectComparison != null
+                    && !reviewDependencies.contains(effectComparison))
+                reviewDependencies.add(effectComparison);
             if (meta != null && !reviewDependencies.contains(meta))
                 reviewDependencies.add(meta);
             reviewDependencies.addAll(evidenceOperations);
@@ -201,6 +212,32 @@ public final class StudyPlanner {
                 operations.add(priority);
                 reviewDependencies.add(String.valueOf(priority.get("id")));
             }
+            Map<String, Object> assistance = StudyIO.optionalMap(
+                study.get("assistance"), "assistance");
+            Set<String> selectedCohorts = new LinkedHashSet<>();
+            for (String datasetId : selected) {
+                Map<String, Object> dataset = datasets.get(datasetId);
+                if (dataset != null && dataset.get("cohort") instanceof String cohort
+                        && !cohort.isBlank()) selectedCohorts.add(cohort);
+            }
+            boolean automaticLeaveOneOut = meta != null
+                && selectedCohorts.size() >= 3;
+            boolean requestedSensitivity = !StudyIO.optionalList(
+                assistance.get("allow_analyses"), "assistance.allow_analyses")
+                .isEmpty();
+            if (automaticLeaveOneOut || requestedSensitivity) {
+                Map<String, Object> sensitivity = operation(counter,
+                    "sensitivity_analysis", hypothesisId, selected,
+                    reviewDependencies);
+                sensitivity.put("allow_incomplete_dependencies", true);
+                Map<String, Object> configuration = new LinkedHashMap<>(
+                    operationConfiguration(analysis, "sensitivity_analysis"));
+                configuration.put("automatic_leave_one_cohort_out",
+                    automaticLeaveOneOut);
+                sensitivity.put("configuration", configuration);
+                operations.add(sensitivity);
+                reviewDependencies.add(String.valueOf(sensitivity.get("id")));
+            }
             Map<String, Object> diagnostics = operation(counter,
                 "diagnostic_review", hypothesisId, selected,
                 reviewDependencies.isEmpty()
@@ -209,18 +246,11 @@ public final class StudyPlanner {
             diagnostics.put("allow_incomplete_dependencies", true);
             operations.add(diagnostics);
             reviewDependencies.add(String.valueOf(diagnostics.get("id")));
-            Map<String, Object> assistance = StudyIO.optionalMap(study.get("assistance"), "assistance");
             if (Boolean.TRUE.equals(assistance.get("enabled")) && Boolean.TRUE.equals(assistance.get("next_steps"))) {
                 Map<String, Object> advisor = operation(counter, "advisor_review", hypothesisId, selected, reviewDependencies);
                 advisor.put("allow_incomplete_dependencies", true);
                 operations.add(advisor);
                 reviewDependencies.add(String.valueOf(advisor.get("id")));
-            }
-            if (!StudyIO.optionalList(assistance.get("allow_analyses"), "assistance.allow_analyses").isEmpty()) {
-                Map<String, Object> sensitivity = operation(counter, "sensitivity_analysis", hypothesisId, selected, reviewDependencies);
-                sensitivity.put("allow_incomplete_dependencies", true);
-                operations.add(sensitivity);
-                reviewDependencies.add(String.valueOf(sensitivity.get("id")));
             }
             if (Boolean.TRUE.equals(assistance.get("enabled")) && Boolean.TRUE.equals(assistance.get("manuscript"))) {
                 Map<String, Object> draft = operation(counter, "manuscript_draft", hypothesisId, selected, reviewDependencies);

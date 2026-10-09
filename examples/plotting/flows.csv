@@ -1,0 +1,10 @@
+source,target,weight,kind
+Intake,Screened,90,recruitment
+Screened,Eligible,65,recruitment
+Screened,Excluded,25,excluded
+Eligible,Assigned A,34,allocation
+Eligible,Assigned B,31,allocation
+Assigned A,Completed,30,follow-up
+Assigned B,Completed,27,follow-up
+Assigned A,Lost,4,lost
+Assigned B,Lost,4,lost
