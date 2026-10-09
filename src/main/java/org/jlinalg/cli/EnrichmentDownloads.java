@@ -5,14 +5,10 @@ package org.jlinalg.cli;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,8 +21,6 @@ import java.util.regex.Pattern;
 
 /** Explicit, versioned downloads; incomplete packages are never published as installed. */
 final class EnrichmentDownloads {
-    private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30))
-        .version(HttpClient.Version.HTTP_1_1).followRedirects(HttpClient.Redirect.NORMAL).build();
     private final PrintStream console;
     private final long maximumBytes;
     private final Properties manifest=new Properties();
@@ -193,17 +187,9 @@ final class EnrichmentDownloads {
         while(matcher.find()) { String name=matcher.group(1); if(!name.matches("[A-Za-z0-9._-]+")) throw new IOException("unsafe Parquet filename"); fetch(url+name,directory+"/"+name); count++; }
         if(count==0) throw new IOException("no Parquet parts found at "+url);
     }
-    private HttpRequest request(String url) throws IOException {
-        URI uri=URI.create(url); if(!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null) throw new IOException("database source must be HTTPS without embedded credentials");
-        return HttpRequest.newBuilder(uri).timeout(Duration.ofMinutes(30)).header("User-Agent","JLinAlg-enrichment/1").GET().build();
-    }
     private String text(String url) throws IOException,InterruptedException {
-        var response=client.send(request(url),HttpResponse.BodyHandlers.ofInputStream());
-        try(var input=response.body()) {
-            if(response.statusCode()!=200) throw new IOException("HTTP "+response.statusCode()+" from "+url);
-            byte[] bytes=input.readNBytes(4*1024*1024+1); if(bytes.length>4*1024*1024) throw new IOException("database index too large");
-            return new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
-        }
+        return PublicResourceDownloader.text(URI.create(url),4L*1024*1024,
+            "JLinAlg-enrichment/1");
     }
     private void fetch(String url,String name) throws IOException,InterruptedException {
         for (int attempt=1; ; attempt++) {
@@ -219,25 +205,12 @@ final class EnrichmentDownloads {
     private void fetchOnce(String url,String name) throws IOException,InterruptedException {
         console.println("Downloading "+url);
         Path output=EnrichmentDatabase.safeChild(stage,name); Files.createDirectories(output.getParent());
-        var response=client.send(request(url),HttpResponse.BodyHandlers.ofInputStream());
-        try(var input=response.body()) {
-            if(response.statusCode()!=200) throw new IOException("HTTP "+response.statusCode()+" downloading "+url);
-            long declared=response.headers().firstValueAsLong("Content-Length").orElse(-1);
-            if(declared>maximumBytes) throw new IOException("download exceeds --max-download-bytes");
-            long total=0,next=128L*1024*1024;
-            try(var file=Files.newOutputStream(output)) {
-                byte[] buffer=new byte[65536];
-                for(int n;(n=input.read(buffer))!=-1;) {
-                    total+=n; if(total>maximumBytes) throw new IOException("download exceeds --max-download-bytes");
-                    file.write(buffer,0,n);
-                    if(total>=next) { console.println("  "+name+": "+total+" bytes"); next+=128L*1024*1024; }
-                }
-            }
-            if(total==0 || (declared>=0 && total!=declared)) throw new IOException("empty or incomplete download: "+url);
-        }
-        manifest.setProperty("source."+name,response.uri().toString());
+        var response=PublicResourceDownloader.download(URI.create(url),output,
+            maximumBytes,"JLinAlg-enrichment/1",console,128L*1024*1024);
+        manifest.setProperty("source."+name,response.source());
         manifest.setProperty("sha256."+name,sha256(output));
-        response.headers().firstValue("Last-Modified").ifPresent(v->manifest.setProperty("last_modified."+name,v));
+        if(response.lastModified()!=null)
+            manifest.setProperty("last_modified."+name,response.lastModified());
     }
     static String sha256(Path path) throws IOException {
         try {

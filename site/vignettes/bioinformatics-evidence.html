@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Audited source discovery, regional genetic inference, protein and sequence investigation, literature search and local evidence packaging."><title>Bioinformatics evidence workflow · JLinAlg</title>
+<link rel="stylesheet" href="../assets/styles.css"><script src="../assets/app.js" defer></script></head>
+<body><site-header root="../"></site-header><main id="main">
+<section class="page-hero"><div class="container"><div class="breadcrumbs"><a href="../index.html">Home</a><span>/</span><a href="../vignettes/index.html">Vignettes</a><span>/</span><span>Bioinformatics evidence workflow</span></div>
+<span class="eyebrow">CLI tutorial · Source build</span><h1>Bioinformatics evidence workflow</h1><p>Audited source discovery, regional genetic inference, protein and sequence investigation, literature search and local evidence packaging.</p></div></section>
+<div class="container page-layout"><article class="prose"><p>JLinAlg can extend result-first omics studies beyond replication and meta-analysis into public-source discovery, molecular genetic inference, protein and reference-sequence investigation, literature retrieval, and transparent candidate prioritization. The deterministic planner retains control. Each operation saves its inputs, source citations, queries, responses, decisions and output hashes for the project index and research notebook.</p>
+<p>This source-build feature does not make every biological question answerable automatically. In particular, choosing a valid molecular QTL, interpreting an unusual result, establishing instrument validity, or obtaining restricted data may require the scientist. Missing evidence is reported as a prerequisite, not fabricated and not interpreted as a null finding.</p>
+<h2 id="quick-start">Quick start</h2>
+<p>The smallest real-study entry point remains a study contract plus the input result files and a current executable JAR:</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>java -jar jlinalg-0.3.6.jar study auto study.yaml
+java -jar jlinalg-0.3.6.jar study verify --project .
+</code></pre></div>
+<p><code>analysis.mode</code> defaults to <code>auto</code>. Existing discovery/replication, meta-analysis, enrichment and diagnostic operations remain available. Auto mode now also plans <code>source_discovery</code> when genetic support is relevant, <code>bioinformatics_investigation</code>, and <code>literature_search</code>. They are independent branches: a retired QTL service does not prevent an available literature or protein investigation. Optional LLM literature interpretation is a separate <code>literature_support</code> operation.</p>
+<p>Use <code>--offline</code> to prevent built-in network access. Repeat the same command after supplying an approved amendment or restoring connectivity. Completed operations are reused only when their inputs, implementation and outputs still match. Waiting operations are retried at operation granularity; a partial public search may repeat its earlier queries. <code>--rerun</code> requests new attempts while preserving history.</p>
+<p>For a numerical demonstration with no internet or LLM, copy <a href="https://github.com/robbyjo/JLinAlg/tree/main/examples/study-pipeline/bioinformatics">the synthetic bioinformatics example</a> to a scratch directory. Run <code>run.ps1 -Jar /path/to/jlinalg.jar</code> or <code>sh run.sh /absolute/path/to/jlinalg.jar</code>. Its invented regional statistics exercise the entire numerical follow-up branch. They are not evidence for a biological hypothesis or a realism benchmark.</p>
+<h2 id="keep-the-study-contract-small">Keep the study contract small</h2>
+<p>Public investigation uses dataset annotations and the hypothesis outcome. Add optional search controls only when needed:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>datasets:
+  - id: blood-results
+    type: transcriptomics
+    stage: association_results
+    species: human
+    tissue: whole_blood
+    genome_build: GRCh38
+    annotation_release: GENCODE_v44
+    files:
+      results: results.tsv
+      annotation: probe-annotation.tsv
+
+hypotheses:
+  - id: H1
+    description: Blood molecular associations with sleep duration
+    outcome: sleep duration
+    inputs: {discovery: [blood-results]}
+    analysis:
+      mode: auto
+      bioinformatics:
+        phenotype_terms: [sleep duration]
+        relevant_tissues: [whole blood, brain]
+        max_features: 10
+        fdr: 0.05
+        window_bp: 500000
+</code></pre></div>
+<p>This is a fragment to merge into a complete contract with <code>schema_version</code> and <code>project</code>. For an already-resolved project, make the change through <code>amendment-&lt;ID&gt;.yaml</code> and scientist approval rather than editing its base contract. The <a href="../schemas/study-v1.schema.json">study schema</a> describes the optional settings.</p>
+<p>Selection uses BH across the full valid tested family in the available meta-analysis, or separately within each primary table when no meta-analysis is available. It does not recalculate FDR on only the top hits. Primary-table selection is exploratory, not pooled evidence or an independent replication claim. Conflicting or ambiguous annotations are excluded. The feature limit defaults to 10 and is capped at 100; search budgets are visible in the result records.</p>
+<h2 id="feature-annotation">Feature annotation</h2>
+<p>Local annotation tables and GTFs take priority. Declare the coordinate convention for tables. Internal annotated intervals are 1-based and closed. Unknown probe IDs are never treated as gene symbols simply because they look plausible.</p>
+<p>For human Ensembl features with an explicit modern GENCODE release and GRCh38 build, JLinAlg can retrieve the release-specific GTF automatically, cache it, and record the source URL and checksum. This download requests a public reference release, not the project's feature list. It does not guess a genome build, lift coordinates, or download an arbitrary platform manifest. Other platforms and unsupported releases need a local <code>files.annotation</code> table/GTF.</p>
+<p>Annotation is not a claim that the feature is causal, that an sQTL exists, or that a transcript maps uniquely to a protein isoform. The generated scientist questions retain these distinctions.</p>
+<h2 id="sources-and-scientific-relevance">Sources and scientific relevance</h2>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Implemented use</th>
+<th>Scientific boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GWAS Catalog REST v2 and harmonized FTP</td>
+<td>Primary or related-trait study discovery, gene-associated hits, coordinate-window SNP discovery, and indexed retrieval of selected harmonized GRCh38 regional summary statistics</td>
+<td>REST associations are curated lead associations, not full regional results. Automatic regional use requires a downloadable, ancestry-matched, at-least-100,000-variant study with sorted harmonized data and a tabix index. Candidate ranking and database coverage are disclosed.</td>
+</tr>
+<tr>
+<td>Pan-UK Biobank</td>
+<td>Automatic exposure-instrument lookup for the public BMI field 21001 EUR summary statistics; other traits remain discoverable candidates until a provider adapter or reviewed custom source is declared</td>
+<td>The native source is GRCh37. JLinAlg projects each biallelic exposure allele through NCBI SPDI, matches the indexed Pan-UKB row, and emits an audited GRCh38-coordinate adapter table. It does not lift positions by offset or treat a UKB-plus-external meta-analysis as independent of every cohort.</td>
+</tr>
+<tr>
+<td>eQTL Catalogue</td>
+<td>Audited dataset discovery request, with a documented bulk-access fallback</td>
+<td>An unavailable/retired API is reported as such. The measured feature and molecular assay must match; a gene eQTL is not automatically a splicing QTL.</td>
+</tr>
+<tr>
+<td>GTEx</td>
+<td>Versioned tissue-availability metadata, filtered using declared study or follow-up tissues</td>
+<td>Tissue availability is not evidence of a QTL for a particular feature. Full regional QTL input still needs selection and provenance.</td>
+</tr>
+<tr>
+<td>UniProt</td>
+<td>Reviewed gene/species protein candidates</td>
+<td>Multiple matches remain ambiguous; absence of reviewed entries does not mean no protein exists.</td>
+</tr>
+<tr>
+<td>AlphaFold DB</td>
+<td>Predicted structure identifiers, versions, confidence metrics and model links</td>
+<td>Prediction is not isoform equivalence, binding, druggability, safety or efficacy evidence.</td>
+</tr>
+<tr>
+<td>UCSC</td>
+<td>Build-specific reference sequence and browser links for annotated intervals</td>
+<td>Forward genomic sequence, not patient sequence or a reconstructed spliced transcript.</td>
+</tr>
+<tr>
+<td>Europe PMC</td>
+<td>Bounded field/phenotype and gene/phenotype searches, article identifiers, bibliographic metadata and a deduplicated reference catalog</td>
+<td>Candidate papers require reading and appraisal. This is not a systematic review or automatic confirmation of their conclusions.</td>
+</tr>
+</tbody>
+</table>
+<p>The same framework applies to different phenotypes, cohorts and tissues. For example, a blood/sleep study may declare brain as a follow-up tissue with a documented rationale. JLinAlg does not infer that all available brain QTLs are appropriate. Related phenotype suggestions from an LLM remain proposals until reviewed and incorporated into the study.</p>
+<p>The built-in GWAS Catalog/eQTL Catalogue/GTEx discovery branch requires explicitly human datasets. It does not substitute human genetic resources for another organism. Nonhuman studies need species-matched genetic-source adapters; the reviewed protein lookup currently supports human and mouse.</p>
+<p>Searches distinguish <code>no_matches</code>, <code>search_limited</code>, <code>not_found</code>, <code>endpoint_retired</code>, <code>access_denied</code>, <code>rate_limited</code>, <code>unavailable</code>, <code>offline_policy</code>, and <code>policy_denied</code>. HTTP 404/410, malformed responses and connectivity failures never become a scientific “no associations exist” conclusion. Search defaults are three pages per strategy, 20 regional catalogue SNPs per feature, 20 literature records per page, and a hard 200-request budget per operation. A search hitting its budget is not exhaustive. UCSC requests are limited to one per second and sequences to 100 kb by default.</p>
+<h2 id="from-a-source-candidate-to-genetic-inference">From a source candidate to genetic inference</h2>
+<p><code>genetic_pairs</code> is the legacy/custom-source name for an analysis recipe, not a biological object. One entry binds an exact molecular exposure table, phenotype outcome table, LD reference, region, ancestry, build, sample-size and overlap declaration. It remains necessary for arbitrary sources and nonstandard designs, but supported public MR sources no longer require a hand-written entry per transcript.</p>
+<p>For an FHS irQTL exposure and BMI outcome, declare the concise source policy once:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>analysis:
+  goals: [mendelian_randomization]
+  bioinformatics:
+    mr:
+      exposure_dataset: fhs-bmi
+      exposure_ancestry: European
+      outcome_provider: auto
+      outcome_trait: 21001
+      outcome_ancestry: EUR
+      ld_provider: 1000g-30x-grch38
+      ld_population: EUR
+</code></pre></div>
+<p>The actual irQTL analysis ancestry is deliberately required; JLinAlg does not infer it from the FHS cohort name. For BMI/EUR, <code>auto</code> selects the public Pan-UK Biobank field 21001 EUR analysis and its recorded sample size. A non-UKB exposure cohort plus the UKB-only outcome establishes the named-cohort basis for <code>sample_overlap: none</code>; an exposure that may include UK Biobank is rejected. The policy expands the reviewed irQTL candidate file into per-feature recipes, records every NCBI build projection and Pan-UKB lookup, and uses the GRCh38 LD provider below. The operation still stops if fewer than two strong, matched and LD-independent instruments remain.</p>
+<p>For colocalization, JLinAlg can use GWAS Catalog REST v2 to find studies and the Catalog's harmonized FTP collection for indexed regional retrieval. The REST API itself exposes metadata and curated lead associations, not arbitrary full-summary-statistic rows. JLinAlg therefore verifies the selected accession's harmonized metadata, GRCh38 build, sorted status and tabix index before requesting only the declared interval; it retains the Catalog MD5 while disclosing that the entire remote file was not downloaded and rehashed.</p>
+<h3 id="related-phenotype-colocalization-policy">Related-phenotype colocalization policy</h3>
+<p>Related phenotypes may be scientist-declared, or an optional LLM advisor can propose up to 20 search labels. The advisor prompt requests direct consequences, biomarkers, intermediate traits, common comorbidities and physiological domains, with one to five literature identifiers per phenotype. Every suggestion is stored as <code>advisor_proposal_unreviewed</code>; its literature still needs independent verification. The suggestion authorizes only bounded public-source discovery. It does not amend the hypothesis, approve a GWAS, or establish causality.</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>assistance:
+  enabled: true
+  provider: openai
+  model: APPROVED_MODEL
+  related_phenotypes: true
+
+analysis:
+  goals: [colocalization]
+  bioinformatics:
+    colocalization:
+      exposure_dataset: fhs-bmi
+      exposure_ancestry: European
+      outcome_provider: gwas-catalog
+      outcome_ancestry: European
+      related_phenotypes: [type 2 diabetes, glycated hemoglobin, systolic blood pressure, triglycerides]
+      max_related_phenotypes: 20
+      max_colocalization_traits: 5
+      allow_partial_regions: true
+      minimum_exposure_overlap: 0.5
+      ld_provider: 1000g-30x-grch38
+      ld_population: EUR
+      sample_overlap: unknown
+</code></pre></div>
+<p>The primary phenotype and every declared/advisor-proposed label are searched separately. For each label, the bounded automatic selector prefers the largest ancestry-matched study among the retrieved exact-trait GWAS Catalog pages when it has downloadable full summary statistics, at least 100,000 variants and no obvious CNV-only label. This is a reproducible availability/sample-size heuristic, not a claim that the chosen phenotype is the most biologically important. By default at most five traits proceed to colocalization; up to 20 can be searched or explicitly analyzed.</p>
+<p>The irQTL export may be significance-filtered or otherwise incomplete. With <code>allow_partial_regions: true</code>, JLinAlg still performs harmonization, ancestry-matched GRCh38 LD extraction, fine-mapping mechanics and prior-sensitivity colocalization when at least two usable variants remain and the declared fraction of exported QTL variants matches. The result is labeled <code>exploratory_partial_region_major_limitation</code>, not conventional complete-region colocalization. The operation records exposure and outcome match fractions independently; it never calls missing database rows negative evidence.</p>
+<p>Every generated report/manuscript must retain this caveat: partial-data posterior probabilities are conditional on the observed selected variants; missing variants, significance filtering, unequal coverage, winner's curse and unknown sample overlap can materially bias them, and a null result is not evidence against a shared causal variant. Set <code>allow_partial_regions: false</code> when the scientific plan requires conventional full-region colocalization.</p>
+<p>The regional adapter runs after a scientist approves an exact exposure/outcome policy or pair. Its declarations can be short, but the required facts cannot be guessed: molecular feature, phenotype, assay, tissue, build, ancestry, sample size, source citation, regional coverage and sample overlap. See the complete checked-in example for custom-source YAML.</p>
+<p>Each <code>analysis.bioinformatics.genetic_pairs</code> entry has <code>id</code>, <code>feature_id</code>, <code>rationale</code>, <code>approved</code>, a 1-based <code>region</code>, <code>exposure</code>, <code>outcome</code>, <code>ld</code>, <code>sample_overlap</code>, and <code>sample_overlap_basis</code>. MR additionally requires <code>instrument_validity_rationale</code>. These are assertions to audit, not facts proved by JLinAlg. Approval does not replace the source paper or scientific appraisal.</p>
+<p>Local summary files must be declared under an input dataset's <code>files</code> mapping and referenced by <code>dataset_id</code> plus <code>file_role</code>. This includes QTL, GWAS, LD and LD-allele files, so changing any of them invalidates reuse. Source records require <code>source_id</code> and <code>citation</code>.</p>
+<p>Canonical regional summary columns are:</p>
+<div class="code-window"><div class="code-bar"><span>text</span></div><pre><code>variant_id chromosome position effect_allele other_allele beta se p_value
+</code></pre></div>
+<p>Use tab-separated or comma-separated local files, with 1-based positions and biallelic SNPs. A QTL <code>feature_id</code> column, if present, is filtered to the approved measured feature. Without it, the file must already contain only that feature's regional statistics. Do not put patient genotypes or individual phenotype records in these files. Declare <code>complete_region: true</code> only for full regional results, never a significant-only table.</p>
+<p>A source may instead specify a public HTTPS <code>url</code>, pinned <code>sha256</code>, <code>license</code>, <code>source_id</code> and <code>citation</code>, together with its scientific metadata. JLinAlg downloads and verifies it into a project cache and retains a source snapshot. This path currently expects canonical, uncompressed regional TSV data and caps downloads at 512 MiB; it does not guess arbitrary columns or decompress multi-gigabyte genome-wide releases. Supported remote hosts are restricted to the built-in public evidence providers; redirects are refused. Other sources, including restricted or differently formatted UK Biobank/GTEx releases, must be acquired and converted locally with the conversion script and citations retained. A downloaded source is not automatically approved merely because its checksum matches.</p>
+<p>The adapter checks the finding's identity and location, same build and declared ancestry, identical variant coordinates, allele direction and regional overlap. Conventional complete-region analysis defaults to at least 80% of the larger source's variant set. Exploratory partial-region analysis instead checks the matched fraction of the exported QTL variants and reports the much smaller outcome-region fraction separately. Palindromic SNPs are conservatively excluded rather than guessed using absent allele frequencies. Every exclusion and sign flip is recorded. MR requires explicitly nonoverlapping samples. Partial colocalization can preserve <code>sample_overlap: unknown</code>, but that uncertainty is appended to its mandatory major caveat.</p>
+<h3 id="ld-and-automatic-reference-downloads">LD and automatic reference downloads</h3>
+<p>For a supplied LD matrix, rows and columns must have matching variant IDs. An <code>alleles_file_role</code> table supplies <code>variant_id</code>, <code>effect_allele</code>, and <code>other_allele</code> defining the matrix's signed orientation. Matrix symmetry, bounds, diagonal and positive semidefiniteness are checked; invalid matrices are not silently replaced or regularized.</p>
+<p>Alternatively set <code>ld: {population: EUR}</code> (or AFR/AMR/EAS/SAS) and allow reference downloads. The existing pinned 1000 Genomes Phase 3 installer fetches a missing panel. The pipeline extracts signed Pearson A1-dosage correlation among founders, checks at least 95% observed calls per SNP and mean-imputes remaining missing reference calls. This is different from the haplotype r-squared used by the standalone clumping command. Alleles, reference coordinates and panel hashes are retained.</p>
+<p>The downloadable bundled panel is GRCh37. For GRCh38 MR, <code>ld_provider: 1000g-30x-grch38</code> instead queries the official 30x high-coverage phased 1000 Genomes chromosome VCF and tabix index by HTTPS. It restricts genotypes to the requested AFR/AMR/EAS/EUR/SAS superpopulation in the official 2,504-sample Phase 3 panel, thereby excluding the additional relatives in the 3,202-sample callset; applies call-rate and MAF checks; and records the regional source URLs, sample-panel hash, exclusions, alleles and resulting matrix hash. This is indexed regional retrieval, not a silent whole-genome download or coordinate liftover.</p>
+<p>JLinAlg will not apply GRCh37 LD to mismatching coordinates. Missing, monomorphic or incompatible reference variants remain actionable blockers. Population is never guessed; the source ancestry must agree with the selected panel. The public source definitions are documented by the <a href="https://www.internationalgenome.org/data-portal/data-collection/1000genomes_30x">1000 Genomes 30x GRCh38 collection</a>, <a href="https://pan.ukbb.broadinstitute.org/docs/per-phenotype-files/index.html">Pan-UK Biobank per-phenotype files</a>, and <a href="https://api.ncbi.nlm.nih.gov/variation/v0/">NCBI Variation Services</a>.</p>
+<h3 id="statistical-outputs">Statistical outputs</h3>
+<p>SuSiE fine-mapping runs on the harmonized overlapping SNP set for both traits and must converge. Colocalization uses those SuSiE effects, with a second shared-prior setting for sensitivity. Curated nearby lead SNPs or omics association coefficients alone are never presented as conventional colocalization. When a reviewed policy explicitly permits incomplete QTL data, the same computation may run as exploratory partial-data colocalization with the evidence-grade and mandatory caveat above.</p>
+<p>MR selects exposure instruments using p ≤ 5e-8 and F ≥ 10 by default, then LD-prunes at r-squared ≤ 0.001. It requires at least two remaining instruments for this automatic IVW branch. Outputs include fixed/random IVW, and, with at least three instruments, Egger, weighted median and leave-one-instrument-out estimates. Weak instruments, pleiotropy, selection bias, tissue specificity and exclusion-restriction assumptions still need scientific appraisal. Numerical success is not proof of a causal drug target.</p>
+<p>The current in-memory regional limit is 5,000 variants and the window cannot exceed 10 Mb. Multi-trait, multi-tissue and multiple-region analyses are separate declared pairs with separate provenance. No additional across-pair multiplicity adjustment is silently implied by their individual estimates.</p>
+<h2 id="questions-and-optional-ai">Questions and optional AI</h2>
+<p>Built-in missing-input questions are recorded in <code>QUESTIONS.md</code>, the question inbox and <code>SESSION_HISTORY.md</code>. Use <code>study questions --out answers.yaml</code>, then <code>study answer answers.yaml --actor-id PERSON --check</code> and <code>--record</code>. Answers record statements and may propose amendments; they do not grant execution or transmission permission.</p>
+<p>Opt-in OpenAI/Gemini advice can produce a dedicated, typed list of up to 20 related phenotypes with literature identifiers, or separately propose cited QTL sources, up to three scientist questions, and bounded code text. Each proposal records the provider, returned model, prompt/response, retrieval citations and decision. Suggested phenotype labels may feed public GWAS discovery but remain explicitly unreviewed; they do not change the hypothesis or certify their references. Suggested questions are explicitly labelled as LLM suggestions. New scientific directions require review and amendments. Only registered analysis policies execute automatically.</p>
+<p>Generated code is saved as a hashed <code>.txt</code> proposal and never executed by the proposal handler. Arbitrary generated-code execution, container/OS isolation, general pipeline local-model adapters, MCP and provider-specific OAuth login/refresh remain future integration work. Browser handoff is the default assistance transport when assistance is explicitly enabled. An optional OpenAI-compatible adapter accepts an API key or provider-issued OAuth access token through an environment variable; it does not borrow website sessions. These other capabilities are not made safe merely by adding a prompt or asking the scientist to approve a string.</p>
+<h2 id="privacy-and-offline-execution">Privacy and offline execution</h2>
+<p>Public evidence searches transmit only constructed queries containing public identifiers, phenotype labels or reference intervals. No dataset file is uploaded by these adapters. Nevertheless, a gene/phenotype query can disclose unpublished research interests. The same deny-all policy is checked before sending these project-derived queries as before LLM requests. Additional per-request disclosure conditions fail closed when the adapter cannot satisfy them.</p>
+<p>Use <code>project.data_policy.remote_transmission: deny_all</code> to prevent such project-derived requests; use <code>--offline</code> or <code>resources.network: offline</code> to prevent built-in network requests altogether. Fixed public-reference downloads keyed only by a declared reference release may still be permitted by deny-all, since they do not contain study findings; offline prevents those as well. An already verified local cache can still support analysis offline.</p>
+<p>These are application-level controls, not a guarantee that unrelated software or an arbitrary user-launched script cannot transmit data. Strong non-egress assurance still requires an externally enforced network boundary, restricted filesystem access, validated disclosure bundles and institutional review. Review each result/index before giving it to an LLM; aggregate does not mean nonsensitive or automatically anonymous.</p>
+<h2 id="results-and-evidence-packaging">Results and evidence packaging</h2>
+<p><code>index/index.html</code> and its JSON counterpart show available findings, source statuses, citations and required inputs. Candidate tables keep association ranking, per-feature contextual evidence and operation availability separate. A structure or paper match is not counted as causal validation. All statistical claims should cite the result ID, source snapshot, command and hashed output—not just the dashboard.</p>
+<p>To produce a local audit snapshot:</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>java -jar jlinalg-0.3.6.jar study export --project . --out evidence.zip --acknowledge-sensitive
+</code></pre></div>
+<p>The archive includes the contract, ledger, notebook, questions/answers, plans, amendments, operation artifacts and index. <code>EVIDENCE_BUNDLE.json</code> lists checksums and omissions. Original dataset files outside those evidence directories, reference caches and software binaries are not copied automatically. Intermediate outputs, answer text and LLM interactions may still be sensitive. External preprocessing and unrecorded software remain explicit audit gaps; retain their scripts, versions and input/output hashes.</p>
+<p>The command does not upload the ZIP or assert journal/FDA readiness, anonymity, identity authentication or regulatory compliance. It refuses to overwrite an existing archive. The project records the export and its hash after the snapshot has been written.</p>
+<h2 id="validation-and-remaining-boundaries">Validation and remaining boundaries</h2>
+<p>Automated tests use synthetic regional data and injected provider replies: successful inference, allele reversal, build mismatch, invalid LD, weak instruments, source unavailability, zero matches, schema changes, disclosure denial, proposal quarantine and archive integrity. Public service response shapes were also inspected using generic public identifiers; no private research result was transmitted and no paid LLM inference was used for that inspection.</p>
+<p>Automatic selection and conversion of arbitrary genome-wide GWAS/QTL releases is not implemented. Catalogue discovery and exact, reviewed regional acquisition are distinct steps. A retired service or missing exact splicing-QTL mapping cannot be repaired by treating a gene eQTL as equivalent. The source index and scientist questions explain the next required input. These boundaries apply across projects, not just Splicing-BMI.</p>
+<p>The generated references below cover the methods and public resources. Individual retrieved study/structure/article records retain their own citations and query snapshots; cite those sources in a manuscript alongside JLinAlg.</p>
+<!-- SCIENTIFIC-CITATIONS:START -->
+<section class="citation-strip" aria-labelledby="scientific-citations-bioinformatics-evidence">
+  <div class="container narrow">
+    <span class="eyebrow">Scientific foundations</span>
+    <h2 id="scientific-citations-bioinformatics-evidence">Primary method citations</h2>
+    <p>Cite the relevant method publication as well as JLinAlg when reporting results from this workflow.</p>
+    <ul class="citation-links">
+      <li><a href="../citations.html#gwas-catalog-api-v2">Catalog (2026) — Phenotype-matched source discovery</a></li><li><a href="../citations.html#gwas-catalog-summary-statistics">Catalog (2026) — Harmonized GRCh38 summary statistics</a></li><li><a href="../citations.html#eqtl-catalogue-data-access">Catalogue (2026) — Molecular QTL source discovery</a></li><li><a href="../citations.html#gtex-atlas-2020">Consortium (2020) — Tissue-specific molecular QTL context</a></li><li><a href="../citations.html#uniprot-api-documentation">Consortium (2026) — Reviewed gene and species protein mapping</a></li><li><a href="../citations.html#varadi-alphafold-2022">Varadi et al. (2022) — Predicted protein structure investigation</a></li><li><a href="../citations.html#ucsc-api-documentation">Browser (2026) — Build-specific genomic reference sequence</a></li><li><a href="../citations.html#europe-pmc-rest">PMC (2026) — Non-LLM literature retrieval</a></li><li><a href="../citations.html#frankish-gencode-2021">Frankish et al. (2021) — GENCODE transcript-to-gene annotation</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/33270111/">PMID: 33270111</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7778937/">PMCID: PMC7778937</a>)</span></li><li><a href="../citations.html#thousand-genomes-2015">Consortium (2015) — 1000 Genomes Phase 3</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/26432245/">PMID: 26432245</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4750478/">PMCID: PMC4750478</a>)</span></li><li><a href="../citations.html#wang-susie-2020">Wang (2020) — SuSiE</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/37220626/">PMID: 37220626</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10201948/">PMCID: PMC10201948</a>)</span></li><li><a href="../citations.html#wallace-coloc-2021">Wallace (2021) — SuSiE colocalization</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/34587156/">PMID: 34587156</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8504726/">PMCID: PMC8504726</a>)</span></li><li><a href="../citations.html#bowden-mr-egger-2015">Bowden (2015) — MR-Egger</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/26050253/">PMID: 26050253</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4469799/">PMCID: PMC4469799</a>)</span></li><li><a href="../citations.html#bowden-weighted-median-2016">Bowden et al. (2016) — weighted-median MR</a> <span class="citation-inline-identifiers">(<a href="https://pubmed.ncbi.nlm.nih.gov/27061298/">PMID: 27061298</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4849733/">PMCID: PMC4849733</a>)</span></li><li><a href="../citations.html#sandve-reproducibility-2013">Sandve et al. (2013) — Configuration provenance</a></li><li><a href="../citations.html#w3c-prov-o-2013">W3C (2013) — Evidence provenance graph</a></li>
+    </ul>
+    <a class="text-link" href="../citations.html">Search all scientific citations →</a>
+  </div>
+</section>
+<!-- SCIENTIFIC-CITATIONS:END -->
+<h2 id="publication-reporting-and-local-participant-summaries">Publication reporting and local participant summaries</h2>
+<p>Evidence acquisition must explain <strong>why the source addresses the hypothesis</strong>,
+not merely log a URL. Public requests now retain a scientific rationale,
+hypothesis, operation, citation, request/response audit and retrieval status.
+Cached uses retain their own rationale. Regional genetic sources have a separate
+acquisition-intent record, including local sources. Ontology and reference
+downloads explain their role in annotation, enrichment or genetic follow-up.</p>
+<p>In automatic mode, a dataset with <code>files.phenotype</code> schedules the local
+<code>participant_characteristics</code> operation. It does not transmit participant data.
+For example, add the following to an existing dataset:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>files:
+  results: results.csv
+  phenotype: phenotype.csv
+  analysis_members: analysis-members.csv
+columns:
+  characteristics:
+    id: participant_id
+    membership_role: analysis_members
+    membership_id_column: participant_id
+    population_rationale: Exact sample identifiers exported from the fitted model design matrix.
+    age: visit_age
+    main_phenotype: BMI
+    sex: sex
+    male_value: 1
+    female_value: 2
+    continuous: {White blood cell count: WBC}
+    categorical: {Sequencing batch: batch}
+    units: {Age: years, Main phenotype: kg/m2}
+</code></pre></div>
+<p>These sex codes are an example, not a default. Without a membership file, an
+explicit <code>analysis_population_confirmed: true</code> and <code>population_rationale</code> may
+declare that the phenotype file already represents the analysis sample. The
+declaration is recorded, not independently proven. Otherwise JLinAlg computes
+<strong>provisional phenotype-file summaries</strong> and requests verification; it does not
+equate the number of phenotype records with association-analysis N. Repeated
+participant IDs require explicit visit selection. Optional <code>filters</code> map columns
+to lists of allowed values; they never execute code. Age at the assay visit must
+not silently become baseline age. Single-sex cohorts may use <code>sex_constant:
+female</code> or <code>male</code> with a documented <code>sex_basis</code>.</p>
+<p>Continuous summaries use available-case means and sample standard deviations
+(n−1), reporting nonmissing n and missing counts. Sex percentages retain their
+denominator and unmapped/missing counts. No imputation is performed. With
+feature-specific missingness, provide an appropriately defined primary analysis
+population and explain the varying feature-specific N separately.</p>
+<p>Every report operation now writes a local <code>publication-draft.html</code>,
+<code>publication-supplement.html</code> and <code>publication-claims.yaml</code>, without requiring an
+LLM. Results begin with Table 1. Methods use <code>datasets[].analysis_description</code>
+fields <code>model</code>, <code>outcome</code>, <code>predictor</code>, <code>covariates</code>, <code>technical_factors</code>,
+<code>relatedness</code>, <code>transformations</code>, <code>sample_selection</code> and <code>source</code>. Unknown fields
+remain explicit requests, never reconstructed from a filename or script default.
+Hypotheses are stated using their descriptions, not internal IDs. Common
+abbreviations are expanded at first text use; additional definitions can be
+declared in <code>hypotheses[].metadata.abbreviations</code>.</p>
+<p>The deterministic draft presents Results in the same order as the applicable
+Methods, after participant characteristics. Impact ranking belongs in Discussion,
+not Results. A scientist or advisory LLM selects up to three distinct principal
+findings and explains their importance using effect size, uncertainty,
+reproducibility, biological relevance and contrary evidence. JLinAlg does not
+assign scientific importance from operation type or the smallest P-value. Missing
+interpretations remain explicit writing needs, not invented findings. Null
+results and major limitations remain visible; the supplement retains all evidence
+layers. Publication priority is not drug-target validation. Each result links to
+its source manifest and checksums.</p>
+<h2 id="publication-precision-and-combined-participant-characteristics">Publication precision and combined participant characteristics</h2>
+<p>Publication HTML displays estimates and percentages to two decimal places, with
+small nonzero values in scientific notation (for example, <code>8.01e-21</code>, never
+<code>0.00</code> for that value). Integer counts remain integers. This is display rounding,
+not truncation of the underlying evidence: result CSV files, YAML evidence and
+numerical claim bindings retain their original precision. The same formatter is
+available to native study figure-label generators; existing external figures
+are not rewritten by manuscript revision.</p>
+<p>Table 1 places characteristics in rows and cohorts in columns. Multiple
+hypotheses can share a cohort column only when phenotype-file hashes, participant
+selection fingerprints, membership hashes, N, sex coding, units and overlapping
+summaries agree. Different populations remain separate columns; JLinAlg does not
+sum repeated cohort counts. Reduced available-case n is shown only where it
+differs from N. Supplemental Table 1 retains the per-dataset details and missing
+counts, alongside a full-precision <code>participant-characteristics.csv</code> export.</p>
+<p>Explicit binary definitions are useful when several outcomes share a descriptive
+table. For example, the following uses the investigator-specified definition
+<strong>BMI &gt; 30</strong>, not BMI ≥ 30:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>columns:
+  characteristics:
+    id: participant_id
+    age: Age
+    sex: Sex
+    male_value: 1
+    female_value: 2
+    sex_basis: Investigator-confirmed data dictionary convention.
+    main_phenotype: BMI
+    continuous: {BMI: BMI}
+    units: {Age: years, BMI: kg/m2}
+    derived_binary:
+      Obesity:
+        column: BMI
+        operator: gt
+        threshold: 30
+        definition: Obesity is defined as BMI &gt; 30 kg/m2.
+    analysis_population_confirmed: false
+</code></pre></div>
+<p>The definition is configurable; it is not a global obesity default. Missing BMI
+is excluded from the binary denominator, not counted as non-obese. Operators
+<code>gt</code>, <code>ge</code>, <code>lt</code> and <code>le</code> require an explicit finite threshold and definition.
+Sex codes are never inferred from the presence of 1 and 2. Declare their meanings
+from a dictionary or scientist statement, and document the basis. A descriptive
+definition does not establish the definition used in previously fitted models.</p>
+<p>To refresh demographics without refitting unrelated association analyses, run a
+separate native study with the same hypothesis IDs, phenotype files and updated
+<code>characteristics</code> settings. Set <code>analysis: {mode: manual, goals: []}</code> to request
+only the baseline validation, participant summaries, diagnostics and report;
+omit unrelated irQTL inputs and disable assistance/network. Retain its ledger.
+Preserve the original <code>columns.validation</code> and <code>analysis.harmonization</code> settings:
+reducing the requested analysis goals does not authorize changing the existing
+invalid-row or common-feature policy.
+Then add this explicit, hash-pinned reference to the manuscript revision:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>participant_project:
+  path: /absolute/path/to/participant-summary-project
+  ledger_sha256: EXACT_SHA256_OF_ledger/events.jsonl
+  rationale: Update descriptive coding and outcome summaries as requested by the scientist.
+</code></pre></div>
+<p>JLinAlg verifies both projects and imports only current participant-characteristic
+operations matching existing hypothesis IDs. Association, enrichment, genetic
+and literature evidence still comes from the original project. The revision
+preserves the refresh contract and ledger, source manifests, hashes and rationale.
+Keep both projects with the manuscript. An unverified analysis population remains
+provisional after this refresh; formatting cannot establish missing membership.</p>
+<h2 id="local-isoform-ratio-qtl-review">Local isoform-ratio QTL review</h2>
+<p>A dataset may declare a local, optionally bzip2/gzip-compressed irQTL result file:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>files:
+  irqtl: irqtl-cis-results.csv.bz2
+columns:
+  irqtl:
+    genome_build: GRCh38
+    effect_allele: ALT
+    complete_region: false
+    export_p_threshold: 1.0e-7
+    rationale: Match the measured transcript isoform ratio to its own cis genetic associations for instrument assessment.
+</code></pre></div>
+<p>The current streaming adapter expects columns <code>SNP</code>, <code>SNP_Chr</code>, <code>SNP_Pos</code>, <code>EAF</code>,
+<code>N</code>, <code>Tx</code>, <code>Is_Cis</code>, <code>RSq</code>, <code>Fx</code>, <code>T</code>, and <code>log10P</code>, with SNP IDs such as
+<code>chr1:123:G:A:rs123</code>. It checks exact transcript versions, parses declared ALT
+effects, retains log10 probabilities to avoid underflow, and derives candidate
+standard errors as <code>abs(Fx/T)</code>. That derivation requires the statistic definition
+to be correct. Flags highlight rare alleles, near-perfect fits, extreme statistics,
+weak instruments and the usual MR instrument threshold. Flags are review aids,
+not proof of artifacts; their absence is not instrument approval. At most 50,000
+matching records are written, in source order, with truncation disclosed.</p>
+<p>The output is <strong>candidate review, not by itself MR or colocalization inference</strong>. The
+candidate-review operation is complete when its audited candidate files exist;
+it no longer reports itself as waiting for downstream MR inputs. MR still needs
+suitable phenotype GWAS effects, LD, ancestry, overlap assessment and instrument
+validity review, supplied either by <code>analysis.bioinformatics.mr</code> or custom
+<code>genetic_pairs</code>. Conventional colocalization needs unfiltered regional statistics
+on both sides, including nonsignificant variants. A P &lt; 10⁻⁷ irQTL export cannot
+stand in for complete regional evidence. <code>analysis.bioinformatics.colocalization</code>
+can nevertheless run a deliberately labeled exploratory partial-data analysis and
+propagate its mandatory caveat into reporting. Gene-expression QTLs are not silently
+substituted for isoform-ratio QTLs. Sharing a consortium or genome build does not
+prove independence or matching ancestry.</p>
+<p>For a separately reviewed <code>genetic_pairs</code> MR analysis, a filtered exposure is
+permitted when its declared <code>export_p_threshold</code> includes the prespecified
+instrument threshold. Outcome statistics must not be selected by their outcome
+P-value: declare complete regional data or <code>selection_basis:
+exposure_instrument_lookup</code>. Harmonization coverage is measured against the
+exposure-variant set for MR; regional inference retains its full-region coverage
+check. These declarations do not themselves acquire missing data or approve
+instruments. The current automatic MR estimator requires at least two independent
+strong instruments; single-instrument follow-up remains a separate capability.</p>
+<h2 id="literature-depth-and-excerpts">Literature depth and excerpts</h2>
+<p>The deterministic literature step starts with four field-level strategies:
+field background, hypothesis relevance, similar studies, and potentially
+conflicting findings. These searches run even when no gene passes the analysis
+threshold. They combine declared phenotype labels with molecular-field terms,
+inferred from dataset type or supplied explicitly in each hypothesis:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>analysis:
+  bioinformatics:
+    phenotype_terms: [body mass index, obesity]
+    literature_terms: [RNA splicing, isoform ratio, transcript isoform]
+    max_pages: 3
+</code></pre></div>
+<p><code>literature_terms</code> replaces the inferred molecular terms; <code>phenotype_terms</code>
+replaces the default outcome label. Use synonyms appropriate to the question,
+not patient information or a confidential project narrative. Unknown assay
+types need explicit field terms. These are bounded title/abstract keyword
+searches, not an automated understanding of every aspect of the hypothesis.
+Review tissue, species, design and phenotype relevance when screening results.</p>
+<p>For eligible genes, three additional strategies address direct gene–phenotype
+matches, molecular mechanisms, and replication/contrary findings. The adapter
+retrieves Europe PMC core records with available abstracts and records cursor
+pagination and search limits. It preserves bibliographic provenance and literal
+excerpts of at most twelve words, with offsets in explicitly normalized abstract
+text and links to hashed source responses. Excerpts are lexical candidates for
+review, not a claim of hypothesis support; unavailable abstracts remain unavailable.
+This is not an exhaustive or systematic review. Queries intentionally do not
+select only positive results, but vocabulary, indexing and bounded budgets can
+still miss important work.</p>
+<p>Each literature operation writes <code>reference-catalog.yaml</code> and a browsable
+<code>reference-catalog.html</code>. Publication drafts and manuscript revisions also
+consolidate their native literature evidence into these catalogs. Entries retain
+available title, authors, year, journal, DOI, PMID/PMCID, source link, literal
+excerpt, metadata conflicts and every retrieval context. Context includes the
+strategy, query, scientific rationale, page, timestamps and hashed response
+or cached-response audit link. The manuscript snapshot additionally identifies
+the source operation and manifest; keep the source analysis bundle for its raw
+response files.</p>
+<p>Records are deduplicated by normalized identifiers, not similar titles. Matching
+identifiers connect occurrences without discarding their query histories;
+conflicting bibliographic metadata stays visible for review. An article without
+a usable identifier remains a candidate but cannot be cited by the revision
+command. Catalog IDs are deterministic for the available identifier set, not
+permanent identifiers across later metadata corrections. References remain
+<code>unreviewed_candidate_not_hypothesis_support</code> after retrieval.</p>
+<p>Coverage is reported for each strategy and operation/phenotype scope. A completed
+empty search differs from missing inputs, denied transmission, offline access,
+failed requests and truncated results. Even complete bounded coverage requires
+scientific review: assess synonyms and database/date coverage, read the relevant
+source text, examine contrary findings and compare the closest prior studies.
+Neither a paper count nor an empty search establishes sufficient scholarship or
+that a study is the first of its kind. Extend the search through a study amendment
+when needed. The reporting-only revision command does not acquire missing papers.</p>
+<p>Opt-in LLM review is instructed to distinguish quotations, interpretation and
+proposed experiments; give design, species, tissue, trait and contrary evidence;
+and justify publication priorities separately from therapeutic opportunities.
+Generated advice still requires source verification and scientist review. The
+new participant summaries are <strong>not automatically added to remote LLM payloads</strong>.
+Literature and draft advisors receive at most 20 catalog candidate previews,
+ordered by reference ID rather than relevance. Editorial review receives all
+cited catalog entries plus at most 20 additional field/cohort/method-search candidates. These
+previews omit full abstracts, local paths and query-audit records; they cannot
+replace review of the complete local catalog. New sources suggested or retrieved
+by an advisor remain separately audited candidates, not automatically verified
+manuscript references. No remote provider is enabled by this writing policy.</p>
+<p>The <a href="https://www.ebi.ac.uk/eqtl/Data_access/">eQTL Catalogue Data Access page</a>
+reports that its REST API has been retired (checked 2026-10-02). JLinAlg records
+that service state rather than retrying the withdrawn endpoint or treating it as
+no biological matches. FTP/tabix acquisition remains a separately reviewed source
+route, not an implemented automatic replacement in this adapter.</p>
+<h2 id="revise-a-manuscript-without-rerunning-the-analysis">Revise a manuscript without rerunning the analysis</h2>
+<p>The current source build provides a reporting-only, offline revision command:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg.jar study manuscript revision.yaml --project SOURCE_PROJECT --out NEW_REVISION_BUNDLE --actor-type human --actor-id scientist-1
+java -jar jlinalg.jar study manuscript-verify --project NEW_REVISION_BUNDLE
+</code></pre></div>
+<p>Use the rebuilt executable JAR; the version label alone does not establish that
+an older release contains this command. The source project remains unchanged.
+The command verifies its ledger and outputs, reconstructs current evidence from
+authoritative artifacts rather than trusting an editable index, and creates a
+new bundle. It does not refit models, amend hypotheses, query databases or call
+an LLM. A supplied LLM-authored editorial request should use <code>--actor-type llm</code>
+and <code>--model</code> with the known model identity, or an explicit unknown declaration.</p>
+<h3 id="develop-the-introduction-from-the-field-to-the-hypotheses">Develop the Introduction from the field to the hypotheses</h3>
+<p>Native first drafts, revision checks and LLM drafting/editorial instructions share
+the same four- or five-paragraph structure:</p>
+<ol>
+<li>One or two paragraphs summarizing the relevant field and established findings.</li>
+<li>One paragraph explaining why the study hypothesis is relevant to that field.</li>
+<li>One paragraph explaining why the question matters, what closely related studies
+   have already done, and precisely how this study differs.</li>
+<li>One final paragraph stating the overall hypotheses and their scientific motivation.</li>
+</ol>
+<p>Use citations for background, rationale and prior-work comparisons. A different
+assay, tissue, population or validation design is a specific contribution to
+explain, not proof of novelty. Do not invent a prespecified motivation from the
+significant results; changed hypotheses belong in the study amendment history.
+The finished Introduction uses connected prose without paragraph mini-headings
+or editorial/audit commentary.</p>
+<p>Generated bundles provide <code>introduction-template.yaml</code>, a revision request with
+the four roles and explicit placeholders, and <code>introduction-review.yaml</code>, which
+lists missing roles, citation needs and literature coverage. Fill the template
+with reviewed prose and cataloged references. For example, a paragraph under
+<code>sections</code> can have:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>- id: intro-prior-work
+  section: introduction
+  introduction_role: importance_and_gap
+  text: &gt;-
+    [SCIENTIST INPUT REQUIRED: Compare the closest studies and explain the
+    specific contribution, using sources that actually support the comparison.]
+  references: []
+  sources: []
+  rationale: Develop the importance and prior-work comparison after source review.
+</code></pre></div>
+<p>The ordered roles are <code>field_background</code>, <code>hypothesis_relevance</code>,
+<code>importance_and_gap</code>, and <code>hypotheses_and_motivation</code>. The first permits two
+paragraphs; every other role permits one. Blank lines separate paragraphs.
+Unknown roles, roles outside the Introduction, excess paragraphs and reversed
+role order are rejected before a revision bundle is created. Missing roles,
+placeholders and missing citations instead remain explicit writing needs.
+Existing untagged prose is preserved and flagged for classification; it is not
+silently rewritten. A structurally complete Introduction still needs scientific
+review: JLinAlg cannot verify source support merely by checking citation IDs.</p>
+<h3 id="start-methods-with-the-cohorts-and-then-the-performed-analyses">Start Methods with the cohorts and then the performed analyses</h3>
+<p>The shared Methods model begins with a description and design/recruitment
+citation for <strong>each participating cohort</strong>, followed by association analysis,
+discovery/replication where applicable, meta-analysis, enrichment/ontology,
+Mendelian randomization, network analysis, fine mapping where applicable,
+colocalization, sensitivity analyses and reproducibility. Include the methods
+actually performed, not every possible pipeline branch. A blocked MR or
+colocalization step must not read as a completed analysis.</p>
+<p>For established cohorts, select the design publication matching the particular
+cohort or subcohort. Examples include the
+<a href="https://pubmed.ncbi.nlm.nih.gov/474565/">Framingham Offspring design paper</a>,
+<a href="https://pubmed.ncbi.nlm.nih.gov/3204420/">CARDIA design and recruitment paper</a>,
+<a href="https://pubmed.ncbi.nlm.nih.gov/9492970/">WHI design paper</a>, and
+<a href="https://pubmed.ncbi.nlm.nih.gov/16317982/">JHS recruitment and cohort-description paper</a>.
+These are starting points for source selection, not interchangeable references
+for every generation, ancillary sample or examination. In particular, a cohort's
+original enrollment count must never become the current study's analysis N.
+Describe the analyzed visits, recruitment subset, inclusion/exclusion criteria,
+tissue and sample selection from this study's actual provenance.</p>
+<p>The cohort contract now accepts public names and selected references:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>cohorts:
+  - id: fhs-offspring
+    name: Framingham Offspring Study
+    literature_name: Framingham Offspring Study
+    references: [pmid:474565]
+    description: &gt;-
+      [SCIENTIST INPUT REQUIRED: describe this study's included examination,
+      eligibility criteria and sample selection; do not copy historical N.]
+</code></pre></div>
+<p><code>literature_name</code> is an explicit public search label. Otherwise JLinAlg uses an
+explicit <code>name</code>, or expands the recognized identifiers FHS, CARDIA, WHI, JHS,
+<code>fhs-offspring</code> and <code>fhs-gen3</code> to public names. Unknown private cohort identifiers
+and descriptions are not used as search queries; the index requests a public
+name instead. Literature searches now include cohort design/recruitment queries
+and exact lookups of declared DOI, <code>pmid:</code> or <code>pmcid:</code> references. A search result
+is still a candidate: JLinAlg does not select the first hit as the definitive
+cohort paper. A declared reference is inserted into the writing template only
+after its identifier is present in the retrieved catalog.</p>
+<p>Method references may also be supplied in <code>datasets[].analysis_description.references</code>
+for externally supplied associations, or in the relevant analysis configuration,
+for example <code>analysis.meta_analysis.references</code>. These fields select reporting
+references; they do not change the statistical estimator. New native association,
+meta-analysis, enrichment and regional genetic runs record <code>details.method_report</code>
+with method identity, settings or links to their authoritative logs, software and
+available references. The literature branch searches these recorded method terms
+and reference identifiers as well. Cohort/method query rationale, status and
+provenance are retained separately from Introduction search coverage.</p>
+<p>For every performed analysis, cite the method and report the relevant settings:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Reporting requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Association</td>
+<td>Model family/link, formula orientation, covariates, technical factors, transformations, missing-data handling, sample selection, pedigree/relatedness adjustment and multiple-testing rule. Distinguish externally supplied results from a model fitted by JLinAlg.</td>
+</tr>
+<tr>
+<td>Meta-analysis</td>
+<td>Effect scale, weighting, fixed/random-effects estimator, heterogeneity, minimum cohorts, inference/confidence settings and overlap handling.</td>
+</tr>
+<tr>
+<td>Enrichment and ontology</td>
+<td>Selected features/genes, threshold, mapped tested-gene universe, mapping rules, database release, test and multiplicity correction; cite the statistical method and resource.</td>
+</tr>
+<tr>
+<td>MR</td>
+<td>Molecular exposure/outcome and tissue, GWAS/QTL sources, instrument P/F thresholds, LD reference and clumping scope/r2, allele harmonization, sample overlap, estimators and sensitivities.</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>Network source/version, node/edge definitions, weights, filtering thresholds, algorithm and null model. The writing model does not add an executable network adapter.</td>
+</tr>
+<tr>
+<td>Colocalization</td>
+<td>Region/build, full regional inputs, sample sizes, LD, single/multiple-signal model, priors, posterior interpretation threshold and sensitivity to priors.</td>
+</tr>
+</tbody>
+</table>
+<p>Explain parameter choices where a justification was recorded. Merely using a
+default is not a scientific justification. New meta-analysis records capture
+backend defaults at execution; old runs with missing settings remain flagged
+for recovery from original logs, rather than acquiring today's defaults. The
+regional adapter records actual instrument thresholds and estimators, fine-mapping
+settings/logs, and colocalization priors. These reporting additions do not refit
+historical analyses or retroactively justify decisions.</p>
+<p>Each new manuscript bundle contains <code>methods-template.yaml</code>,
+<code>methods-inventory.yaml</code> and <code>methods-review.yaml</code>. Use the template's ordered
+<code>methods_role</code> values and preserve source IDs. Cohort paragraphs identify
+<code>cohort_ids</code>; analytical paragraphs carry <code>parameters</code> and
+<code>parameter_justifications</code> mappings. For example, an illustrative paragraph
+under <code>sections</code> may contain:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>- id: methods-meta
+  section: methods
+  methods_role: meta_analysis
+  text: &gt;-
+    [SCIENTIST INPUT REQUIRED: describe the verified estimator, parameters
+    and supporting method citation in publication prose.]
+  sources: [H1.meta_analysis]
+  references: []
+  parameters:
+    source: Verified method_report and original command log for H1.meta_analysis
+  parameter_justifications:
+    estimator: Not recorded; request the scientist's rationale.
+  rationale: Document the actual pooled analysis without inventing its rationale.
+</code></pre></div>
+<p>Fill this from the actual run and catalog; an empty citation list remains a
+review need. The role order is recorded in the template policy, with <code>cohorts</code>
+first and <code>reproducibility</code> last. Invalid or reversed roles are rejected before
+bundle creation. Missing cohort descriptions, citations, parameters or
+justifications are review needs, not fabricated text. Existing untagged Methods
+paragraphs and their attribution remain intact; classify or explicitly replace
+them in a new revision. Structural checks do not establish source support or
+certify that prose accurately describes an executed analysis.</p>
+<p>LLM drafting and editorial prompts use the same model. Automatic assistance does
+not receive raw cohort descriptions, patient files or the local methods inventory.
+Explicitly submitted paragraph parameters and justifications are part of the
+hash-approved editorial payload; inspect them for sensitive text and paths before
+authorizing disclosure. Offline and deny-all policies still block remote queries.</p>
+<h2 id="results-and-discussion-writing-model">Results and Discussion writing model</h2>
+<p>Results begin with native Table 1, followed by association, discovery and
+replication, meta-analysis, enrichment and ontology, Mendelian randomization,
+network analysis, fine mapping, colocalization, and sensitivity analyses, as
+applicable. These are the same analytical roles and order used by Methods; an
+unperformed analysis does not become a result. Important null and discordant
+findings belong with their analysis, not hidden in the supplement. There is no
+five-paragraph Results limit.</p>
+<p>Tag each Results paragraph with <code>results_role</code> and its primary <code>sources</code>.
+<code>supporting_evidence</code> places bioinformatics context beside the finding it informs.
+Each entry names a current evidence <code>source</code> and explains the <code>relationship</code>,
+including the molecular feature, tissue and phenotype match, concordance or
+conflict, and interpretive limits. Paragraph <code>references</code> cite the corresponding
+retrieved literature. These links record an interpretation; they do not certify
+independence, mechanistic support or isoform-specific causality. A partly blocked
+operation may retain useful retrieved records, but its incomplete status remains
+visible and its usable source-level result must be identified and reviewed.
+Native drafting inventories candidate context without attaching every database
+match to every finding.</p>
+<p>Discussion begins with one connected paragraph about the most impactful finding
+and why it matters, followed by one paragraph each for the second and third.
+Use <code>discussion_role: principal_finding</code>, consecutive <code>impact_rank</code> values 1–3,
+<code>result_ids</code> linking the relevant Results paragraphs, and <code>impact_reason</code>.
+Express that reason in the scientific prose as well as the audit field. Consider
+effect magnitude and uncertainty, replication, biological relevance, sensitivity
+and conflicting evidence; a small P-value or completed operation is not by itself
+a reason for high impact. Different findings can originate in the same analysis,
+but repeated Results links trigger a check that the priorities are genuinely
+distinct. If fewer than three findings merit discussion, remove unused template
+slots and explain why in the top-level <code>discussion_selection_note</code>.</p>
+<p>After those paragraphs, use <code>future_potential</code>, <code>next_steps</code>, and <code>limitations</code>
+in that order. Distinguish possible applications and proposed follow-up from work
+actually performed; explain how limitations constrain interpretation. Finish
+with <code>overall_conclusion</code>, either as the final Discussion paragraph or in the
+separate <code>conclusion</code> section, not both. It should synthesize the supported
+contribution, not introduce a new finding or promise clinical utility.</p>
+<p>Every new native report and manuscript revision includes:</p>
+<ul>
+<li><code>results-discussion-template.yaml</code>: editable ordered paragraphs. The three
+  impact slots are explicitly unfilled, not automatically ranked analyses.</li>
+<li><code>results-discussion-inventory.yaml</code>: eligible analysis sources, available
+  bioinformatics and literature context, and unresolved evidence.</li>
+<li><code>results-discussion-review.yaml</code>: missing structure, reasons, evidence links
+  and unclassified older prose requiring review.</li>
+</ul>
+<p>For example, these illustrative paragraphs can be included under <code>sections</code>
+after replacing source IDs and prose with the actual verified findings:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>- id: results-meta
+  section: results
+  results_role: meta_analysis
+  title: Pooled molecular associations
+  text: &gt;-
+    [SCIENTIST INPUT REQUIRED: report estimates, uncertainty, heterogeneity,
+    and important null or discordant results.]
+  sources: [H1.meta_analysis]
+  references: []
+  supporting_evidence:
+    - source: H1.bioinformatics_investigation
+      relationship: &gt;-
+        [Replace with the exact feature-level relationship and limitations;
+        a protein annotation alone is not isoform-specific validation.]
+  rationale: Present pooled results in Methods order with relevant context.
+- id: discussion-primary
+  section: discussion
+  discussion_role: principal_finding
+  impact_rank: 1
+  result_ids: [results-meta]
+  impact_reason: &gt;-
+    [SCIENTIST INPUT REQUIRED: explain why this is the most impactful finding.]
+  text: &gt;-
+    [SCIENTIST INPUT REQUIRED: interpret this finding, explain its importance,
+    compare relevant literature, and retain uncertainty and contrary evidence.]
+  sources: [H1.meta_analysis]
+  references: []
+  rationale: Distinguish scientific importance from statistical significance.
+</code></pre></div>
+<p>Unknown sources, mismatched Results roles, reversed typed ordering, invalid impact
+ranks, unknown Results links and duplicated closing roles are rejected before a
+revision bundle is created. Missing prose, rationale, classification or evidence
+coverage remains a review need. Untagged older paragraphs retain their order,
+text and attribution; JLinAlg does not silently rewrite an earlier manuscript.
+Structural completeness never certifies scientific validity. LLM drafting and
+editorial prompts follow this same model; suggestions still require acceptance
+in a new audited revision. Explicit relationship text and impact reasons enter
+the hash-approved editorial payload, but the full local evidence inventory and
+patient files are not automatically transmitted.</p>
+<h2 id="creating-a-manuscript-revision">Creating a manuscript revision</h2>
+<p>A small revision request can contain:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>schema_version: 1
+id: manuscript-01
+title: Molecular associations with the study phenotype
+rationale: Integrate the latest verified findings and retain uncertainty.
+sections:
+  - id: main-association
+    section: results
+    results_role: meta_analysis
+    title: Pooled molecular associations
+    text: &gt;-
+      The analysis tested {{H1.meta_analysis#/tested_features}} features;
+      {{H1.meta_analysis#/BH_FDR_0_05_features}} met the displayed false
+      discovery rate threshold. These associations do not establish causality.
+    sources: [H1.meta_analysis]
+    rationale: Put the completed primary analysis before exploratory context.
+comments:
+  - id: check-population
+    comment: Confirm that Table 1 represents the analysis population.
+    status: pending
+</code></pre></div>
+<p>Replace <code>H1</code> with the actual hypothesis ID. Bindings use a hypothesis/operation
+key plus a JSON pointer into its native <code>key_findings</code>. Missing, ambiguous,
+malformed or nonscalar bindings are errors, not guessed values. The claim map
+records the exact substituted values and their source manifests. Ordinary prose
+is attributed editorial input and is <strong>not</strong> automatically fact-checked.</p>
+<p>Allowed sections are <code>introduction</code>, <code>methods</code>, <code>results</code>, <code>discussion</code> and
+<code>conclusion</code>. Results start with native participant characteristics, retaining
+unverified population and missing-coding warnings. Typed Results paragraphs must
+follow Methods order, each requiring matching completed analysis evidence and an
+editorial rationale. Untagged older paragraphs remain intact and flagged for
+classification. Important caveats remain in the manuscript, while every
+current evidence layer is retained in the supplement. A completed operation is
+not necessarily positive evidence. Optional <code>references</code> lists DOIs (also accepted
+as DOI URLs), <code>pmid:123</code>, <code>pmcid:PMC123</code>, or <code>ref-...</code> catalog IDs already present
+in the current native literature results; a missing reference is rejected.
+Retrieval establishes provenance, not scientific support.</p>
+<p>For another revision, add a <code>previous_revision</code> mapping with <code>manifest</code> pointing
+to the earlier bundle's <code>metadata/manifest.yaml</code> and its <code>sha256</code>. Supply only
+changed paragraph IDs: omitted paragraphs and their author attribution are
+retained, while replaced paragraphs have before/after records. To remove a
+paragraph, use <code>remove_sections: [{id: paragraph-id, rationale: reason}]</code>.
+To move existing prose or place a new paragraph before an older one, optionally
+supply <code>paragraph_order</code>, listing <strong>every retained paragraph ID exactly once</strong>.
+The change log records that explicit ordering decision without changing the
+authorship of untouched paragraphs. Omit it on later revisions to retain the
+current order; an old ordering request is not replayed on new additions.
+Comments merge by ID and have <code>pending</code>, <code>addressed</code> or <code>deferred</code> status;
+addressed comments require a <code>response</code>. Numerical bindings refresh against the
+current evidence, so reread all retained interpretations after scientific changes.</p>
+<p>The bundle includes <code>artifacts/manuscript.html</code>, <code>supplement.html</code>, a deduplicated
+<code>literature-review.html</code>, <code>reference-catalog.html</code>, <code>reference-catalog.yaml</code>,
+<code>introduction-template.yaml</code>, <code>introduction-review.yaml</code>, <code>evidence.yaml</code>,
+<code>methods-template.yaml</code>, <code>methods-inventory.yaml</code>, <code>methods-review.yaml</code>,
+<code>results-discussion-template.yaml</code>, <code>results-discussion-inventory.yaml</code>,
+<code>results-discussion-review.yaml</code>,
+<code>publication-claims.yaml</code>, and a local HTML index. Metadata preserves the request, resolved revision, previous drafts
+as inert text, source manifests, original actor attribution and editorial change
+log. The running packaged JAR is copied to <code>scripts/</code>; a class-directory test run
+explicitly reports that no packaged JAR is available. A notebook, timestamps,
+software identity and checksum manifest document generation. Keep the original
+analysis bundle: large result tables and public response caches are referenced,
+not duplicated into this reporting snapshot.</p>
+<p>Never edit a checksummed generated draft in place. Free-form edits in an external
+editor are not imported automatically; put revised text into the next request's
+section IDs. Scientific changes still require study amendments and analysis
+execution. This reporting command cannot establish missing sample membership,
+sex coding, model covariates, valid instruments or regional colocalization input.
+No patient-level rows are read by the revision command, but editorial text and
+aggregate results may remain sensitive; local generation does not authorize
+sharing. Integrity verification is not publication or regulatory certification.</p>
+<h3 id="request-an-optional-llm-editorial-pass">Request an optional LLM editorial pass</h3>
+<p>Each revision prepares <code>artifacts/editorial-payload.json</code> locally, without sending
+it. This contains the manuscript sections, editorial comments, bounded aggregate
+association/replication/enrichment/irQTL previews, and cited literature metadata.
+It excludes input files, patient rows, automatic Table 1 summaries, local paths,
+raw response caches and free-text scientist answers. Manuscript prose or comments
+can themselves contain sensitive information: inspect the <strong>whole exact payload</strong>.
+An allowlist is not a guarantee of anonymization or protection against disclosure.</p>
+<p>After that inspection, authorize the payload by its exact SHA-256:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>$payload = 'REVISION_BUNDLE/artifacts/editorial-payload.json'
+$approved = (Get-FileHash -Algorithm SHA256 -LiteralPath $payload).Hash.ToLowerInvariant()
+# Review $payload before using its hash as disclosure approval.
+java -jar jlinalg.jar study manuscript-editorial --project REVISION_BUNDLE --out NEW_REVIEW_BUNDLE --approved-payload-sha256 $approved --actor-id scientist-1
+java -jar jlinalg.jar study manuscript-verify --project NEW_REVIEW_BUNDLE
+</code></pre></div>
+<p>Omitting <code>--provider</code> selects <strong>browser handoff</strong>, not a remote request. No model,
+key, account, browser installation or internet connection is needed to prepare
+the packet. Open <code>NEW_REVIEW_BUNDLE/artifacts/handoff/index.html</code> and review the
+exact <code>prompt.txt</code> before manually submitting anything. <code>--offline</code> still allows
+local preparation and import; it does not authorize browser transmission.</p>
+<h3 id="complete-the-browser-handoff">Complete the browser handoff</h3>
+<p>The local packet is plain HTML and UTF-8 text, with no JavaScript, external assets,
+forms, automatic clipboard access or remote requests. Keep it unchanged. To open
+it explicitly:</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>java -jar jlinalg.jar study handoff-open --handoff NEW_REVIEW_BUNDLE/artifacts/handoff
+# Alternatively select --browser chrome, chromium, firefox, edge, links or none.
+</code></pre></div>
+<p><code>auto</code> first requests the system-default browser; if unavailable, it looks for
+installed Chrome, Chromium, Firefox or Edge in a graphical environment, then
+Links in an interactive terminal. An explicit selection does not silently choose
+another family. It opens only the verified local packet, reports the selection
+or manual-opening path, and never installs a browser. Launch success does not
+prove that a page rendered. A headless server can prepare the packet for an
+authorized workstation instead.</p>
+<p>Browser choices were evaluated against their documented capabilities:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Role in this workflow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chrome, Chromium, Firefox or Edge</td>
+<td>Recommended for the actual modern AI website; use the installed browser that works with the scientist's account. No website compatibility or login is assumed.</td>
+</tr>
+<tr>
+<td>Linux Links</td>
+<td>Lightweight local packet viewer and terminal fallback. Its <a href="https://links.twibright.com/features.php">feature page</a> describes HTML 4 without CSS, and its <a href="https://links.twibright.com/user_en.html">manual</a> says JavaScript is deactivated. Do not depend on it for AI Mode/Gemini/ChatGPT web applications.</td>
+</tr>
+<tr>
+<td>Browsh</td>
+<td>A possible terminal browser for modern pages, but its <a href="https://www.brow.sh/docs/introduction/">architecture requires Firefox and an extension</a>. Not bundled or required; AI-site compatibility has not been tested.</td>
+</tr>
+<tr>
+<td>Automated browser drivers</td>
+<td>Not part of this handoff implementation. Website changes, authentication, disclosure controls and provider terms need separate evaluation. No CAPTCHA bypass, private endpoint replay or cookie extraction.</td>
+</tr>
+</tbody>
+</table>
+<p>If policy permits, manually copy <strong>only the exact reviewed prompt</strong> into the
+chosen AI website. Do not upload the study folder, phenotype files, full evidence
+index or other attachments. The approved payload excludes patient files, but
+free-text manuscript content and unpublished aggregate findings can still be
+confidential. Provider terms matter even for free services.</p>
+<p>Copy <code>handoff/response-template.yaml</code> <strong>outside the frozen packet</strong>. Fill in its
+provider, displayed model (<code>not_disclosed</code> if unknown), clean HTTPS website URL,
+quoted ISO-8601 submission/receipt timestamps, complete response, references and
+review rationale. Reference entries have <code>title</code> and <code>url</code>. Record only URLs
+without query strings, fragments or credentials; never include login tokens.
+Confirm <code>exact_prompt_submitted</code>, <code>disclosure_approved</code> and <code>no_patient_data</code>
+only when true. If the prompt was edited, prepare a new packet; do not attest an
+exact match. <code>decision</code> is <code>pending_review</code>, <code>accepted_for_revision</code> or <code>rejected</code>.</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>java -jar jlinalg.jar study handoff-import response.yaml --handoff NEW_REVIEW_BUNDLE/artifacts/handoff --out NEW_RECEIPT --actor-id scientist-1
+java -jar jlinalg.jar study handoff-verify NEW_RECEIPT/receipt.yaml
+</code></pre></div>
+<p>The new receipt preserves the prompt, response, request identity, checksums,
+provider/model declarations, timestamps, named human actor, disposition and
+<code>SESSION_HISTORY.md</code>. Response HTML and code are displayed as escaped text,
+never executed. Existing packets/receipts cannot be overwritten. Importing an
+accepted answer still does not edit a manuscript or execute a new analysis.</p>
+<p><strong>Audit limit:</strong> JLinAlg verifies local integrity and request matching. It did
+not observe the browser interaction, authenticate the provider/model, establish
+that all conversation turns were supplied, or independently verify citations.
+External submission times, no-patient-data assertions and response attribution
+are human attestations, not certified telemetry. Store only one exact-prompt
+exchange per receipt; create another packet for follow-up context rather than
+silently omitting the conversation. The archive explains this gap explicitly.</p>
+<h3 id="resume-pipeline-assistance">Resume pipeline assistance</h3>
+<p>For a pipeline, enable the desired purposes and optionally predeclare receipt
+paths before the first run. Omitted provider means <code>browser</code>; enabling assistance
+is still explicit and does not itself authorize disclosure:</p>
+<div class="code-window"><div class="code-bar"><span>yaml</span></div><pre><code>assistance:
+  enabled: true
+  next_steps: true
+  literature: true
+  response_files:
+    - responses/H1-advisor/receipt.yaml
+    - responses/H1-literature/receipt.yaml
+</code></pre></div>
+<p>The project index links each waiting operation's <code>handoff/index.html</code> and states
+the required input. Import each response into its declared <strong>new</strong> receipt
+directory, then repeat the same <code>study auto</code> command. Missing receipt paths are
+allowed initially. Matching uses the exact prompt, purpose, hypothesis and policy
+identity, not filenames alone. Completed unchanged upstream operations are reused;
+changed response artifacts invalidate assistance caching. Receipts are copied
+into the operation's immutable outputs. Declare more paths by an approved
+amendment if they were not planned initially. Do not edit the base study in place.</p>
+<p>An unrelated receipt is not applied, duplicate matches are rejected, a rejected
+response stays waiting, and malformed suggestions cannot authorize execution.
+For next-step advice the imported answer must satisfy the requested JSON
+<code>proposals</code> contract. Literature references are labelled human-transcribed and
+unverified, not provider-retrieved evidence. Empty citations are not proof of no
+relevant literature. Editorial receipt suggestions are incorporated by creating
+a new <code>study manuscript</code> revision and citing the receipt in its rationale.</p>
+<h3 id="optional-api-key-and-oauth-access-token-connections">Optional API key and OAuth access token connections</h3>
+<p>Use an API connection only when explicitly selected. <code>--provider openai</code> uses
+the OpenAI Responses API; <code>--provider gemini</code> uses the Gemini API. Each needs its
+model and environment-variable credential. The portable alternative is
+<code>--provider openai_compatible</code>, which uses non-streaming Chat Completions:</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>java -jar jlinalg.jar study manuscript-editorial --project REVISION_BUNDLE --out NEW_API_REVIEW --approved-payload-sha256 HASH --provider openai_compatible --model PROVIDER_MODEL --endpoint https://gateway.example.org/v1/chat/completions --auth api_key --api-key-env RESEARCH_AI_KEY --actor-id scientist-1
+
+# Only when the endpoint officially accepts a token issued by its OAuth service:
+java -jar jlinalg.jar study manuscript-editorial --project REVISION_BUNDLE --out NEW_OAUTH_REVIEW --approved-payload-sha256 HASH --provider openai_compatible --model PROVIDER_MODEL --endpoint https://gateway.example.org/v1/chat/completions --auth oauth --oauth-token-env RESEARCH_AI_ACCESS_TOKEN --actor-id scientist-1
+</code></pre></div>
+<p>The corresponding study keys are <code>provider: openai_compatible</code>, <code>model</code>,
+<code>endpoint</code>, <code>auth: api_key</code> plus <code>api_key_env</code>, or <code>auth: oauth</code> plus
+<code>oauth_token_env</code>. Use one authentication method. Endpoint URLs must use HTTPS
+and end in <code>/chat/completions</code>, without credentials, query parameters or
+fragments. Redirects are disabled. Tokens are read from the environment and
+sent only as bearer credentials to that explicit endpoint; echoed tokens are
+redacted from stored responses. Never place credentials in YAML, CLI arguments,
+manuscripts or browser transcripts. The <a href="https://developers.openai.com/api/reference/overview">OpenAI authentication reference</a>
+documents bearer authentication; individual compatible gateways may differ.</p>
+<p>OAuth here means <strong>using an already issued API access token</strong>. JLinAlg does not
+implement provider registration, browser/device login, consent or token refresh,
+and does not claim that a ChatGPT/Google consumer subscription grants API access.
+Use the provider's supported authentication tooling. An expired/denied token is
+recorded, with no silent API-key/provider fallback. Generic Chat Completions does
+not guarantee web search or retrieval citations; the literature branch remains
+waiting if the provider returns no usable retrieval evidence. Model capabilities,
+account access, terms, retention and costs must be checked for that endpoint.</p>
+<p>The command refuses a mismatched or unanchored payload. Source <code>deny_all</code> policy
+still wins over payload approval. Offline restrictions block API calls, not local
+browser packet preparation/import. Additional project
+disclosure constraints unsupported by the adapter remain blocking; approval does
+not silently relax the study policy. The reviewed payload and policy are preserved
+with the source-revision hash and approving actor. Exact prompts, credential-redacted
+responses, requested/returned model, timestamps, request disposition and editorial
+decision are retained. Missing credentials, denials, timeouts and refusals appear
+in <code>artifacts/index.html</code>; an archived attempt is not necessarily successful review.</p>
+<p>The model proposes section-ID replacements, reasons, source checks and scientist
+questions. It cannot change the draft, numerical evidence or analytical plan.
+Accept selected suggestions by entering those sections in a <strong>new</strong> manuscript
+revision and recording the editorial-review bundle in the rationale. Previous text
+and attribution remain auditable. No generated code or HTML is executed, no new
+web search is requested by this editorial pass, and no fallback or automatic retry
+occurs. A new attempt can incur another provider charge.</p>
+<p>The OpenAI adapter uses <code>store: false</code> as described in the
+<a href="https://developers.openai.com/api/docs/guides/migrate-to-responses">Responses API documentation</a>.
+That setting does not by itself establish zero retention; review the provider's
+<a href="https://developers.openai.com/api/docs/guides/your-data">data controls</a> and your
+institution's disclosure requirements. Leaving the editorial pass unused keeps
+manuscript revision entirely local.</p>
+<p>For an already installed <strong>local</strong> model, the explicit editorial-only adapter
+also supports a keyless loopback chat-completions endpoint. This is not the
+default and does not require or install any particular model application:</p>
+<div class="code-window"><div class="code-bar"><span>powershell</span></div><pre><code>java -jar jlinalg.jar study manuscript-editorial --project REVISION_BUNDLE --out NEW_LOCAL_REVIEW --provider local --model YOUR_LOADED_MODEL --endpoint http://127.0.0.1:1234/v1/chat/completions --approved-payload-sha256 $approved --actor-id scientist-1
+</code></pre></div>
+<p>Only literal IPv4 loopback, an explicit port and the exact chat-completions path
+are accepted. DNS names, remote addresses, credentials in URLs, query strings,
+proxies and redirects are rejected or disabled. No API key is read or sent. A
+remote-transmission <code>deny_all</code> policy does not prohibit this loopback-only local
+inference; <code>--offline</code> blocks even local HTTP and unsupported extra disclosure
+constraints still block the request. JLinAlg does not install, start or download
+models, and a loopback address cannot prove that a user-managed server does not
+itself forward data elsewhere. Use a trusted local-only model configuration.
+The recorded model name is the server's self-report, not a verified weights hash.
+Model identity/weights and server version should be included in deployment
+provenance. A missing or stopped server is recorded as unavailable, not successful
+editorial review. This local adapter is currently editorial-only.</p>
+<h3 id="local-editorial-review-with-llamacpp">Local editorial review with llama.cpp</h3>
+<p><code>--provider llama_cpp</code> explicitly selects the same keyless, loopback-only transport
+and records the declared runtime as llama.cpp. No LM Studio dependency is needed.
+Use an already installed, trusted <code>llama-server</code> and an instruction-tuned local
+GGUF model. The <a href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server">upstream server documentation</a>
+describes its Chat Completions endpoint and model aliases. For example:</p>
+<div class="code-window"><div class="code-bar"><span>sh</span></div><pre><code>llama-server -m /path/to/review-model.gguf --host 127.0.0.1 --port 8080 --alias editorial-local --ctx-size 32768
+java -jar jlinalg.jar study manuscript-editorial --project REVISION_BUNDLE --out NEW_LLAMA_REVIEW --provider llama_cpp --model editorial-local --endpoint http://127.0.0.1:8080/v1/chat/completions --approved-payload-sha256 HASH --actor-id scientist-1
+</code></pre></div>
+<p>Choose a context size the model and hardware support, large enough for the full
+prompt plus output; 32768 is an example, not a memory-capacity guarantee. JLinAlg
+requests at most 4000 output tokens and rejects truncated completions rather than
+presenting them as successful reviews. The alias avoids leaking model filesystem
+paths in request metadata. Record the GGUF checksum, server build/version and
+launch arguments separately; the alias is not proof of model identity.</p>
+<p>Use local weights, not a cloud-forwarding server or remote RPC backend. JLinAlg
+does not download or launch llama.cpp or its models. <code>deny_all</code> permits this local
+route; <code>--offline</code> blocks local HTTP too. Do not expose the unauthenticated server
+on a public/LAN interface. An actual local inference run requires a working server;
+adapter regression tests alone do not establish model quality or hardware fitness.</p>
+<h3 id="chatgpt-sign-in-and-an-external-codex-editorial-client">ChatGPT sign-in and an external Codex editorial client</h3>
+<p>A Codex login is not an API key to copy into JLinAlg. The supported
+<a href="https://learn.chatgpt.com/docs/non-interactive-mode">Codex non-interactive client</a>
+can use its own saved sign-in for a reviewed manuscript-only request. Keep
+credentials inside that client; record its version, exact prompt, response,
+model identity when available, timestamps and decisions. Disable unrelated tools
+and do not run the editor in a patient-data directory. Feed only the approved
+aggregate payload. This external-client workflow is distinct from JLinAlg's
+manual browser receipts: never label an automated exchange as human-transcribed.</p>
+<p>OpenAI also documents a separate
+<a href="https://developers.openai.com/siwc/token-sharing-open-source">Sign in with ChatGPT flow for eligible open-source apps</a>.
+That requires app registration, user consent, authorized scopes and token lifecycle
+handling. It is not implemented by JLinAlg's generic <code>--auth oauth</code> option, and
+existing Codex session credentials are not automatically a JLinAlg authorization.
+The documented ChatGPT-plan route uses streaming Responses requests; do not point
+the non-streaming Chat Completions adapter at it or reuse an unrelated session token.</p></article>
+<aside class="toc"><strong>On this page</strong><a href="#quick-start">Quick start</a><a href="#keep-the-study-contract-small">Keep the study contract small</a><a href="#feature-annotation">Feature annotation</a><a href="#sources-and-scientific-relevance">Sources and scientific relevance</a><a href="#from-a-source-candidate-to-genetic-inference">From a source candidate to genetic inference</a><a href="#questions-and-optional-ai">Questions and optional AI</a><a href="#privacy-and-offline-execution">Privacy and offline execution</a><a href="#results-and-evidence-packaging">Results and evidence packaging</a><a href="#validation-and-remaining-boundaries">Validation and remaining boundaries</a><a href="#scientific-citations-bioinformatics-evidence">Scientific citations</a><a href="#publication-reporting-and-local-participant-summaries">Publication reporting and local participant summaries</a><a href="#publication-precision-and-combined-participant-characteristics">Publication precision and combined participant characteristics</a><a href="#local-isoform-ratio-qtl-review">Local isoform-ratio QTL review</a><a href="#literature-depth-and-excerpts">Literature depth and excerpts</a><a href="#revise-a-manuscript-without-rerunning-the-analysis">Revise a manuscript without rerunning the analysis</a><a href="#results-and-discussion-writing-model">Results and Discussion writing model</a><a href="#creating-a-manuscript-revision">Creating a manuscript revision</a></aside></div>
+</main><site-footer root="../"></site-footer></body></html>

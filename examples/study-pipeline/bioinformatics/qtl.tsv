@@ -1,0 +1,4 @@
+variant_id	chromosome	position	effect_allele	other_allele	beta	se	p_value	feature_id
+rs1	1	100	A	G	0.1	0.01	1e-12	probe1
+rs2	1	200	A	G	0.2	0.01	1e-12	probe1
+rs3	1	300	A	G	0.3	0.01	1e-12	probe1

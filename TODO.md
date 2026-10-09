@@ -1,6 +1,6 @@
 # Development TODO
 
-Last reviewed: 2026-09-20.
+Last reviewed: 2026-10-01.
 
 This inventory tracks open work. Completed implementation and audit details are
 recorded in the [advanced-method validation report](docs/advanced-validation.md),
@@ -10,11 +10,141 @@ the [v0.3.0 remaining-code audit](docs/release-0.3.0-audit.md), the
 
 ## Omics pipeline foundations — shared design and data contracts
 
-The following roadmap records planned work, not implemented capabilities. Build
-reusable analytical operations before composing complete pipelines. Initial entry
+The fixed deterministic project kernel is implemented in the source build. The
+remaining roadmap expands its scientific profiles and interchange coverage.
+Initial entry
 points should accept quantified matrices, supplied annotations and segmentation;
 raw-read alignment, raw mass-spectrum processing and image segmentation are
-separate future scope. LLM integration remains deferred.
+separate future scope. Optional bounded API assistance is implemented; autonomous
+LLM orchestration and high-assurance disclosure isolation remain deferred.
+
+- [x] **Versioned study contract and defaults.** Validate concise YAML/JSON,
+  resolve all defaults and relationship assumptions, support matrix- and
+  result-first entry, and preserve the original base contract.
+- [x] **Auditable project state.** Generate a hash-chained event ledger,
+  `project-status.yaml`, `SESSION_HISTORY.md`, `AGENTS.md`, per-operation
+  manifests, artifact hashes, and portable JSON/HTML evidence indexes.
+- [x] **Controlled scientific evolution.** Preview and apply immutable,
+  base-hash-bound amendments; retain hypothesis origin and status fields; record
+  unusual-result observations and optional amendment proposals with actor/model
+  attribution.
+- [x] **Deterministic planner and execution kernel.** Compile typed operation
+  graphs, require human plan/assumption approval, supersede stale plans after an
+  amendment, execute through adapters, and support verified resume and
+  content-addressed reuse.
+- [x] **CLI and adoption materials.** Wire `study init|validate|resolve|status|amend|plan|approve|run|auto|observe|index|verify|operations`,
+  publish version-1 schemas, and provide a runnable two-cohort result-first
+  example and vignette.
+- [x] **Automatic result-first evidence graph.** In `mode: auto`, treat explicit
+  goals as a minimum, infer objective-driven parallel evidence branches, run all
+  eligible branches despite independent blockers, resolve GENCODE and local
+  GO/Reactome resources through an embedded HTTPS transport, conditionally
+  install the pinned checksum-verified
+  1000 Genomes Phase 3 LD panels, and produce publication/prioritization evidence
+  tables plus JSON/HTML/LLM-oriented indexes with bounded key findings and
+  cross-cohort scale/replication anomaly flags. Fine-mapping, colocalization, MR,
+  and literature remain visibly blocked when their scientific inputs are absent.
+
+- [x] **Explicit feature annotation and actionable evidence dashboard.** Resolve
+  local probe tables or GTF annotations and declared GENCODE gene mappings;
+  retain version/build conflicts and ambiguous/unmapped IDs, require coordinate
+  conventions for table intervals, and never assume unknown probes are symbols.
+  Show primary and meta-analysis feature/gene previews, annotation requests,
+  and diagnostic-triggered sensitivity proposals in HTML/JSON/LLM indexes.
+  Non-variant input skips variant scoring with an auditable `not_applicable`
+  disposition. Declared human GRCh38 GENCODE releases can now supply a downloaded,
+  checksummed coordinate GTF. Other platform manifests remain local inputs.
+- [x] **Audited public bioinformatics investigation.** Add GWAS Catalog v2 study,
+  gene and coordinate-window searches with live build metadata; eQTL Catalogue
+  availability records and GTEx tissue candidates; reviewed UniProt/AlphaFold
+  mappings, UCSC reference FASTA and Europe PMC literature search. Preserve
+  source citations, exact queries/responses, budgets, privacy/offline decisions,
+  and service failures separately from empty searches. Add per-feature evidence
+  to candidate tables and the [bioinformatics tutorial](docs/vignettes/bioinformatics-evidence.md).
+- [x] **Reviewed regional genetic execution.** Run allele/build/ancestry/region-
+  checked SuSiE, colocalization with prior sensitivity, and strong-instrument,
+  LD-pruned MR with estimator and leave-one-instrument-out sensitivity. Accept
+  cited local canonical summaries or checksum-pinned public regional TSVs;
+  extract signed dosage LD from automatically installed 1000G panels only with
+  explicit compatible population/build. Missing facts create scientist questions.
+- [x] **Local evidence snapshot export.** Add `study export` with integrity checks,
+  a hash inventory, explicit omitted inputs and sensitivity acknowledgment;
+  no implicit external submission or regulatory-compliance claim.
+- [ ] **Automatic molecular genetic evidence acquisition.** Resolve phenotype
+  ontology terms; search GWAS loci near verified feature coordinates; acquire
+  tissue/feature-matched QTL and full regional outcome statistics. Record
+  successful empty search, failed search, search not run, and missing inputs
+  separately. Discovery and reviewed canonical regional acquisition are now
+  implemented. A scoped automatic MR adapter now expands reviewed irQTL
+  candidates, retrieves Pan-UK Biobank BMI field 21001 EUR effects by indexed
+  instrument lookup with audited NCBI GRCh38/GRCh37 allele projection, and derives
+  ancestry-matched regional LD from the official 1000 Genomes 30x GRCh38 callset.
+  Automatic colocalization now accepts scientist-declared or bounded, cited LLM-
+  proposed related phenotype labels; searches GWAS Catalog REST v2; ranks
+  ancestry-matched downloadable studies; retrieves indexed harmonized GRCh38
+  regions; and can run incomplete-irQTL exploratory colocalization with a mandatory
+  manuscript caveat and separate coverage fractions. Arbitrary non-harmonized GWAS,
+  automatic acquisition of arbitrary QTL databases, reference verification, and
+  ontology resolution remain open. Nearby phenotype-GWAS lead SNPs alone cannot
+  support conventional MR/coloc.
+
+- [x] **Deterministic scientist questions and documented answers.** Add typed
+  prerequisite needs, first rule set, immutable question revisions, local
+  `QUESTIONS.md` and session notebook, searchable inbox, blank answer export,
+  checked batch import, evidence snapshots, answer-linked amendment proposals,
+  scoped gates, stale-answer rejection, explicit unknown/defer/optional-decline,
+  correction history, and repair of verified derived views. Optional bounded LLM
+  question proposals now enter this local review inbox without implicit execution
+  permission. See the
+  [implemented scope](docs/vignettes/study-questions-and-decisions.md#implemented-first-tranche).
+- [ ] **Broader intelligent study questions and decisions.** Continue the
+  [reviewable subsystem design](docs/vignettes/study-questions-and-decisions.md):
+  typed needs, deterministic question rules, optional policy-bounded LLM
+  proposals, auditable answers, branch-specific gates, explicit unknown/defer/
+  decline handling, amendment links, and stale-answer/conflict detection.
+  Extend the implemented batch CLI and local indexes with incomplete-contract
+  intake, remaining typed blockers, broader scientific rules, interactive review,
+  and selective decision-aware cache invalidation. Remote identity assurance,
+  general transaction recovery, and generated-code execution remain separate
+  later milestones. The broader design is not yet fully implemented.
+- [x] **Audited advisory bioinformatics proposals.** Let opt-in provider advice
+  suggest related phenotypes, source selection, scientist questions and hashed
+  code text. Retain model/prompt/response/decision lineage. Generated code is
+  quarantined as text, never executed by the proposal handler; safe general code
+  execution and broader provider transports remain open milestones.
+
+- [x] **Resumable attempts and auditable bounded assistance.** Retry unfinished
+  operations by default, reuse only verified input/implementation-matched results,
+  preserve attempts and require `--rerun` for recomputation. Support local YAML/JSON
+  data dictionaries, explicit offline dispositions, provider/model/query/answer/
+  decision records, OpenAI/Gemini opt-in advice and retrieval-cited literature,
+  preapproved fixed/random and leave-one-cohort-out sensitivity, and opt-in HTML
+  first drafts. These adapters retain JLinAlg execution control and enforce
+  `deny_all`; no live provider call was used in validation.
+- [x] **Browser handoff and optional compatible APIs.** Default explicitly enabled
+  assistance to offline HTML/text packets with exact-prompt hashes, named-human
+  transcript import, provider/model/timestamp attestations, escaped answer display,
+  immutable receipts and resumable pipeline consumption. Prefer an installed
+  modern browser; retain Links as a local terminal viewer. State the unobserved
+  browser audit gap. Support explicit HTTPS OpenAI-compatible Chat Completions
+  with environment-variable API keys or provider-issued OAuth access tokens;
+  provider-specific login/refresh remains separate future work.
+- [ ] **High-assurance disclosure and broader LLM integration.** Extend the
+  current bounded-preview adapter into verified disclosure bundles. The policy permits
+  verified aggregate result files, not patient/sample-level data. “Aggregate
+  result” must be an artifact class validated from content and lineage, not a
+  filename: association/meta-analysis summaries, enrichment or fine-mapping
+  results, summary diagnostics and redacted figures may qualify; participant
+  matrices, phenotypes, covariates, identifiers, residuals and per-person scores
+  do not. Provide a project-level `deny_all` override for sensitive unpublished
+  research. Before claiming high-assurance non-egress, implement disclosure bundles and
+  manifests, policy precedence in which denial wins, human approval scope,
+  identifier/small-cell checks, isolated read access, destination-restricted
+  egress, provider/model attribution and auditable request/response hashes.
+  Use an optional typed advisor through an official API (including Gemini):
+  minimal general-topic requests, source verification, deterministic admissibility
+  checks, and approved amendments for new hypotheses. JLinAlg retains execution
+  control. Generating a suggestion does not establish scientific evidence.
 
 - [ ] **Pipeline families.** Define profiles for bulk single-source omics;
   specialized RNA (miRNA, lincRNA/other lncRNA and extracellular RNA);
@@ -41,10 +171,12 @@ separate future scope. LLM integration remains deferred.
   import/export adapters for AnnData/MuData, SingleCellExperiment/QFeatures and
   SpatialData or equivalent explicit tables. Preserve assay layers, sample IDs,
   coordinates and metadata; benchmark memory and avoid implicit dense conversion.
-- [ ] **Composable execution.** Describe each operation's inputs, supported designs,
-  assumptions, outputs, diagnostics and resource limits. Add resumable execution,
-  versioned manifests and cached artifacts using project-over-local configuration.
-  Support entry from raw quantified, preprocessed or already annotated matrices.
+- [ ] **Broaden composable execution.** The typed registry, resumable execution,
+  versioned manifests, content cache, matrix entry, result entry, public resource
+  resolver, and objective-driven result-first graph are in place.
+  Add scientifically validated modality-specific preprocessing and design
+  adapters, stronger resource declarations, and entry from supplied annotations
+  without implying that generic association is appropriate for every modality.
 
 ## Multivariate and phenotype-family analyses
 
@@ -431,7 +563,8 @@ Further scope remains explicit:
 - [ ] Full real-data validation of local VEP/ANNOVAR installations, CBC/CPLEX solver
   adapters and biological target prioritization; do not generalize synthetic checks.
 - [ ] Integrated workflow scheduling, a cross-provider lockfile manager, and drug-target
-  dossiers. LLM integration is deliberately deferred pending design decisions.
+  dossiers. Autonomous LLM orchestration remains deferred; bounded study API
+  assistance is described under Omics pipeline foundations above.
 
 Implemented differential, regional, multiplicity and imputation workflows are
 documented in [modern inference validation](docs/inference-workflows-validation.md).

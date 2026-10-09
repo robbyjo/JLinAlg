@@ -26,6 +26,16 @@ final class DelimitedData {
     }
 
     static DelimitedData read(Path path) throws IOException {
+        return read(path, false);
+    }
+
+    /** Read a result table, accepting the conventional unnamed leading R row-name column. */
+    static DelimitedData readResult(Path path) throws IOException {
+        return read(path, true);
+    }
+
+    private static DelimitedData read(Path path, boolean allowLeadingRowName)
+            throws IOException {
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
         char delimiter = name.endsWith(".csv") ? ',' : '\t';
         try (BufferedReader input = Files.newBufferedReader(
@@ -36,6 +46,8 @@ final class DelimitedData {
             Map<String, Boolean> unique = new LinkedHashMap<>();
             for (int index = 0; index < header.size(); index++) {
                 String value = header.get(index).trim();
+                if (value.isEmpty() && allowLeadingRowName && index == 0)
+                    value = "__row_name__";
                 if (value.isEmpty() || unique.put(value, Boolean.TRUE) != null)
                     throw new IOException(
                         "table column names must be unique and nonblank: " + path);

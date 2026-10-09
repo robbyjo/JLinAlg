@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robbyjo.github.io/JLinAlg/schemas/amendment-v1.schema.json",
+  "title": "JLinAlg study amendment version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "amendment", "changes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "amendment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "base_study_hash"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"},
+        "title": {}, "base_study_hash": {"type": "string", "minLength": 1},
+        "proposed_at": {}, "proposed_by": {}, "source": {}, "rationale": {},
+        "revision": {}
+      }
+    },
+    "changes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "add": {"$ref": "#/$defs/changeSet"},
+        "update": {"$ref": "#/$defs/changeSet"},
+        "retire": {"$ref": "#/$defs/changeSet"},
+        "configure": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "assistance": {"type": "object"}, "resources": {"type": "object"}, "project": {"type": "object"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "changeSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cohorts": {"type": "array", "items": {"type": "object"}},
+        "cohort_relationships": {"type": "array", "items": {"type": "object"}},
+        "datasets": {"type": "array", "items": {"type": "object"}},
+        "hypotheses": {"type": "array", "items": {"type": "object"}},
+        "analysis_requests": {"type": "array", "items": {"type": "object"}}
+      }
+    }
+  }
+}

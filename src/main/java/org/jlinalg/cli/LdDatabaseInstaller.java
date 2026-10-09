@@ -11,9 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -22,7 +19,6 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +36,7 @@ final class LdDatabaseInstaller {
     private static final int TAR_BLOCK_SIZE = 512;
     private static final int BUFFER_SIZE = 1024 * 1024;
     private static final long PROGRESS_INTERVAL = 128L * 1024 * 1024;
+    private static final long MAX_DOWNLOAD_BYTES = 20L * 1024 * 1024 * 1024;
     private static final byte[] PLINK_BED_VARIANT_MAJOR =
         {(byte) 0x6c, (byte) 0x1b, (byte) 0x01};
 
@@ -96,44 +93,9 @@ final class LdDatabaseInstaller {
 
     private static void download(LdDatabaseSpec database, Path archive,
             PrintStream output) throws IOException, InterruptedException {
-        HttpClient client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
-        HttpRequest request = HttpRequest.newBuilder(database.downloadUri())
-            .header("User-Agent", "JLinAlg-LD-reference-installer/1")
-            .GET()
-            .build();
-        HttpResponse<InputStream> response = client.send(request,
-            HttpResponse.BodyHandlers.ofInputStream());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            response.body().close();
-            throw new IOException("download server returned HTTP "
-                + response.statusCode());
-        }
-        long expected = response.headers().firstValueAsLong("Content-Length")
-            .orElse(-1L);
-        try (InputStream input = new BufferedInputStream(response.body());
-                OutputStream file = new BufferedOutputStream(
-                    Files.newOutputStream(archive,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.TRUNCATE_EXISTING))) {
-            byte[] buffer = new byte[BUFFER_SIZE];
-            long copied = 0;
-            long nextProgress = PROGRESS_INTERVAL;
-            for (int count = input.read(buffer); count >= 0;
-                    count = input.read(buffer)) {
-                if (count == 0) continue;
-                file.write(buffer, 0, count);
-                copied += count;
-                if (copied >= nextProgress) {
-                    output.println("  downloaded " + humanBytes(copied)
-                        + (expected > 0
-                            ? " of " + humanBytes(expected) : ""));
-                    nextProgress += PROGRESS_INTERVAL;
-                }
-            }
-        }
+        PublicResourceDownloader.download(database.downloadUri(), archive,
+            MAX_DOWNLOAD_BYTES, "JLinAlg-LD-reference-installer/1", output,
+            PROGRESS_INTERVAL);
     }
 
     private static void verifyChecksum(LdDatabaseSpec database, Path archive)
@@ -462,11 +424,6 @@ final class LdDatabaseInstaller {
         } catch (AtomicMoveNotSupportedException exception) {
             Files.move(source, destination);
         }
-    }
-
-    private static String humanBytes(long bytes) {
-        return String.format(java.util.Locale.ROOT, "%.1f MB",
-            bytes / (1024.0 * 1024.0));
     }
 
     record PanelStatistics(LdPanelSpec panel, long sampleCount,

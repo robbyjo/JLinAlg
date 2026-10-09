@@ -42,6 +42,12 @@ List supported sources:
 
     java -jar jlinalg-<version>.jar ld-db list
 
+The list also reports `1000g-30x-grch38`. Unlike the packaged GRCh37 source,
+this provider performs bounded tabix-indexed regional HTTPS reads from the
+official high-coverage 1000 Genomes GRCh38 phased VCF during a configured study
+MR operation. It is not installed with `ld-db download` and does not fetch an
+entire chromosome merely to calculate LD for a few instruments.
+
 Install into the current directory:
 
     java -jar jlinalg-<version>.jar ld-db download --database 1000g-phase3
@@ -85,3 +91,9 @@ the retained original rows and columns in input order.
 Use `--overwrite` to replace an existing output. JLinAlg validates the database
 manifest and BED/BIM/FAM sizes before clumping, and writes through a temporary
 file so a failed run cannot leave a partial result.
+
+The standalone `clump` command currently consumes installed BED/BIM/FAM
+references. The `1000g-30x-grch38` provider is integrated with the study MR
+adapter, which records its requested superpopulation, official unrelated-sample
+panel, regional VCF/index URLs, variant exclusions, allele orientation, and
+derived matrix hashes in each analysis bundle.

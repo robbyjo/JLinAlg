@@ -9,10 +9,17 @@ New source-build follow-up workflows: [project configuration](project-configurat
 [networks and candidate regulators](network-followup.md). Each includes runnable
 CLI examples, references, data contracts and validation boundaries.
 
-The [auditable omics research pipeline design](auditable-omics-pipeline.md)
-specifies the planned minimal `study.yaml`, materialized project status,
-immutable amendments, evidence lineage, research notebook, and guarded future
-LLM assistance. It is roadmap documentation, not a current CLI feature.
+The source-build [auditable omics research pipeline](auditable-omics-pipeline.md)
+implements the minimal `study.yaml`, deterministic plan approval and execution,
+materialized project status, immutable amendments, evidence lineage, research
+notebook, unusual-result capture, and guarded attribution for future LLM use.
+The companion [hands-on tutorial](study-pipeline-tutorial.md) runs the checked-in
+two-cohort example end to end and specifies a default-deny, independently
+verifiable patient-data boundary for future local or remote LLM assistance.
+The [questions and decisions subsystem](study-questions-and-decisions.md)
+implements the first deterministic question rules, a local inbox, checked batch
+answers, answer-linked amendments, and exact question/answer notebooks. The
+broader design describes future LLM proposals and interactive review.
 
 These worked examples start with small in-memory arrays so the statistical
 model is visible. Replace those arrays with your own columnar or file-backed
@@ -31,15 +38,19 @@ Run the complete verification suite before adapting an example:
 
 ## Choose a vignette
 
-The v0.3.6 executable includes the complete CLI documented here: cohort and
+The v0.3.6 release executable includes cohort and
 rare-variant meta-analysis, GRM construction, xWAS follow-up, latent-factor and
 batch adjustment, ACAT, differential/regional analysis, adaptive or hierarchical
-testing, and multiple-imputation inference. Examples naming
-`jlinalg-0.3.6.jar` are release-compatible.
+testing, and multiple-imputation inference. Pages explicitly marked source build,
+including the study/question subsystem, require a newly built executable even
+when its filename still contains `0.3.6`; they do not describe the published JAR.
 
 | Vignette | Features covered |
 | --- | --- |
-| [Auditable omics research pipeline design](auditable-omics-pipeline.md) | Minimal study contract, defaults, result-first entry, `project-status.yaml`, `amendment-XXX.yaml`, hypothesis evolution, provenance, evidence lineage, and future LLM-assisted drafting (roadmap) |
+| [Auditable omics research pipeline](auditable-omics-pipeline.md) | Implemented minimal study contract, matrix/result-first planning, approvals, resumable execution, `project-status.yaml`, `amendment-XXX.yaml`, provenance, evidence index, unusual-result capture, and future LLM-assisted drafting |
+| [Auditable study pipeline tutorial](study-pipeline-tutorial.md) | Runnable result-first project, contract and plan review, approval, execution, resume, verification, amendments, unusual-result capture, and patient-level LLM non-egress assurance design |
+| [Bioinformatics evidence workflow](bioinformatics-evidence.md) | Public-source discovery, reviewed regional genetics, protein and reference sequence investigation, non-LLM literature search, auditable AI proposals and evidence archives |
+| [Study questions and decisions design](study-questions-and-decisions.md) | Implemented deterministic questions, audited batch answers and amendment proposals; broader routing, LLM, authorization, and resume roadmap |
 | [Censored and ordinal regression](censored-ordinal.md) | Tobit; Weibull, lognormal and exponential AFT; ordered logit/probit ML (source build) |
 | [Rare-event and survey inference](sampling-models.md) | King-Zeng/prior corrections and stratified PSU Taylor covariance (source build) |
 | [LDSC genetic architecture](ldsc.md) | observed-scale heritability/genetic correlation, shared block jackknife, S/V exports (v0.3.6+) |

@@ -119,6 +119,9 @@ tasks.register('nativeCholmodJar', Jar) {
 
 dependencies {
     implementation 'org.yaml:snakeyaml:2.5'
+    implementation 'org.apache.commons:commons-compress:1.28.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.6.4'
+    runtimeOnly 'org.slf4j:slf4j-nop:1.7.36'
     api files(jdistlibJar)
     api 'com.github.samtools:htsjdk:5.0.0'
     api 'com.github.luben:zstd-jni:1.5.7-16'
@@ -221,6 +224,9 @@ tasks.register('checkWebsite') {
             'vignettes/single-cell.html',
             'vignettes/spatial-analysis.html',
             'vignettes/auditable-omics-pipeline.html',
+            'vignettes/study-pipeline-tutorial.html',
+            'vignettes/study-questions-and-decisions.html',
+            'vignettes/bioinformatics-evidence.html',
             'regression-inference-validation.html',
             'vignettes/censored-ordinal.html',
             'vignettes/sampling-models.html',
@@ -367,6 +373,7 @@ tasks.register('checkWebsite') {
         }
 
         List<String> cliExamplePages = [
+            'vignettes/study-pipeline-tutorial.html',
             'vignettes/censored-ordinal.html',
             'vignettes/sampling-models.html',
             'vignettes/acat-rare-variants.html',

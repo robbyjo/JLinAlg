@@ -42,6 +42,40 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 - [Buuren (2011) — mice: Multivariate Imputation by Chained Equations in R](#vanbuuren-mice-2011)
 - [Barnard (1999) — Small-sample degrees of freedom with multiple imputation](#barnard-rubin-1999)
 
+## Bioinformatics evidence resources
+
+<a id="gwas-catalog-api-v2"></a>
+- **NHGRI-EBI GWAS Catalog (2026).** GWAS Catalog REST API v2 documentation. *EMBL-EBI documentation.* [Primary source](https://www.ebi.ac.uk/gwas/docs/programmatic-access/rest-api/)
+  - JLinAlg methods: Phenotype-matched source discovery, Curated genomic-window GWAS candidates, Source and release provenance.
+
+<a id="gwas-catalog-summary-statistics"></a>
+- **NHGRI-EBI GWAS Catalog (2026).** GWAS Catalog summary statistics documentation. *EMBL-EBI documentation.* [Primary source](https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics/)
+  - JLinAlg methods: Harmonized GRCh38 summary statistics, Indexed regional retrieval, Metadata and checksum provenance.
+
+<a id="eqtl-catalogue-data-access"></a>
+- **eQTL Catalogue (2026).** eQTL Catalogue data access. *EMBL-EBI documentation.* [Primary source](https://www.ebi.ac.uk/eqtl/Data_access/)
+  - JLinAlg methods: Molecular QTL source discovery, Bulk-access fallback and source citations.
+
+<a id="gtex-atlas-2020"></a>
+- **GTEx Consortium (2020).** The GTEx Consortium atlas of genetic regulatory effects across human tissues. *Science 369:1318-1330.* [DOI: 10.1126/science.aaz1776](https://doi.org/10.1126/science.aaz1776)
+  - JLinAlg methods: Tissue-specific molecular QTL context, Explicit cross-tissue scientific relevance.
+
+<a id="uniprot-api-documentation"></a>
+- **UniProt Consortium (2026).** UniProt API queries. *UniProt documentation.* [Primary source](https://www.uniprot.org/help/api_queries)
+  - JLinAlg methods: Reviewed gene and species protein mapping, Protein mapping ambiguity.
+
+<a id="varadi-alphafold-2022"></a>
+- **M. Varadi et al. (2022).** AlphaFold Protein Structure Database: massively expanding the structural coverage of protein-sequence space with high-accuracy models. *Nucleic Acids Research 50:D439-D444.* [DOI: 10.1093/nar/gkab1061](https://doi.org/10.1093/nar/gkab1061)
+  - JLinAlg methods: Predicted protein structure investigation, Model version and confidence provenance.
+
+<a id="ucsc-api-documentation"></a>
+- **UCSC Genome Browser (2026).** UCSC Genome Browser REST API. *UCSC documentation.* [Primary source](https://genome.ucsc.edu/goldenPath/help/api.html)
+  - JLinAlg methods: Build-specific genomic reference sequence, Audited coordinate conversion and browser links.
+
+<a id="europe-pmc-rest"></a>
+- **Europe PMC (2026).** Europe PMC RESTful Web Service. *Europe PMC documentation.* [Primary source](https://europepmc.org/RestfulWebService)
+  - JLinAlg methods: Non-LLM literature retrieval, Bibliographic provenance and bounded searches.
+
 ## Foundational inference
 
 <a id="student-1908"></a>
@@ -262,6 +296,10 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 - **Jack Euesden, Cathryn M. Lewis, and Paul F. O'Reilly (2015).** PRSice: polygenic risk score software. *Bioinformatics 31:1466-1468.* [DOI: 10.1093/bioinformatics/btu848](https://doi.org/10.1093/bioinformatics/btu848) · [PMID: 25550326](https://pubmed.ncbi.nlm.nih.gov/25550326/) · [PMCID: PMC4410663](https://pmc.ncbi.nlm.nih.gov/articles/PMC4410663/)
   - JLinAlg methods: polygenic scores, score evaluation.
 
+<a id="thousand-genomes-2015"></a>
+- **1000 Genomes Project Consortium (2015).** A global reference for human genetic variation. *Nature 526:68-74.* [DOI: 10.1038/nature15393](https://doi.org/10.1038/nature15393) · [PMID: 26432245](https://pubmed.ncbi.nlm.nih.gov/26432245/) · [PMCID: PMC4750478](https://pmc.ncbi.nlm.nih.gov/articles/PMC4750478/)
+  - JLinAlg methods: 1000 Genomes Phase 3, ancestry-stratified LD reference.
+
 ## Latent variation and batch correction
 
 <a id="leek-storey-2007"></a>
@@ -418,6 +456,18 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 - **Christiaan A. de Leeuw et al. (2015).** MAGMA: generalized gene-set analysis of GWAS data. *PLoS Computational Biology 11:e1004219.* [DOI: 10.1371/journal.pcbi.1004219](https://doi.org/10.1371/journal.pcbi.1004219) · [PMID: 25885710](https://pubmed.ncbi.nlm.nih.gov/25885710/) · [PMCID: PMC4401657](https://pmc.ncbi.nlm.nih.gov/articles/PMC4401657/)
   - JLinAlg methods: MAGMA, GWAS gene-set analysis.
 
+<a id="frankish-gencode-2021"></a>
+- **Adam Frankish et al. (2021).** GENCODE 2021. *Nucleic Acids Research 49:D916-D923.* [DOI: 10.1093/nar/gkaa1087](https://doi.org/10.1093/nar/gkaa1087) · [PMID: 33270111](https://pubmed.ncbi.nlm.nih.gov/33270111/) · [PMCID: PMC7778937](https://pmc.ncbi.nlm.nih.gov/articles/PMC7778937/)
+  - JLinAlg methods: GENCODE transcript-to-gene annotation, reference genome annotation.
+
+<a id="go-consortium-2021"></a>
+- **Gene Ontology Consortium (2021).** The Gene Ontology resource: enriching a GOld mine. *Nucleic Acids Research 49:D325-D334.* [DOI: 10.1093/nar/gkaa1113](https://doi.org/10.1093/nar/gkaa1113) · [PMID: 33290552](https://pubmed.ncbi.nlm.nih.gov/33290552/)
+  - JLinAlg methods: Gene Ontology, functional annotation.
+
+<a id="milacic-reactome-2024"></a>
+- **Marija Milacic et al. (2024).** The Reactome Pathway Knowledgebase 2024. *Nucleic Acids Research 52:D672-D678.* [DOI: 10.1093/nar/gkad1025](https://doi.org/10.1093/nar/gkad1025) · [PMID: 37941124](https://pubmed.ncbi.nlm.nih.gov/37941124/) · [PMCID: PMC10767911](https://pmc.ncbi.nlm.nih.gov/articles/PMC10767911/)
+  - JLinAlg methods: Reactome pathways, curated pathway knowledge.
+
 ## High-throughput inference
 
 <a id="smyth-limma-2004"></a>
@@ -513,6 +563,14 @@ Chained equations, Rubin variance pooling, and finite-sample degrees of freedom.
 <a id="fda-electronic-records-2024"></a>
 - **U.S. Food and Drug Administration (2024).** Electronic Systems, Electronic Records, and Electronic Signatures in Clinical Investigations: Questions and Answers. *Final Guidance, October 2024.* [Primary source](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/electronic-systems-electronic-records-and-electronic-signatures-clinical-investigations-questions)
   - JLinAlg methods: Electronic audit trails, Searchable electronic records.
+
+<a id="hhs-hipaa-deidentification-2012"></a>
+- **U.S. Department of Health and Human Services, Office for Civil Rights (2012).** Guidance Regarding Methods for De-identification of Protected Health Information in Accordance with the HIPAA Privacy Rule. *HHS Office for Civil Rights guidance.* [Primary source](https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html)
+  - JLinAlg methods: Safe Harbor and Expert Determination, Health-data disclosure boundary.
+
+<a id="nist-genai-profile-2024"></a>
+- **National Institute of Standards and Technology (2024).** Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile. *NIST AI 600-1.* [DOI: 10.6028/NIST.AI.600-1](https://doi.org/10.6028/NIST.AI.600-1)
+  - JLinAlg methods: Generative-AI data provenance, Data-flow testing and documentation.
 
 <a id="wang-annovar-2010"></a>
 - **Kai Wang, Mingyao Li, and Hakon Hakonarson (2010).** ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data. *Nucleic Acids Research 38:e164.* [DOI: 10.1093/nar/gkq603](https://doi.org/10.1093/nar/gkq603)

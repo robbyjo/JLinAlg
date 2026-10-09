@@ -25,6 +25,9 @@ public final class JLinAlgCli {
     static int run(String[] arguments, PrintStream output,
             PrintStream errorOutput) {
         try {
+            if (arguments.length > 0 && arguments[0].equals("study"))
+                return StudyCli.run(Arrays.copyOfRange(
+                    arguments, 1, arguments.length), output, errorOutput);
             ProjectConfiguration.Resolved config = ProjectConfiguration.resolve(arguments,
                 java.nio.file.Path.of("").toAbsolutePath(), java.nio.file.Path.of(System.getProperty("user.home")));
             arguments = config.arguments();
@@ -237,6 +240,7 @@ public final class JLinAlgCli {
     private static String help() {
         return """
             Usage:
+              java -jar jlinalg-<version>.jar study --help
               java -jar jlinalg-<version>.jar config --command COMMAND
               java -jar jlinalg-<version>.jar variant-db --help
               java -jar jlinalg-<version>.jar variant-annotate --help

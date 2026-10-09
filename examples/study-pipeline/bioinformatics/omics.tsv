@@ -1,0 +1,4 @@
+feature_id	beta	se	p_value
+probe1	0.25	0.02	1e-9
+background1	0.01	0.02	0.5
+background2	-0.01	0.02	0.5

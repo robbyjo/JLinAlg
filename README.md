@@ -60,12 +60,37 @@ The source build adds [project-over-local YAML configuration](docs/vignettes/pro
 [variant annotation, consequence adapters and evidence scoring](docs/vignettes/variant-followup.md),
 and [six network workflows](docs/vignettes/network-followup.md), including WGCNA,
 GENIE3 and CARNIVAL adapters. These use explicit local/remote data sources and
-audited outputs; no LLM integration is included.
+audited outputs. The study pipeline also offers separately opted-in AI assistance.
 
-The [auditable omics research pipeline design](docs/vignettes/auditable-omics-pipeline.md)
-specifies the planned minimal study contract, progress status, immutable
-amendments, evidence lineage, and future LLM-assisted drafting. It is roadmap
-scope rather than a current CLI feature.
+The source build includes the [auditable omics research pipeline](docs/vignettes/auditable-omics-pipeline.md):
+a minimal versioned study contract, deterministic planning and approval,
+matrix- or result-first execution, immutable amendments, hash-chained evidence,
+`SESSION_HISTORY.md`, a one-command `study auto` runner, automatic public
+GO/Reactome and GENCODE resource resolution through an embedded HTTPS client, a
+conditional checksum-verified 1000 Genomes LD download, quantitative
+cross-cohort anomaly flags, and an LLM-oriented evidence index with bounded key
+findings. Repeating a command resumes verified work and retries unfinished steps;
+`--rerun` starts a fresh immutable attempt. Optional data dictionaries, preapproved
+sensitivity analyses, audited browser handoff (the default assistance transport),
+explicit OpenAI/Gemini or OpenAI-compatible API connections, cited literature review,
+and explicitly enabled HTML manuscript drafts extend the same provenance chain. See the
+[hands-on tutorial](docs/vignettes/study-pipeline-tutorial.md) and
+[runnable two-cohort example](examples/study-pipeline/README.md). Missing
+fine-mapping, colocalization, MR, or literature inputs become explicit indexed
+blockers while independent evidence branches continue. Autonomous LLM orchestration
+and certified submission workflows remain future work.
+The [bioinformatics evidence workflow](docs/vignettes/bioinformatics-evidence.md)
+adds audited public-source discovery, reviewed regional fine-mapping/colocalization/MR,
+protein and reference-sequence investigation, non-LLM literature search, per-feature
+candidate evidence, and local evidence archives. A separate offline synthetic example
+exercises the numerical chain; missing scientific inputs remain explicit questions.
+
+The first [study questions and decisions tranche](docs/vignettes/study-questions-and-decisions.md#implemented-first-tranche)
+adds deterministic prerequisite questions, checked batch answers, answer-linked
+amendment proposals, branch-specific gates, and stale-answer protection. Exact
+questions and answers appear in `QUESTIONS.md`, the research notebook, and the
+searchable local index. Optional LLM-suggested questions now enter the same local
+review inbox; interactive prompting remains future work. See the [question workflow](docs/vignettes/study-pipeline-tutorial.md#documented-scientist-questions).
 
 The source build adds [Tobit, AFT and ordinal likelihoods](docs/vignettes/censored-ordinal.md)
 and [rare-event and survey inference](docs/vignettes/sampling-models.md).

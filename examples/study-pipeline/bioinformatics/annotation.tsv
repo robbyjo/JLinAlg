@@ -1,0 +1,4 @@
+feature_id	gene_symbol	gene_id	chromosome	start	end	genome_build
+probe1	SYNTHETIC	TEST1	1	100	300	GRCh38
+background1	BACKGROUND1	TEST2	1	1000	1500	GRCh38
+background2	BACKGROUND2	TEST3	1	2000	2500	GRCh38

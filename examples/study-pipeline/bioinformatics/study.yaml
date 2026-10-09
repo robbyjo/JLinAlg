@@ -1,0 +1,72 @@
+schema_version: 1
+project:
+  id: bioinformatics-synthetic
+  title: Synthetic regional bioinformatics workflow
+  description: Software validation only. These are invented data, not scientific findings.
+  objective: [publication, drug_discovery]
+  data_policy: {remote_transmission: deny_all}
+resources: {network: offline}
+datasets:
+  - id: discovery
+    type: transcriptomics
+    stage: association_results
+    species: human
+    tissue: whole_blood
+    genome_build: GRCh38
+    coordinate_system: 1-based-closed
+    files:
+      results: omics.tsv
+      annotation: annotation.tsv
+      qtl: qtl.tsv
+      gwas: gwas.tsv
+      ld: ld.tsv
+      ld_alleles: ld-alleles.tsv
+hypotheses:
+  - id: H1
+    description: Exercise the complete regional inference branch with synthetic data.
+    outcome: BMI
+    inputs: {discovery: [discovery]}
+    analysis:
+      mode: manual
+      goals: [genetic_support, candidate_prioritization]
+      bioinformatics:
+        genetic_pairs:
+          - id: synthetic-pair
+            feature_id: probe1
+            approved: true
+            rationale: Fully synthetic fixture designed to test wiring, not target discovery.
+            sample_overlap: none
+            sample_overlap_basis: Independent synthetic source samples.
+            instrument_validity_rationale: Synthetic proportional effects; not a claim about real instruments.
+            region: {chromosome: '1', start: 1, end: 500}
+            exposure:
+              dataset_id: discovery
+              file_role: qtl
+              source_id: simulated-sqtl
+              citation: JLinAlg synthetic software fixture
+              trait: splicing
+              feature_id: probe1
+              assay: sQTL
+              tissue: whole_blood
+              genome_build: GRCh38
+              ancestry: European
+              sample_size: 10000
+              complete_region: true
+            outcome:
+              dataset_id: discovery
+              file_role: gwas
+              source_id: simulated-gwas
+              citation: JLinAlg synthetic software fixture
+              trait: BMI
+              genome_build: GRCh38
+              ancestry: European
+              sample_size: 10000
+              complete_region: true
+            ld:
+              dataset_id: discovery
+              file_role: ld
+              alleles_file_role: ld_alleles
+              source_id: simulated-independent-ld
+              citation: JLinAlg synthetic software fixture
+              genome_build: GRCh38
+              ancestry: European

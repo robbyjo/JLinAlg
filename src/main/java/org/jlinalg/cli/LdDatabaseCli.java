@@ -14,6 +14,8 @@ final class LdDatabaseCli {
     private static final String DOWNLOAD_COMMAND =
         "java -jar jlinalg-<version>.jar ld-db download "
         + "--database 1000g-phase3 [--location DIRECTORY]";
+    private static final String GRCH38_NOTE = "1000g-30x-grch38  1000 Genomes 30x high-coverage phased regional VCF; GRCh38; "
+        + "indexed HTTPS retrieval during configured MR (not a whole-database ld-db download)";
 
     @FunctionalInterface
     interface Installer {
@@ -57,6 +59,7 @@ final class LdDatabaseCli {
             return 2;
         }
         output.println(LdDatabaseCatalog.choices());
+        output.println("  " + GRCH38_NOTE);
         output.println("\nDownload with:");
         output.println("  " + DOWNLOAD_COMMAND);
         return 0;
@@ -124,13 +127,14 @@ final class LdDatabaseCli {
         output.println("Install a freely available LD database with:");
         output.println("  " + DOWNLOAD_COMMAND);
         output.println(LdDatabaseCatalog.choices());
+        output.println("  " + GRCH38_NOTE);
         output.println("Omit --location, or pass an empty value, "
             + "to install in the current directory.");
     }
 
     private static String downloadHelp() {
         return "Usage:\n  " + DOWNLOAD_COMMAND + "\n\n"
-            + LdDatabaseCatalog.choices() + "\n\n"
+            + LdDatabaseCatalog.choices() + "\n  " + GRCH38_NOTE + "\n\n"
             + "--location defaults to the current directory.";
     }
 

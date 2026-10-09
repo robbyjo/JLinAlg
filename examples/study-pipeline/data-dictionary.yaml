@@ -1,0 +1,10 @@
+columns:
+  feature_id: feature_id
+  effect: beta
+  standard_error: se
+  p_value: p_value
+descriptions:
+  feature_id: Synthetic gene symbol for this teaching fixture, not a participant identifier.
+  beta: Association coefficient on a comparable synthetic scale in both cohorts.
+  se: Standard error of beta, not its variance.
+  p_value: Two-sided association p-value supplied by the source analysis.

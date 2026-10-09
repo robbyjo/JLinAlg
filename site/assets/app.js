@@ -145,7 +145,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tocLinks = [...document.querySelectorAll(".toc a")];
   if (tocLinks.length && "IntersectionObserver" in window) {
-    const sections = tocLinks.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+    const sections = tocLinks.map(link => {
+      const fragment = link.getAttribute("href");
+      if (!fragment || !fragment.startsWith("#")) return null;
+      try { return document.getElementById(decodeURIComponent(fragment.slice(1))); }
+      catch { return null; }
+    }).filter(Boolean);
     const tocObserver = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) {
         tocLinks.forEach(link => link.classList.toggle("active", link.getAttribute("href") === `#${entry.target.id}`));

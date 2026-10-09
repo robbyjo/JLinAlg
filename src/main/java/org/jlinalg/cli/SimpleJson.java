@@ -14,6 +14,7 @@ import java.util.Map;
 final class SimpleJson {
     private final String text;
     private int offset;
+    private int depth;
 
     private SimpleJson(String text) {
         this.text = text;
@@ -28,6 +29,8 @@ final class SimpleJson {
     }
 
     private Object value() throws IOException {
+        if (++depth > 80) return fail("nesting limit exceeded");
+        try {
         space();
         if (offset >= text.length()) return fail("expected a value");
         return switch (text.charAt(offset)) {
@@ -39,6 +42,7 @@ final class SimpleJson {
             case 'n' -> literal("null", null);
             default -> number();
         };
+        } finally { depth--; }
     }
 
     private Map<String, Object> object() throws IOException {
@@ -53,6 +57,7 @@ final class SimpleJson {
             String key = string();
             space();
             if (!take(':')) return fail("expected ':'");
+            if (result.containsKey(key)) return fail("duplicate object key");
             result.put(key, value());
             space();
             if (take('}')) return result;
@@ -129,10 +134,14 @@ final class SimpleJson {
                     && Character.isDigit(text.charAt(offset))) offset++;
         }
         String token = text.substring(start, offset);
+        if (!token.matches("-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?"))
+            return fail("invalid number");
         try {
             if (!token.contains(".") && !token.contains("e")
                     && !token.contains("E")) return Long.valueOf(token);
-            return Double.valueOf(token);
+            double number = Double.parseDouble(token);
+            if (!Double.isFinite(number)) return fail("nonfinite number");
+            return number;
         } catch (NumberFormatException exception) {
             return fail("invalid number");
         }

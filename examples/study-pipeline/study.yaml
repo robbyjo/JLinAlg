@@ -1,0 +1,46 @@
+schema_version: 1
+
+project:
+  id: result-first-example
+  title: Two-cohort result-first transcriptomics example
+  description: Validate discovery findings in an independent cohort and pool effects.
+  objective: publication
+
+cohorts:
+  - id: discovery-cohort
+  - id: replication-cohort
+
+cohort_relationships:
+  - between: [discovery-cohort, replication-cohort]
+    type: independent
+
+datasets:
+  - id: discovery-results
+    cohort: discovery-cohort
+    type: transcriptomics
+    tissue: whole_blood
+    stage: association_results
+    feature_id_type: gene_symbol
+    files:
+      results: data/discovery.tsv
+      data_dictionary: data-dictionary.yaml
+
+  - id: replication-results
+    cohort: replication-cohort
+    type: transcriptomics
+    tissue: whole_blood
+    stage: association_results
+    feature_id_type: gene_symbol
+    files:
+      results: data/replication.tsv
+      data_dictionary: data-dictionary.yaml
+
+hypotheses:
+  - id: H1
+    description: Transcript associations have concordant effects in the replication cohort.
+    inputs:
+      discovery: [discovery-results]
+      replication: [replication-results]
+    analysis:
+      mode: manual
+      goals: [discovery_replication, meta_analysis]

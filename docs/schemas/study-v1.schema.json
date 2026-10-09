@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robbyjo.github.io/JLinAlg/schemas/study-v1.schema.json",
+  "title": "JLinAlg study contract version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project", "datasets", "hypotheses"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project": {"$ref": "#/$defs/project"},
+    "resources": {"$ref": "#/$defs/resources"},
+    "assistance": {"$ref": "#/$defs/assistance"},
+    "cohorts": {"type": "array", "items": {"$ref": "#/$defs/cohort"}},
+    "cohort_relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}},
+    "datasets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/dataset"}},
+    "hypotheses": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hypothesis"}},
+    "analysis_requests": {"type": "array", "items": {"$ref": "#/$defs/analysisRequest"}},
+    "assumptions": {"type": "array", "items": {"$ref": "#/$defs/assumption"}},
+    "_resolution": {"type": "object"}
+  },
+  "$defs": {
+    "assistance": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "provider": {"enum": ["browser", "openai", "gemini", "openai_compatible"], "default": "browser"},
+        "model": {"type": "string", "minLength": 1},
+        "api_key_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "oauth_token_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "auth": {"enum": ["api_key", "oauth"], "default": "api_key"},
+        "endpoint": {"type": "string", "pattern": "^https://[^/?#@]+/[^?#]*chat/completions$"},
+        "response_files": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "Paths to audited browser receipt.yaml files. May be absent initially; import then repeat the same run command."},
+        "next_steps": {"type": "boolean", "default": false},
+        "related_phenotypes": {"type": "boolean", "default": false, "description": "Request a bounded, cited list of up to 20 related phenotype labels for public GWAS discovery. Suggestions remain unreviewed and do not amend hypotheses."},
+        "literature": {"type": "boolean", "default": false},
+        "manuscript": {"type": "boolean", "default": false},
+        "allow_analyses": {"type": "array", "uniqueItems": true, "items": {"enum": ["leave_one_cohort_out", "fixed_random_comparison"]}},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 300, "default": 60}
+      },
+      "allOf": [
+        {"if": {"properties": {"enabled": {"const": true}, "provider": {"enum": ["openai", "gemini", "openai_compatible"]}}, "required": ["enabled", "provider"]}, "then": {"required": ["model"]}},
+        {"if": {"properties": {"provider": {"const": "openai_compatible"}}, "required": ["provider"]}, "then": {"required": ["endpoint"]}, "else": {"not": {"required": ["endpoint"]}}},
+        {"if": {"properties": {"auth": {"const": "oauth"}}, "required": ["auth"]}, "then": {"required": ["provider", "oauth_token_env"], "properties": {"provider": {"const": "openai_compatible"}}, "not": {"required": ["api_key_env"]}}, "else": {"not": {"required": ["oauth_token_env"]}}},
+        {"if": {"properties": {"provider": {"enum": ["openai", "gemini", "openai_compatible"]}}, "required": ["provider"]}, "then": {"properties": {"response_files": {"maxItems": 0}}}, "else": {"not": {"anyOf": [{"required": ["model"]}, {"required": ["api_key_env"]}, {"required": ["auth"]}]}}}
+      ]
+    },
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"},
+    "stringOrStrings": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      ]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "objective": {"$ref": "#/$defs/stringOrStrings"},
+        "investigators": {}, "organization": {}, "tags": {}, "data_policy": {}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Public reference policy. Defaults are automatic project-scoped downloads and the checksum-verified 1000 Genomes Phase 3 LD catalog entry.",
+      "properties": {
+        "downloads": {"enum": ["automatic", "manual", "deny"], "default": "automatic"},
+        "network": {"enum": ["online", "offline"], "default": "online"},
+        "directory": {"type": "string", "minLength": 1, "default": "resources"},
+        "ld": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "database": {"type": "string", "minLength": 1, "default": "1000g-phase3"},
+            "population": {"type": "string", "minLength": 1, "default": "auto"},
+            "location": {"type": "string", "minLength": 1},
+            "auto_download": {"type": "boolean", "default": true}
+          }
+        }
+      }
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "parent": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 150},
+        "literature_name": {"type": "string", "minLength": 1, "maxLength": 150, "description": "Public cohort name for design-paper searches; never patient information."},
+        "references": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "description": {}, "species": {}, "population": {}, "metadata": {},
+        "status": {}, "retired_reason": {}
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["between", "type"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "between": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/id"}},
+        "type": {"type": "string", "minLength": 1},
+        "description": {}, "overlap_fraction": {}, "shared_participants": {},
+        "metadata": {}, "status": {}, "retired_reason": {}
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "files"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "cohort": {"$ref": "#/$defs/id"},
+        "cohorts": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "type": {"type": "string", "minLength": 1},
+        "modality": {}, "tissue": {},
+        "stage": {"enum": ["raw_quantified", "quantified_matrix", "processed_matrix", "association_results", "annotated_results", "meta_analysis_results", "enrichment_results", "variant_scores", "fine_mapping_results", "colocalization_results", "mr_results", "evidence_results"]},
+        "description": {},
+        "files": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string", "minLength": 1}},
+        "columns": {"$ref": "#/$defs/columns"},
+        "analysis_description": {}, "provenance": {}, "source": {},
+        "anatomical_site": {}, "compartment": {}, "preparation": {}, "assay": {},
+        "species": {}, "donor": {}, "specimen": {}, "condition": {}, "visit": {},
+        "time": {}, "batch": {}, "cell_type": {}, "genome_build": {},
+        "annotation_release": {},
+        "feature_id_type": {"enum": ["auto", "probe", "ensembl_gene", "ensembl_transcript", "gene_symbol", "variant", "protein", "metabolite"]},
+        "coordinate_system": {"enum": ["1-based-closed", "0-based-half-open"]},
+        "units": {}, "detection_limit": {},
+        "feature_universe": {}, "spatial_resolution": {}, "metadata": {},
+        "status": {}, "retired_reason": {}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"stage": {"enum": ["raw_quantified", "quantified_matrix", "processed_matrix"]}}},
+          "then": {"properties": {"files": {"required": ["matrix"]}}}
+        },
+        {
+          "if": {"required": ["stage"], "properties": {"stage": {"pattern": "_results$"}}},
+          "then": {"properties": {"files": {"required": ["results"]}}}
+        }
+      ]
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "description": {"type": "string", "minLength": 1},
+        "outcome": {}, "exposure": {},
+        "covariates": {"type": "array"},
+        "inputs": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {"$ref": "#/$defs/id"},
+              {"type": "array", "items": {"$ref": "#/$defs/id"}}
+            ]
+          }
+        },
+        "analysis": {"$ref": "#/$defs/analysis"},
+        "depends_on": {"type": "array", "items": {"type": "object", "required": ["hypothesis"]}},
+        "origin": {}, "validation_requirement": {}, "status": {}, "estimand": {},
+        "contrasts": {}, "population": {}, "timepoint": {}, "metadata": {},
+        "retired_reason": {}
+      }
+    },
+    "columns": {
+      "type": "object",
+      "description": "Logical column mappings for a dataset. A blank leading CSV header used for R row names is available as __row_name__.",
+      "properties": {
+        "validation": {"$ref": "#/$defs/columnValidation"}
+      },
+      "additionalProperties": true
+    },
+    "columnValidation": {
+      "type": "object",
+      "description": "Optional eligibility checks applied before result harmonization.",
+      "additionalProperties": false,
+      "properties": {
+        "finite": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "positive": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "nonnegative": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "probability": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "description": "Hypothesis-specific analytical plan.",
+      "properties": {
+        "harmonization": {"$ref": "#/$defs/harmonization"},
+        "replication": {"$ref": "#/$defs/replicationPolicy"},
+        "bioinformatics": {"$ref": "#/$defs/bioinformatics"}
+      },
+      "additionalProperties": true
+    },
+    "bioinformatics": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "max_features": {"type": "integer", "minimum": 1, "maximum": 100, "default": 10},
+        "max_pages": {"type": "integer", "minimum": 1, "maximum": 20, "default": 3},
+        "max_regional_snps": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+        "max_sequence_bp": {"type": "integer", "minimum": 1, "maximum": 1000000, "default": 100000},
+        "window_bp": {"type": "integer", "minimum": 0, "maximum": 5000000, "default": 500000},
+        "fdr": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 0.05},
+        "phenotype_terms": {"type": "array", "maxItems": 20, "items": {"type": "string", "minLength": 1, "maxLength": 150}},
+        "literature_terms": {"type": "array", "maxItems": 10, "items": {"type": "string", "minLength": 1, "maxLength": 150}, "description": "Public molecular-field search terms; inferred from dataset type when omitted. Never put patient information here."},
+        "relevant_tissues": {"type": "array", "maxItems": 10, "items": {"type": "string", "minLength": 1, "maxLength": 150}},
+        "genetic_pairs": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/geneticPair"}},
+        "mr": {"$ref": "#/$defs/mrSourcePolicy"},
+        "colocalization": {"$ref": "#/$defs/colocalizationSourcePolicy"}
+      }
+    },
+    "colocalizationSourcePolicy": {
+      "type": "object", "additionalProperties": false, "required": ["exposure_ancestry"],
+      "description": "Automatic exploratory irQTL-GWAS colocalization discovery. Related phenotype labels are searched in GWAS Catalog; indexed harmonized regional results are preferred. Partial QTL regions can be analyzed only with a mandatory major caveat.",
+      "properties": {
+        "exposure_dataset": {"type": "string", "minLength": 1},
+        "exposure_ancestry": {"type": "string", "minLength": 1},
+        "exposure_source_id": {"type": "string", "minLength": 1},
+        "exposure_citation": {"type": "string", "minLength": 1},
+        "outcome_ancestry": {"type": "string", "minLength": 1},
+        "outcome_provider": {"enum": ["auto", "gwas-catalog"], "default": "auto"},
+        "ld_provider": {"const": "1000g-30x-grch38", "default": "1000g-30x-grch38"},
+        "ld_population": {"enum": ["AFR", "AMR", "EAS", "EUR", "SAS"]},
+        "related_phenotypes": {"type": "array", "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 150}},
+        "max_related_phenotypes": {"type": "integer", "minimum": 1, "maximum": 20, "default": 20},
+        "max_colocalization_traits": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+        "max_exposure_variants": {"type": "integer", "minimum": 2, "maximum": 5000, "default": 500},
+        "region_window_bp": {"type": "integer", "minimum": 0, "maximum": 5000000, "default": 500000},
+        "allow_partial_regions": {"type": "boolean", "default": true},
+        "minimum_exposure_overlap": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 0.5},
+        "sample_overlap": {"enum": ["none", "unknown"], "default": "unknown"},
+        "sample_overlap_basis": {"type": "string", "minLength": 1}
+      }
+    },
+    "mrSourcePolicy": {
+      "type": "object", "additionalProperties": false, "required": ["exposure_ancestry"],
+      "description": "Concise automatic cis-irQTL MR source policy. JLinAlg expands it into audited per-feature pairs. Custom sources continue to use genetic_pairs.",
+      "properties": {
+        "exposure_dataset": {"type": "string", "minLength": 1},
+        "exposure_ancestry": {"type": "string", "minLength": 1, "description": "Explicit ancestry of the actual irQTL analysis sample; never inferred from the cohort name."},
+        "exposure_source_id": {"type": "string", "minLength": 1},
+        "exposure_citation": {"type": "string", "minLength": 1},
+        "outcome_provider": {"enum": ["auto", "pan-ukb"], "default": "auto"},
+        "outcome_trait": {"type": "string", "minLength": 1, "description": "BMI aliases and UK Biobank field 21001 select the built-in Pan-UKB BMI adapter."},
+        "outcome_ancestry": {"type": "string", "minLength": 1},
+        "ld_provider": {"enum": ["1000g-30x-grch38"], "default": "1000g-30x-grch38"},
+        "ld_population": {"enum": ["AFR", "AMR", "EAS", "EUR", "SAS"]},
+        "sample_overlap": {"const": "none", "default": "none"},
+        "sample_overlap_basis": {"type": "string", "minLength": 1},
+        "instrument_validity_rationale": {"type": "string", "minLength": 1},
+        "instrument_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.00000005, "default": 0.00000005},
+        "minimum_f": {"type": "number", "minimum": 10, "default": 10},
+        "clump_r2": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.01, "default": 0.001},
+        "max_instruments": {"type": "integer", "minimum": 2, "maximum": 500, "default": 100}
+      }
+    },
+    "geneticPair": {
+      "type": "object", "required": ["id", "feature_id", "rationale"],
+      "description": "Scientist-reviewed regional evidence. Missing scientific prerequisites are documented as questions at execution, never guessed.",
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "feature_id": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string", "minLength": 1}, "approved": {"type": "boolean", "default": false},
+        "sample_overlap": {"type": "string"}, "sample_overlap_basis": {"type": "string"},
+        "instrument_validity_rationale": {"type": "string"},
+        "minimum_overlap": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 0.8},
+        "instrument_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.00000005},
+        "minimum_f": {"type": "number", "minimum": 10},
+        "clump_r2": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.01},
+        "region": {"type": "object", "required": ["chromosome", "start", "end"], "properties": {"chromosome": {"type": "string"}, "start": {"type": "integer", "minimum": 1}, "end": {"type": "integer", "minimum": 1}}},
+        "exposure": {"$ref": "#/$defs/geneticSource"}, "outcome": {"$ref": "#/$defs/geneticSource"},
+        "ld": {"type": "object", "description": "A cited local signed matrix and allele file, a population for automatic 1000G GRCh37 LD, or database 1000g-30x-grch38 plus a superpopulation for indexed GRCh38 regional LD."}
+      }, "additionalProperties": true
+    },
+    "geneticSource": {
+      "type": "object", "properties": {
+        "dataset_id": {"type": "string"}, "file_role": {"type": "string"},
+        "source_id": {"type": "string"}, "citation": {"type": "string"},
+        "genome_build": {"enum": ["GRCh37", "GRCh38"]}, "ancestry": {"type": "string"},
+        "sample_size": {"type": "integer", "minimum": 3}, "complete_region": {"type": "boolean"},
+        "trait": {"type": "string"}, "feature_id": {"type": "string"}, "assay": {"type": "string"}, "tissue": {"type": "string"},
+        "url": {"type": "string", "format": "uri"}, "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "license": {"type": "string"}
+      }, "additionalProperties": true
+    },
+    "harmonization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "invalid_rows": {"enum": ["error", "exclude"], "default": "error"},
+        "common_universe": {"enum": ["none", "intersection"], "default": "none"}
+      }
+    },
+    "replicationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adjustment_scope": {"enum": ["all_results", "discovery_subset"], "default": "all_results"},
+        "require_same_sign": {"type": "boolean", "default": true},
+        "threshold_comparison": {"enum": ["less_than", "less_than_or_equal"], "default": "less_than_or_equal"}
+      }
+    },
+    "analysisRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "description"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"type": "string", "minLength": 1},
+        "for_hypothesis": {"$ref": "#/$defs/id"},
+        "for_hypotheses": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "description": {"type": "string", "minLength": 1},
+        "reason": {}, "origin_observation": {}, "status": {}, "metadata": {},
+        "retired_reason": {}
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "between": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "type": {}, "statement": {"type": "string", "minLength": 1},
+        "source": {}, "review_status": {}, "metadata": {}
+      }
+    }
+  }
+}

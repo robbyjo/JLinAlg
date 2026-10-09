@@ -17,6 +17,22 @@ import org.junit.jupiter.api.io.TempDir;
 class PlinkBedLdClumperTest {
     @TempDir Path temporaryDirectory;
 
+    @Test void signedLdRetainsAlleleOrientationAndVariantOrder() throws Exception {
+        Path prefix = temporaryDirectory.resolve("signed");
+        writeReference(prefix, new Variant("1", "a", 100, new int[] {0, 0, 1, 1, 2, 2}),
+            new Variant("1", "b", 200, new int[] {2, 2, 1, 1, 0, 0}));
+        var ld = PlinkBedLdClumper.signedCorrelation(prefix, List.of("b", "a"));
+        assertEquals(List.of("b", "a"), ld.variants());
+        assertEquals(List.of("A", "A"), ld.effectAlleles());
+        assertEquals(List.of("G", "G"), ld.otherAlleles());
+        assertEquals(-1, ld.correlation()[0][1], 1e-12);
+        assertEquals(6, ld.founders());
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+            () -> PlinkBedLdClumper.signedCorrelation(prefix, List.of("absent")));
+        double[][] copy = ld.correlation(); copy[0][1] = 0;
+        assertEquals(-1, ld.correlation()[0][1], 1e-12);
+    }
+
     @Test
     void slowPhaseCannotAbortValidFortyOneFounderClump() throws Exception {
         checkPhaseTable(new int[][]{{4,0,2},{3,21,4},{3,3,1}}, .01, "slow");

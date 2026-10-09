@@ -6,14 +6,18 @@ The static output is checked in; website deployment needs no Python runtime.
 from pathlib import Path
 import html
 import re
+import shutil
 import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = {
+    "bioinformatics-evidence": ("Bioinformatics evidence workflow", "Audited source discovery, regional genetic inference, protein and sequence investigation, literature search and local evidence packaging.", "CLI tutorial · Source build"),
     "single-cell": ("Replicated single-cell RNA analysis", "Sparse QC, pseudobulk, donor-aware state and abundance, functional scores and exploratory representations.", "CLI + Java/R · Source build"),
     "spatial-analysis": ("Physical spatial RNA analysis", "Tissue graphs, Moran and Geary tests, neighborhoods, sample-aware comparisons and distance gradients.", "CLI + Java · Source build"),
     "project-configuration": ("Project configuration", "Project-over-local YAML precedence and reproducible CLI runs.", "CLI · Source build"),
-    "auditable-omics-pipeline": ("Auditable omics research pipeline", "A minimal study contract, project status, amendments, provenance, and future LLM-assisted planning.", "Roadmap design · Fixed pipeline first"),
+    "auditable-omics-pipeline": ("Auditable omics research pipeline", "A deterministic study contract, approval-gated execution, amendments, provenance, and guarded future LLM assistance.", "CLI · Source build"),
+    "study-pipeline-tutorial": ("Auditable study pipeline tutorial", "Run a result-first study end to end, inspect its evidence chain, and design a defensible patient-data boundary for future LLM assistance.", "CLI tutorial · Source build"),
+    "study-questions-and-decisions": ("Study questions and decisions subsystem design", "Implemented deterministic scientist questions, audited batch answers and amendment proposals, followed by the broader subsystem design.", "Source build · First tranche and roadmap"),
     "variant-followup": ("Variant annotation and scoring", "Local snapshots, POST/API lookup, VEP/ANNOVAR adapters and transparent evidence integration.", "CLI · Source build"),
     "network-followup": ("Networks and candidate regulators", "Reference networks, WGCNA, sparse and differential associations, GENIE3 and CARNIVAL.", "CLI + Java/R · Source build"),
     "censored-ordinal": ("Censored and ordinal regression", "Fit Tobit, parametric survival-time and ordered logit/probit likelihoods with validated covariance.", "CLI + Java · Source build"),
@@ -48,7 +52,12 @@ def render(source, destination, title, description, root, eyebrow="CLI + Java ·
         lambda m: '<div class="code-window"><div class="code-bar"><span>'
         + html.escape(m.group(1) or "Input / output") + '</span></div><pre><code>'
         + m.group(2) + '</code></pre></div>', body)
-    toc = ''.join(f'<a href="#{item["id"]}">{html.escape(item["name"])}</a>' for item in md.toc_tokens)
+    # The citation generator replaces the Markdown heading with a slugged panel.
+    def toc_id(item):
+        if destination.parent.name == "vignettes" and item["id"] == "scientific-citations":
+            return "scientific-citations-" + destination.stem
+        return item["id"]
+    toc = ''.join(f'<a href="#{toc_id(item)}">{html.escape(item["name"])}</a>' for item in md.toc_tokens)
     page = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="{html.escape(description)}"><title>{html.escape(title)} · JLinAlg</title>
@@ -64,6 +73,12 @@ def render(source, destination, title, description, root, eyebrow="CLI + Java ·
 
 for slug, (title, description, eyebrow) in PAGES.items():
     render(ROOT / f"docs/vignettes/{slug}.md", ROOT / f"site/vignettes/{slug}.html", title, description, "../", eyebrow)
+
+schema_output = ROOT / "site/schemas"
+schema_output.mkdir(parents=True, exist_ok=True)
+for schema in (ROOT / "docs/schemas").glob("*.schema.json"):
+    shutil.copyfile(schema, schema_output / schema.name)
+
 render(ROOT / "docs/xwas-followup-validation.md", ROOT / "site/xwas-followup-validation.html",
        "xWAS follow-up validation", "Independent numerical fixtures, reproducible checks and explicit estimator boundaries.", "./")
 render(ROOT / "docs/latent-confounder-validation.md", ROOT / "site/latent-confounder-validation.html",

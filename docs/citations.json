@@ -2,6 +2,86 @@
   "schemaVersion": 1,
   "references": [
     {
+      "id": "gwas-catalog-api-v2",
+      "category": "Bioinformatics evidence resources",
+      "authors": "NHGRI-EBI GWAS Catalog",
+      "year": 2026,
+      "title": "GWAS Catalog REST API v2 documentation",
+      "venue": "EMBL-EBI documentation",
+      "url": "https://www.ebi.ac.uk/gwas/docs/programmatic-access/rest-api/",
+      "features": ["Phenotype-matched source discovery", "Curated genomic-window GWAS candidates", "Source and release provenance"]
+    },
+    {
+      "id": "gwas-catalog-summary-statistics",
+      "category": "Bioinformatics evidence resources",
+      "authors": "NHGRI-EBI GWAS Catalog",
+      "year": 2026,
+      "title": "GWAS Catalog summary statistics documentation",
+      "venue": "EMBL-EBI documentation",
+      "url": "https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics/",
+      "features": ["Harmonized GRCh38 summary statistics", "Indexed regional retrieval", "Metadata and checksum provenance"]
+    },
+    {
+      "id": "eqtl-catalogue-data-access",
+      "category": "Bioinformatics evidence resources",
+      "authors": "eQTL Catalogue",
+      "year": 2026,
+      "title": "eQTL Catalogue data access",
+      "venue": "EMBL-EBI documentation",
+      "url": "https://www.ebi.ac.uk/eqtl/Data_access/",
+      "features": ["Molecular QTL source discovery", "Bulk-access fallback and source citations"]
+    },
+    {
+      "id": "gtex-atlas-2020",
+      "category": "Bioinformatics evidence resources",
+      "authors": "GTEx Consortium",
+      "year": 2020,
+      "title": "The GTEx Consortium atlas of genetic regulatory effects across human tissues",
+      "venue": "Science 369:1318-1330",
+      "url": "https://doi.org/10.1126/science.aaz1776",
+      "features": ["Tissue-specific molecular QTL context", "Explicit cross-tissue scientific relevance"]
+    },
+    {
+      "id": "uniprot-api-documentation",
+      "category": "Bioinformatics evidence resources",
+      "authors": "UniProt Consortium",
+      "year": 2026,
+      "title": "UniProt API queries",
+      "venue": "UniProt documentation",
+      "url": "https://www.uniprot.org/help/api_queries",
+      "features": ["Reviewed gene and species protein mapping", "Protein mapping ambiguity"]
+    },
+    {
+      "id": "varadi-alphafold-2022",
+      "category": "Bioinformatics evidence resources",
+      "authors": "M. Varadi et al.",
+      "year": 2022,
+      "title": "AlphaFold Protein Structure Database: massively expanding the structural coverage of protein-sequence space with high-accuracy models",
+      "venue": "Nucleic Acids Research 50:D439-D444",
+      "url": "https://doi.org/10.1093/nar/gkab1061",
+      "features": ["Predicted protein structure investigation", "Model version and confidence provenance"]
+    },
+    {
+      "id": "ucsc-api-documentation",
+      "category": "Bioinformatics evidence resources",
+      "authors": "UCSC Genome Browser",
+      "year": 2026,
+      "title": "UCSC Genome Browser REST API",
+      "venue": "UCSC documentation",
+      "url": "https://genome.ucsc.edu/goldenPath/help/api.html",
+      "features": ["Build-specific genomic reference sequence", "Audited coordinate conversion and browser links"]
+    },
+    {
+      "id": "europe-pmc-rest",
+      "category": "Bioinformatics evidence resources",
+      "authors": "Europe PMC",
+      "year": 2026,
+      "title": "Europe PMC RESTful Web Service",
+      "venue": "Europe PMC documentation",
+      "url": "https://europepmc.org/RestfulWebService",
+      "features": ["Non-LLM literature retrieval", "Bibliographic provenance and bounded searches"]
+    },
+    {
       "id": "student-1908",
       "category": "Foundational inference",
       "authors": "Student [W. S. Gosset]",
@@ -1254,6 +1334,65 @@
       "pmcid": "PMC4401657"
     },
     {
+      "id": "frankish-gencode-2021",
+      "category": "Enrichment and annotation",
+      "authors": "Adam Frankish et al.",
+      "year": 2021,
+      "title": "GENCODE 2021",
+      "venue": "Nucleic Acids Research 49:D916-D923",
+      "url": "https://doi.org/10.1093/nar/gkaa1087",
+      "features": [
+        "GENCODE transcript-to-gene annotation",
+        "reference genome annotation"
+      ],
+      "pmid": "33270111",
+      "pmcid": "PMC7778937"
+    },
+    {
+      "id": "go-consortium-2021",
+      "category": "Enrichment and annotation",
+      "authors": "Gene Ontology Consortium",
+      "year": 2021,
+      "title": "The Gene Ontology resource: enriching a GOld mine",
+      "venue": "Nucleic Acids Research 49:D325-D334",
+      "url": "https://doi.org/10.1093/nar/gkaa1113",
+      "features": [
+        "Gene Ontology",
+        "functional annotation"
+      ],
+      "pmid": "33290552"
+    },
+    {
+      "id": "milacic-reactome-2024",
+      "category": "Enrichment and annotation",
+      "authors": "Marija Milacic et al.",
+      "year": 2024,
+      "title": "The Reactome Pathway Knowledgebase 2024",
+      "venue": "Nucleic Acids Research 52:D672-D678",
+      "url": "https://doi.org/10.1093/nar/gkad1025",
+      "features": [
+        "Reactome pathways",
+        "curated pathway knowledge"
+      ],
+      "pmid": "37941124",
+      "pmcid": "PMC10767911"
+    },
+    {
+      "id": "thousand-genomes-2015",
+      "category": "Quantitative and statistical genetics",
+      "authors": "1000 Genomes Project Consortium",
+      "year": 2015,
+      "title": "A global reference for human genetic variation",
+      "venue": "Nature 526:68-74",
+      "url": "https://doi.org/10.1038/nature15393",
+      "features": [
+        "1000 Genomes Phase 3",
+        "ancestry-stratified LD reference"
+      ],
+      "pmid": "26432245",
+      "pmcid": "PMC4750478"
+    },
+    {
       "id": "smyth-limma-2004",
       "category": "High-throughput inference",
       "authors": "Gordon K. Smyth",
@@ -1542,6 +1681,34 @@
       "features": [
         "Electronic audit trails",
         "Searchable electronic records"
+      ]
+    },
+    {
+      "id": "hhs-hipaa-deidentification-2012",
+      "category": "Reproducible omics follow-up",
+      "authors": "U.S. Department of Health and Human Services, Office for Civil Rights",
+      "short_author": "HHS OCR",
+      "year": 2012,
+      "title": "Guidance Regarding Methods for De-identification of Protected Health Information in Accordance with the HIPAA Privacy Rule",
+      "venue": "HHS Office for Civil Rights guidance",
+      "url": "https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html",
+      "features": [
+        "Safe Harbor and Expert Determination",
+        "Health-data disclosure boundary"
+      ]
+    },
+    {
+      "id": "nist-genai-profile-2024",
+      "category": "Reproducible omics follow-up",
+      "authors": "National Institute of Standards and Technology",
+      "short_author": "NIST",
+      "year": 2024,
+      "title": "Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile",
+      "venue": "NIST AI 600-1",
+      "url": "https://doi.org/10.6028/NIST.AI.600-1",
+      "features": [
+        "Generative-AI data provenance",
+        "Data-flow testing and documentation"
       ]
     },
     {
@@ -2009,7 +2176,35 @@
     "auditable-omics-pipeline": [
       "sandve-reproducibility-2013",
       "w3c-prov-o-2013",
-      "fda-electronic-records-2024"
+      "frankish-gencode-2021",
+      "go-consortium-2021",
+      "milacic-reactome-2024",
+      "thousand-genomes-2015",
+      "fda-electronic-records-2024",
+      "hhs-hipaa-deidentification-2012",
+      "nist-genai-profile-2024"
+    ],
+    "study-pipeline-tutorial": [
+      "sandve-reproducibility-2013",
+      "w3c-prov-o-2013",
+      "frankish-gencode-2021",
+      "go-consortium-2021",
+      "milacic-reactome-2024",
+      "thousand-genomes-2015",
+      "fda-electronic-records-2024",
+      "hhs-hipaa-deidentification-2012",
+      "nist-genai-profile-2024"
+    ],
+    "bioinformatics-evidence": [
+      "gwas-catalog-api-v2", "gwas-catalog-summary-statistics", "eqtl-catalogue-data-access", "gtex-atlas-2020",
+      "uniprot-api-documentation", "varadi-alphafold-2022", "ucsc-api-documentation", "europe-pmc-rest",
+      "frankish-gencode-2021", "thousand-genomes-2015", "wang-susie-2020",
+      "wallace-coloc-2021", "bowden-mr-egger-2015", "bowden-weighted-median-2016",
+      "sandve-reproducibility-2013", "w3c-prov-o-2013"
+    ],
+    "study-questions-and-decisions": [
+      "sandve-reproducibility-2013",
+      "w3c-prov-o-2013"
     ],
     "variant-followup": [
       "wang-annovar-2010",

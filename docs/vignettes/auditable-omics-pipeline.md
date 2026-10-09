@@ -1,20 +1,26 @@
-# Auditable omics research pipeline design
+# Auditable omics research pipeline
 
-> **Roadmap design, not a current CLI contract.** This page specifies the
-> proposed deterministic pipeline and provenance subsystem. The commands and
-> schemas below are illustrative until their implementation, validation, and
-> release are complete.
+> **Source-build feature.** The version-1 study contract, deterministic planner,
+> approval gate, resumable runner, amendments, hash-chained provenance, research
+> notebook, unusual-result observations, and searchable evidence index are
+> implemented. Modality-specific automatic pipelines remain limited to the
+> registered operations described below; unsupported evidence steps stop with a
+> visible request rather than fabricating a result.
 
 ## Purpose
 
-The planned pipeline starts from quantified or processed molecular matrices,
+The pipeline starts from quantified or processed molecular matrices,
 previously calculated association results, or later-stage evidence. A scientist
 describes the study and hypotheses; JLinAlg validates the description, constructs
 a fixed analysis plan, executes the supported operations, and records how every
 result was produced.
 
-The first implementation is deterministic and does not require an LLM. A future
-local or remote LLM may help draft the study description, investigate unusual
+The execution kernel is deterministic and does not require an LLM. Optional
+bounded assistance defaults to audited manual browser handoff, with explicit
+OpenAI/Gemini or OpenAI-compatible API alternatives. It can review aggregate
+findings, suggest analyses, support literature review and draft an unreviewed
+manuscript. Browser responses are human-attested, not authenticated provider output. A future
+local adapter may help draft the study description, investigate unusual
 results, or propose plan amendments. It must use the same validated contracts and
 cannot bypass JLinAlg's execution, approval, or audit rules.
 
@@ -28,6 +34,15 @@ genome -> epigenome -> transcription/splicing -> protein -> pathway -> phenotype
 ~~~
 
 The objective may be publication, drug-discovery prioritization, or both.
+
+The first [study questions and decisions tranche](study-questions-and-decisions.md#implemented-first-tranche)
+uses built-in rules to document hypothesis-linked questions, collect checked
+batch answers, propose amendments, and gate affected operations. Questions and
+answers are preserved in `QUESTIONS.md`, the session notebook, and the local
+index. Optional LLM-suggested questions now enter the same review inbox; interactive
+prompting remains future work. The [bioinformatics evidence workflow](bioinformatics-evidence.md)
+documents source discovery, reviewed regional genetic inference, protein/sequence
+investigation, non-LLM literature search and local evidence archives.
 
 ## Human contract, resolved contract, and executable plan
 
@@ -43,6 +58,10 @@ The project uses three separate documents:
 YAML and JSON represent the same logical object. YAML is the recommended
 human-facing form; JLinAlg canonicalizes either representation before hashing.
 The original study file is never silently rewritten.
+
+The Java validator is authoritative. Editor and integration tooling can use the
+[study version-1 JSON Schema](../schemas/study-v1.schema.json) and
+[amendment version-1 JSON Schema](../schemas/amendment-v1.schema.json).
 
 ## Minimal study schema
 
@@ -60,6 +79,15 @@ project:
     Discover molecular associations with BMI, validate them, and investigate
     functional and genetic support.
   objective: publication
+
+# Optional. These are the resolved defaults when the block is omitted.
+resources:
+  downloads: automatic
+  directory: resources
+  ld:
+    database: 1000g-phase3
+    population: auto
+    auto_download: true
 
 cohorts:
   - id: fhs-offspring
@@ -173,8 +201,8 @@ drug_discovery_prioritization, or both.
 
 ## Defaults remain visible
 
-Omitted optional values are expanded in resolved-study.yaml. Suggested initial
-defaults are:
+Omitted optional values are expanded in resolved-study.yaml. Version 1 uses
+these defaults:
 
 | Omitted value | Resolved default |
 | --- | --- |
@@ -278,6 +306,63 @@ effects and uncertainty; allele-aware genetic operations require alleles,
 positions, genome build, and other method-specific fields. An unavailable
 prerequisite blocks the operation with an explanation rather than a guessed value.
 
+### Multi-phenotype result files and strict feature universes
+
+A physical result file may contain several outcomes. Declare one logical dataset
+per outcome and let those datasets reuse the same `files.results` path with
+different column mappings. This keeps each hypothesis and estimand explicit
+without copying the source data. A blank first CSV header produced by R row names
+is exposed as the reserved `__row_name__` column.
+
+For result sets that must reproduce a predefined eligible-feature universe, add
+column validity rules and an explicit harmonization policy:
+
+~~~yaml
+datasets:
+  - id: fhs-bmi
+    cohort: fhs
+    type: transcriptomics
+    stage: association_results
+    files: {results: results/splicing-bmi-fhs.csv}
+    columns:
+      feature_id: __row_name__
+      effect: Fx_BMI
+      standard_error: SE_BMI
+      p_value: P_BMI
+      sample_size: N_BMI
+      validation:
+        finite: [Fx_BMI, SE_BMI, P_BMI, N_BMI]
+        positive: [N_BMI]
+        nonnegative: [SE_BMI]
+        probability: [P_BMI]
+
+hypotheses:
+  - id: H-BMI
+    description: FHS BMI associations replicate in validation cohorts.
+    inputs:
+      discovery: [fhs-bmi]
+      replication: [cardia-bmi, jhs-bmi, whi-bmi]
+    analysis:
+      goals: [discovery_replication, meta_analysis]
+      harmonization:
+        invalid_rows: exclude
+        common_universe: intersection
+      multiple_testing: {method: BH, alpha: 0.05}
+      replication:
+        adjustment_scope: discovery_subset
+        require_same_sign: false
+        threshold_comparison: less_than
+~~~
+
+`common_universe: intersection` retains only feature IDs eligible in every input
+dataset. `adjustment_scope: discovery_subset` recomputes each validation cohort's
+multiple-testing adjustment only over discovery-selected features. Direction is
+still reported, but it affects replication eligibility only when
+`require_same_sign: true`. These choices are scientifically consequential and
+therefore must be declared rather than inferred. Defaults remain conservative:
+invalid rows are errors, no intersection is imposed, adjustment covers all
+results, sign agreement is required, and the threshold comparison is inclusive.
+
 ## LLM-assisted drafting
 
 An LLM may eventually help translate protocols, meeting notes, data dictionaries,
@@ -321,8 +406,8 @@ validation.
 
 ## Diagnostic review and unusual findings
 
-Fixed pipelines cannot enumerate every meaningful visual pattern. JLinAlg should
-therefore emit standard quantitative diagnostics and plots, then record unusual
+Fixed pipelines cannot enumerate every meaningful visual pattern. JLinAlg emits
+registered deterministic diagnostics, and `study observe` records unusual
 observations without prematurely labeling them as biology or processing error.
 Examples include off-diagonal streaks in effect comparisons, unexpected
 clusters, sign discordance, batch-aligned bands, heteroscedastic fans, genomic
@@ -343,14 +428,14 @@ decision, and resulting artifacts remain linked in the evidence graph.
 
 ## Project progress status
 
-The proposed generated file is project-status.yaml. If it is absent, the project
+The generated file is `state/project-status.yaml`. If it is absent, the project
 is at its beginning: no compiled or executed project state is claimed.
 
 ~~~yaml
 schema_version: 1
 project_id: bmi-molecular-study
-study_hash: sha256:...
-resolved_study_hash: sha256:...
+study_hash: "<64-character SHA-256 hex>"
+resolved_study_hash: "<64-character SHA-256 hex>"
 
 state: waiting_for_plan_approval
 phase: planning
@@ -358,27 +443,28 @@ updated_at: 2026-10-05T14:22:31Z
 last_event_id: event-000042
 
 active_plan:
-  id: plan-0003
-  hash: sha256:...
+  plan_id: plan-0123456789ab
+  plan_hash: "<64-character SHA-256 hex>"
   status: proposed
 
 hypotheses:
   H1:
     status: approved
-    completed_operations: 0
-    planned_operations: 7
+
+pending_assumptions: 1
 
 pending_decisions:
-  - id: decision-0007
+  - id: approve-plan-0123456789ab
     type: plan_approval
 
 applied_amendments:
   - meeting-2026-10-01
 
-provenance:
-  complete_artifacts: 4
-  partial_artifacts: 1
-  provenance_gaps: 1
+operations:
+  completed: 0
+  reused: 0
+  waiting: 0
+  failed: 0
 ~~~
 
 Suggested project states are planning, waiting_for_approval, ready, running,
@@ -396,6 +482,8 @@ amendment-meeting-2026-10-01.yaml and amendment-add-whi.yaml.
 An amendment names the approved contract on which it is based and contains only
 the additions, updates, retirements, or new analysis directions. Added and
 updated objects use the same structure as study.yaml.
+Copy `resolved_study_hash` exactly from `study status`; version 1 emits the raw
+lower-case 64-character SHA-256 hexadecimal value.
 
 ~~~yaml
 schema_version: 1
@@ -403,7 +491,7 @@ schema_version: 1
 amendment:
   id: meeting-2026-10-01
   title: Add a replication cohort and investigate batch sensitivity
-  base_study_hash: sha256:...
+  base_study_hash: "<resolved_study_hash from study status>"
   proposed_at: 2026-10-01T16:30:00Z
   proposed_by:
     type: human
@@ -518,9 +606,11 @@ the evidence visible when it was proposed, and its validation requirement.
 
 ## Deterministic orchestration first
 
-The first implementation uses a rule-based planner and registered operations.
-Every operation declares its inputs, outputs, supported designs, assumptions,
-estimand, diagnostics, resource bounds, and downstream compatibility.
+The implementation uses a rule-based planner and registered operations.
+Each registry entry declares its executor, accepted stages and modalities,
+outputs, and diagnostics; the compiled plan pins its datasets, dependencies, and
+explicit configuration. Richer estimand and resource-limit declarations remain
+part of the pipeline-profile roadmap.
 
 The planner may start from matrices, association results, or later supported
 artifacts and constructs only the remaining operations:
@@ -536,16 +626,41 @@ validate and harmonize
   -> publication or prioritization report
 ~~~
 
+`analysis.mode` defaults to `auto`. In auto mode, listed goals are a minimum,
+not a ceiling: JLinAlg adds goals implied by input stages, omics types, cohort
+roles, and the project objective. Use `mode: manual` only when the contract
+should run exactly the listed goals. Functional, genetic, literature,
+diagnostic, and report branches are independent, so a missing MR input does not
+suppress enrichment or reporting.
+
+Public reference resolution is inbound-only. With the default
+`resources.downloads: automatic`, JLinAlg stores downloaded references in the
+project resource directory and records source metadata and hashes. The
+standalone JAR embeds its HTTPS transport, so no external download utility is
+required. GENCODE releases are inferred from `dataset.annotation_release`;
+the versioned transcript-ranking and HGNC metadata tables provide the local
+feature-to-gene map. GO and Reactome
+collections are downloaded for local enrichment. LD-dependent configured work
+defaults to the cataloged, checksum-verified `1000g-phase3` package containing
+AFR, AMR, EAS, EUR, and SAS panels. That approximately 1.6 GB package is fetched
+only after eligible variant-level inputs are present. `population: auto` does
+not silently substitute a European panel: analysis waits for ancestry when a
+particular panel is required. Set `downloads: manual` or `deny` to prohibit
+automatic fetches.
+
 The compiled plan is deterministic and resumable without an LLM. A later LLM
 planner will propose the same typed plan and amendment objects; JLinAlg will
 continue to own validation, execution, permissions, artifacts, and audit state.
 
 ## Provenance and the research notebook
 
-Every completed operation creates immutable, hashed artifacts and an event
-identifying its inputs, outputs, code, configuration, environment, timestamps,
-status, and responsible actor. Actor types include human, jlinalg, external
-software, and llm with its reported provider/model or local model hash.
+Every operation creates overwrite-protected, hashed artifacts and a manifest
+whose hash is anchored in the event ledger. Events identify the plan, operation,
+inputs, outputs, configuration, timestamps, status, and responsible actor.
+Actor types include human, jlinalg, external software, and llm with its reported
+provider/model or local model hash. `study verify` checks the base and resolved
+contracts, plans, amendments, observations and their artifacts, derived notebook
+files, manifests, and output hashes against that chain.
 
 SESSION_HISTORY.md is required as the readable research notebook. Its
 machine-readable source is an append-only event ledger. Corrections append a new
@@ -557,7 +672,7 @@ known software information, supplying person, reason for acceptance, and an
 explicit provenance gap. Downstream results inherit that limitation instead of
 hiding it.
 
-A conventional layout keeps the same evidence discoverable without special
+The current portable layout keeps the same evidence discoverable without special
 software:
 
 ~~~text
@@ -570,10 +685,11 @@ project/
   ledger/events.jsonl
   SESSION_HISTORY.md
   plans/<plan-id>/
-  runs/<run-id>/{inputs,outputs,logs,diagnostics,provenance}/
-  reports/
-  index/{index.json,index.html}
-  archives/
+  runs/run-<plan-id>/
+    run-manifest.yaml
+    operations/<operation-id>/{manifest.yaml,artifacts...}
+  resources/{gencode,enrichment,ld}/...
+  index/{index.json,index.html,evidence-summary.json,LLM_CONTEXT.md}
 ~~~
 
 Generated paths and filenames are recorded in the ledger; moving a portable
@@ -581,39 +697,210 @@ archive does not break result IDs or internal evidence links.
 
 ## Traceable reports and submission archives
 
-Every number and figure in a generated report references a stable result ID that
-resolves to the source table, row or statistic, generating operation, plan,
-configuration, software, and inputs. LLM-written narrative may cite result IDs
-but must not become the source of a numerical result.
+Current generated reports distinguish complete, waiting, and failed evidence,
+list stable result IDs and dependency manifests, and create publication and,
+when requested, drug-discovery evidence inventories. They do not invent
+narrative or causal conclusions. Any future number or figure inserted
+into a report must resolve to a source table row or statistic, generating
+operation, plan, configuration, software, and inputs. LLM-written narrative may
+cite result IDs but must not become the source of a numerical result.
 
-The searchable project index supports lookup by hypothesis, cohort, tissue,
-feature, variant, operation, actor, software or LLM, timestamp, status, report,
-and provenance gap. A portable HTML index accompanies the machine-readable
-index.
+The project index supports lookup by result ID, hypothesis, operation, state,
+manifest, artifact path, and SHA-256 hash. `index/evidence-summary.json` is the
+portable machine view. `index/LLM_CONTEXT.md` is a compact retrieval handoff that
+states hypotheses, evidence states, artifacts, blockers, audit locations,
+deterministic cross-cohort diagnostics, and a bounded set of leading enrichment
+or candidate rows. It is still an index: an LLM or human drafter must trace every
+numerical claim to the referenced artifact and manifest.
 
-Journal or regulatory archives include the approved and resolved contracts,
+Future journal or regulatory archive packaging will include the approved and resolved contracts,
 plans, amendments, project status, event ledger, SESSION_HISTORY.md, reports,
 scripts, logs, software inventory, checksums, signatures, and verification
 instructions. Controlled source data may be represented by hashes and access
 instructions rather than redistributed.
 
-## Planned interface
+## Current CLI workflow
 
-These commands describe the intended workflow and are not implemented yet:
+Build the executable and inspect the study commands:
 
-~~~text
-jlinalg study validate study.yaml
-jlinalg study resolve study.yaml
-jlinalg study plan resolved-study.yaml
-jlinalg study status
-jlinalg study amend amendment-meeting-2026-10-01.yaml
-jlinalg audit verify
-jlinalg archive build --profile journal
-jlinalg archive verify submission.zip
+~~~powershell
+.\gradlew.bat executableJar
+java -jar build/cli/jlinalg-0.3.6.jar study --help
 ~~~
 
-The adoption target is a short study file, focused questions only when an omitted
-detail changes the science, and complete provenance generated automatically.
+Create a template or validate an existing YAML/JSON contract. `--check-files`
+also verifies every declared file path relative to the study file.
+
+~~~powershell
+java -jar build/cli/jlinalg-0.3.6.jar study init --template association-results --out study.yaml
+java -jar build/cli/jlinalg-0.3.6.jar study validate study.yaml --check-files
+java -jar build/cli/jlinalg-0.3.6.jar study resolve study.yaml --actor-id scientist-1
+java -jar build/cli/jlinalg-0.3.6.jar study plan --project . --actor-id scientist-1
+java -jar build/cli/jlinalg-0.3.6.jar study status --project .
+~~~
+
+Review `resolved-study.yaml`, its pending assumptions, and the generated plan.
+Approval is a separate human event. If the plan contains default relationship
+assumptions, accepting them must be explicit.
+
+~~~powershell
+java -jar build/cli/jlinalg-0.3.6.jar study approve --project . --approved-by scientist-1 --accept-assumptions
+java -jar build/cli/jlinalg-0.3.6.jar study run --project . --actor-id scientist-1
+java -jar build/cli/jlinalg-0.3.6.jar study verify --project .
+~~~
+
+The default end-to-end lifecycle is also available as one idempotent command:
+
+~~~powershell
+java -jar build/cli/jlinalg-0.3.6.jar study auto study.yaml --project . --actor-id scientist-1
+~~~
+
+This validates declared files, resolves the contract, compiles and records the
+command-line approval, executes every eligible branch, verifies the audit chain,
+and rebuilds all indexes. Default independent-cohort assumptions are recorded
+and accepted by this deliberate invocation. Potential dependence, such as two
+subcohorts under one parent cohort, generates a documented scientist question
+and gates the affected comparisons while independent work continues.
+`--accept-assumptions` does not resolve that question or establish independence;
+record and approve an evidence-supported relationship amendment instead.
+Scientific prerequisite gaps produce indexed blockers and do not make
+`study auto` fail; execution or integrity failures return status 2.
+
+`study run` returns 0 for completion, 2 for invalid or failed execution, and 3
+when a registered operation is waiting for an external resource or explicit
+configuration. `--allow-partial` changes the last case to a successful process
+exit without changing the recorded `waiting_for_input` project state. A verified
+completed run is reused by default with `study run` or `study auto`;
+`--resume` remains a compatibility alias. Waiting and failed operations retry
+in a new immutable attempt. `--rerun` bypasses completed-result reuse without
+deleting history; `--offline` disables built-in network requests. The index
+distinguishes current from historical attempts and reports connection/policy
+failures separately from absent scientific evidence.
+
+Amendments have a read-only impact preview and require a named human approver:
+
+~~~powershell
+java -jar build/cli/jlinalg-0.3.6.jar study amend amendment-add-whi.yaml --project . --check
+java -jar build/cli/jlinalg-0.3.6.jar study amend amendment-add-whi.yaml --project . --approved-by scientist-1
+~~~
+
+An amendment immediately supersedes the active plan. Compile and approve a new
+plan before further execution. Once a project is resolved, direct edits to the
+base study cannot replace the contract; use an amendment so the change remains
+auditable.
+
+Record an unusual artifact with its competing explanations and a proposed
+direction. An LLM actor must supply its reported model identifier or local model
+hash; this records attribution but does not give the LLM approval authority.
+
+~~~powershell
+java -jar build/cli/jlinalg-0.3.6.jar study observe --project . `
+  --id off-diagonal-1 --type off_diagonal_streak --artifact plots/effects.png `
+  --hypothesis H1 --description "Off-diagonal effect streak" `
+  --explanation "processing batch" --explanation "biological subgroup" `
+  --proposed-direction sensitivity_analysis --amendment-id check-batch `
+  --actor-type llm --actor-id local-reviewer --model sha256:MODEL_HASH
+~~~
+
+`study operations` lists the typed operation registry. Matrix association,
+result standardization, discovery/replication comparison, fixed-effect
+or random-effects meta-analysis, local GO and Reactome enrichment, deterministic
+cross-cohort diagnostics, transparent candidate ordering, and traceable
+reporting have direct adapters. GENCODE transcript-to-gene mappings and public
+enrichment databases are resolved automatically when metadata are sufficient.
+Variant scoring, fine-mapping, colocalization, and MR accept explicit
+`analysis.operations.<goal>` command configuration; absent regional summary
+statistics, alleles, sample sizes, ancestry, or paired exposure/outcome data
+produce a hashed `request.yaml` naming the missing inputs. Configured arguments
+may use `@project@`, `@output@`, `@upstream@`, `@ld_database@`, and
+`@ld_population@`; `requires_ld: true` triggers reference resolution.
+Literature support is currently a recorded evidence request; no network service
+or LLM is contacted automatically.
+
+The generic matrix association adapter is limited to bulk/generic modalities.
+Single-cell, spatial, microbiome, and multimodal templates describe a valid
+contract but do not authorize a bulk model; execution waits for a registered
+modality-specific operation. Likewise, raw or merely quantified matrices require
+an explicit `analysis.association` model and preprocessing decision. For
+discovery/replication, both discovery selection and replication significance use
+the declared family correction (`BH` by default, or explicit `NONE`). By default,
+adjustment covers every result, significance is compared inclusively with alpha,
+and sign concordance is required. A study may instead declare
+`analysis.replication.adjustment_scope: discovery_subset`,
+`threshold_comparison: less_than`, or `require_same_sign: false`; the comparison
+output still reports direction. `analysis.operations.meta_analysis` may set
+`model: fixed|random` and `min_cohorts`.
+
+The complete runnable result-first project is in the
+[GitHub example directory](https://github.com/robbyjo/JLinAlg/tree/main/examples/study-pipeline).
+The [hands-on pipeline tutorial](study-pipeline-tutorial.md) walks through the
+complete run, amendments, observation capture, and the patient-level data
+boundary enforced for bounded assistance and the remaining high-assurance work.
+
+## LLM privacy and patient-data assurance
+
+Feature annotation and diagnostic follow-up are now described in the
+[tutorial's annotation and next-analysis sections](study-pipeline-tutorial.md#probe-annotation-and-genomic-locations).
+The source build writes an annotation assessment, retains ambiguous or missing
+locations, shows annotated primary/meta-analysis previews and explicit input
+requirements in the evidence dashboard, and emits diagnostic-triggered
+`next-steps.yaml` proposals. Gene-name resolution is distinct from verified
+probe coordinates and feature-matched molecular-QTL evidence.
+
+The tutorial now documents the opt-in typed advisor: JLinAlg constructs
+allowlisted aggregate previews and retains execution and amendment control.
+Browser handoff prepares a local packet without sending it; the scientist reviews
+disclosure, submits manually, and imports a hash-matched transcript. OpenAI/Gemini
+use official APIs, not scraped websites. An explicitly configured OpenAI-compatible
+endpoint accepts an API key or provider-issued OAuth bearer token. Only explicitly
+preapproved registered sensitivity analyses execute. All other suggestions
+remain review requests. Prompts, answers, decisions, UTC timestamps and model
+identifiers are retained and hashed within each operation.
+
+Without explicit `assistance.enabled` and purpose permissions, no LLM call is
+made. The `llm` actor type alone is attribution, not a network permission.
+MCP, provider-specific OAuth login/refresh, general pipeline local-model adapters
+and unrestricted orchestration remain future work. A separate editorial-only
+loopback adapter is optional, not the default. The application cannot prove what
+unrelated software, a manual browser interaction or a separately launched agent
+did. See the [browser handoff tutorial](bioinformatics-evidence.md#complete-the-browser-handoff)
+for the recorded audit gap, immutable imports and resume commands.
+
+A broader disclosure milestone will extend the current `aggregate_results`
+default eligibility policy: bounded result previews may be transmitted, while patient- or
+sample-level data remain prohibited. Eligibility is determined by registered
+artifact type, schema, content and lineage—not by a filename or output directory.
+Association and meta-analysis summaries, enrichment or fine-mapping results,
+summary diagnostics and redacted figures may qualify; participant matrices,
+phenotype/covariate rows, identifiers, individual predictions/residuals and
+per-person scores do not.
+
+Because unpublished research may itself be highly sensitive, the contract
+offers a project-level `deny_all` mode in which no project content
+is sent to a remote LLM. A denial overrides broader defaults or operation-level
+requests and is recorded in the audit trail. This denial is enforced by the
+bounded adapter. Additional per-request human approval, small-cell rules and
+artifact allowlists currently cause a no-transmission waiting state because
+those stricter controls are not yet implemented. This is not a general PHI
+detector or a regulatory assurance certification.
+
+For permitted aggregate transmission, JLinAlg should release only locally
+checked artifacts into a separate disclosure directory; a human-approved,
+hash-anchored manifest should name the exact bytes, source result IDs,
+transformations, destination, provider/model, purpose, and policy decision. The
+connector should have read-only access to that directory and default-deny network
+access limited to the approved endpoint. The connector's capability boundary is
+default-deny even though the project policy permits verified aggregate results.
+A network-disabled local model remains another deployment option.
+
+Application records alone are insufficient for a strong non-egress claim.
+High-assurance deployments should reconcile disclosure manifests with
+independent proxy/firewall logs, test with canary identifiers, restrict the
+connector's filesystem permissions, and retain an SBOM plus security review.
+Calling output “aggregate” is not automatically adequate de-identification;
+release rules must follow the applicable legal and institutional determination.
+The tutorial gives the complete control and verification model and clearly marks
+it as planned rather than implemented version-1 behavior.
 
 <!-- SCIENTIFIC-CITATIONS:START -->
 ## Scientific citations
@@ -622,7 +909,13 @@ These are the primary sources for the methods used in this workflow. Cite the re
 
 - [Geir Kjetil Sandve et al. (2013) — Ten Simple Rules for Reproducible Computational Research](../CITATIONS.md#sandve-reproducibility-2013)
 - [W3C Provenance Working Group (2013) — PROV-O: The PROV Ontology](../CITATIONS.md#w3c-prov-o-2013)
+- [Adam Frankish et al. (2021) — GENCODE 2021](../CITATIONS.md#frankish-gencode-2021) — [PMID: 33270111](https://pubmed.ncbi.nlm.nih.gov/33270111/) · [PMCID: PMC7778937](https://pmc.ncbi.nlm.nih.gov/articles/PMC7778937/)
+- [Gene Ontology Consortium (2021) — The Gene Ontology resource: enriching a GOld mine](../CITATIONS.md#go-consortium-2021) — [PMID: 33290552](https://pubmed.ncbi.nlm.nih.gov/33290552/)
+- [Marija Milacic et al. (2024) — The Reactome Pathway Knowledgebase 2024](../CITATIONS.md#milacic-reactome-2024) — [PMID: 37941124](https://pubmed.ncbi.nlm.nih.gov/37941124/) · [PMCID: PMC10767911](https://pmc.ncbi.nlm.nih.gov/articles/PMC10767911/)
+- [1000 Genomes Project Consortium (2015) — A global reference for human genetic variation](../CITATIONS.md#thousand-genomes-2015) — [PMID: 26432245](https://pubmed.ncbi.nlm.nih.gov/26432245/) · [PMCID: PMC4750478](https://pmc.ncbi.nlm.nih.gov/articles/PMC4750478/)
 - [U.S. Food and Drug Administration (2024) — Electronic Systems, Electronic Records, and Electronic Signatures in Clinical Investigations: Questions and Answers](../CITATIONS.md#fda-electronic-records-2024)
+- [U.S. Department of Health and Human Services, Office for Civil Rights (2012) — Guidance Regarding Methods for De-identification of Protected Health Information in Accordance with the HIPAA Privacy Rule](../CITATIONS.md#hhs-hipaa-deidentification-2012)
+- [National Institute of Standards and Technology (2024) — Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile](../CITATIONS.md#nist-genai-profile-2024)
 
 [Search the complete scientific bibliography](https://robbyjo.github.io/JLinAlg/citations.html).
 <!-- SCIENTIFIC-CITATIONS:END -->

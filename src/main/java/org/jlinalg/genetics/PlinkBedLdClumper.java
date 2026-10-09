@@ -38,6 +38,65 @@ public final class PlinkBedLdClumper {
 
     private PlinkBedLdClumper() { }
 
+    /** A1-dosage Pearson LD with mean-imputed missing calls among founders. */
+    public record SignedLd(List<String> variants, List<String> chromosomes,
+            List<Long> positions, List<String> effectAlleles, List<String> otherAlleles,
+            double[][] correlation, int founders) {
+        public SignedLd {
+            variants = List.copyOf(variants); chromosomes = List.copyOf(chromosomes);
+            positions = List.copyOf(positions); effectAlleles = List.copyOf(effectAlleles);
+            otherAlleles = List.copyOf(otherAlleles);
+            correlation = Arrays.stream(correlation).map(double[]::clone).toArray(double[][]::new);
+        }
+        @Override public double[][] correlation() { return Arrays.stream(correlation).map(double[]::clone).toArray(double[][]::new); }
+    }
+
+    /** Extracts signed genotype correlation, not haplotype r-squared used by clump. */
+    public static SignedLd signedCorrelation(Path prefix, List<String> variants) throws IOException {
+        if (variants.isEmpty() || variants.size() > 5000 || new HashSet<>(variants).size() != variants.size())
+            throw new IllegalArgumentException("Signed LD requires 1-5000 unique variant IDs");
+        Reference reference = Reference.open(prefix, new HashSet<>(variants));
+        int founders = 0;
+        for (boolean founder : reference.founders()) if (founder) founders++;
+        if (founders < 3) throw new IOException("At least three reference founders are required");
+        double[][] standardized = new double[variants.size()][founders];
+        List<String> chromosomes = new ArrayList<>(), effect = new ArrayList<>(), other = new ArrayList<>();
+        List<Long> positions = new ArrayList<>();
+        try (FileChannel bed = reference.openBed()) {
+            for (int index = 0; index < variants.size(); index++) {
+                Variant variant = reference.variants().get(variants.get(index));
+                if (variant == null) throw new IOException("Variant absent from reference: " + variants.get(index));
+                chromosomes.add(variant.chromosome()); positions.add(variant.position());
+                effect.add(variant.effectAllele()); other.add(variant.otherAllele());
+                byte[] genotypes = reference.readGenotypes(bed, variant.bedIndex());
+                double total = 0; int observed = 0;
+                for (int sample = 0; sample < genotypes.length; sample++)
+                    if (reference.founders()[sample] && genotypes[sample] >= 0) { total += genotypes[sample]; observed++; }
+                if (observed < Math.max(3, (int) Math.ceil(founders * 0.95))) throw new IOException("Reference call rate below 95% for " + variant.id());
+                double mean = total / observed, sumSquares = 0;
+                int next = 0;
+                for (int sample = 0; sample < genotypes.length; sample++) if (reference.founders()[sample]) {
+                    double centered = genotypes[sample] < 0 ? 0 : genotypes[sample] - mean;
+                    standardized[index][next++] = centered;
+                    sumSquares += centered * centered;
+                }
+                if (!(sumSquares > 0)) throw new IOException("Monomorphic reference variant: " + variant.id());
+                double norm = Math.sqrt(sumSquares);
+                for (int sample = 0; sample < founders; sample++) standardized[index][sample] /= norm;
+            }
+        }
+        double[][] correlation = new double[variants.size()][variants.size()];
+        for (int i = 0; i < variants.size(); i++) {
+            correlation[i][i] = 1;
+            for (int j = 0; j < i; j++) {
+                double dot = 0;
+                for (int sample = 0; sample < founders; sample++) dot += standardized[i][sample] * standardized[j][sample];
+                correlation[i][j] = correlation[j][i] = Math.max(-1, Math.min(1, dot));
+            }
+        }
+        return new SignedLd(variants, chromosomes, positions, effect, other, correlation, founders);
+    }
+
     /**
      * Clumps unique group/variant candidates against a PLINK fileset prefix.
      *
@@ -308,7 +367,7 @@ public final class PlinkBedLdClumper {
     private record IndexedCandidate(LdClumpCandidate candidate, int index) { }
     private record IndexedExclusion(int index, LdClumpExclusion exclusion) { }
     private record Variant(String chromosome, String id, long position,
-            long bedIndex) { }
+            long bedIndex, String effectAllele, String otherAllele) { }
 
     private static final class GenotypeReadFailure extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -424,7 +483,7 @@ public final class PlinkBedLdClumper {
                                 + fields[1], exception);
                         }
                         result.put(fields[1], new Variant(fields[0], fields[1],
-                            position, index));
+                            position, index, fields[4], fields[5]));
                     }
                     index++;
                 }
