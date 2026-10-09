@@ -3,7 +3,6 @@ package org.jlinalg.cli;
 
 import htsjdk.tribble.readers.TabixReader;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -51,8 +50,6 @@ final class ThousandGenomesGrch38Ld {
         population = population.toUpperCase(Locale.ROOT);
         ancestry(population);
         if (requested.isEmpty()) throw new IOException("No overlapping variants for GRCh38 LD extraction");
-        String blocked = StudyPublicEvidence.blocked(context.study());
-        if (!blocked.isEmpty()) throw new IOException("1000 Genomes GRCh38 LD query not sent: " + blocked);
         String chromosome = requested.get(0).chromosome().replaceFirst("^chr", "");
         if (requested.stream().anyMatch(v -> !v.chromosome().replaceFirst("^chr", "").equals(chromosome)))
             throw new IOException("One regional LD query cannot span chromosomes");
@@ -62,24 +59,28 @@ final class ThousandGenomesGrch38Ld {
             ? "1kGP_high_coverage_Illumina.chrX.filtered.SNV_INDEL_SV_phased_panel.v2.vcf.gz"
             : "1kGP_high_coverage_Illumina.chr" + chromosome + ".filtered.SNV_INDEL_SV_phased_panel.vcf.gz";
         String data = ROOT + filename, index = data + ".tbi";
-        StudyPublicEvidence.validate(URI.create(data));
-        StudyPublicEvidence.validate(URI.create(index));
-        StudyPublicEvidence.validate(URI.create(PANEL));
+        PublicGeneticResourceCache.Installed installedPanel =
+            PublicGeneticResourceCache.acquire(context, DATABASE, RELEASE,
+                "integrated_call_samples_v3.20130502.ALL.panel", PANEL,
+                64L * 1024 * 1024, null);
+        PublicGeneticResourceCache.Installed installedData =
+            PublicGeneticResourceCache.acquire(context, DATABASE, RELEASE,
+                filename, data, 100L * 1024 * 1024 * 1024, null);
+        PublicGeneticResourceCache.Installed installedIndex =
+            PublicGeneticResourceCache.acquire(context, DATABASE, RELEASE,
+                filename + ".tbi", index, 4L * 1024 * 1024 * 1024,
+                null);
         Files.createDirectories(directory);
-        String panelText;
-        try { panelText = PublicResourceDownloader.text(URI.create(PANEL), 2 * 1024 * 1024,
-                "JLinAlg-GRCh38-LD/1"); }
-        catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IOException("1000 Genomes sample-panel retrieval interrupted", exception);
-        }
+        String panelText = Files.readString(installedPanel.path());
         Path panelFile = directory.resolve("1000g-unrelated-samples.panel");
         Files.writeString(panelFile, panelText);
         Set<String> samples = samples(panelText, population);
         if (samples.size() < 50) throw new IOException("Fewer than 50 unrelated 1000 Genomes samples for " + population);
         List<Dosage> found = new ArrayList<>();
         List<Object> exclusions = new ArrayList<>();
-        try (TabixReader reader = new TabixReader(data, index)) {
+        try (TabixReader reader = new TabixReader(
+                installedData.path().toString(),
+                installedIndex.path().toString())) {
             String[] header = vcfHeader(reader);
             Set<String> available = new LinkedHashSet<>(Arrays.asList(header).subList(9, header.length));
             if (!available.containsAll(samples)) {
@@ -160,7 +161,13 @@ final class ThousandGenomesGrch38Ld {
         provenance.put("sample_definition", "Samples in the official 2504-sample Phase 3 panel with matching superpopulation; relatives added to the 3202-sample VCF are excluded");
         provenance.put("sample_panel", PANEL); provenance.put("sample_panel_sha256", FollowupSupport.hash(panelFile));
         provenance.put("regional_vcf", data); provenance.put("regional_vcf_index", index);
-        provenance.put("range_retrieval", "Indexed HTTPS byte ranges; full remote VCF checksum was not recomputed");
+        provenance.put("local_sample_panel", installedPanel.path().toString());
+        provenance.put("local_sample_panel_sha256", installedPanel.sha256());
+        provenance.put("local_chromosome_vcf", installedData.path().toString());
+        provenance.put("local_chromosome_vcf_sha256", installedData.sha256());
+        provenance.put("local_tabix_index", installedIndex.path().toString());
+        provenance.put("local_tabix_index_sha256", installedIndex.sha256());
+        provenance.put("retrieval_policy", "Complete public chromosome VCF and index installed once; LD extraction performed locally");
         provenance.put("requested_variants", requested.size()); provenance.put("retained_variants", found.size());
         provenance.put("exclusions", exclusions); provenance.put("call_rate_minimum", 0.95);
         provenance.put("minor_allele_frequency_minimum", 0.01);

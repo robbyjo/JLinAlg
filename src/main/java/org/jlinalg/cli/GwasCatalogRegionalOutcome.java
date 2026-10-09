@@ -30,6 +30,10 @@ final class GwasCatalogRegionalOutcome {
 
     record Result(int retainedVariants, String dataUrl, String indexUrl,
             Map<String, Object> metadata, Map<String, Object> provenance) { }
+    private record Resources(PublicGeneticResourceCache.Installed data,
+            PublicGeneticResourceCache.Installed index,
+            PublicGeneticResourceCache.Installed metadata,
+            Map<String, Object> metadataDocument) { }
     private record Row(String id, String chromosome, long position,
             String effect, String other, double beta, double se, double p) { }
 
@@ -40,30 +44,18 @@ final class GwasCatalogRegionalOutcome {
         if (!accession.matches("GCST[0-9]{6,}")) throw new IllegalArgumentException("Invalid GWAS Catalog accession");
         if (start < 1 || end < start || end - start > 10_000_000L)
             throw new IllegalArgumentException("GWAS Catalog regional query must be a valid interval no wider than 10 Mb");
-        String blocked = StudyPublicEvidence.blocked(context.study());
-        if (!blocked.isEmpty()) throw new IOException("GWAS Catalog regional query not sent: " + blocked);
-        String directory = ROOT + bin(accession) + "/" + accession + "/harmonised/";
-        String listing = fetchText(directory, 2 * 1024 * 1024);
-        Set<String> files = links(listing);
-        List<String> dataFiles = files.stream().filter(name -> name.endsWith(".h.tsv.gz") && !name.endsWith(".f.tsv.gz"))
-            .sorted().toList();
-        if (dataFiles.isEmpty()) throw new IOException(accession + " has no harmonized regional summary-statistics file");
-        String preferred = accession + ".h.tsv.gz";
-        String dataFile = dataFiles.contains(preferred) ? preferred
-            : dataFiles.size() == 1 ? dataFiles.get(0)
-            : throwIo(accession + " has multiple harmonized files; an explicit source adapter is required");
-        String indexFile = dataFile + ".tbi", metadataFile = dataFile + "-meta.yaml";
-        if (!files.contains(indexFile)) throw new IOException(accession + " harmonized results have no tabix index");
-        if (!files.contains(metadataFile)) throw new IOException(accession + " harmonized results have no metadata file");
-        String dataUrl = directory + dataFile, indexUrl = directory + indexFile, metadataUrl = directory + metadataFile;
-        validate(URI.create(dataUrl)); validate(URI.create(indexUrl)); validate(URI.create(metadataUrl));
-        Map<String, Object> metadata = map(new Yaml().load(fetchText(metadataUrl, 2 * 1024 * 1024)));
+        Resources installed = resources(context, accession, ancestry);
+        String dataUrl = installed.data().source();
+        String indexUrl = installed.index().source();
+        Map<String, Object> metadata = installed.metadataDocument();
+        verifyAncestry(metadata, ancestry, accession);
         if (!accession.equals(text(metadata.get("gwas_id"))) || !Boolean.TRUE.equals(metadata.get("is_harmonised"))
                 || !Boolean.TRUE.equals(metadata.get("is_sorted")) || !"GRCh38".equals(metadata.get("genome_assembly")))
             throw new IOException("GWAS Catalog metadata is not sorted harmonized GRCh38 for " + accession);
-        verifyAncestry(metadata, ancestry, accession);
         List<Row> rows = new ArrayList<>(); Set<String> duplicates = new LinkedHashSet<>();
-        try (TabixReader reader = new TabixReader(dataUrl, indexUrl)) {
+        try (TabixReader reader = new TabixReader(
+                installed.data().path().toString(),
+                installed.index().path().toString())) {
             Map<String, Integer> columns = header(reader);
             String contig = reader.getChromosomes().contains(chromosome) ? chromosome
                 : reader.getChromosomes().contains("chr" + chromosome) ? "chr" + chromosome : null;
@@ -89,17 +81,97 @@ final class GwasCatalogRegionalOutcome {
         Files.writeString(output, table);
         Map<String, Object> provenance = new LinkedHashMap<>();
         provenance.put("provider", "GWAS Catalog harmonized summary statistics"); provenance.put("accession", accession);
-        provenance.put("documentation", DOCUMENTATION); provenance.put("directory", directory);
-        provenance.put("summary_statistics", dataUrl); provenance.put("tabix_index", indexUrl); provenance.put("metadata", metadataUrl);
+        provenance.put("documentation", DOCUMENTATION);
+        provenance.put("summary_statistics", dataUrl); provenance.put("tabix_index", indexUrl);
+        provenance.put("metadata", installed.metadata().source());
+        provenance.put("local_summary_statistics", installed.data().path().toString());
+        provenance.put("local_summary_statistics_sha256", installed.data().sha256());
+        provenance.put("local_tabix_index", installed.index().path().toString());
+        provenance.put("local_tabix_index_sha256", installed.index().sha256());
         provenance.put("genome_build", "GRCh38"); provenance.put("ancestry", ancestry);
         provenance.put("region", Map.of("chromosome", chromosome, "start", start, "end", end));
-        provenance.put("range_retrieval", "Indexed HTTPS byte ranges; the whole remote file was not downloaded or rehashed");
+        provenance.put("retrieval_policy", "Complete public GWAS files installed once; regional extraction performed locally");
         provenance.put("catalog_data_file_md5", metadata.getOrDefault("data_file_md5sum", "not_declared"));
         provenance.put("retained_variants", rows.size()); provenance.put("duplicate_rsid_rows_excluded", duplicates.size());
-        provenance.put("retrieved_at", Instant.now().toString()); provenance.put("output_sha256", FollowupSupport.hash(output));
+        provenance.put("analyzed_at", Instant.now().toString()); provenance.put("output_sha256", FollowupSupport.hash(output));
         provenance.put("metadata_document", metadata);
         StudyPublicEvidence.write(output.resolveSibling(output.getFileName() + ".source.yaml"), provenance);
         return new Result(rows.size(), dataUrl, indexUrl, metadata, provenance);
+    }
+
+    private static synchronized Resources resources(Context context,
+            String accession, String ancestry) throws IOException {
+        Path cacheDirectory = StudyResourceManager.resourceRoot(context.project(),
+            context.study()).resolve("public-genetics/gwas-catalog")
+            .resolve(accession).toAbsolutePath().normalize();
+        Path selection = cacheDirectory.resolve("selection.yaml");
+        if (Files.isRegularFile(selection)) {
+            Map<String, Object> record;
+            try (var reader = Files.newBufferedReader(selection)) {
+                record = map(new Yaml().load(reader));
+            }
+            if (!accession.equals(record.get("accession")))
+                throw new IOException("GWAS Catalog cache selection identity mismatch: " + selection);
+            return installed(context, accession, record);
+        }
+        String blocked = StudyPublicEvidence.resourceInstallBlocked(
+            context.study());
+        if (!blocked.isEmpty())
+            throw new IOException("GWAS Catalog resource is not installed and download is blocked: " + blocked);
+        String remoteDirectory = ROOT + bin(accession) + "/" + accession + "/harmonised/";
+        String listing = fetchText(remoteDirectory, 2 * 1024 * 1024);
+        Set<String> files = links(listing);
+        List<String> dataFiles = files.stream().filter(name -> name.endsWith(".h.tsv.gz") && !name.endsWith(".f.tsv.gz"))
+            .sorted().toList();
+        if (dataFiles.isEmpty()) throw new IOException(accession + " has no harmonized regional summary-statistics file");
+        String preferred = accession + ".h.tsv.gz";
+        String dataFile = dataFiles.contains(preferred) ? preferred
+            : dataFiles.size() == 1 ? dataFiles.get(0)
+            : throwIo(accession + " has multiple harmonized files; an explicit source adapter is required");
+        String indexFile = dataFile + ".tbi", metadataFile = dataFile + "-meta.yaml";
+        if (!files.contains(indexFile)) throw new IOException(accession + " harmonized results have no tabix index");
+        if (!files.contains(metadataFile)) throw new IOException(accession + " harmonized results have no metadata file");
+        String dataUrl = remoteDirectory + dataFile, indexUrl = remoteDirectory + indexFile, metadataUrl = remoteDirectory + metadataFile;
+        validate(URI.create(dataUrl)); validate(URI.create(indexUrl)); validate(URI.create(metadataUrl));
+        Map<String, Object> metadata = map(new Yaml().load(fetchText(metadataUrl, 2 * 1024 * 1024)));
+        if (!accession.equals(text(metadata.get("gwas_id"))) || !Boolean.TRUE.equals(metadata.get("is_harmonised"))
+                || !Boolean.TRUE.equals(metadata.get("is_sorted")) || !"GRCh38".equals(metadata.get("genome_assembly")))
+            throw new IOException("GWAS Catalog metadata is not sorted harmonized GRCh38 for " + accession);
+        verifyAncestry(metadata, ancestry, accession);
+        Files.createDirectories(selection.getParent());
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("schema_version", 1); record.put("accession", accession);
+        record.put("data_file", dataFile); record.put("data_url", dataUrl);
+        record.put("index_file", indexFile); record.put("index_url", indexUrl);
+        record.put("metadata_file", metadataFile); record.put("metadata_url", metadataUrl);
+        record.put("data_md5", metadata.getOrDefault("data_file_md5sum", ""));
+        StudyPublicEvidence.write(selection, record);
+        return installed(context, accession, record);
+    }
+
+    private static Resources installed(Context context, String accession,
+            Map<String, Object> record) throws IOException {
+        String md5 = text(record.get("data_md5"));
+        PublicGeneticResourceCache.ExpectedChecksum expected =
+            md5.matches("[a-fA-F0-9]{32}")
+                ? new PublicGeneticResourceCache.ExpectedChecksum("MD5", md5)
+                : null;
+        var metadata = PublicGeneticResourceCache.acquire(context,
+            "gwas-catalog", accession, text(record.get("metadata_file")),
+            text(record.get("metadata_url")), 64L * 1024 * 1024, null);
+        Map<String, Object> document;
+        try (var reader = Files.newBufferedReader(metadata.path())) {
+            document = map(new Yaml().load(reader));
+        }
+        var data = PublicGeneticResourceCache.acquire(context,
+            "gwas-catalog", accession, text(record.get("data_file")),
+            text(record.get("data_url")), 250L * 1024 * 1024 * 1024,
+            expected);
+        var index = PublicGeneticResourceCache.acquire(context,
+            "gwas-catalog", accession, text(record.get("index_file")),
+            text(record.get("index_url")), 4L * 1024 * 1024 * 1024,
+            null);
+        return new Resources(data, index, metadata, document);
     }
 
     private static Row parse(String[] fields, Map<String, Integer> columns) throws IOException {

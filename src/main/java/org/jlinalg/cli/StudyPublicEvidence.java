@@ -24,7 +24,7 @@ final class StudyPublicEvidence {
     static final Set<String> HOSTS = Set.of("www.ebi.ac.uk", "ftp.ebi.ac.uk",
         "rest.uniprot.org", "alphafold.ebi.ac.uk", "api.genome.ucsc.edu", "gtexportal.org", "api.crossref.org",
         "api.ncbi.nlm.nih.gov", "pan-ukb-us-east-1.s3.amazonaws.com",
-        "ftp.1000genomes.ebi.ac.uk");
+        "ftp.1000genomes.ebi.ac.uk", "hgdownload.soe.ucsc.edu");
     record Reply(int status, String body) { }
     @FunctionalInterface interface Transport {
         Reply get(URI uri) throws IOException, InterruptedException;
@@ -122,6 +122,17 @@ final class StudyPublicEvidence {
                 || llm.containsKey("eligible_remote_artifacts")) return "disclosure_review_required";
         if ("offline".equals(map(study.get("resources")).get("network"))) return "offline_policy";
         if (!"automatic".equals(map(study.get("resources")).getOrDefault("downloads", "automatic")))
+            return "automatic_downloads_disabled";
+        return "";
+    }
+
+    /** Generic public dataset installation never transmits a study payload. */
+    static String resourceInstallBlocked(Map<String, Object> study) {
+        Map<String, Object> resources = map(study.get("resources"));
+        if ("offline".equals(resources.get("network")))
+            return "offline_policy";
+        if (!"automatic".equals(resources.getOrDefault("downloads",
+                "automatic")))
             return "automatic_downloads_disabled";
         return "";
     }

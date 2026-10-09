@@ -60,6 +60,32 @@ class ProjectConfigurationFlagsTest {
             assertEquals(enabled?20./14:1,Double.parseDouble(dose[table.header().indexOf("beta")]),1e-12);
         }
     }
+    @Test void globalResourceDirectoryIsResolvedOnceForEveryStudyProject()
+            throws Exception {
+        Path home=dir.resolve("home"), config=home.resolve(".jlinalg/config.yaml");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config,"schema_version: 1\nresources:\n  directory: {path: shared-public-data}\n");
+        Path expected=config.getParent().resolve("shared-public-data")
+            .toAbsolutePath().normalize();
+        assertEquals(expected.toString(),
+            ProjectConfiguration.globalResources(home).get("directory"));
+        assertEquals(expected,StudyResourceManager.resourceRoot(
+            dir.resolve("project-a"),Map.of(),home));
+        assertEquals(expected,StudyResourceManager.resourceRoot(
+            dir.resolve("project-b"),Map.of(),home));
+        Path override=StudyResourceManager.resourceRoot(dir.resolve("project"),
+            Map.of("resources",Map.of("directory","private-cache")),home);
+        assertEquals(dir.resolve("project/private-cache").toAbsolutePath()
+            .normalize(),override);
+    }
+
+    @Test void globalResourcesRejectUnknownSettings() throws Exception {
+        Path config=dir.resolve("home/.jlinalg/config.yaml");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config,"schema_version: 1\nresources: {directory: data, token: forbidden}\n");
+        assertThrows(IllegalArgumentException.class,
+            ()->ProjectConfiguration.globalResources(dir.resolve("home")));
+    }
     private void config(String command,String key,String value) throws IOException {
         Files.writeString(dir.resolve("jlinalg.yaml"),"schema_version: 1\ncommands:\n  "+command+":\n    "+key+": "+value+"\n");
     }

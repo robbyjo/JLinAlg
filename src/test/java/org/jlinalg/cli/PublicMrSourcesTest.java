@@ -2,9 +2,14 @@ package org.jlinalg.cli;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import htsjdk.samtools.liftover.LiftOver;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class PublicMrSourcesTest {
+    @TempDir Path directory;
     @Test void bmiSelectsIndependentPanUkbEurOutcome() {
         assertTrue(PanUkbbGwasOutcome.supports("BMI", "EUR"));
         assertTrue(PanUkbbGwasOutcome.supports("body mass index", "EUR"));
@@ -13,15 +18,20 @@ class PublicMrSourcesTest {
         assertEquals("GRCh37", PanUkbbGwasOutcome.descriptor().get("source_genome_build"));
     }
 
-    @Test void ncbiSpdiProjectionPreservesTheMappedAllele() throws Exception {
-        String json = "{\"data\":{\"spdis\":["
-            + "{\"seq_id\":\"NC_000001.11\",\"position\":93158581,\"deleted_sequence\":\"G\",\"inserted_sequence\":\"T\"},"
-            + "{\"seq_id\":\"NC_000001.10\",\"position\":93624138,\"deleted_sequence\":\"G\",\"inserted_sequence\":\"T\"}]}}";
-        var input = new PanUkbbGwasOutcome.Instrument("rs2749735", "1", 93158582, "T", "G");
-        var mapped = PanUkbbGwasOutcome.parseProjection(input, "NC_000001.10", "https://example.invalid", json);
-        assertEquals(93624139, mapped.position());
-        assertEquals("T", mapped.effect());
-        assertEquals("G", mapped.other());
+    @Test void localChainProjectionPreservesOrComplementsAlleles()
+            throws Exception {
+        Path chain=directory.resolve("test.chain");
+        Files.writeString(chain,"chain 1 chr1 100 + 0 100 chr1 100 + 0 100 1\n100\n\n"
+            + "chain 1 chr2 100 + 0 100 chr2 100 - 0 100 2\n100\n");
+        LiftOver lift=new LiftOver(chain.toFile());
+        var forward=PanUkbbGwasOutcome.project(
+            new PanUkbbGwasOutcome.Instrument("rs1","1",10,"T","G"),lift);
+        assertEquals(10,forward.position());assertEquals("T",forward.effect());
+        assertEquals("G",forward.other());
+        var reverse=PanUkbbGwasOutcome.project(
+            new PanUkbbGwasOutcome.Instrument("rs2","2",10,"A","C"),lift);
+        assertEquals(91,reverse.position());assertEquals("T",reverse.effect());
+        assertEquals("G",reverse.other());
     }
 
     @Test void grch38LdRequiresAnExplicitSupportedPopulation() {

@@ -218,9 +218,26 @@ final class StudyResourceManager {
     }
 
     static Path resourceRoot(Path project, Map<String, Object> study) {
+        return resourceRoot(project, study,
+            Path.of(System.getProperty("user.home")));
+    }
+
+    static Path resourceRoot(Path project, Map<String, Object> study,
+            Path home) {
         Object configured = map(study.get("resources")).get("directory");
-        return configured == null ? project.resolve("resources")
-            : resolve(project, String.valueOf(configured));
+        if (configured != null)
+            return resolve(project, String.valueOf(configured));
+        try {
+            Object global = ProjectConfiguration.globalResources(home)
+                .get("directory");
+            if (global != null)
+                return Path.of(String.valueOf(global)).toAbsolutePath()
+                    .normalize();
+        } catch (IOException failure) {
+            throw new IllegalArgumentException(
+                "Cannot read global JLinAlg resource configuration", failure);
+        }
+        return project.resolve("resources").toAbsolutePath().normalize();
     }
 
     private static Path resolve(Path project, String value) {

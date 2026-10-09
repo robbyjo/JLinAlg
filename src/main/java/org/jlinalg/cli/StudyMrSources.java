@@ -113,7 +113,7 @@ final class StudyMrSources {
             outcome.put("prepared_path", outcomeFile.toAbsolutePath().normalize().toString());
             outcome.put("source_id", "pan-ukb-21001-eur"); outcome.put("citation", PanUkbbGwasOutcome.DOCUMENTATION);
             outcome.put("genome_build", "GRCh38"); outcome.put("source_genome_build", "GRCh37");
-            outcome.put("build_projection", "NCBI SPDI all_equivalent_contextual, audited per instrument");
+            outcome.put("build_projection", "Local hg38-to-hg19 chain projection with reverse-strand allele complementation and exact Pan-UKB allele matching, audited per instrument");
             outcome.put("ancestry", ancestry); outcome.put("sample_size", PanUkbbGwasOutcome.BMI_EUR_N);
             outcome.put("complete_region", false); outcome.put("selection_basis", "exposure_instrument_lookup"); outcome.put("trait", text(StudyBioinformatics.hypothesis(context).get("outcome")));
             Map<String, Object> ld = new LinkedHashMap<>(); ld.put("database", ldProvider); ld.put("population", population);

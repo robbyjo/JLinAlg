@@ -43,10 +43,10 @@ List supported sources:
     java -jar jlinalg-<version>.jar ld-db list
 
 The list also reports `1000g-30x-grch38`. Unlike the packaged GRCh37 source,
-this provider performs bounded tabix-indexed regional HTTPS reads from the
-official high-coverage 1000 Genomes GRCh38 phased VCF during a configured study
-MR operation. It is not installed with `ld-db download` and does not fetch an
-entire chromosome merely to calculate LD for a few instruments.
+this provider installs complete chromosome VCF/index files from the official
+high-coverage 1000 Genomes GRCh38 phased release into the configured shared
+resource cache, then performs tabix-indexed regional reads locally. Required
+chromosomes are downloaded once and reused by later studies and offline runs.
 
 Install into the current directory:
 
@@ -95,5 +95,5 @@ file so a failed run cannot leave a partial result.
 The standalone `clump` command currently consumes installed BED/BIM/FAM
 references. The `1000g-30x-grch38` provider is integrated with the study MR
 adapter, which records its requested superpopulation, official unrelated-sample
-panel, regional VCF/index URLs, variant exclusions, allele orientation, and
-derived matrix hashes in each analysis bundle.
+panel, complete local chromosome VCF/index hashes, variant exclusions, allele
+orientation, and derived matrix hashes in each analysis bundle.

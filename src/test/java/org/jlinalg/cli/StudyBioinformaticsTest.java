@@ -211,11 +211,35 @@ class StudyBioinformaticsTest {
                 : uri.getPath().contains("eqtl") ? "[]" : "{\"_embedded\":{\"studies\":[]}}";
             return new StudyPublicEvidence.Reply(200, body);
         });
-        Context context = context("source_discovery", Map.of());
+        Context context = context("source_discovery", Map.of("hypotheses", List.of(Map.of(
+            "id", "h1", "outcome", "body mass index", "analysis", Map.of("bioinformatics",
+                Map.of("remote_feature_queries", true))))));
         new StudyBioinformatics(client).execute(context);
         assertTrue(requests.stream().anyMatch(url -> url.contains("bp_start=1&bp_end=500103")));
         assertTrue(requests.stream().anyMatch(url -> url.contains("rs_id=rs123&efo_trait=body+mass+index")));
         assertTrue(Files.readString(context.outputDirectory().resolve("source-discovery.yaml")).contains("catalogue_metadata_audit"));
+    }
+
+    @Test void defaultDiscoveryDoesNotTransmitSelectedFeatureCoordinates() throws Exception {
+        List<String> requests = new ArrayList<>();
+        var client = new StudyPublicEvidence(uri -> {
+            requests.add(uri.toString());
+            String body = uri.getPath().contains("associations") ? "{\"_embedded\":{\"associations\":[]}}"
+                : uri.getHost().equals("gtexportal.org") ? "{\"data\":[]}"
+                : uri.getPath().contains("eqtl") ? "[]" : "{\"_embedded\":{\"studies\":[]}}";
+            return new StudyPublicEvidence.Reply(200, body);
+        });
+        Context context = context("source_discovery", Map.of("hypotheses", List.of(Map.of(
+            "id", "h1", "outcome", "body mass index", "analysis", Map.of("bioinformatics",
+                Map.of("colocalization", Map.of("exposure_ancestry", "European")))))));
+        var result = new StudyBioinformatics(client).execute(context);
+        assertEquals(State.COMPLETE, result.state());
+        assertTrue(requests.stream().noneMatch(url -> url.contains("bp_start=") || url.contains("rs_id=")
+            || url.contains("TP53") || url.contains("ENSG00000141510")));
+        String discovery = Files.readString(context.outputDirectory().resolve("source-discovery.yaml"));
+        assertTrue(discovery.contains("feature_specific_public_queries"));
+        assertTrue(discovery.contains("not_requested"));
+        assertFalse(discovery.contains("genetic-source-selection"));
     }
 
     @Test void sourceDiscoverySearchesAdvisorPhenotypesWithoutTreatingThemAsApprovedBiology() throws Exception {

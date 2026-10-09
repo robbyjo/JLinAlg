@@ -413,7 +413,11 @@ public final class StudyValidator {
         if (analysis.containsKey("bioinformatics")) {
             String where = path + ".analysis.bioinformatics";
             Map<String, Object> bio = mapping(analysis.get("bioinformatics"), where, true, issues);
-            unknown(bio, Set.of("max_features", "max_pages", "max_sequence_bp", "max_regional_snps", "window_bp", "fdr", "phenotype_terms", "relevant_tissues", "literature_terms", "genetic_pairs", "mr", "colocalization"), where, issues);
+            unknown(bio, Set.of("max_features", "max_pages", "max_sequence_bp", "max_regional_snps", "window_bp", "fdr", "phenotype_terms", "relevant_tissues", "literature_terms", "remote_feature_queries", "genetic_pairs", "mr", "colocalization"), where, issues);
+            if (bio.containsKey("remote_feature_queries")
+                    && !(bio.get("remote_feature_queries") instanceof Boolean))
+                issues.add(issue(ERROR, where + ".remote_feature_queries",
+                    "must be true or false"));
             for (String field : List.of("max_features", "max_pages", "max_sequence_bp", "max_regional_snps", "window_bp")) if (bio.containsKey(field)) {
                 Object number = bio.get(field);
                 int max = Set.of("max_features", "max_regional_snps").contains(field) ? 100 : field.equals("max_pages") ? 20 : field.equals("window_bp") ? 5000000 : 1000000;

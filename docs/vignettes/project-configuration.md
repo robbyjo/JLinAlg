@@ -34,7 +34,8 @@ commands:
     genome-build: GRCh38
 ```
 
-The only root keys are `schema_version`, `defaults`, and `commands`. `defaults`
+The root keys are `schema_version`, `defaults`, `commands`, and the optional
+machine-resource section `resources`. `defaults`
 contains CLI options common to the commands you intend to run; prefer command
 sections because commands reject inapplicable options. Use `association` for the
 original formula CLI and `enrichment` for `--enrichment` commands. Other section
@@ -59,6 +60,29 @@ always remain relative to the working directory. Environment-variable expansion,
 shell commands, YAML object tags, duplicate keys and aliases are not supported.
 Store credentials outside these files; HTTP commands accept an environment-variable
 **name** through `token-env`, never a literal token.
+
+### Shared public-resource cache
+
+Large non-secret reference resources can be shared by every study project through
+the user/machine file:
+
+```yaml
+schema_version: 1
+resources:
+  directory: {path: D:/Research/jlinalg-resources}
+```
+
+`resources.directory` is resolved relative to the configuration file when it is
+relative, and may be an absolute path. A study contract's explicit
+`resources.directory` takes precedence; without either setting, the study keeps
+using its project-local `resources/` directory. No credentials, cohort paths, or
+participant data belong in the global configuration.
+
+Provider installers place complete public files, indexes, source URLs, sizes and
+checksums below this directory. Analyses open the installed local files and work
+with `--offline`; they do not substitute provider-side regional byte-range reads.
+Installation may contact approved public hosts, but its URLs identify only public
+datasets, releases, accessions or whole chromosomes—not study variants or regions.
 
 A machine file can supply R installation details without embedding them in a
 shared project:

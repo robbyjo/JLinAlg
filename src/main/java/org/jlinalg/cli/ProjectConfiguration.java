@@ -113,11 +113,28 @@ final class ProjectConfiguration {
         try(var reader=Files.newBufferedReader(file)) { data=mapping(yaml().load(reader),file.toString()); }
         if(!Integer.valueOf(1).equals(data.get("schema_version")))
             throw new IllegalArgumentException("Configuration requires schema_version: 1 in "+file);
-        for(String key:data.keySet()) if(!Set.of("schema_version","defaults","commands").contains(key))
+        for(String key:data.keySet()) if(!Set.of("schema_version","defaults","commands","resources").contains(key))
             throw new IllegalArgumentException("Unknown configuration section: "+key);
         resolvePaths(data,file.toAbsolutePath().getParent());
         merge(merged,data);
         sources.add(Map.of("path",file.toAbsolutePath().normalize().toString(),"sha256",FollowupSupport.hash(file)));
+    }
+    /** Machine-wide, non-secret public-resource settings shared by study projects. */
+    static Map<String,Object> globalResources(Path home) throws IOException {
+        Map<String,Object> merged = new LinkedHashMap<>();
+        load(home.resolve(".jlinalg/config.yaml"), false, merged,
+            new ArrayList<>());
+        Map<String,Object> resources = mapping(merged.get("resources"),
+            "resources");
+        for(String key:resources.keySet()) if(!key.equals("directory"))
+            throw new IllegalArgumentException(
+                "Unknown global resource setting: "+key);
+        Object directory = resources.get("directory");
+        if(directory!=null && (!(directory instanceof String value)
+                || value.isBlank()))
+            throw new IllegalArgumentException(
+                "resources.directory must be a nonblank path");
+        return Map.copyOf(resources);
     }
     static Map<String,Object> mapping(Object value,String name) {
         if(value==null) return new LinkedHashMap<>();

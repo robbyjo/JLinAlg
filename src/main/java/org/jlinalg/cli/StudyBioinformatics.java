@@ -57,12 +57,20 @@ final class StudyBioinformatics implements StudyOperationExecutor {
             if (terms.isEmpty()) needs.add(review(context, "phenotype", "Which phenotype label or ontology term should the GWAS search use?",
                 "Specify hypotheses[].outcome or analysis.bioinformatics.phenotype_terms. Abbreviations are not expanded silently."));
             String primary = text(hypothesis.get("outcome"));
+            boolean remoteFeatures = Boolean.TRUE.equals(
+                config.get("remote_feature_queries"));
             for (String term : terms) catalog(context, term,
-                term.equalsIgnoreCase(primary) ? features : List.of(), evidence, termOrigins.get(term));
+                remoteFeatures && term.equalsIgnoreCase(primary)
+                    ? features : List.of(), evidence, termOrigins.get(term));
+            if (!remoteFeatures && !features.isEmpty()) evidence.add(Map.of(
+                "kind", "feature_specific_public_queries", "status",
+                "not_requested", "reason", "Default local-first policy: GWAS discovery sent public phenotype labels only; selected genes, variants and regions were not used in provider queries. Set remote_feature_queries: true only after explicit review."));
             qtl(context, evidence);
             }
-            needs.add(review(context, "genetic-source-selection", "Which GWAS and molecular QTL sources are scientifically appropriate for this hypothesis?",
-                "Inspect source-discovery.yaml. Automatic colocalization may rank indexed harmonized GWAS candidates under analysis.bioinformatics.colocalization; custom sources use genetic_pairs. Advisor labels and catalogue matches are search candidates, not automatically verified biological relationships or causal evidence."));
+            boolean automaticGeneticSources = !map(config.get("mr")).isEmpty()
+                || !map(config.get("colocalization")).isEmpty();
+            if (!automaticGeneticSources) needs.add(review(context, "genetic-source-selection", "Which GWAS and molecular QTL sources are scientifically appropriate for this hypothesis?",
+                "Inspect source-discovery.yaml. Automatic MR or colocalization may use an approved source policy under analysis.bioinformatics; custom sources use genetic_pairs. Advisor labels and catalogue matches are search candidates, not automatically verified biological relationships or causal evidence."));
         } else if (operation.equals("bioinformatics_investigation")) {
             for (Feature feature : features) {
                 protein(context, feature, evidence);
