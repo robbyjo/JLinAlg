@@ -25,6 +25,39 @@ class StudyPipelineCliTest {
     private String stdout;
     private String stderr;
 
+    @Test void candidatePrioritizationIgnoresStudyLevelEvidenceRowsWithoutFeatures()
+            throws Exception {
+        Path meta = directory.resolve("meta"), literature = directory.resolve("literature");
+        Path output = directory.resolve("prioritization");
+        Files.createDirectories(meta); Files.createDirectories(literature); Files.createDirectories(output);
+        Files.writeString(meta.resolve("meta-analysis.tsv"),
+            "feature_id\tbeta\tp_value\ti_squared\tstatus\nGENE1\t.2\t.001\t0\tok\n");
+        Files.writeString(meta.resolve("manifest.yaml"), """
+            operation_type: meta_analysis
+            state: complete
+            output_sha256: {meta-analysis.tsv: fixture}
+            """);
+        Files.writeString(literature.resolve("literature-search.yaml"), """
+            evidence:
+              - {kind: literature, feature_id: '', status: offline_policy}
+              - {kind: literature, feature_id: GENE1, status: retrieved}
+            """);
+        Files.writeString(literature.resolve("manifest.yaml"), """
+            operation_type: literature_search
+            state: waiting_for_input
+            output_sha256: {literature-search.yaml: fixture}
+            """);
+        var context = new org.jlinalg.study.StudyOperationExecutor.Context(
+            directory, output, Map.of("type", "candidate_prioritization"),
+            Map.of(), Map.of(), Map.of("meta", meta, "literature", literature));
+        var result = new StudyCliExecutor().execute(context);
+        assertEquals(org.jlinalg.study.StudyOperationExecutor.State.COMPLETE,
+            result.state());
+        String table = Files.readString(output.resolve("candidate-prioritization.tsv"));
+        assertTrue(table.contains("GENE1"));
+        assertTrue(table.contains("literature:retrieved"));
+    }
+
     @Test void preapprovedSensitivityRunsOfflineWithoutAnLlmAndKeepsPrimaryResults() throws Exception {
         Path project = directory.resolve("sensitivity");
         Files.createDirectories(project);

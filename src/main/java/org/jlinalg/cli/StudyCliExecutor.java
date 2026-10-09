@@ -779,10 +779,16 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 try (var reader = Files.newBufferedReader(path)) { summary = StudyPublicEvidence.map(new Yaml().load(reader)); }
                 for (Object raw : StudyPublicEvidence.list(summary.getOrDefault("evidence", summary.get("pairs")))) {
                     Map<String, Object> row = StudyPublicEvidence.map(raw);
-                    String feature = text(row.get("feature_id"));
+                    String feature = row.get("feature_id") == null
+                        ? "" : String.valueOf(row.get("feature_id"));
                     if (feature.isBlank()) continue;
-                    String kind = text(row.getOrDefault("kind", directory.getFileName().toString()));
-                    featureEvidence.computeIfAbsent(feature, ignored -> new ArrayList<>()).add(kind + ":" + text(row.get("status")));
+                    String kind = row.get("kind") == null
+                        ? "" : String.valueOf(row.get("kind"));
+                    if (kind.isBlank()) kind = directory.getFileName().toString();
+                    String status = row.get("status") == null
+                        ? "unknown" : String.valueOf(row.get("status"));
+                    if (status.isBlank()) status = "unknown";
+                    featureEvidence.computeIfAbsent(feature, ignored -> new ArrayList<>()).add(kind + ":" + status);
                 }
             }
         }
