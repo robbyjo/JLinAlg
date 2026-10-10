@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import org.jlinalg.study.StudyEvidenceIndex;
 import org.jlinalg.study.StudyOperationExecutor.Context;
-import org.yaml.snakeyaml.Yaml;
 
 /** Deterministic, local, source-linked publication scaffold. No LLM or upload needed. */
 final class StudyPublication {
@@ -221,7 +220,9 @@ final class StudyPublication {
     private static String relative(Path from, Path to) { return from.toAbsolutePath().normalize().relativize(to.toAbsolutePath().normalize()).toString().replace('\\', '/'); }
     private static String label(String value) { return value.replace('_', ' '); }
     private static String esc(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;"); }
-    private static Map<String, Object> load(Path path) throws IOException { return map(new Yaml().load(Files.readString(path))); }
+    private static Map<String, Object> load(Path path) throws IOException {
+        return StudyYaml.loadMap(path);
+    }
     static String render(Object value) {
         if (value instanceof Map<?, ?> m) { StringBuilder h = new StringBuilder("<dl>"); m.forEach((k, v) -> h.append("<dt>").append(esc(label(text(k)))).append("</dt><dd>").append(v instanceof Map<?, ?> || v instanceof List<?> ? render(v) : esc(StudyReportNumbers.field(text(k), v))).append("</dd>")); return h.append("</dl>").toString(); }
         if (value instanceof List<?> l) { StringBuilder h = new StringBuilder("<ul>"); l.forEach(v -> h.append("<li>").append(render(v)).append("</li>")); return h.append("</ul>").toString(); }

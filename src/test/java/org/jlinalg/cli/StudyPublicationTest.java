@@ -57,6 +57,22 @@ class StudyPublicationTest {
         assertTrue(draft.contains("GENE1"));
         assertFalse(Files.readString(directory.resolve("publication-claims.yaml")).contains("main_text_rank"));
     }
+    @Test void publicationReadsLargeGeneratedOperationManifest() throws Exception {
+        Path dependency = directory.resolve("large-operation");
+        Path output = directory.resolve("large-report");
+        Files.createDirectories(dependency); Files.createDirectories(output);
+        Files.writeString(dependency.resolve("manifest.yaml"),
+            "operation_type: custom_evidence\nstate: waiting_for_input\nsummary: Synthetic limitation\ndetails:\n  padding: "
+                + "x".repeat(3_300_000) + "\n");
+        Context context = new Context(directory, output,
+            Map.of("hypothesis", "H", "datasets", List.of()),
+            Map.of("hypotheses", List.of(Map.of("id", "H",
+                "description", "Synthetic hypothesis."))), Map.of(),
+            Map.of("large", dependency));
+        StudyPublication.write(context);
+        assertTrue(Files.readString(output.resolve("publication-draft.html"))
+            .contains("Synthetic limitation"));
+    }
     @Test void abbreviationsExpandAtFirstTextUseWithoutChangingLinksOrAlreadyExpandedText() {
         String result = StudyPublication.expandAbbreviations("<html><body><p>BMI predicts BMI.</p><a href=\"BMI.html\">BMI</a><p>Mendelian randomization (MR)</p><p>MR</p></body></html>", Map.of());
         assertTrue(result.contains("body mass index (BMI) predicts BMI"));
