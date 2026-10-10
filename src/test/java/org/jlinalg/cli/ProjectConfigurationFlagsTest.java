@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import org.jlinalg.study.StudyResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -85,6 +86,36 @@ class ProjectConfigurationFlagsTest {
         Files.writeString(config,"schema_version: 1\nresources: {directory: data, token: forbidden}\n");
         assertThrows(IllegalArgumentException.class,
             ()->ProjectConfiguration.globalResources(dir.resolve("home")));
+    }
+
+    @Test void resolvedStudyDoesNotTurnFallbackIntoProjectOverride()
+            throws Exception {
+        Path home=dir.resolve("home"), config=home.resolve(".jlinalg/config.yaml");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config,"schema_version: 1\nresources:\n  directory: {path: shared-public-data}\n");
+        Path study=dir.resolve("study.yaml");
+        Files.writeString(study,"""
+            schema_version: 1
+            project: {id: cache-test, title: Cache test, description: Test shared resource resolution.}
+            resources: {downloads: automatic}
+            datasets:
+              - id: supplied-results
+                type: transcriptomics
+                stage: association_results
+                files: {results: data/results.tsv}
+                columns: {feature_id: feature_id, effect: beta, standard_error: se, p_value: p_value}
+            hypotheses:
+              - id: H1
+                description: Test resource resolution.
+                inputs: {discovery: [supplied-results]}
+                analysis: {mode: manual, goals: [gene_ontology]}
+            """);
+        Map<String,Object> resolved=StudyResolver.resolve(study).document();
+        assertFalse(((Map<?,?>)resolved.get("resources")).containsKey("directory"));
+        Path expected=config.getParent().resolve("shared-public-data")
+            .toAbsolutePath().normalize();
+        assertEquals(expected,StudyResourceManager.resourceRoot(
+            dir.resolve("project"),resolved,home));
     }
     private void config(String command,String key,String value) throws IOException {
         Files.writeString(dir.resolve("jlinalg.yaml"),"schema_version: 1\ncommands:\n  "+command+":\n    "+key+": "+value+"\n");

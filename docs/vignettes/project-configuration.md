@@ -78,6 +78,10 @@ relative, and may be an absolute path. A study contract's explicit
 using its project-local `resources/` directory. No credentials, cohort paths, or
 participant data belong in the global configuration.
 
+Study resolution preserves an omitted directory as omitted. It does not insert
+the project-local fallback into `resolved-study.yaml`, so an installed global
+cache remains distinguishable from an explicit study-level override.
+
 Provider installers place complete public files, indexes, source URLs, sizes and
 checksums below this directory. Analyses open the installed local files and work
 with `--offline`; they do not substitute provider-side regional byte-range reads.

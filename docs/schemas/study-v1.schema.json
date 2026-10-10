@@ -66,11 +66,11 @@
     "resources": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Public reference policy. Defaults are automatic project-scoped downloads and the checksum-verified 1000 Genomes Phase 3 LD catalog entry.",
+      "description": "Public reference policy. Downloads are automatic by default. An omitted directory uses the user-level shared resource cache when configured, otherwise the project-local resources directory.",
       "properties": {
         "downloads": {"enum": ["automatic", "manual", "deny"], "default": "automatic"},
         "network": {"enum": ["online", "offline"], "default": "online"},
-        "directory": {"type": "string", "minLength": 1, "default": "resources"},
+        "directory": {"type": "string", "minLength": 1},
         "ld": {
           "type": "object",
           "additionalProperties": false,

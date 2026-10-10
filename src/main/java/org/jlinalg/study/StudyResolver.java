@@ -36,7 +36,6 @@ public final class StudyResolver {
         Map<String, Object> resources = StudyIO.optionalMap(
             resolved.get("resources"), "resources");
         resources.putIfAbsent("downloads", "automatic");
-        resources.putIfAbsent("directory", "resources");
         Map<String, Object> ld = StudyIO.optionalMap(resources.get("ld"),
             "resources.ld");
         ld.putIfAbsent("database", "1000g-phase3");
