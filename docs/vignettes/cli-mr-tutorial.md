@@ -190,7 +190,7 @@ java -jar jlinalg-<version>.jar mr-estimate --input harmonized.csv `
 
 The estimator output columns are `method`, `estimate`,
 `standard_error`, `causal_p_value`, `ci_lower`, `ci_upper`, and
-`instruments`. Methods include `ivw-fixed`, `ivw-random`, `egger`,
+`instruments`. Methods include single-instrument `wald-ratio`, `ivw-fixed`, `ivw-random`, `egger`,
 `weighted-median`, generalized LD-aware variants, overlap-aware IVW,
 conditional association, and `all`. A signed, allele-aligned LD matrix
 passed with `--ld` must follow the exact input row order.

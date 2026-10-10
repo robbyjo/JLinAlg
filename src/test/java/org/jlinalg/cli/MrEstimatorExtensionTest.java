@@ -44,6 +44,14 @@ final class MrEstimatorExtensionTest {
         assertTrue(result.output().contains("IVW_GENERALIZED_FIXED"));
         assertTrue(result.output().contains("causal_p_value"));
     }
+    @Test void waldRatioRequiresAndReportsExactlyOneInstrument() throws Exception {
+        Path input = directory.resolve("one.tsv");
+        Files.writeString(input, "variant_id\tbeta_exposure\tse_exposure\tbeta_outcome\tse_outcome\nrs1\t.1\t.01\t.05\t.02\n");
+        Run result = run("wald-ratio", "--input", input.toString(), "--confidence", "0.9");
+        assertEquals(0, result.status(), result.error());
+        assertTrue(result.output().contains("WALD_RATIO\t0.5"));
+        assertEquals(2, run("wald-ratio").status());
+    }
     @Test void overlapConfidenceIsPropagatedIncludingAllPath() throws Exception {
         Path covariance=directory.resolve("cov.tsv");
         Files.writeString(covariance,"0.00024\n0.0004\n0.000315\n0.000175\n0.000495\n");

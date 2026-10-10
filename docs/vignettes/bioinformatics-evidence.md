@@ -431,8 +431,12 @@ P-value: declare complete regional data or `selection_basis:
 exposure_instrument_lookup`. Harmonization coverage is measured against the
 exposure-variant set for MR; regional inference retains its full-region coverage
 check. These declarations do not themselves acquire missing data or approve
-instruments. The current automatic MR estimator requires at least two independent
-strong instruments; single-instrument follow-up remains a separate capability.
+instruments. Automatic source preparation rejects unsupported non-SNP alleles,
+invalid standard errors and duplicate rsIDs row by row, and records exclusion
+counts instead of rejecting an otherwise usable feature. If LD clumping leaves
+one independent strong instrument, the pipeline reports a Wald ratio with an
+explicit limitation: heterogeneity, pleiotropy, Egger, weighted-median and
+leave-one-instrument-out diagnostics are not estimable.
 
 ## Literature depth and excerpts
 

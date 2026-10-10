@@ -22,9 +22,6 @@ import org.yaml.snakeyaml.Yaml;
 /** Expands related-phenotype discovery into audited exploratory irQTL-GWAS pairs. */
 final class StudyColocalizationSources {
     record Prepared(List<Object> pairs, Map<String, Object> audit) { }
-    private record Candidate(String feature, String id, String chromosome,
-            long position, String effect, String other, double beta, double se,
-            double log10p, int n) { }
     private record Study(String trait, String origin, String accession,
             int sampleSize, Map<String, Object> metadata) { }
 
@@ -56,7 +53,10 @@ final class StudyColocalizationSources {
         if (cohort.isBlank()) throw new IllegalArgumentException("The irQTL exposure dataset must declare its cohort for overlap assessment");
         Path candidateFile = candidateFile(context);
         int maximumVariants = StudyBioinformatics.integer(config, "max_exposure_variants", 500, 2, 5000);
-        Map<String, List<Candidate>> byFeature = candidates(candidateFile);
+        StudyGeneticCandidates.Selection selection =
+            StudyGeneticCandidates.read(candidateFile, null);
+        Map<String, List<StudyGeneticCandidates.Candidate>> byFeature =
+            selection.byFeature();
         Path discoveryFile = discoveryFile(context);
         Map<String, Object> discovery;
         try (var reader = Files.newBufferedReader(discoveryFile)) { discovery = map(new Yaml().load(reader)); }
@@ -78,26 +78,27 @@ final class StudyColocalizationSources {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "verified_grch38_location_required"));
                 continue;
             }
-            List<Candidate> available = new ArrayList<>(byFeature.getOrDefault(feature.id(), List.of()));
-            available.sort(Comparator.comparingDouble(Candidate::log10p).thenComparing(Candidate::id));
+            List<StudyGeneticCandidates.Candidate> available = new ArrayList<>(byFeature.getOrDefault(feature.id(), List.of()));
+            available.sort(Comparator.comparingDouble(StudyGeneticCandidates.Candidate::log10p).thenComparing(StudyGeneticCandidates.Candidate::id));
             int total = available.size();
             if (available.size() > maximumVariants) available = new ArrayList<>(available.subList(0, maximumVariants));
-            available.sort(Comparator.comparingLong(Candidate::position).thenComparing(Candidate::id));
+            available.sort(Comparator.comparingLong(StudyGeneticCandidates.Candidate::position).thenComparing(StudyGeneticCandidates.Candidate::id));
             if (available.size() < 2) {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "fewer_than_two_exported_irQTL_variants", "available", total));
                 continue;
             }
             long start = Math.max(1, Math.min(Long.parseLong(feature.start()) - window,
-                available.stream().mapToLong(Candidate::position).min().orElseThrow()));
+                available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).min().orElseThrow()));
             long end = Math.max(Long.parseLong(feature.end()) + window,
-                available.stream().mapToLong(Candidate::position).max().orElseThrow());
+                available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).max().orElseThrow());
             if (end - start > 10_000_000L) {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "regional_window_exceeds_10mb"));
                 continue;
             }
             Path featureDirectory = root.resolve(safe(feature.id())); Files.createDirectories(featureDirectory);
-            Path exposureFile = featureDirectory.resolve("exposure.tsv"); writeExposure(exposureFile, available);
-            int sampleSize = available.stream().mapToInt(Candidate::n).max().orElseThrow();
+            Path exposureFile = featureDirectory.resolve("exposure.tsv");
+            StudyGeneticCandidates.writeExposure(exposureFile, available);
+            int sampleSize = available.stream().mapToInt(StudyGeneticCandidates.Candidate::n).max().orElseThrow();
             for (Study study : selectedStudies) {
                 Map<String, Object> pair = new LinkedHashMap<>();
                 pair.put("id", safe(feature.id() + "-" + study.accession())); pair.put("feature_id", feature.id());
@@ -137,7 +138,8 @@ final class StudyColocalizationSources {
         audit.put("outcome_provider", "GWAS Catalog harmonized summary statistics"); audit.put("selected_studies", selectedStudies.stream().map(StudyColocalizationSources::document).toList());
         audit.put("ld_provider", ThousandGenomesGrch38Ld.DATABASE); audit.put("ld_population", population);
         audit.put("partial_region_policy", partial ? "run_and_emit_mandatory_major_caveat" : "require_complete_regions");
-        audit.put("candidate_file", candidateFile.toString()); audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
+        audit.put("candidate_file", candidateFile.toString()); audit.put("candidate_exclusions", selection.exclusions());
+        audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
         StudyPublicEvidence.write(context.outputDirectory().resolve("automatic-colocalization-sources.yaml"), audit);
         if (pairs.isEmpty()) throw new IllegalArgumentException("No feature had at least two exported irQTL variants for automatic colocalization");
         return new Prepared(List.copyOf(pairs), audit);
@@ -224,29 +226,6 @@ final class StudyColocalizationSources {
             .filter(Files::isRegularFile).sorted().toList();
         if (found.size() != 1) throw new IOException("Automatic colocalization needs exactly one source_discovery artifact; found " + found.size());
         return found.get(0);
-    }
-
-    private static Map<String, List<Candidate>> candidates(Path path) throws IOException {
-        DelimitedData table = DelimitedData.read(path); Map<String, List<Candidate>> result = new LinkedHashMap<>();
-        for (String[] row : table.rows()) {
-            String[] tokens = row[table.column("variant_id")].split(":", -1); String id = tokens[tokens.length - 1];
-            if (!id.matches("rs[1-9][0-9]*")) continue;
-            double n = number(row[table.column("n")]); if (n < 3 || n != Math.rint(n)) continue;
-            Candidate value = new Candidate(row[table.column("feature_id")], id,
-                row[table.column("chromosome")].replaceFirst("^chr", ""), Long.parseLong(row[table.column("position")]),
-                row[table.column("effect_allele")].toUpperCase(Locale.ROOT), row[table.column("other_allele")].toUpperCase(Locale.ROOT),
-                number(row[table.column("beta")]), number(row[table.column("se")]), number(row[table.column("log10_p")]), (int) n);
-            result.computeIfAbsent(value.feature(), ignored -> new ArrayList<>()).add(value);
-        }
-        return result;
-    }
-
-    private static void writeExposure(Path output, List<Candidate> variants) throws IOException {
-        StringBuilder table = new StringBuilder("feature_id\tvariant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n");
-        for (Candidate value : variants) table.append(value.feature()).append('\t').append(value.id()).append('\t').append(value.chromosome()).append('\t')
-            .append(value.position()).append('\t').append(value.effect()).append('\t').append(value.other()).append('\t').append(value.beta()).append('\t')
-            .append(value.se()).append('\t').append(Math.pow(10, value.log10p())).append('\n');
-        Files.writeString(output, table);
     }
 
     private static String ancestry(String value) {

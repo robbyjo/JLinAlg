@@ -195,7 +195,9 @@ effects are on the log-odds scale when that was the outcome GWAS scale;
 `Math.exp(estimate)` converts a log-odds causal estimate to an odds ratio.
 
 One instrument can be analyzed with
-`MendelianRandomization.waldRatios(instruments)`. Two instruments can use
+`MendelianRandomization.waldRatios(instruments)`,
+`MendelianRandomization.waldRatio(instrument, confidenceLevel)`, or
+`mr-estimate --method wald-ratio`. Two instruments can use
 `MendelianRandomization.ivw(...)`. The combined `analyze` method intentionally
 requires three.
 
@@ -215,7 +217,7 @@ java -jar jlinalg-<version>.jar mr-estimate \
 The SVG contains the instrument points and the selected estimator's line.
 Egger plots use the fitted intercept and orient both effects to the
 exposure-increasing allele, exactly as the regression does. Use `--method
-ivw-fixed`, `ivw-random`, `egger`, or `weighted-median` for a single causal
+wald-ratio`, `ivw-fixed`, `ivw-random`, `egger`, or `weighted-median` for a single causal
 effect row; its p-value column is `causal_p_value`. With `all`, the plot shows
 the first estimator (fixed IVW).
 `--backend cpu` selects portable CPU matrix algebra for generalized MR and

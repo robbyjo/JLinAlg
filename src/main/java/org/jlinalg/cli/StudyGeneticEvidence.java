@@ -373,7 +373,7 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             if (reason.equals("retained")) selected.add(i);
         }
         record.put("instrument_selection", decisions);
-        if (selected.size() < 2) throw new IllegalArgumentException("Fewer than two independent strong instruments remain; automatic IVW/pleiotropy inference is not justified");
+        if (selected.isEmpty()) throw new IllegalArgumentException("No independent strong instrument remains after the prespecified p-value, strength and LD filters");
         Path input = directory.resolve("mr-instruments.tsv");
         StringBuilder table = new StringBuilder("variant_id\tbeta_exposure\tse_exposure\tbeta_outcome\tse_outcome\n");
         for (int i : selected) {
@@ -382,8 +382,12 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
                 .append(a.outcome().beta() * a.outcomeSign()).append('\t').append(a.outcome().se()).append('\n');
         }
         Files.writeString(input, table);
-        List<String> methods = new ArrayList<>(List.of("ivw-fixed", "ivw-random"));
+        List<String> methods = selected.size() == 1
+            ? new ArrayList<>(List.of("wald-ratio"))
+            : new ArrayList<>(List.of("ivw-fixed", "ivw-random"));
         if (selected.size() >= 3) methods.addAll(List.of("egger", "weighted-median"));
+        else if (selected.size() == 1) record.put("sensitivity_limitation",
+            "Only one independent strong instrument remained; a Wald ratio is reported. Heterogeneity, MR-Egger, weighted median, pleiotropy and leave-one-instrument-out diagnostics are not estimable.");
         else record.put("sensitivity_limitation", "Fewer than three instruments; Egger and weighted median not attempted");
         List<Object> estimates = new ArrayList<>();
         for (String method : methods) {

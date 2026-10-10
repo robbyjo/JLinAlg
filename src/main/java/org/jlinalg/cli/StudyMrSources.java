@@ -17,9 +17,6 @@ import org.jlinalg.study.StudyOperationExecutor.Context;
 /** Expands a concise MR source policy into per-feature reviewed pair inputs. */
 final class StudyMrSources {
     record Prepared(List<Object> pairs, Map<String, Object> audit) { }
-    private record Candidate(String feature, String id, String chromosome,
-            long position, String effect, String other, double beta, double se,
-            double log10p, int n) { }
 
     private StudyMrSources() { }
 
@@ -59,7 +56,10 @@ final class StudyMrSources {
         int maximum = config.containsKey("max_instruments")
             ? StudyBioinformatics.integer(config, "max_instruments", 100, 2, 500) : 100;
         Path candidates = candidateFile(context);
-        Map<String, List<Candidate>> byFeature = candidates(candidates, instrumentP);
+        StudyGeneticCandidates.Selection selection =
+            StudyGeneticCandidates.read(candidates, instrumentP);
+        Map<String, List<StudyGeneticCandidates.Candidate>> byFeature =
+            selection.byFeature();
         List<Object> pairs = new ArrayList<>(), featureAudit = new ArrayList<>();
         Path root = context.outputDirectory().resolve("automatic-mr-sources");
         Files.createDirectories(root);
@@ -68,8 +68,8 @@ final class StudyMrSources {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "missing_verified_grch38_location"));
                 continue;
             }
-            List<Candidate> available = new ArrayList<>(byFeature.getOrDefault(feature.id(), List.of()));
-            available.sort(Comparator.comparingDouble(Candidate::log10p).thenComparing(Candidate::id));
+            List<StudyGeneticCandidates.Candidate> available = new ArrayList<>(byFeature.getOrDefault(feature.id(), List.of()));
+            available.sort(Comparator.comparingDouble(StudyGeneticCandidates.Candidate::log10p).thenComparing(StudyGeneticCandidates.Candidate::id));
             int allStrong = available.size();
             if (available.size() > maximum) available = new ArrayList<>(available.subList(0, maximum));
             Map<String, Object> oneAudit = new LinkedHashMap<>();
@@ -81,14 +81,14 @@ final class StudyMrSources {
             }
             Path directory = root.resolve(safe(feature.id())); Files.createDirectories(directory);
             Path exposureFile = directory.resolve("exposure.tsv");
-            writeExposure(exposureFile, available);
+            StudyGeneticCandidates.writeExposure(exposureFile, available);
             List<PanUkbbGwasOutcome.Instrument> instruments = available.stream()
                 .map(v -> new PanUkbbGwasOutcome.Instrument(v.id(), v.chromosome(), v.position(), v.effect(), v.other())).toList();
             Path outcomeFile = directory.resolve("outcome.tsv");
             Map<String, Object> outcomeAudit = PanUkbbGwasOutcome.extract(context, instruments, outcomeFile);
-            int sampleSize = available.stream().mapToInt(Candidate::n).max().orElseThrow();
-            long start = Math.min(Long.parseLong(feature.start()), available.stream().mapToLong(Candidate::position).min().orElseThrow());
-            long end = Math.max(Long.parseLong(feature.end()), available.stream().mapToLong(Candidate::position).max().orElseThrow());
+            int sampleSize = available.stream().mapToInt(StudyGeneticCandidates.Candidate::n).max().orElseThrow();
+            long start = Math.min(Long.parseLong(feature.start()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).min().orElseThrow());
+            long end = Math.max(Long.parseLong(feature.end()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).max().orElseThrow());
             if (end - start > 10_000_000L) throw new IllegalArgumentException("Automatic MR instrument span exceeds 10 Mb for " + feature.id());
             Map<String, Object> pair = new LinkedHashMap<>();
             pair.put("id", safe(feature.id())); pair.put("feature_id", feature.id()); pair.put("approved", true);
@@ -129,6 +129,7 @@ final class StudyMrSources {
         audit.put("exposure_dataset", dataset.get("id")); audit.put("exposure_cohort", cohort); audit.put("exposure_ancestry", ancestry);
         audit.put("outcome", PanUkbbGwasOutcome.descriptor()); audit.put("ld_provider", ldProvider); audit.put("ld_population", population);
         audit.put("sample_overlap", overlap); audit.put("sample_overlap_basis", overlapBasis); audit.put("candidate_file", candidates.toString());
+        audit.put("candidate_exclusions", selection.exclusions());
         audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
         StudyPublicEvidence.write(context.outputDirectory().resolve("automatic-mr-sources.yaml"), audit);
         if (pairs.isEmpty()) throw new IllegalArgumentException("No feature has at least two genome-wide-significant irQTL candidates for automatic MR");
@@ -156,41 +157,6 @@ final class StudyMrSources {
         }
         if (found.size() != 1) throw new IOException("Automatic MR needs exactly one irqtl_candidate_review candidate file dependency; found " + found.size());
         return found.get(0);
-    }
-
-    private static Map<String, List<Candidate>> candidates(Path path,
-            double threshold) throws IOException {
-        DelimitedData table = DelimitedData.read(path);
-        Map<String, List<Candidate>> result = new LinkedHashMap<>();
-        double cutoff = Math.log10(threshold);
-        for (String[] row : table.rows()) {
-            double logp = number(row[table.column("log10_p")]);
-            if (logp > cutoff) continue;
-            String raw = row[table.column("variant_id")];
-            String[] tokens = raw.split(":", -1); String id = tokens[tokens.length - 1];
-            if (!id.matches("rs[1-9][0-9]*")) continue;
-            double n = number(row[table.column("n")]);
-            if (n < 3 || n != Math.rint(n)) continue;
-            Candidate value = new Candidate(row[table.column("feature_id")], id,
-                row[table.column("chromosome")].replaceFirst("^chr", ""),
-                Long.parseLong(row[table.column("position")]),
-                row[table.column("effect_allele")].toUpperCase(Locale.ROOT),
-                row[table.column("other_allele")].toUpperCase(Locale.ROOT),
-                number(row[table.column("beta")]), number(row[table.column("se")]),
-                logp, (int) n);
-            result.computeIfAbsent(value.feature(), key -> new ArrayList<>()).add(value);
-        }
-        return result;
-    }
-
-    private static void writeExposure(Path output, List<Candidate> variants)
-            throws IOException {
-        StringBuilder table = new StringBuilder("feature_id\tvariant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n");
-        for (Candidate v : variants) table.append(v.feature()).append('\t').append(v.id()).append('\t')
-            .append(v.chromosome()).append('\t').append(v.position()).append('\t').append(v.effect()).append('\t')
-            .append(v.other()).append('\t').append(v.beta()).append('\t').append(v.se()).append('\t')
-            .append(Math.pow(10, v.log10p())).append('\n');
-        Files.writeString(output, table);
     }
 
     private static String ancestry(String value) {

@@ -66,7 +66,20 @@ class StudyGeneticEvidenceTest {
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("1e-12", ".1"));
         result = new StudyGeneticEvidence().execute(context);
         assertEquals(State.WAITING_FOR_INPUT, result.state());
-        assertTrue(result.details().toString().contains("Fewer than two independent strong instruments"));
+        assertTrue(result.details().toString().contains("No independent strong instrument"));
+    }
+
+    @Test void oneIndependentStrongInstrumentProducesLimitedWaldRatio() throws Exception {
+        Context context = context("mendelian_randomization", Map.of());
+        Files.writeString(project.resolve("ld.tsv"), "variant_id\trs1\trs2\trs3\nrs1\t1\t.9\t.9\nrs2\t.9\t1\t.9\nrs3\t.9\t.9\t1\n");
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        Path output = context.outputDirectory().resolve("pair/mr-wald-ratio.tsv");
+        assertTrue(Files.isRegularFile(output));
+        assertTrue(Files.readString(output).contains("WALD_RATIO\t0.5"));
+        assertFalse(Files.exists(context.outputDirectory().resolve("pair/mr-ivw-fixed.tsv")));
+        assertTrue(result.details().toString().contains("Only one independent strong instrument remained"));
+        assertTrue(result.details().toString().contains("not estimable"));
     }
 
     @Test void automaticLdNeverGuessesAncestryAndDoesNotLiftBuild() throws Exception {

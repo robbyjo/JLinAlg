@@ -65,6 +65,18 @@ public final class MendelianRandomization {
         return List.copyOf(result);
     }
 
+    /** Returns a single-instrument Wald-ratio estimate with a normal confidence interval. */
+    public static MrEstimate waldRatio(
+            HarmonizedInstrument instrument, double confidenceLevel) {
+        if (instrument == null)
+            throw new IllegalArgumentException("instrument is required");
+        validateConfidence(confidenceLevel);
+        WaldRatio ratio = waldRatios(List.of(instrument)).get(0);
+        return estimate(MrMethod.WALD_RATIO, ratio.estimate(),
+            ratio.standardError(), confidenceLevel, Double.NaN, 0,
+            Double.NaN, 1);
+    }
+
     /** Returns an IVW estimate for independent instruments. */
     public static MrEstimate ivw(
             List<HarmonizedInstrument> instruments,
