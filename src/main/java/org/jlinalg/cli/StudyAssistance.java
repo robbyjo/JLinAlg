@@ -396,7 +396,7 @@ final class StudyAssistance {
             Path directory = dependency.getValue();
             Path manifest = directory.resolve("manifest.yaml");
             Map<String, Object> source;
-            try (var reader = Files.newBufferedReader(manifest)) { source = map(new Yaml().load(reader)); }
+            try (var reader = Files.newBufferedReader(manifest)) { source = map(StudyYaml.load(reader)); }
             String operation = text(source.get("operation_type"));
             sources.add(Map.of("operation", operation, "manifest", context.project().relativize(manifest).toString().replace('\\', '/'),
                 "manifest_sha256", FollowupSupport.hash(manifest), "output_sha256", source.getOrDefault("output_sha256", Map.of())));
@@ -404,7 +404,7 @@ final class StudyAssistance {
                 unavailable.add(Map.of("operation", operation, "state", source.get("state")));
             if (operation.equals("literature_support") && Files.isRegularFile(directory.resolve("decision.yaml"))) {
                 try (var reader = Files.newBufferedReader(directory.resolve("decision.yaml"))) {
-                    references.addAll(list(map(new Yaml().load(reader)).get("references")));
+                    references.addAll(list(map(StudyYaml.load(reader)).get("references")));
                 }
             }
             if (operation.equals("literature_search"))

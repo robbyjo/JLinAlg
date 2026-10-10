@@ -321,6 +321,13 @@ numerical claim bindings retain their original precision. The same formatter is
 available to native study figure-label generators; existing external figures
 are not rewritten by manuscript revision.
 
+Generated study YAML can be larger than SnakeYAML's general-purpose default when
+many regional evidence pairs and exclusion audits are retained. Downstream study
+operations use the same safe bounded reader as the project engine: duplicate
+keys and aliases are rejected, nesting is capped, and the document limit is 16
+million code points. The larger bound prevents valid generated evidence from
+breaking prioritization and reporting without accepting unbounded input.
+
 Table 1 places characteristics in rows and cohorts in columns. Multiple
 hypotheses can share a cohort column only when phenotype-file hashes, participant
 selection fingerprints, membership hashes, N, sex coding, units and overlapping

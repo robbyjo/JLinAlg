@@ -170,7 +170,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
         outputs.addAll(StudyFeatureAnnotations.write(context, standardized));
         boolean retryable;
         try (var reader = Files.newBufferedReader(context.outputDirectory().resolve("annotation-summary.yaml"))) {
-            retryable = list(map(new Yaml().load(reader), "annotation summary").get("input_requests"), "input_requests")
+            retryable = list(map(StudyYaml.load(reader), "annotation summary").get("input_requests"), "input_requests")
                 .stream().anyMatch(item -> Boolean.TRUE.equals(map(item, "request").get("retryable")));
         }
         return new Result(State.COMPLETE, "Validated and hashed " + selected.size()
@@ -603,7 +603,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 primaryMeta = dependency.resolve("meta-analysis.tsv");
                 try (var reader = Files.newBufferedReader(
                         dependency.resolve("manifest.yaml"))) {
-                    primaryReady |= "complete".equals(map(new Yaml().load(reader),
+                    primaryReady |= "complete".equals(map(StudyYaml.load(reader),
                         "manifest").get("state"));
                 }
             }
@@ -1062,7 +1062,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 Path path = directory.resolve(name);
                 if (!Files.isRegularFile(path)) continue;
                 Map<String, Object> summary;
-                try (var reader = Files.newBufferedReader(path)) { summary = StudyPublicEvidence.map(new Yaml().load(reader)); }
+                try (var reader = Files.newBufferedReader(path)) { summary = StudyPublicEvidence.map(StudyYaml.load(reader)); }
                 for (Object raw : StudyPublicEvidence.list(summary.getOrDefault("evidence", summary.get("pairs")))) {
                     Map<String, Object> row = StudyPublicEvidence.map(raw);
                     String feature = row.get("feature_id") == null
@@ -1630,14 +1630,8 @@ final class StudyCliExecutor implements StudyOperationExecutor {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> loadYaml(Path path) throws IOException {
-        Object value = new Yaml().load(Files.readString(path));
-        if (!(value instanceof Map<?, ?> raw))
-            throw new IOException("Expected YAML mapping: " + path);
-        Map<String, Object> result = new LinkedHashMap<>();
-        raw.forEach((key, item) -> result.put(String.valueOf(key), item));
-        return result;
+        return StudyYaml.loadMap(path);
     }
 
     private Result waiting(Context context, String message) throws IOException {

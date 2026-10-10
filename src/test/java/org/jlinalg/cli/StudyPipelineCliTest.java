@@ -96,6 +96,36 @@ class StudyPipelineCliTest {
         assertTrue(table.contains("literature:retrieved"));
     }
 
+    @Test void candidatePrioritizationReadsLargeGeneratedGeneticEvidence()
+            throws Exception {
+        Path meta = directory.resolve("large-meta"), genetics = directory.resolve("large-genetics");
+        Path output = directory.resolve("large-prioritization");
+        Files.createDirectories(meta); Files.createDirectories(genetics); Files.createDirectories(output);
+        Files.writeString(meta.resolve("meta-analysis.tsv"),
+            "feature_id\tbeta\tp_value\ti_squared\tstatus\nGENE1\t.2\t.001\t0\tok\n");
+        Files.writeString(meta.resolve("manifest.yaml"), """
+            operation_type: meta_analysis
+            state: complete
+            output_sha256: {meta-analysis.tsv: fixture}
+            """);
+        Files.writeString(genetics.resolve("genetic-evidence.yaml"),
+            "pairs:\n  - {kind: mr, feature_id: GENE1, status: complete}\npadding: "
+                + "x".repeat(3_300_000) + "\n");
+        Files.writeString(genetics.resolve("manifest.yaml"), """
+            operation_type: mendelian_randomization
+            state: complete
+            output_sha256: {genetic-evidence.yaml: fixture}
+            """);
+        var context = new org.jlinalg.study.StudyOperationExecutor.Context(
+            directory, output, Map.of("type", "candidate_prioritization"),
+            Map.of(), Map.of(), Map.of("meta", meta, "genetics", genetics));
+        var result = new StudyCliExecutor().execute(context);
+        assertEquals(org.jlinalg.study.StudyOperationExecutor.State.COMPLETE,
+            result.state());
+        assertTrue(Files.readString(output.resolve("candidate-prioritization.tsv"))
+            .contains("mr:complete"));
+    }
+
     @Test void preapprovedSensitivityRunsOfflineWithoutAnLlmAndKeepsPrimaryResults() throws Exception {
         Path project = directory.resolve("sensitivity");
         Files.createDirectories(project);
