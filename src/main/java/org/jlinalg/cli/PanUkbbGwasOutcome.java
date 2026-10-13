@@ -23,6 +23,10 @@ import org.yaml.snakeyaml.Yaml;
 
 /** Bounded Pan-UK Biobank instrument lookup with explicit NCBI build projection. */
 final class PanUkbbGwasOutcome {
+    static final class NoMatchedEffectsException extends IOException {
+        private static final long serialVersionUID = 1L;
+        NoMatchedEffectsException(String message) { super(message); }
+    }
     static final String PROVIDER = "pan-ukb";
     static final String BMI_TRAIT = "21001";
     static final int BMI_EUR_N = 419163;
@@ -261,7 +265,7 @@ final class PanUkbbGwasOutcome {
         provenance.put("instrument_audit", audit);
         provenance.put("output_sha256", FollowupSupport.hash(output));
         StudyPublicEvidence.write(output.resolveSibling(output.getFileName() + ".source.yaml"), provenance);
-        if (retained == 0) throw new IOException("No Pan-UKB EUR " + profile.description()
+        if (retained == 0) throw new NoMatchedEffectsException("No Pan-UKB EUR " + profile.description()
             + " effects matched the projected exposure instruments");
         return provenance;
     }

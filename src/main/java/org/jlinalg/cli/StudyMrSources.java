@@ -86,8 +86,17 @@ final class StudyMrSources {
             List<PanUkbbGwasOutcome.Instrument> instruments = available.stream()
                 .map(v -> new PanUkbbGwasOutcome.Instrument(v.id(), v.chromosome(), v.position(), v.effect(), v.other())).toList();
             Path outcomeFile = directory.resolve("outcome.tsv");
-            Map<String, Object> outcomeAudit = outcomeLookup.extract(instruments,
-                outcomeFile);
+            Map<String, Object> outcomeAudit;
+            try {
+                outcomeAudit = outcomeLookup.extract(instruments, outcomeFile);
+            } catch (PanUkbbGwasOutcome.NoMatchedEffectsException exception) {
+                oneAudit.put("status", "not_estimable_no_matching_outcome_effects");
+                oneAudit.put("reason", String.valueOf(exception.getMessage()));
+                oneAudit.put("outcome_lookup_audit", outcomeFile.resolveSibling(
+                    outcomeFile.getFileName() + ".source.yaml").toString());
+                featureAudit.add(oneAudit);
+                continue;
+            }
             int sampleSize = available.stream().mapToInt(StudyGeneticCandidates.Candidate::n).max().orElseThrow();
             long start = Math.min(Long.parseLong(feature.start()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).min().orElseThrow());
             long end = Math.max(Long.parseLong(feature.end()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).max().orElseThrow());
@@ -135,7 +144,6 @@ final class StudyMrSources {
         audit.put("candidate_exclusions", selection.exclusions());
         audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
         StudyPublicEvidence.write(context.outputDirectory().resolve("automatic-mr-sources.yaml"), audit);
-        if (pairs.isEmpty()) throw new IllegalArgumentException("No feature has a genome-wide-significant cis-irQTL candidate for automatic MR");
         return new Prepared(List.copyOf(pairs), audit);
     }
 
