@@ -63,8 +63,10 @@ final class StudyMrSources {
         List<Object> pairs = new ArrayList<>(), featureAudit = new ArrayList<>();
         Path root = context.outputDirectory().resolve("automatic-mr-sources");
         Files.createDirectories(root);
-        for (StudyBioinformatics.Feature feature : StudyBioinformatics.features(context,
-                StudyBioinformatics.mrFeatureLimit(context))) {
+        try (PanUkbbGwasOutcome.Lookup outcomeLookup =
+                PanUkbbGwasOutcome.lookup(context, outcomeProfile)) {
+          for (StudyBioinformatics.Feature feature : StudyBioinformatics.features(context,
+                  StudyBioinformatics.mrFeatureLimit(context))) {
             if (!"located".equals(feature.status())) {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "missing_verified_grch38_location"));
                 continue;
@@ -84,8 +86,8 @@ final class StudyMrSources {
             List<PanUkbbGwasOutcome.Instrument> instruments = available.stream()
                 .map(v -> new PanUkbbGwasOutcome.Instrument(v.id(), v.chromosome(), v.position(), v.effect(), v.other())).toList();
             Path outcomeFile = directory.resolve("outcome.tsv");
-            Map<String, Object> outcomeAudit = PanUkbbGwasOutcome.extract(context,
-                outcomeProfile, instruments, outcomeFile);
+            Map<String, Object> outcomeAudit = outcomeLookup.extract(instruments,
+                outcomeFile);
             int sampleSize = available.stream().mapToInt(StudyGeneticCandidates.Candidate::n).max().orElseThrow();
             long start = Math.min(Long.parseLong(feature.start()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).min().orElseThrow());
             long end = Math.max(Long.parseLong(feature.end()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).max().orElseThrow());
@@ -123,6 +125,7 @@ final class StudyMrSources {
             oneAudit.put("status", "prepared"); oneAudit.put("pair_id", pair.get("id"));
             oneAudit.put("exposure_sha256", FollowupSupport.hash(exposureFile)); oneAudit.put("outcome", outcomeAudit);
             featureAudit.add(oneAudit);
+          }
         }
         Map<String, Object> audit = new LinkedHashMap<>();
         audit.put("interface", "analysis.bioinformatics.mr"); audit.put("legacy_interface", "analysis.bioinformatics.genetic_pairs remains supported for custom sources");

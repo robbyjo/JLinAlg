@@ -51,6 +51,38 @@ final class PanUkbbGwasOutcome {
     @FunctionalInterface interface Projector {
         Projected project(Instrument variant) throws IOException;
     }
+    static final class Lookup implements AutoCloseable {
+        private final Context context;
+        private final Profile profile;
+        private final Projector projector;
+        private final PublicGeneticResourceCache.Installed data;
+        private final PublicGeneticResourceCache.Installed index;
+        private final Path chain;
+        private final TabixReader reader;
+        private final Map<String, Integer> columns;
+
+        private Lookup(Context context, Profile profile, Projector projector,
+                PublicGeneticResourceCache.Installed data,
+                PublicGeneticResourceCache.Installed index, Path chain,
+                TabixReader reader) throws IOException {
+            this.context = context;
+            this.profile = profile;
+            this.projector = projector;
+            this.data = data;
+            this.index = index;
+            this.chain = chain;
+            this.reader = reader;
+            this.columns = header(reader);
+        }
+
+        Map<String, Object> extract(List<Instrument> variants, Path output)
+                throws IOException {
+            return PanUkbbGwasOutcome.extract(context, profile, variants,
+                output, projector, data, index, chain, reader, columns);
+        }
+
+        @Override public void close() throws IOException { reader.close(); }
+    }
 
     private PanUkbbGwasOutcome() { }
 
@@ -115,6 +147,12 @@ final class PanUkbbGwasOutcome {
 
     static Map<String, Object> extract(Context context, Profile profile,
             List<Instrument> variants, Path output) throws IOException {
+        try (Lookup lookup = lookup(context, profile)) {
+            return lookup.extract(variants, output);
+        }
+    }
+
+    static Lookup lookup(Context context, Profile profile) throws IOException {
         String dataUrl = ROOT + "sumstats_flat_files/" + profile.file();
         String indexUrl = ROOT + "sumstats_flat_files_tabix/" + profile.file() + ".tbi";
         PublicGeneticResourceCache.Installed data =
@@ -129,23 +167,29 @@ final class PanUkbbGwasOutcome {
                     profile.indexMd5()));
         Path chain = chain(context);
         LiftOver liftOver = new LiftOver(chain.toFile());
-        return extract(context, profile, variants, output,
-            variant -> project(variant, liftOver), data, index, chain);
+        TabixReader reader = new TabixReader(data.path().toString(),
+            index.path().toString());
+        try {
+            return new Lookup(context, profile,
+                variant -> project(variant, liftOver), data, index, chain,
+                reader);
+        } catch (IOException | RuntimeException exception) {
+            reader.close();
+            throw exception;
+        }
     }
 
     private static Map<String, Object> extract(Context context,
             Profile profile, List<Instrument> variants, Path output, Projector projector,
             PublicGeneticResourceCache.Installed data,
-            PublicGeneticResourceCache.Installed index, Path chain)
+            PublicGeneticResourceCache.Installed index, Path chain,
+            TabixReader reader, Map<String, Integer> columns)
             throws IOException {
         if (variants.isEmpty()) throw new IllegalArgumentException("No exposure instruments were supplied for outcome lookup");
         Files.createDirectories(output.getParent());
         List<Object> audit = new ArrayList<>();
         int retained = 0;
-        try (TabixReader reader = new TabixReader(data.path().toString(),
-                index.path().toString())) {
-            Map<String, Integer> columns = header(reader);
-            String population = "EUR";
+        String population = "EUR";
             for (String required : List.of("chr", "pos", "ref", "alt",
                     "beta_" + population, "se_" + population,
                     "neglog10_pval_" + population,
@@ -201,8 +245,7 @@ final class PanUkbbGwasOutcome {
                 }
                 audit.add(rowAudit);
             }
-            Files.writeString(output, table);
-        }
+        Files.writeString(output, table);
         Map<String, Object> provenance = new LinkedHashMap<>(descriptor(profile));
         provenance.put("retrieved_at", Instant.now().toString());
         provenance.put("local_summary_statistics", data.path().toString());
