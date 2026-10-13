@@ -648,6 +648,9 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 Map<String, Object> primary = optionalMap(map(hypothesis(context.study(), text(operation.get("hypothesis")))
                     .get("analysis"), "analysis").get("operations"), "operations");
                 Map<String, Object> settings = new LinkedHashMap<>(optionalMap(primary.get("meta_analysis"), "meta_analysis"));
+                if (action.equals("leave_one_cohort_out") && configuration.containsKey("min_cohorts"))
+                    settings.put("min_cohorts", positiveInteger(configuration.get("min_cohorts"),
+                        "sensitivity_analysis.min_cohorts"));
                 if (positiveInteger(settings.getOrDefault("min_cohorts", 2), "min_cohorts") > selected.size()) {
                     incomplete = true;
                     dispositions.add(Map.of("action", action, "variant", variant, "status", "waiting_for_input",

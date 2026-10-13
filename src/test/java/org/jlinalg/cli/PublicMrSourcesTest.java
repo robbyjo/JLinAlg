@@ -13,9 +13,13 @@ class PublicMrSourcesTest {
     @Test void bmiSelectsIndependentPanUkbEurOutcome() {
         assertTrue(PanUkbbGwasOutcome.supports("BMI", "EUR"));
         assertTrue(PanUkbbGwasOutcome.supports("body mass index", "EUR"));
-        assertFalse(PanUkbbGwasOutcome.supports("obesity", "EUR"));
+        assertTrue(PanUkbbGwasOutcome.supports("obesity", "EUR"));
         assertEquals(419163, PanUkbbGwasOutcome.descriptor().get("sample_size"));
         assertEquals("GRCh37", PanUkbbGwasOutcome.descriptor().get("source_genome_build"));
+        var obesity = PanUkbbGwasOutcome.profile("Obesity", "EUR");
+        assertEquals("icd10-E66", obesity.trait());
+        assertEquals(420531, obesity.sampleSize());
+        assertEquals(15917, PanUkbbGwasOutcome.descriptor(obesity).get("cases"));
     }
 
     @Test void localChainProjectionPreservesOrComplementsAlleles()

@@ -137,7 +137,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         String operation = text(context.operation().get("type"));
         boolean mrOnly = operation.equals("mendelian_randomization");
         boolean partialColocalization = operation.equals("colocalization") && Boolean.TRUE.equals(pair.get("partial_colocalization"));
-        StudyBioinformatics.Feature finding = StudyBioinformatics.features(context).stream().filter(item -> item.id().equals(feature)).findFirst()
+        int featureLimit = mrOnly ? StudyBioinformatics.mrFeatureLimit(context)
+            : StudyBioinformatics.featureLimit(context);
+        StudyBioinformatics.Feature finding = StudyBioinformatics.features(context,
+            featureLimit).stream().filter(item -> item.id().equals(feature)).findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Genetic pair must identify an eligible unambiguously annotated finding from this hypothesis"));
         required(pair, "rationale");
         if (!Boolean.TRUE.equals(pair.get("approved"))) throw new IllegalArgumentException("Set approved:true only after scientist review of phenotype, molecular feature, tissue, ancestry, source citations and instrument assumptions");

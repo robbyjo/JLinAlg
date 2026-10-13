@@ -25,7 +25,8 @@ import org.jlinalg.study.StudyOperationExecutor;
 final class StudyIrQtlReview implements StudyOperationExecutor {
     @Override public Result execute(Context context) throws IOException {
         Files.createDirectories(context.outputDirectory());
-        List<StudyBioinformatics.Feature> features = StudyBioinformatics.features(context);
+        List<StudyBioinformatics.Feature> features = StudyBioinformatics.features(context,
+            StudyBioinformatics.geneticFeatureLimit(context));
         Set<String> selected = new HashSet<>();
         features.forEach(f -> selected.add(f.id()));
         List<Object> sources = new ArrayList<>();
@@ -72,9 +73,9 @@ final class StudyIrQtlReview implements StudyOperationExecutor {
         String hash = FollowupSupport.hash(source);
         Map<String, Long> counts = new LinkedHashMap<>(), flaggedCounts = new LinkedHashMap<>();
         selected.stream().sorted().forEach(id -> { counts.put(id, 0L); flaggedCounts.put(id, 0L); });
-        long rows = 0, matched = 0, retained = 0, invalid = 0;
+        long rows = 0, selectedRows = 0, matched = 0, retained = 0, invalid = 0,
+            nonCis = 0;
         double largestLogP = Double.NEGATIVE_INFINITY;
-        int maxCandidates = 50000;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(open(source), StandardCharsets.UTF_8), 1024 * 1024);
                 BufferedWriter writer = Files.newBufferedWriter(output)) {
             String first = reader.readLine();
@@ -93,6 +94,11 @@ final class StudyIrQtlReview implements StudyOperationExecutor {
                 if (Double.isFinite(logP)) largestLogP = Math.max(largestLogP, logP);
                 String feature = row.get(tx);
                 if (!selected.contains(feature)) continue;
+                selectedRows++;
+                if (!row.get(header.indexOf("Is_Cis")).equals("1")) {
+                    nonCis++;
+                    continue;
+                }
                 matched++; counts.merge(feature, 1L, Long::sum);
                 String variant = row.get(header.indexOf("SNP")); String[] allele = variant.split(":", -1);
                 double beta = Double.parseDouble(row.get(header.indexOf("Fx"))), t = Double.parseDouble(row.get(header.indexOf("T")));
@@ -105,13 +111,11 @@ final class StudyIrQtlReview implements StudyOperationExecutor {
                         || !Double.isFinite(logP) || logP > 0 || !Double.isFinite(r2) || r2 < 0 || r2 > 1) { invalid++; continue; }
                 if (!allele[0].replaceFirst("^chr", "").equals(row.get(header.indexOf("SNP_Chr")).replaceFirst("^chr", ""))
                         || !allele[1].equals(row.get(header.indexOf("SNP_Pos")))) throw new IOException("irQTL variant identifier and coordinate columns disagree");
-                if (!row.get(header.indexOf("Is_Cis")).equals("1")) flags.add("not_declared_cis");
                 if (Math.min(eaf, 1 - eaf) < 0.01) flags.add("minor_allele_frequency_below_0.01");
                 if (r2 >= 0.99 || Math.abs(t) > 10000) flags.add("near_perfect_fit_or_extreme_statistic");
                 if (logP > Math.log10(5e-8)) flags.add("above_default_MR_instrument_threshold");
                 if (t * t < 10) flags.add("weak_instrument_statistic");
                 if (!flags.isEmpty()) flaggedCounts.merge(feature, 1L, Long::sum);
-                if (retained >= maxCandidates) continue;
                 retained++;
                 writer.write(String.join("\t", feature, variant, row.get(header.indexOf("SNP_Chr")), row.get(header.indexOf("SNP_Pos")),
                     allele[3], allele[2], Double.toString(beta), Double.toString(se), Double.toString(logP), Double.toString(eaf), Double.toString(n),
@@ -119,10 +123,13 @@ final class StudyIrQtlReview implements StudyOperationExecutor {
             }
         }
         if (!hash.equals(FollowupSupport.hash(source))) throw new IOException("irQTL source changed during scan");
-        result.put("source_sha256", hash); result.put("rows_scanned", rows); result.put("exact_feature_matches", matched);
+        result.put("source_sha256", hash); result.put("rows_scanned", rows);
+        result.put("selected_feature_rows", selectedRows);
+        result.put("non_cis_rows_excluded", nonCis);
+        result.put("exact_feature_matches", matched);
         result.put("matches_by_feature", counts); result.put("flagged_by_feature", flaggedCounts);
         result.put("invalid_matched_rows_excluded", invalid); result.put("candidate_rows_written", retained);
-        result.put("output_limited", matched - invalid > retained); result.put("output_order", "Source order, not instrument strength ranking; at most 50000 rows");
+        result.put("output_limited", false); result.put("output_order", "Source order; every valid cis-irQTL row for the selected features is written");
         result.put("maximum_observed_log10_p", Double.isFinite(largestLogP) ? largestLogP : "unavailable");
         result.put("candidate_file", output.getFileName().toString()); result.put("candidate_sha256", FollowupSupport.hash(output));
         result.put("standard_error_derivation", "abs(Fx / T); requires confirmation that T is the signed coefficient statistic. log10P is preserved to avoid probability underflow.");

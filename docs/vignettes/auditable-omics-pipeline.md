@@ -829,7 +829,11 @@ and sign concordance is required. A study may instead declare
 `analysis.replication.adjustment_scope: discovery_subset`,
 `threshold_comparison: less_than`, or `require_same_sign: false`; the comparison
 output still reports direction. `analysis.operations.meta_analysis` may set
-`model: fixed|random` and `min_cohorts`.
+`model: fixed|random` and `min_cohorts`. A prespecified
+`analysis.operations.sensitivity_analysis.min_cohorts` may be lower than the
+primary threshold for leave-one-cohort-out reruns (for example, primary 4 and
+sensitivity 3); the all-cohort primary analysis and its threshold remain
+unchanged.
 
 The complete runnable result-first project is in the
 [GitHub example directory](https://github.com/robbyjo/JLinAlg/tree/main/examples/study-pipeline).

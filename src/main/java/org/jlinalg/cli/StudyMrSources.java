@@ -39,6 +39,8 @@ final class StudyMrSources {
         if (!provider.equals(PanUkbbGwasOutcome.PROVIDER) || !PanUkbbGwasOutcome.supports(trait, outcomeAncestry))
             throw new IllegalArgumentException("No automatic full-summary-statistics adapter is registered for outcome '" + trait
                 + "' and ancestry " + outcomeAncestry + ". Use GWAS Catalog discovery, select a full harmonized study, and declare a reviewed genetic_pair; catalog lead hits are insufficient");
+        PanUkbbGwasOutcome.Profile outcomeProfile = PanUkbbGwasOutcome.profile(trait,
+            outcomeAncestry);
         String ldProvider = text(config.getOrDefault("ld_provider", ThousandGenomesGrch38Ld.DATABASE));
         if (!ldProvider.equals(ThousandGenomesGrch38Ld.DATABASE))
             throw new IllegalArgumentException("The automatic GRCh38 MR adapter currently supports ld_provider: " + ThousandGenomesGrch38Ld.DATABASE);
@@ -53,8 +55,6 @@ final class StudyMrSources {
             "Exposure cohort " + cohort + "; outcome cohort UK Biobank only; distinct named source cohorts"));
         double instrumentP = number(config.getOrDefault("instrument_p", 5e-8));
         if (!(instrumentP > 0 && instrumentP <= 5e-8)) throw new IllegalArgumentException("mr.instrument_p must be in (0,5e-8]");
-        int maximum = config.containsKey("max_instruments")
-            ? StudyBioinformatics.integer(config, "max_instruments", 100, 2, 500) : 100;
         Path candidates = candidateFile(context);
         StudyGeneticCandidates.Selection selection =
             StudyGeneticCandidates.read(candidates, instrumentP);
@@ -63,19 +63,18 @@ final class StudyMrSources {
         List<Object> pairs = new ArrayList<>(), featureAudit = new ArrayList<>();
         Path root = context.outputDirectory().resolve("automatic-mr-sources");
         Files.createDirectories(root);
-        for (StudyBioinformatics.Feature feature : StudyBioinformatics.features(context)) {
+        for (StudyBioinformatics.Feature feature : StudyBioinformatics.features(context,
+                StudyBioinformatics.mrFeatureLimit(context))) {
             if (!"located".equals(feature.status())) {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "missing_verified_grch38_location"));
                 continue;
             }
             List<StudyGeneticCandidates.Candidate> available = new ArrayList<>(byFeature.getOrDefault(feature.id(), List.of()));
             available.sort(Comparator.comparingDouble(StudyGeneticCandidates.Candidate::log10p).thenComparing(StudyGeneticCandidates.Candidate::id));
-            int allStrong = available.size();
-            if (available.size() > maximum) available = new ArrayList<>(available.subList(0, maximum));
             Map<String, Object> oneAudit = new LinkedHashMap<>();
-            oneAudit.put("feature_id", feature.id()); oneAudit.put("strong_candidate_instruments", allStrong);
-            oneAudit.put("instrument_lookup_limit", maximum);
-            if (available.size() < 2) {
+            oneAudit.put("feature_id", feature.id()); oneAudit.put("strong_candidate_instruments", available.size());
+            oneAudit.put("instrument_selection", "all eligible cis-irQTLs supplied simultaneously; LD clumping occurs in the MR pair analysis");
+            if (available.isEmpty()) {
                 oneAudit.put("status", "insufficient_strong_candidates_before_outcome_or_ld_lookup");
                 featureAudit.add(oneAudit); continue;
             }
@@ -85,7 +84,8 @@ final class StudyMrSources {
             List<PanUkbbGwasOutcome.Instrument> instruments = available.stream()
                 .map(v -> new PanUkbbGwasOutcome.Instrument(v.id(), v.chromosome(), v.position(), v.effect(), v.other())).toList();
             Path outcomeFile = directory.resolve("outcome.tsv");
-            Map<String, Object> outcomeAudit = PanUkbbGwasOutcome.extract(context, instruments, outcomeFile);
+            Map<String, Object> outcomeAudit = PanUkbbGwasOutcome.extract(context,
+                outcomeProfile, instruments, outcomeFile);
             int sampleSize = available.stream().mapToInt(StudyGeneticCandidates.Candidate::n).max().orElseThrow();
             long start = Math.min(Long.parseLong(feature.start()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).min().orElseThrow());
             long end = Math.max(Long.parseLong(feature.end()), available.stream().mapToLong(StudyGeneticCandidates.Candidate::position).max().orElseThrow());
@@ -111,10 +111,10 @@ final class StudyMrSources {
             exposure.put("tissue", text(dataset.getOrDefault("tissue", "not_declared")));
             Map<String, Object> outcome = new LinkedHashMap<>();
             outcome.put("prepared_path", outcomeFile.toAbsolutePath().normalize().toString());
-            outcome.put("source_id", "pan-ukb-21001-eur"); outcome.put("citation", PanUkbbGwasOutcome.DOCUMENTATION);
+            outcome.put("source_id", "pan-ukb-" + outcomeProfile.key()); outcome.put("citation", PanUkbbGwasOutcome.DOCUMENTATION);
             outcome.put("genome_build", "GRCh38"); outcome.put("source_genome_build", "GRCh37");
             outcome.put("build_projection", "Local hg38-to-hg19 chain projection with reverse-strand allele complementation and exact Pan-UKB allele matching, audited per instrument");
-            outcome.put("ancestry", ancestry); outcome.put("sample_size", PanUkbbGwasOutcome.BMI_EUR_N);
+            outcome.put("ancestry", ancestry); outcome.put("sample_size", outcomeProfile.sampleSize());
             outcome.put("complete_region", false); outcome.put("selection_basis", "exposure_instrument_lookup"); outcome.put("trait", text(StudyBioinformatics.hypothesis(context).get("outcome")));
             Map<String, Object> ld = new LinkedHashMap<>(); ld.put("database", ldProvider); ld.put("population", population);
             ld.put("genome_build", "GRCh38"); ld.put("ancestry", ancestry); ld.put("citation", ThousandGenomesGrch38Ld.CITATION);
@@ -127,12 +127,12 @@ final class StudyMrSources {
         Map<String, Object> audit = new LinkedHashMap<>();
         audit.put("interface", "analysis.bioinformatics.mr"); audit.put("legacy_interface", "analysis.bioinformatics.genetic_pairs remains supported for custom sources");
         audit.put("exposure_dataset", dataset.get("id")); audit.put("exposure_cohort", cohort); audit.put("exposure_ancestry", ancestry);
-        audit.put("outcome", PanUkbbGwasOutcome.descriptor()); audit.put("ld_provider", ldProvider); audit.put("ld_population", population);
+        audit.put("outcome", PanUkbbGwasOutcome.descriptor(outcomeProfile)); audit.put("ld_provider", ldProvider); audit.put("ld_population", population);
         audit.put("sample_overlap", overlap); audit.put("sample_overlap_basis", overlapBasis); audit.put("candidate_file", candidates.toString());
         audit.put("candidate_exclusions", selection.exclusions());
         audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
         StudyPublicEvidence.write(context.outputDirectory().resolve("automatic-mr-sources.yaml"), audit);
-        if (pairs.isEmpty()) throw new IllegalArgumentException("No feature has at least two genome-wide-significant irQTL candidates for automatic MR");
+        if (pairs.isEmpty()) throw new IllegalArgumentException("No feature has a genome-wide-significant cis-irQTL candidate for automatic MR");
         return new Prepared(List.copyOf(pairs), audit);
     }
 

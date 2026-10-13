@@ -129,7 +129,7 @@ class StudyPipelineCliTest {
     @Test void preapprovedSensitivityRunsOfflineWithoutAnLlmAndKeepsPrimaryResults() throws Exception {
         Path project = directory.resolve("sensitivity");
         Files.createDirectories(project);
-        for (int i = 1; i <= 3; i++) Files.writeString(project.resolve("c" + i + ".tsv"),
+        for (int i = 1; i <= 4; i++) Files.writeString(project.resolve("c" + i + ".tsv"),
             "feature_id\tbeta\tse\tp_value\nGENE1\t" + (i * 10) + "\t1\t.001\n");
         Path study = project.resolve("study.yaml");
         Files.writeString(study, """
@@ -143,10 +143,16 @@ class StudyPipelineCliTest {
               - {id: d1, cohort: c1, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: c1.tsv}}
               - {id: d2, cohort: c2, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: c2.tsv}}
               - {id: d3, cohort: c3, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: c3.tsv}}
+              - {id: d4, cohort: c4, type: transcriptomics, stage: association_results, feature_id_type: gene_symbol, files: {results: c4.tsv}}
             hypotheses:
               - id: H1
                 description: Check cohort influence.
-                analysis: {mode: manual, goals: [meta_analysis]}
+                analysis:
+                  mode: manual
+                  goals: [meta_analysis]
+                  operations:
+                    meta_analysis: {min_cohorts: 4}
+                    sensitivity_analysis: {min_cohorts: 3}
             """);
         assertEquals(0, run("study", "auto", study.toString(), "--offline"), stderr);
         assertTrue(stdout.contains("state: completed"), stdout);
@@ -155,7 +161,7 @@ class StudyPipelineCliTest {
         assertTrue(disposition.contains("leave_one_cohort_out"));
         assertTrue(disposition.contains("fixed_random_comparison"));
         try (var paths = Files.walk(decision.getParent())) {
-            assertEquals(5, paths.filter(path -> path.getFileName().toString().equals("meta-analysis.tsv")).count());
+            assertEquals(6, paths.filter(path -> path.getFileName().toString().equals("meta-analysis.tsv")).count());
         }
         String fixed = Files.readString(decision.getParent().resolve("fixed_random_comparison/analysis-1/meta-analysis.tsv"));
         String random = Files.readString(decision.getParent().resolve("fixed_random_comparison/analysis-2/meta-analysis.tsv"));

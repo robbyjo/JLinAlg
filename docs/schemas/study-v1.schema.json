@@ -249,7 +249,7 @@
         "exposure_source_id": {"type": "string", "minLength": 1},
         "exposure_citation": {"type": "string", "minLength": 1},
         "outcome_provider": {"enum": ["auto", "pan-ukb"], "default": "auto"},
-        "outcome_trait": {"type": "string", "minLength": 1, "description": "BMI aliases and UK Biobank field 21001 select the built-in Pan-UKB BMI adapter."},
+        "outcome_trait": {"type": "string", "minLength": 1, "description": "BMI aliases/UK Biobank field 21001 or obesity aliases/ICD-10 E66 select the corresponding built-in Pan-UKB adapter."},
         "outcome_ancestry": {"type": "string", "minLength": 1},
         "ld_provider": {"enum": ["1000g-30x-grch38"], "default": "1000g-30x-grch38"},
         "ld_population": {"enum": ["AFR", "AMR", "EAS", "EUR", "SAS"]},
@@ -259,7 +259,7 @@
         "instrument_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.00000005, "default": 0.00000005},
         "minimum_f": {"type": "number", "minimum": 10, "default": 10},
         "clump_r2": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.01, "default": 0.001},
-        "max_instruments": {"type": "integer", "minimum": 2, "maximum": 500, "default": 100}
+        "max_features": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 10, "description": "Number of FDR-significant meta-analysis features to screen for cis-irQTL MR. Every eligible cis instrument for each selected feature is passed to harmonization and LD clumping."}
       }
     },
     "geneticPair": {

@@ -29,6 +29,11 @@ final class PanUkbbGwasOutcome {
     static final String BMI_FILE = "continuous-21001-both_sexes-irnt.tsv.bgz";
     static final String BMI_MD5 = "ca9ceaa99c79d510fb0e26a780787416";
     static final String BMI_INDEX_MD5 = "15552b6a7670abdfd74834b5d3b5a3b6";
+    static final String OBESITY_TRAIT = "icd10-E66";
+    static final int OBESITY_EUR_N = 420531;
+    static final String OBESITY_FILE = "icd10-E66-both_sexes.tsv.bgz";
+    static final String OBESITY_MD5 = "e226a9283e8f7a9ee1bab459eb2791fc";
+    static final String OBESITY_INDEX_MD5 = "2a83e61111eb250497ef905cabe567d3";
     static final String ROOT = "https://pan-ukb-us-east-1.s3.amazonaws.com/";
     static final String DATA = ROOT + "sumstats_flat_files/" + BMI_FILE;
     static final String INDEX = ROOT + "sumstats_flat_files_tabix/" + BMI_FILE + ".tbi";
@@ -37,6 +42,10 @@ final class PanUkbbGwasOutcome {
 
     record Instrument(String id, String chromosome, long position,
             String effect, String other) { }
+    record Profile(String key, String trait, Set<String> aliases,
+            String description, String file, String md5, String indexMd5,
+            int sampleSize, int cases, int controls, String effectScale,
+            String selectionNote) { }
     record Projected(String chromosome, long position, String effect,
             String other, String audit) { }
     @FunctionalInterface interface Projector {
@@ -45,51 +54,87 @@ final class PanUkbbGwasOutcome {
 
     private PanUkbbGwasOutcome() { }
 
+    private static final Profile BMI = new Profile("21001-eur", BMI_TRAIT,
+        Set.of("21001", "bmi", "bodymassindex"),
+        "Body mass index (BMI), inverse-rank normal transformed", BMI_FILE,
+        BMI_MD5, BMI_INDEX_MD5, BMI_EUR_N, -1, -1, "standard-deviation units",
+        "UK Biobank-only EUR outcome avoids FHS exposure-sample overlap; do not substitute a UKB-plus-GIANT meta-analysis without reassessing overlap");
+    private static final Profile OBESITY = new Profile("icd10-E66-eur",
+        OBESITY_TRAIT, Set.of("obesity", "e66", "icd10e66"),
+        "ICD-10 E66 obesity", OBESITY_FILE, OBESITY_MD5,
+        OBESITY_INDEX_MD5, OBESITY_EUR_N, 15917, 404614, "log odds",
+        "Pan-UKB ICD-10 E66 provides a UK Biobank-only obesity outcome independent of the FHS irQTL exposure cohort; GIANT remains a possible alternative only after explicit cohort-overlap review");
+
     static boolean supports(String trait, String ancestry) {
-        String normalized = trait == null ? "" : trait.toLowerCase(Locale.ROOT)
-            .replaceAll("[^a-z0-9]+", "");
-        return Set.of("21001", "bmi", "bodymassindex").contains(normalized)
-            && "EUR".equalsIgnoreCase(ancestry);
+        try { profile(trait, ancestry); return true; }
+        catch (IllegalArgumentException exception) { return false; }
     }
 
     static Map<String, Object> descriptor() {
-        return Map.ofEntries(
+        return descriptor(BMI);
+    }
+
+    static Profile profile(String trait, String ancestry) {
+        if (!"EUR".equalsIgnoreCase(ancestry))
+            throw new IllegalArgumentException("Pan-UKB automatic outcomes currently require EUR ancestry");
+        String normalized = trait == null ? "" : trait.toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+", "");
+        for (Profile profile : List.of(BMI, OBESITY))
+            if (profile.aliases().contains(normalized)) return profile;
+        throw new IllegalArgumentException("Unsupported Pan-UKB outcome trait: " + trait);
+    }
+
+    static Map<String, Object> descriptor(Profile profile) {
+        Map<String, Object> result = new LinkedHashMap<>(Map.ofEntries(
             Map.entry("provider", PROVIDER),
-            Map.entry("trait", BMI_TRAIT),
-            Map.entry("description", "Body mass index (BMI), inverse-rank normal transformed"),
+            Map.entry("trait", profile.trait()),
+            Map.entry("description", profile.description()),
             Map.entry("ancestry", "EUR"),
-            Map.entry("sample_size", BMI_EUR_N),
+            Map.entry("sample_size", profile.sampleSize()),
             Map.entry("source_genome_build", "GRCh37"),
             Map.entry("effect_allele", "ALT"),
-            Map.entry("summary_statistics", DATA),
-            Map.entry("tabix_index", INDEX),
-            Map.entry("summary_statistics_md5", BMI_MD5),
-            Map.entry("tabix_index_md5", BMI_INDEX_MD5),
+            Map.entry("effect_scale", profile.effectScale()),
+            Map.entry("summary_statistics", ROOT + "sumstats_flat_files/" + profile.file()),
+            Map.entry("tabix_index", ROOT + "sumstats_flat_files_tabix/" + profile.file() + ".tbi"),
+            Map.entry("summary_statistics_md5", profile.md5()),
+            Map.entry("tabix_index_md5", profile.indexMd5()),
             Map.entry("documentation", DOCUMENTATION),
             Map.entry("resource_policy", "complete files installed in the shared cache; analysis reads local files only"),
-            Map.entry("selection_note", "UK Biobank-only EUR outcome avoids FHS exposure-sample overlap; do not substitute a UKB-plus-GIANT meta-analysis without reassessing overlap"));
+            Map.entry("selection_note", profile.selectionNote())));
+        if (profile.cases() >= 0) {
+            result.put("cases", profile.cases());
+            result.put("controls", profile.controls());
+        }
+        return result;
     }
 
     static Map<String, Object> extract(Context context, List<Instrument> variants,
             Path output) throws IOException {
+        return extract(context, BMI, variants, output);
+    }
+
+    static Map<String, Object> extract(Context context, Profile profile,
+            List<Instrument> variants, Path output) throws IOException {
+        String dataUrl = ROOT + "sumstats_flat_files/" + profile.file();
+        String indexUrl = ROOT + "sumstats_flat_files_tabix/" + profile.file() + ".tbi";
         PublicGeneticResourceCache.Installed data =
             PublicGeneticResourceCache.acquire(context, "pan-ukb",
-                "21001-eur", BMI_FILE, DATA, 10L * 1024 * 1024 * 1024,
-                new PublicGeneticResourceCache.ExpectedChecksum("MD5", BMI_MD5));
+                profile.key(), profile.file(), dataUrl, 10L * 1024 * 1024 * 1024,
+                new PublicGeneticResourceCache.ExpectedChecksum("MD5", profile.md5()));
         PublicGeneticResourceCache.Installed index =
             PublicGeneticResourceCache.acquire(context, "pan-ukb",
-                "21001-eur", BMI_FILE + ".tbi", INDEX,
+                profile.key(), profile.file() + ".tbi", indexUrl,
                 1024L * 1024 * 1024,
                 new PublicGeneticResourceCache.ExpectedChecksum("MD5",
-                    BMI_INDEX_MD5));
+                    profile.indexMd5()));
         Path chain = chain(context);
         LiftOver liftOver = new LiftOver(chain.toFile());
-        return extract(context, variants, output,
+        return extract(context, profile, variants, output,
             variant -> project(variant, liftOver), data, index, chain);
     }
 
     private static Map<String, Object> extract(Context context,
-            List<Instrument> variants, Path output, Projector projector,
+            Profile profile, List<Instrument> variants, Path output, Projector projector,
             PublicGeneticResourceCache.Installed data,
             PublicGeneticResourceCache.Installed index, Path chain)
             throws IOException {
@@ -158,7 +203,7 @@ final class PanUkbbGwasOutcome {
             }
             Files.writeString(output, table);
         }
-        Map<String, Object> provenance = new LinkedHashMap<>(descriptor());
+        Map<String, Object> provenance = new LinkedHashMap<>(descriptor(profile));
         provenance.put("retrieved_at", Instant.now().toString());
         provenance.put("local_summary_statistics", data.path().toString());
         provenance.put("local_summary_statistics_sha256", data.sha256());
@@ -173,7 +218,8 @@ final class PanUkbbGwasOutcome {
         provenance.put("instrument_audit", audit);
         provenance.put("output_sha256", FollowupSupport.hash(output));
         StudyPublicEvidence.write(output.resolveSibling(output.getFileName() + ".source.yaml"), provenance);
-        if (retained == 0) throw new IOException("No Pan-UKB EUR BMI effects matched the projected exposure instruments");
+        if (retained == 0) throw new IOException("No Pan-UKB EUR " + profile.description()
+            + " effects matched the projected exposure instruments");
         return provenance;
     }
 

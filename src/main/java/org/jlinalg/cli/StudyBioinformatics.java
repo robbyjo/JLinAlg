@@ -100,9 +100,12 @@ final class StudyBioinformatics implements StudyOperationExecutor {
             needs.add(review(context, "methods-references", "Can you supply public cohort names or valid method reference identifiers for Methods?",
                 "Inspect cohort/method reference search records. Specify cohorts[].literature_name and DOI or pmid:/pmcid: references; do not substitute confidential descriptions or patient data."));
         boolean blocked = evidence.stream().map(StudyPublicEvidence::map).anyMatch(row ->
-            Set.of("annotation_required", "build_required", "species_required", "interval_too_large").contains(row.get("status")));
+            Set.of("annotation_required", "build_required", "species_required").contains(row.get("status")));
         if (blocked) needs.add(review(context, "annotation", "Can you resolve the annotation prerequisites in the bioinformatics evidence table?",
             "Supply explicit species, gene identity, unique genome build and 1-based feature interval. Protein counterparts may be absent for noncoding RNA; do not force a protein mapping."));
+        if (evidence.stream().map(StudyPublicEvidence::map).anyMatch(row -> "interval_too_large".equals(row.get("status"))))
+            evidence.add(Map.of("kind", "resource_limit", "status", "not_retrieved",
+                "reason", "At least one fully annotated feature exceeded analysis.bioinformatics.max_sequence_bp; annotation is present and remains usable for non-sequence analyses."));
         boolean retryable = client.requests().stream().map(StudyPublicEvidence::map)
             .anyMatch(row -> !"retrieved".equals(row.get("status")));
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -543,6 +546,18 @@ final class StudyBioinformatics implements StudyOperationExecutor {
             throw new IllegalArgumentException(key + " must be an integer in [" + min + "," + max + "]");
         return number.intValue();
     }
+    static int featureLimit(Context context) {
+        return integer(config(context), "max_features", 10, 1, 100);
+    }
+
+    static int mrFeatureLimit(Context context) {
+        Map<String, Object> mr = map(config(context).get("mr"));
+        return integer(mr, "max_features", featureLimit(context), 1, 10000);
+    }
+
+    static int geneticFeatureLimit(Context context) {
+        return Math.max(featureLimit(context), mrFeatureLimit(context));
+    }
     private static String label(Object value) {
         String result = text(value);
         if (result.isBlank() || result.length() > 150 || result.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("Phenotype labels must be nonblank bounded text");
@@ -565,6 +580,12 @@ final class StudyBioinformatics implements StudyOperationExecutor {
     }
 
     static List<Feature> features(Context context) throws IOException {
+        return features(context, featureLimit(context));
+    }
+
+    static List<Feature> features(Context context, int limit) throws IOException {
+        if (limit < 1 || limit > 10000)
+            throw new IllegalArgumentException("feature limit must be in [1,10000]");
         Map<String, List<String>> annotations = new LinkedHashMap<>();
         Set<String> ambiguous = new LinkedHashSet<>();
         List<Path> primary = new ArrayList<>();
@@ -616,6 +637,6 @@ final class StudyBioinformatics implements StudyOperationExecutor {
             }
         }
         return chosen.values().stream().sorted(Comparator.comparingDouble(Feature::p).thenComparing(Feature::id))
-            .limit(integer(config(context), "max_features", 10, 1, 100)).toList();
+            .limit(limit).toList();
     }
 }

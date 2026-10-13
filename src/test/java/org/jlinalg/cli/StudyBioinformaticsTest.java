@@ -276,6 +276,32 @@ class StudyBioinformaticsTest {
         assertTrue(StudyBioinformatics.features(context).isEmpty());
     }
 
+    @Test void mrFeatureScopeIsIndependentOfContextualFeatureScope() throws Exception {
+        Context context = context("literature_search", Map.of("hypotheses", List.of(Map.of(
+            "id", "h1", "outcome", "body mass index", "analysis", Map.of(
+                "bioinformatics", Map.of("max_features", 10, "mr", Map.of("max_features", 1000)))))));
+        assertEquals(10, StudyBioinformatics.featureLimit(context));
+        assertEquals(1000, StudyBioinformatics.mrFeatureLimit(context));
+        assertEquals(1000, StudyBioinformatics.geneticFeatureLimit(context));
+    }
+
+    @Test void sequenceBudgetDoesNotMasqueradeAsMissingAnnotation() throws Exception {
+        Context base = context("bioinformatics_investigation", Map.of());
+        Path annotation = base.dependencyDirectories().get("harmonize")
+            .resolve("feature-annotation.tsv");
+        Files.writeString(annotation, Files.readString(annotation)
+            .replace("\t100\t103\t", "\t100\t200000\t"));
+        var client = new StudyPublicEvidence(uri -> new StudyPublicEvidence.Reply(200,
+            uri.getHost().equals("rest.uniprot.org")
+                ? "{\"results\":[{\"primaryAccession\":\"P04637\"}]}"
+                : "[{\"entryId\":\"AF-P04637-F1\",\"globalMetricValue\":75.06}]"));
+        var result = new StudyBioinformatics(client).execute(base);
+        assertEquals(State.COMPLETE, result.state());
+        assertTrue(result.details().toString().contains("interval_too_large"));
+        assertTrue(result.details().toString().contains("annotation is present"));
+        assertFalse(result.details().toString().contains("bioinformatics:h1:annotation"));
+    }
+
     @Test void untrustedUrlsAreRejectedBeforeTransportAndDuplicateQueriesAreCached() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         var client = new StudyPublicEvidence(uri -> { calls.incrementAndGet(); return new StudyPublicEvidence.Reply(200, "{}"); });

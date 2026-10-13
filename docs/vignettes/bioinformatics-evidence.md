@@ -68,7 +68,7 @@ Annotation is not a claim that the feature is causal, that an sQTL exists, or th
 | Source | Implemented use | Scientific boundary |
 | --- | --- | --- |
 | GWAS Catalog REST v2 and harmonized FTP | Primary or related-trait study discovery by public phenotype label, followed by local regional extraction from selected complete harmonized GRCh38 files | REST associations are curated lead associations, not full regional results. Automatic use requires a downloadable, ancestry-matched, at-least-100,000-variant study with sorted harmonized data and a tabix index. The complete selected file and index are installed in the shared cache and verified before local extraction. |
-| Pan-UK Biobank | Automatic exposure-instrument lookup for the public BMI field 21001 EUR summary statistics; other traits remain discoverable candidates until a provider adapter or reviewed custom source is declared | The complete indexed source is installed in the shared cache. Its native build is GRCh37; JLinAlg projects biallelic exposure alleles locally with the installed hg38-to-hg19 chain, verifies exact Pan-UKB alleles, and emits an audited GRCh38-coordinate adapter table. It does not lift positions by offset or treat a UKB-plus-external meta-analysis as independent of every cohort. |
+| Pan-UK Biobank | Automatic exposure-instrument lookup for the public BMI field 21001 EUR or ICD-10 E66 obesity EUR summary statistics; other traits remain discoverable candidates until a provider adapter or reviewed custom source is declared | The complete indexed source is installed in the shared cache. Its native build is GRCh37; JLinAlg projects biallelic exposure alleles locally with the installed hg38-to-hg19 chain, verifies exact Pan-UKB alleles, and emits an audited GRCh38-coordinate adapter table. It does not lift positions by offset or treat a UKB-plus-external meta-analysis as independent of every cohort. |
 | eQTL Catalogue | Audited dataset discovery request, with a documented bulk-access fallback | An unavailable/retired API is reported as such. The measured feature and molecular assay must match; a gene eQTL is not automatically a splicing QTL. |
 | GTEx | Versioned tissue-availability metadata, filtered using declared study or follow-up tissues | Tissue availability is not evidence of a QTL for a particular feature. Full regional QTL input still needs selection and provenance. |
 | UniProt | Reviewed gene/species protein candidates | Multiple matches remain ambiguous; absence of reviewed entries does not mean no protein exists. |
@@ -93,6 +93,7 @@ analysis:
   goals: [mendelian_randomization]
   bioinformatics:
     mr:
+      max_features: 1000
       exposure_dataset: fhs-bmi
       exposure_ancestry: European
       outcome_provider: auto
@@ -102,7 +103,7 @@ analysis:
       ld_population: EUR
 ```
 
-The actual irQTL analysis ancestry is deliberately required; JLinAlg does not infer it from the FHS cohort name. For BMI/EUR, `auto` selects the public Pan-UK Biobank field 21001 EUR analysis and its recorded sample size. A non-UKB exposure cohort plus the UKB-only outcome establishes the named-cohort basis for `sample_overlap: none`; an exposure that may include UK Biobank is rejected. The policy expands the reviewed irQTL candidate file into per-feature recipes, records every local build projection and Pan-UKB lookup, and uses the GRCh38 LD provider below. The operation still stops if fewer than two strong, matched and LD-independent instruments remain.
+The actual irQTL analysis ancestry is deliberately required; JLinAlg does not infer it from the FHS cohort name. For BMI/EUR, `auto` selects Pan-UK Biobank field 21001; for obesity/EUR it selects ICD-10 E66, including recorded case/control counts. A non-UKB exposure cohort plus the UKB-only outcome establishes the named-cohort basis for `sample_overlap: none`; an exposure that may include UK Biobank is rejected. The policy ranks the complete tested meta-analysis family by p-value, retains only full-family FDR-significant features, and independently screens up to `mr.max_features`. It excludes every row not explicitly marked cis, then passes all genome-wide-significant cis-irQTL candidates for each transcript together to outcome matching and ancestry-matched GRCh38 LD clumping. One retained independent instrument produces a Wald ratio; multiple retained instruments produce the applicable multi-instrument estimators and sensitivity analyses. There is no arbitrary per-transcript instrument cap.
 
 For colocalization, JLinAlg can use GWAS Catalog REST v2 to find studies by public phenotype label and the Catalog's harmonized FTP collection for complete summary-statistic files. The REST API itself exposes metadata and curated lead associations, not arbitrary full-summary-statistic rows. JLinAlg verifies the selected accession's harmonized metadata, GRCh38 build, sorted status and tabix index, installs the complete file and index in the shared cache, verifies the Catalog MD5 when available, and performs regional extraction locally.
 
@@ -419,12 +420,13 @@ columns:
 The current streaming adapter expects columns `SNP`, `SNP_Chr`, `SNP_Pos`, `EAF`,
 `N`, `Tx`, `Is_Cis`, `RSq`, `Fx`, `T`, and `log10P`, with SNP IDs such as
 `chr1:123:G:A:rs123`. It checks exact transcript versions, parses declared ALT
-effects, retains log10 probabilities to avoid underflow, and derives candidate
+effects, excludes rows whose `Is_Cis` value is not `1`, retains log10 probabilities to avoid underflow, and derives candidate
 standard errors as `abs(Fx/T)`. That derivation requires the statistic definition
 to be correct. Flags highlight rare alleles, near-perfect fits, extreme statistics,
 weak instruments and the usual MR instrument threshold. Flags are review aids,
-not proof of artifacts; their absence is not instrument approval. At most 50,000
-matching records are written, in source order, with truncation disclosed.
+not proof of artifacts; their absence is not instrument approval. Every valid cis
+record for the selected feature scope is written in source order; no global
+50,000-row truncation can silently remove instruments from later-ranked transcripts.
 
 The output is **candidate review, not by itself MR or colocalization inference**. The
 candidate-review operation is complete when its audited candidate files exist;

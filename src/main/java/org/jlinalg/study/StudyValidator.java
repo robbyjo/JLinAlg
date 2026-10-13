@@ -454,7 +454,7 @@ public final class StudyValidator {
                 unknown(mr, Set.of("exposure_dataset", "exposure_ancestry", "exposure_source_id", "exposure_citation",
                     "outcome_provider", "outcome_trait", "outcome_ancestry", "ld_provider", "ld_population",
                     "sample_overlap", "sample_overlap_basis", "instrument_validity_rationale", "instrument_p",
-                    "minimum_f", "clump_r2", "max_instruments"), mrWhere, issues);
+                    "minimum_f", "clump_r2", "max_features"), mrWhere, issues);
                 requiredText(mr.get("exposure_ancestry"), mrWhere + ".exposure_ancestry", issues);
                 for (String field : List.of("exposure_dataset", "exposure_source_id", "exposure_citation", "outcome_trait",
                         "outcome_ancestry", "ld_population", "sample_overlap_basis", "instrument_validity_rationale"))
@@ -462,9 +462,9 @@ public final class StudyValidator {
                 enumValue(mr.get("outcome_provider"), mrWhere + ".outcome_provider", Set.of("auto", "pan-ukb"), issues);
                 enumValue(mr.get("ld_provider"), mrWhere + ".ld_provider", Set.of("1000g-30x-grch38"), issues);
                 enumValue(mr.get("sample_overlap"), mrWhere + ".sample_overlap", Set.of("none"), issues);
-                if (mr.containsKey("max_instruments") && (!(mr.get("max_instruments") instanceof Number value)
-                        || value.doubleValue() != value.intValue() || value.intValue() < 2 || value.intValue() > 500))
-                    issues.add(issue(ERROR, mrWhere + ".max_instruments", "must be an integer from 2 to 500"));
+                if (mr.containsKey("max_features") && (!(mr.get("max_features") instanceof Number value)
+                        || value.doubleValue() != value.intValue() || value.intValue() < 1 || value.intValue() > 10000))
+                    issues.add(issue(ERROR, mrWhere + ".max_features", "must be an integer from 1 to 10000"));
                 if (mr.containsKey("instrument_p") && (!(mr.get("instrument_p") instanceof Number value)
                         || !(value.doubleValue() > 0 && value.doubleValue() <= 5e-8)))
                     issues.add(issue(ERROR, mrWhere + ".instrument_p", "must be in (0,5e-8]"));
