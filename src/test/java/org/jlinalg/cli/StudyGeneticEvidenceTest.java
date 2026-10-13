@@ -66,8 +66,10 @@ class StudyGeneticEvidenceTest {
         context = context("mendelian_randomization", Map.of());
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("1e-12", ".1"));
         result = new StudyGeneticEvidence().execute(context);
-        assertEquals(State.WAITING_FOR_INPUT, result.state());
+        assertEquals(State.COMPLETE, result.state());
+        assertTrue(result.details().toString().contains("not_estimable"));
         assertTrue(result.details().toString().contains("No independent strong instrument"));
+        assertTrue(((List<?>) result.details().get("needs")).isEmpty());
     }
 
     @Test void oneIndependentStrongInstrumentProducesLimitedWaldRatio() throws Exception {

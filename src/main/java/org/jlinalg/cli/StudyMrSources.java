@@ -103,6 +103,7 @@ final class StudyMrSources {
             if (end - start > 10_000_000L) throw new IllegalArgumentException("Automatic MR instrument span exceeds 10 Mb for " + feature.id());
             Map<String, Object> pair = new LinkedHashMap<>();
             pair.put("id", safe(feature.id())); pair.put("feature_id", feature.id()); pair.put("approved", true);
+            pair.put("automatic_mr_source", true);
             pair.put("approval_basis", "The concise mr source policy is part of the approved study contract; provider selection and every generated field are recorded in automatic-mr-sources.yaml");
             pair.put("rationale", "Exploratory cis-irQTL MR of the exact measured transcript using an independent phenotype-matched UK Biobank outcome");
             pair.put("sample_overlap", overlap); pair.put("sample_overlap_basis", overlapBasis);

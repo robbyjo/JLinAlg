@@ -239,6 +239,11 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             try {
                 generated = automaticLd(context, ld, x, y, directory, mrOnly ? 1 : 2);
             } catch (IOException exception) {
+                if (mrOnly && Boolean.TRUE.equals(pair.get("automatic_mr_source"))
+                        && String.valueOf(exception.getMessage()).startsWith(
+                            "Fewer than 1 requested variant is usable"))
+                    throw new NotEstimableException(String.valueOf(exception.getMessage()),
+                        "The prespecified GRCh38 LD panel was queried locally, but none of the outcome-matched cis-irQTL candidates was usable. The LD source is exhausted, so this transcript is completed but not estimable rather than waiting for investigator input.");
                 if (partialColocalization && String.valueOf(exception.getMessage()).startsWith(
                         "Fewer than 2 requested variants are usable"))
                     throw new NotEstimableException(String.valueOf(exception.getMessage()),
@@ -282,6 +287,9 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         if (aligned.size() < minimumAligned) {
             String reason = "Fewer than " + minimumAligned + " usable aligned variant"
                 + (minimumAligned == 1 ? "" : "s") + " in the region";
+            if (mrOnly && Boolean.TRUE.equals(pair.get("automatic_mr_source")))
+                throw new NotEstimableException(reason,
+                    "The prespecified exposure, Pan-UKB outcome and GRCh38 LD sources were exhausted, but no cis-irQTL could be aligned unambiguously. This transcript is completed but not estimable rather than waiting for investigator input.");
             if (partialColocalization) throw new NotEstimableException(reason,
                 "The prespecified exposure, public outcome, and local LD sources were exhausted, but fewer than two variants could be aligned. The pair is completed but not estimable rather than waiting for investigator input or providing negative colocalization evidence.");
             throw new IllegalArgumentException(reason);
@@ -472,7 +480,9 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             if (reason.equals("retained")) selected.add(i);
         }
         record.put("instrument_selection", decisions);
-        if (selected.isEmpty()) throw new IllegalArgumentException("No independent strong instrument remains after the prespecified p-value, strength and LD filters");
+        if (selected.isEmpty()) throw new NotEstimableException(
+            "No independent strong instrument remains after the prespecified p-value, strength and LD filters",
+            "The prespecified cis-irQTL family was exhausted after significance, F-statistic and LD-clumping filters. This transcript is completed but not estimable; thresholds were not relaxed post hoc.");
         Path input = directory.resolve("mr-instruments.tsv");
         StringBuilder table = new StringBuilder("variant_id\tbeta_exposure\tse_exposure\tbeta_outcome\tse_outcome\n");
         for (int i : selected) {
