@@ -284,8 +284,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         Files.writeString(directory.resolve("harmonization.tsv"), audit);
         if (operation.equals("mendelian_randomization")) mr(pair, aligned, matrix, directory, record);
         else {
-            fine(aligned, false, nx, matrixPath, directory, "exposure", record);
-            fine(aligned, true, ny, matrixPath, directory, "outcome", record);
+            fine(aligned, false, nx, matrixPath, directory, "exposure", record, partialColocalization);
+            fine(aligned, true, ny, matrixPath, directory, "outcome", record, partialColocalization);
             if (operation.equals("colocalization")) {
                 if (!hasDataRows(directory.resolve("exposure.effects.tsv")))
                     throw new NoTestableSignalException("Exposure SuSiE converged but produced no credible signal for colocalization");
@@ -320,20 +320,55 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             : List.of("https://doi.org/10.1371/journal.pgen.1009440"));
     }
 
-    private static void fine(List<Aligned> aligned, boolean outcome, int n, Path ld, Path directory, String name, Map<String, Object> record) throws IOException {
+    private static void fine(List<Aligned> aligned, boolean outcome, int n, Path ld,
+            Path directory, String name, Map<String, Object> record,
+            boolean exploratoryConvergenceFallback) throws IOException {
         StringBuilder summary = new StringBuilder("variant_id\tz\n");
         for (Aligned a : aligned) summary.append(a.exposure().id()).append('\t').append(outcome ? a.outcomeSign() * a.outcome().beta() / a.outcome().se() : a.exposure().beta() / a.exposure().se()).append('\n');
         Path input = directory.resolve(name + "-z.tsv");
         Files.writeString(input, summary);
         Path output = directory.resolve(name + "-fine-mapping.tsv");
-        run("susie", List.of("--summary", input.toString(), "--ld", ld.toString(), "--sample-size", Integer.toString(n),
-            "--z-column", "z", "--effects", Integer.toString(Math.min(10, aligned.size())), "--max-iterations", "2000", "--backend", "cpu",
-            "--out", output.toString(), "--effects-output", directory.resolve(name + ".effects.tsv").toString()), directory.resolve(name + "-command.log"));
-        if (!Files.readString(Path.of(output + ".log")).contains("converged=true")) throw new IOException("SuSiE did not converge for " + name);
+        Path effectsOutput = directory.resolve(name + ".effects.tsv");
+        int requestedEffects = Math.min(10, aligned.size());
+        int selectedEffects = 0;
+        List<Object> attempts = new ArrayList<>();
+        for (int effects = requestedEffects; effects >= 1; effects--) {
+            Path attemptOutput = directory.resolve(name + "-fine-mapping-L" + effects + ".tsv");
+            Path attemptEffects = directory.resolve(name + "-L" + effects + ".effects.tsv");
+            Path attemptCommand = directory.resolve(name + "-command-L" + effects + ".log");
+            run("susie", List.of("--summary", input.toString(), "--ld", ld.toString(), "--sample-size", Integer.toString(n),
+                "--z-column", "z", "--effects", Integer.toString(effects), "--max-iterations", "2000", "--backend", "cpu",
+                "--out", attemptOutput.toString(), "--effects-output", attemptEffects.toString()), attemptCommand);
+            boolean converged = Files.readString(Path.of(attemptOutput + ".log")).contains("converged=true");
+            attempts.add(Map.of("effects", effects, "converged", converged,
+                "command_log", attemptCommand.getFileName().toString(),
+                "backend_log", attemptOutput.getFileName() + ".log"));
+            if (converged) {
+                selectedEffects = effects;
+                Files.copy(attemptOutput, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(attemptEffects, effectsOutput, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(Path.of(attemptOutput + ".log"), Path.of(output + ".log"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(attemptCommand, directory.resolve(name + "-command.log"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                break;
+            }
+            if (!exploratoryConvergenceFallback) break;
+        }
+        if (selectedEffects == 0) throw new IOException("SuSiE did not converge for " + name);
         record.put(name + "_fine_mapping", preview(output));
         var effective = new LinkedHashMap<>(map(record.get("effective_parameters")));
-        effective.put(name + "_fine_mapping", Map.of("sample_size", n, "maximum_effects", Math.min(10, aligned.size()), "maximum_iterations", 2000, "backend", "cpu",
-            "convergence_required", true, "command_log", name + "-command.log", "effective_backend_log", name + "-fine-mapping.tsv.log"));
+        Map<String, Object> fineParameters = new LinkedHashMap<>();
+        fineParameters.put("sample_size", n);
+        fineParameters.put("requested_maximum_effects", requestedEffects);
+        fineParameters.put("selected_effects", selectedEffects);
+        fineParameters.put("maximum_iterations_per_attempt", 2000);
+        fineParameters.put("backend", "cpu");
+        fineParameters.put("convergence_required", true);
+        fineParameters.put("exploratory_largest_convergent_effect_count_fallback", exploratoryConvergenceFallback);
+        fineParameters.put("fallback_used", selectedEffects < requestedEffects);
+        fineParameters.put("attempts", attempts);
+        fineParameters.put("command_log", name + "-command.log");
+        fineParameters.put("effective_backend_log", name + "-fine-mapping.tsv.log");
+        effective.put(name + "_fine_mapping", fineParameters);
         record.put("effective_parameters", effective);
     }
 

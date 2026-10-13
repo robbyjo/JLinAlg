@@ -129,7 +129,10 @@ class StudyGeneticEvidenceTest {
         assertEquals(State.COMPLETE, result.state(), result.details().toString());
         assertTrue(Files.readString(context.outputDirectory().resolve("pair/exposure-command.log"))
             .contains("--max-iterations, 2000"));
-        assertTrue(result.details().toString().contains("maximum_iterations=2000"));
+        assertTrue(result.details().toString().contains("maximum_iterations_per_attempt=2000"));
+        assertTrue(result.details().toString().contains("requested_maximum_effects=3"));
+        assertTrue(result.details().toString().contains("selected_effects=3"));
+        assertTrue(result.details().toString().contains("exploratory_largest_convergent_effect_count_fallback=false"));
     }
 
     @Test void automaticLdNeverGuessesAncestryAndDoesNotLiftBuild() throws Exception {
@@ -154,6 +157,7 @@ class StudyGeneticEvidenceTest {
         assertEquals(State.COMPLETE, partial.state(), partial.details().toString());
         assertTrue(partial.details().toString().contains("exploratory_partial_region_major_limitation"));
         assertTrue(partial.details().toString().contains("absence of colocalization is not evidence of absence"));
+        assertTrue(partial.details().toString().contains("exploratory_largest_convergent_effect_count_fallback=true"));
         exposure.put("export_p_threshold", 1e-10);
         mr = new StudyGeneticEvidence().execute(context("mendelian_randomization", Map.of("exposure", exposure)));
         assertEquals(State.WAITING_FOR_INPUT, mr.state());
