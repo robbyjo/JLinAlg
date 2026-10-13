@@ -30,9 +30,13 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
     record Variant(String id, String chromosome, long position, String effect, String other,
             double beta, double se, double p) { }
     record Aligned(Variant exposure, Variant outcome, int outcomeSign, int ldSign) { }
-    private static final class NoTestableSignalException extends IOException {
+    private static final class NotEstimableException extends IOException {
         private static final long serialVersionUID = 1L;
-        NoTestableSignalException(String message) { super(message); }
+        private final String interpretation;
+        NotEstimableException(String message, String interpretation) {
+            super(message);
+            this.interpretation = interpretation;
+        }
     }
 
     @Override public Result execute(Context context) throws IOException {
@@ -88,10 +92,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             try {
                 executePair(context, pair, directory, record);
                 record.put("status", "complete");
-            } catch (NoTestableSignalException exception) {
+            } catch (NotEstimableException exception) {
                 record.put("status", "not_estimable");
                 record.put("reason", String.valueOf(exception.getMessage()));
-                record.put("interpretation", "The prespecified fine-mapping step completed, but no credible signal was available for signal-pair colocalization; this is not evidence against a shared causal variant.");
+                record.put("interpretation", exception.interpretation);
             } catch (IllegalArgumentException | IOException exception) {
                 record.put("status", "waiting_for_input");
                 record.put("reason", String.valueOf(exception.getMessage()));
@@ -210,8 +214,17 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         Path yPath;
         if (outcome.containsKey("gwas_catalog_accession")) {
             yPath = directory.resolve("outcome-source.tsv");
-            GwasCatalogRegionalOutcome.Result acquired = GwasCatalogRegionalOutcome.extract(context,
-                required(outcome, "gwas_catalog_accession"), ancestry, chromosome, start, end, yPath);
+            GwasCatalogRegionalOutcome.Result acquired;
+            try {
+                acquired = GwasCatalogRegionalOutcome.extract(context,
+                    required(outcome, "gwas_catalog_accession"), ancestry, chromosome, start, end, yPath);
+            } catch (IOException exception) {
+                if (partialColocalization && String.valueOf(exception.getMessage()).startsWith(
+                        "Fewer than two unambiguous effect estimates"))
+                    throw new NotEstimableException(String.valueOf(exception.getMessage()),
+                        "The prespecified public GWAS source was acquired and queried, but the region did not contain enough unambiguous effect estimates for colocalization. The source is exhausted, so this is a completed source-limitation result rather than a request for investigator input or evidence against sharing.");
+                throw exception;
+            }
             record.put("outcome_acquisition", acquired.provenance());
         } else yPath = source(context, outcome, directory, "outcome-source.tsv", required(pair, "rationale") + " Phenotype-matched outcome statistics for " + outcomeTrait + ".");
         Map<String, Variant> x = variants(xPath, chromosome, start, end, feature, null);
@@ -219,7 +232,16 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         Map<String, Variant> y = variants(yPath, chromosome, start, end, null, outcomeFilter);
         Path ldPath, ldAlleles;
         if (automaticLd) {
-            Path[] generated = automaticLd(context, ld, x, y, directory, mrOnly ? 1 : 2);
+            Path[] generated;
+            try {
+                generated = automaticLd(context, ld, x, y, directory, mrOnly ? 1 : 2);
+            } catch (IOException exception) {
+                if (partialColocalization && String.valueOf(exception.getMessage()).startsWith(
+                        "Fewer than 2 requested variants are usable"))
+                    throw new NotEstimableException(String.valueOf(exception.getMessage()),
+                        "The prespecified GRCh38 LD panel was queried locally, but fewer than two requested variants were usable. The LD source is exhausted, so this pair is completed but not estimable rather than waiting for investigator input.");
+                throw exception;
+            }
             ldPath = generated[0]; ldAlleles = generated[1];
         } else {
             ldPath = source(context, ld, directory, "ld-source.tsv", required(pair, "rationale") + " Signed linkage disequilibrium for the harmonized regional variants.");
@@ -254,8 +276,13 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         record.put("exclusions", excluded);
         record.put("exposure_variants", x.size()); record.put("outcome_variants", y.size()); record.put("aligned_variants", aligned.size());
         int minimumAligned = mrOnly ? 1 : 2;
-        if (aligned.size() < minimumAligned) throw new IllegalArgumentException(
-            "Fewer than " + minimumAligned + " usable aligned variant" + (minimumAligned == 1 ? "" : "s") + " in the region");
+        if (aligned.size() < minimumAligned) {
+            String reason = "Fewer than " + minimumAligned + " usable aligned variant"
+                + (minimumAligned == 1 ? "" : "s") + " in the region";
+            if (partialColocalization) throw new NotEstimableException(reason,
+                "The prespecified exposure, public outcome, and local LD sources were exhausted, but fewer than two variants could be aligned. The pair is completed but not estimable rather than waiting for investigator input or providing negative colocalization evidence.");
+            throw new IllegalArgumentException(reason);
+        }
         double exposureCoverage = aligned.size() / (double) x.size();
         double outcomeCoverage = aligned.size() / (double) y.size();
         double coverage = aligned.size() / (double) (mrOnly ? x.size() : Math.max(x.size(), y.size()));
@@ -288,9 +315,11 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             fine(aligned, true, ny, matrixPath, directory, "outcome", record, partialColocalization);
             if (operation.equals("colocalization")) {
                 if (!hasDataRows(directory.resolve("exposure.effects.tsv")))
-                    throw new NoTestableSignalException("Exposure SuSiE converged but produced no credible signal for colocalization");
+                    throw new NotEstimableException("Exposure SuSiE converged but produced no credible signal for colocalization",
+                        "The prespecified fine-mapping step completed, but no credible exposure signal was available for signal-pair colocalization; this is not evidence against a shared causal variant.");
                 if (!hasDataRows(directory.resolve("outcome.effects.tsv")))
-                    throw new NoTestableSignalException("Outcome SuSiE converged but produced no credible signal for colocalization");
+                    throw new NotEstimableException("Outcome SuSiE converged but produced no credible signal for colocalization",
+                        "The prespecified fine-mapping step completed, but no credible outcome signal was available for signal-pair colocalization; this is not evidence against a shared causal variant.");
                 // Make the previously implicit coloc defaults explicit in both commands and reporting.
                 List<String> priors = List.of("--trait1-prior", "1e-4", "--trait2-prior", "1e-4", "--minimum-overlap", "0.5");
                 List<String> primary = new ArrayList<>(List.of("--trait1", directory.resolve("exposure.effects.tsv").toString(), "--trait2", directory.resolve("outcome.effects.tsv").toString(),

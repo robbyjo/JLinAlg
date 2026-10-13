@@ -123,6 +123,21 @@ class StudyGeneticEvidenceTest {
         assertTrue(((List<?>) result.details().get("needs")).isEmpty());
     }
 
+    @Test void exhaustedPartialRegionSourcesAreCompletedNotEstimable() throws Exception {
+        Map<String, Object> exposure = source("exposure", "GRCh38");
+        exposure.put("complete_region", false); exposure.put("export_p_threshold", 1e-7);
+        Context context = context("colocalization", Map.of("exposure", exposure,
+            "partial_colocalization", true, "minimum_exposure_overlap", 0.5));
+        Files.writeString(project.resolve("outcome.tsv"),
+            "variant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n"
+                + "rs1\t1\t100\tA\tG\t0.05\t0.01\t1e-8\n");
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        assertTrue(result.details().toString().contains("not_estimable"));
+        assertTrue(result.details().toString().contains("fewer than two variants could be aligned"));
+        assertTrue(((List<?>) result.details().get("needs")).isEmpty());
+    }
+
     @Test void studyFineMappingRecordsExtendedIterationCeiling() throws Exception {
         Context context = context("colocalization", Map.of());
         var result = new StudyGeneticEvidence().execute(context);
