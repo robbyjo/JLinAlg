@@ -38,6 +38,10 @@ import org.apache.hc.core5.util.Timeout;
 
 /** Bounded HTTPS downloads used only for public reference resources. */
 final class PublicResourceDownloader {
+    private static final long COMPLETE_DOWNLOAD_CHUNK_BYTES = 32L * 1024 * 1024;
+    private static final int COMPLETE_DOWNLOAD_WORKERS = 32;
+    private static final int COMPLETE_DOWNLOAD_ATTEMPTS = 3;
+
     record Result(String source, String lastModified, long bytes) { }
     record Response(int status, String body) { }
 
@@ -84,15 +88,17 @@ final class PublicResourceDownloader {
                 StandardOpenOption.WRITE)) {
             file.write(ByteBuffer.wrap(new byte[] {0}), declared - 1);
         }
-        final long chunkBytes = 32L * 1024 * 1024;
-        ExecutorService workers = Executors.newFixedThreadPool(4);
+        int workerCount = completeDownloadWorkers(declared);
+        ExecutorService workers = Executors.newFixedThreadPool(workerCount);
         List<Future<Long>> tasks = new ArrayList<>();
         try {
-            for (long start = 0; start < declared; start += chunkBytes) {
+            for (long start = 0; start < declared;
+                    start += COMPLETE_DOWNLOAD_CHUNK_BYTES) {
                 long first = start;
-                long last = Math.min(declared - 1, first + chunkBytes - 1);
-                tasks.add(workers.submit(() -> downloadRange(client, source,
-                    output, first, last, declared)));
+                long last = Math.min(declared - 1,
+                    first + COMPLETE_DOWNLOAD_CHUNK_BYTES - 1);
+                tasks.add(workers.submit(() -> downloadRangeWithRetry(client,
+                    source, output, first, last, declared)));
             }
             long copied = 0;
             for (Future<Long> task : tasks) try {
@@ -117,11 +123,41 @@ final class PublicResourceDownloader {
             .firstValue("Last-Modified").orElse(null), declared);
     }
 
+    static int completeDownloadWorkers(long declaredBytes) {
+        if (declaredBytes < 1)
+            throw new IllegalArgumentException(
+                "Complete resource size must be positive");
+        long chunks = Math.addExact(declaredBytes,
+            COMPLETE_DOWNLOAD_CHUNK_BYTES - 1)
+            / COMPLETE_DOWNLOAD_CHUNK_BYTES;
+        return (int) Math.min(COMPLETE_DOWNLOAD_WORKERS, chunks);
+    }
+
+    private static long downloadRangeWithRetry(HttpClient client, URI source,
+            Path output, long first, long last, long total)
+            throws IOException, InterruptedException {
+        IOException failure = null;
+        for (int attempt = 1; attempt <= COMPLETE_DOWNLOAD_ATTEMPTS;
+                attempt++) {
+            try {
+                return downloadRange(client, source, output, first, last,
+                    total);
+            } catch (IOException retryable) {
+                failure = retryable;
+                if (attempt == COMPLETE_DOWNLOAD_ATTEMPTS) break;
+                Thread.sleep(1000L << (attempt - 1));
+            }
+        }
+        throw new IOException("Failed byte range " + first + "-" + last
+            + " after " + COMPLETE_DOWNLOAD_ATTEMPTS + " attempts for "
+            + source, failure);
+    }
+
     private static long downloadRange(HttpClient client, URI source,
             Path output, long first, long last, long total)
             throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(source)
-            .timeout(Duration.ofHours(24))
+            .timeout(Duration.ofMinutes(30))
             .header("User-Agent", "JLinAlg-public-resource/1")
             .header("Accept-Encoding", "identity")
             .header("Range", "bytes=" + first + "-" + last).GET().build();
