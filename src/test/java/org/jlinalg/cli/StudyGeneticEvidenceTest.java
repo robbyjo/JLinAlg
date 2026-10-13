@@ -60,8 +60,9 @@ class StudyGeneticEvidenceTest {
         Context context = context("mendelian_randomization", Map.of());
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("rs2\t1\t200\tA\tG", "rs2\t1\t200\tA\tT"));
         var result = new StudyGeneticEvidence().execute(context);
-        assertEquals(State.WAITING_FOR_INPUT, result.state());
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
         assertTrue(result.details().toString().contains("palindromic"));
+        assertFalse(Files.readString(context.outputDirectory().resolve("pair/mr-instruments.tsv")).contains("rs2"));
         context = context("mendelian_randomization", Map.of());
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("1e-12", ".1"));
         result = new StudyGeneticEvidence().execute(context);
@@ -80,6 +81,55 @@ class StudyGeneticEvidenceTest {
         assertFalse(Files.exists(context.outputDirectory().resolve("pair/mr-ivw-fixed.tsv")));
         assertTrue(result.details().toString().contains("Only one independent strong instrument remained"));
         assertTrue(result.details().toString().contains("not estimable"));
+    }
+
+    @Test void oneAlignedVariantCanProduceWaldRatio() throws Exception {
+        Context context = context("mendelian_randomization", Map.of());
+        Files.writeString(project.resolve("outcome.tsv"),
+            "variant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n"
+                + "rs1\t1\t100\tA\tG\t0.05\t0.01\t1e-8\n");
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        assertTrue(Files.isRegularFile(context.outputDirectory().resolve("pair/mr-wald-ratio.tsv")));
+        assertTrue(result.details().toString().contains("aligned_variants=1"));
+    }
+
+    @Test void partialColocalizationFiltersLargeOutcomeToExposureCandidates() throws Exception {
+        Map<String, Object> exposure = source("exposure", "GRCh38");
+        exposure.put("complete_region", false); exposure.put("export_p_threshold", 1e-7);
+        StringBuilder outcome = new StringBuilder("variant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n");
+        outcome.append("rs1\t1\t100\tA\tG\t0.05\t0.01\t1e-8\nrs2\t1\t200\tG\tA\t-0.1\t0.01\t1e-8\nrs3\t1\t300\tA\tG\t0.15\t0.01\t1e-8\n");
+        for (int i = 0; i < 5001; i++) outcome.append("extra").append(i)
+            .append("\t1\t400\tA\tG\t0.001\t0.01\t0.5\n");
+        Context context = context("colocalization", Map.of("exposure", exposure,
+            "partial_colocalization", true, "minimum_exposure_overlap", 0.5));
+        Files.writeString(project.resolve("outcome.tsv"), outcome);
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        assertFalse(result.details().toString().contains("5000-variant"));
+    }
+
+    @Test void convergedFineMappingWithoutCredibleSignalIsCompletedNotEstimable() throws Exception {
+        Context context = context("colocalization", Map.of());
+        Files.writeString(project.resolve("outcome.tsv"),
+            "variant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n"
+                + "rs1\t1\t100\tA\tG\t1e-8\t1\t0.99\n"
+                + "rs2\t1\t200\tG\tA\t-1e-8\t1\t0.99\n"
+                + "rs3\t1\t300\tA\tG\t1e-8\t1\t0.99\n");
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        assertTrue(result.details().toString().contains("not_estimable"));
+        assertTrue(result.details().toString().contains("no credible signal"));
+        assertTrue(((List<?>) result.details().get("needs")).isEmpty());
+    }
+
+    @Test void studyFineMappingRecordsExtendedIterationCeiling() throws Exception {
+        Context context = context("colocalization", Map.of());
+        var result = new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE, result.state(), result.details().toString());
+        assertTrue(Files.readString(context.outputDirectory().resolve("pair/exposure-command.log"))
+            .contains("--max-iterations, 2000"));
+        assertTrue(result.details().toString().contains("maximum_iterations=2000"));
     }
 
     @Test void automaticLdNeverGuessesAncestryAndDoesNotLiftBuild() throws Exception {

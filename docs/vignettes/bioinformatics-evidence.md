@@ -106,6 +106,8 @@ The actual irQTL analysis ancestry is deliberately required; JLinAlg does not in
 
 For colocalization, JLinAlg can use GWAS Catalog REST v2 to find studies by public phenotype label and the Catalog's harmonized FTP collection for complete summary-statistic files. The REST API itself exposes metadata and curated lead associations, not arbitrary full-summary-statistic rows. JLinAlg verifies the selected accession's harmonized metadata, GRCh38 build, sorted status and tabix index, installs the complete file and index in the shared cache, verifies the Catalog MD5 when available, and performs regional extraction locally.
 
+For an explicitly approved exploratory partial-region analysis, the exposure defines the candidate variant set. JLinAlg therefore filters the complete outcome region to those exposure identifiers before constructing LD; unrelated outcome-only rows do not consume the in-memory LD budget or become evidence of exposure coverage. Conventional complete-region colocalization retains the full-region overlap checks.
+
 ### Related-phenotype colocalization policy
 
 Related phenotypes may be scientist-declared, or an optional LLM advisor can propose up to 20 search labels. The advisor prompt requests direct consequences, biomarkers, intermediate traits, common comorbidities and physiological domains, with one to five literature identifiers per phenotype. Every suggestion is stored as `advisor_proposal_unreviewed`; its literature still needs independent verification. The suggestion authorizes only bounded public-source discovery. It does not amend the hypothesis, approve a GWAS, or establish causality.
@@ -172,6 +174,10 @@ JLinAlg will not apply GRCh37 LD to mismatching coordinates. Missing, monomorphi
 ### Statistical outputs
 
 SuSiE fine-mapping runs on the harmonized overlapping SNP set for both traits and must converge. Colocalization uses those SuSiE effects, with a second shared-prior setting for sensitivity. Curated nearby lead SNPs or omics association coefficients alone are never presented as conventional colocalization. When a reviewed policy explicitly permits incomplete QTL data, the same computation may run as exploratory partial-data colocalization with the evidence-grade and mandatory caveat above.
+
+The study adapter permits up to 2,000 SuSiE iterations and records the effective ceiling. If a fit converges but produces no credible signal, the pair is recorded as completed but not estimable for signal-pair colocalization, rather than as a missing-input request or evidence against sharing.
+
+MR requires at least one strong, allele-aligned instrument after public outcome lookup and LD filtering. A single retained instrument produces a Wald ratio even when other candidates are absent, incompatible or excluded; the attrition and every exclusion remain recorded. A study may declare a stricter minimum lookup-overlap fraction. Multi-instrument diagnostics are never inferred from a one-instrument result.
 
 MR selects exposure instruments using p ≤ 5e-8 and F ≥ 10 by default, then LD-prunes at r-squared ≤ 0.001. It requires at least two remaining instruments for this automatic IVW branch. Outputs include fixed/random IVW, and, with at least three instruments, Egger, weighted median and leave-one-instrument-out estimates. Weak instruments, pleiotropy, selection bias, tissue specificity and exclusion-restriction assumptions still need scientific appraisal. Numerical success is not proof of a causal drug target.
 

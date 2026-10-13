@@ -47,8 +47,15 @@ final class ThousandGenomesGrch38Ld {
 
     static Result extract(Context context, String population,
             List<Variant> requested, Path directory) throws IOException {
+        return extract(context, population, requested, directory, 2);
+    }
+
+    static Result extract(Context context, String population,
+            List<Variant> requested, Path directory, int minimumVariants) throws IOException {
         population = population.toUpperCase(Locale.ROOT);
         ancestry(population);
+        if (minimumVariants < 1 || minimumVariants > 2)
+            throw new IllegalArgumentException("LD minimum variants must be one for MR or two for regional inference");
         if (requested.isEmpty()) throw new IOException("No overlapping variants for GRCh38 LD extraction");
         String chromosome = requested.get(0).chromosome().replaceFirst("^chr", "");
         if (requested.stream().anyMatch(v -> !v.chromosome().replaceFirst("^chr", "").equals(chromosome)))
@@ -139,7 +146,9 @@ final class ThousandGenomesGrch38Ld {
                     selected[4].toUpperCase(Locale.ROOT), dosage, callRate, frequency));
             }
         }
-        if (found.size() < 2) throw new IOException("Fewer than two requested variants are usable in 1000 Genomes 30x GRCh38 " + population);
+        if (found.size() < minimumVariants) throw new IOException("Fewer than " + minimumVariants
+            + " requested variant" + (minimumVariants == 1 ? " is" : "s are")
+            + " usable in 1000 Genomes 30x GRCh38 " + population);
         double[][] correlation = correlation(found);
         Path matrix = directory.resolve("ld-source.tsv"), alleles = directory.resolve("ld-alleles.tsv");
         StringBuilder table = new StringBuilder("variant_id");

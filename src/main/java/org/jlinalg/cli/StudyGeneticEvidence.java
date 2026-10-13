@@ -30,6 +30,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
     record Variant(String id, String chromosome, long position, String effect, String other,
             double beta, double se, double p) { }
     record Aligned(Variant exposure, Variant outcome, int outcomeSign, int ldSign) { }
+    private static final class NoTestableSignalException extends IOException {
+        private static final long serialVersionUID = 1L;
+        NoTestableSignalException(String message) { super(message); }
+    }
 
     @Override public Result execute(Context context) throws IOException {
         Files.createDirectories(context.outputDirectory());
@@ -84,6 +88,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             try {
                 executePair(context, pair, directory, record);
                 record.put("status", "complete");
+            } catch (NoTestableSignalException exception) {
+                record.put("status", "not_estimable");
+                record.put("reason", String.valueOf(exception.getMessage()));
+                record.put("interpretation", "The prespecified fine-mapping step completed, but no credible signal was available for signal-pair colocalization; this is not evidence against a shared causal variant.");
             } catch (IllegalArgumentException | IOException exception) {
                 record.put("status", "waiting_for_input");
                 record.put("reason", String.valueOf(exception.getMessage()));
@@ -112,8 +120,11 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         details.put("needs", needs.stream().map(StudyNeed::document).toList());
         details.put("interpretation", "Exploratory regional genetic evidence. Association, colocalization and MR have different assumptions; neither proves a safe or effective drug target. Selection of the omics hit and instruments can introduce selection bias.");
         write(context.outputDirectory().resolve("genetic-evidence.yaml"), details);
+        long completed = results.stream().map(StudyPublicEvidence::map).filter(row -> "complete".equals(row.get("status"))).count();
+        long notEstimable = results.stream().map(StudyPublicEvidence::map).filter(row -> "not_estimable".equals(row.get("status"))).count();
         return new Result(needs.isEmpty() ? State.COMPLETE : State.WAITING_FOR_INPUT,
-            context.operation().get("type") + ": " + (results.size() - needs.size()) + " completed pairs, " + needs.size() + " require input",
+            context.operation().get("type") + ": " + completed + " completed pairs, " + notEstimable
+                + " completed but not estimable, " + needs.size() + " require input",
             List.of("genetic-evidence.yaml"), details);
     }
 
@@ -203,11 +214,12 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
                 required(outcome, "gwas_catalog_accession"), ancestry, chromosome, start, end, yPath);
             record.put("outcome_acquisition", acquired.provenance());
         } else yPath = source(context, outcome, directory, "outcome-source.tsv", required(pair, "rationale") + " Phenotype-matched outcome statistics for " + outcomeTrait + ".");
-        Map<String, Variant> x = variants(xPath, chromosome, start, end, feature);
-        Map<String, Variant> y = variants(yPath, chromosome, start, end, null);
+        Map<String, Variant> x = variants(xPath, chromosome, start, end, feature, null);
+        Set<String> outcomeFilter = mrOnly || partialColocalization ? x.keySet() : null;
+        Map<String, Variant> y = variants(yPath, chromosome, start, end, null, outcomeFilter);
         Path ldPath, ldAlleles;
         if (automaticLd) {
-            Path[] generated = automaticLd(context, ld, x, y, directory);
+            Path[] generated = automaticLd(context, ld, x, y, directory, mrOnly ? 1 : 2);
             ldPath = generated[0]; ldAlleles = generated[1];
         } else {
             ldPath = source(context, ld, directory, "ld-source.tsv", required(pair, "rationale") + " Signed linkage disequilibrium for the harmonized regional variants.");
@@ -241,20 +253,27 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         aligned.sort(Comparator.comparingLong((Aligned a) -> a.exposure().position()).thenComparing(a -> a.exposure().id()));
         record.put("exclusions", excluded);
         record.put("exposure_variants", x.size()); record.put("outcome_variants", y.size()); record.put("aligned_variants", aligned.size());
-        if (aligned.size() < 2) throw new IllegalArgumentException("Fewer than two usable aligned variants in the region");
+        int minimumAligned = mrOnly ? 1 : 2;
+        if (aligned.size() < minimumAligned) throw new IllegalArgumentException(
+            "Fewer than " + minimumAligned + " usable aligned variant" + (minimumAligned == 1 ? "" : "s") + " in the region");
         double exposureCoverage = aligned.size() / (double) x.size();
         double outcomeCoverage = aligned.size() / (double) y.size();
         double coverage = aligned.size() / (double) (mrOnly ? x.size() : Math.max(x.size(), y.size()));
         record.put("exposure_variant_match_fraction", exposureCoverage); record.put("outcome_variant_match_fraction", outcomeCoverage);
         record.put("overlap_denominator", mrOnly ? "exposure variant set" : "larger observed regional variant set");
         record.put("regional_overlap_fraction", coverage);
-        double minCoverage = number(pair.getOrDefault(partialColocalization ? "minimum_exposure_overlap" : "minimum_overlap",
-            partialColocalization ? 0.5 : 0.8));
-        if (!(minCoverage > 0 && minCoverage <= 1)) throw new IllegalArgumentException("Declared overlap threshold must be in (0,1]");
-        if ((partialColocalization ? exposureCoverage : coverage) < minCoverage)
-            throw new IllegalArgumentException(partialColocalization
-                ? "Too few exported QTL variants matched the GWAS and LD sources for the declared exploratory threshold"
-                : "Regional overlap is below the declared minimum; inspect exclusions and supply matched full-region sources");
+        String overlapKey = partialColocalization ? "minimum_exposure_overlap" : "minimum_overlap";
+        if (!mrOnly || pair.containsKey(overlapKey)) {
+            double minCoverage = number(pair.getOrDefault(overlapKey, partialColocalization ? 0.5 : 0.8));
+            if (!(minCoverage > 0 && minCoverage <= 1)) throw new IllegalArgumentException("Declared overlap threshold must be in (0,1]");
+            if ((partialColocalization ? exposureCoverage : coverage) < minCoverage)
+                throw new IllegalArgumentException(partialColocalization
+                    ? "Too few exported QTL variants matched the GWAS and LD sources for the declared exploratory threshold"
+                    : "Regional overlap is below the declared minimum; inspect exclusions and supply matched full-region sources");
+        } else if (exposureCoverage < 1) {
+            record.put("instrument_lookup_limitation", "Only " + aligned.size() + " of " + x.size()
+                + " exposure candidates had usable aligned outcome and LD evidence; MR used the retained prespecified instruments.");
+        }
         double[][] matrix = matrix(ldPath, aligned);
         Path matrixPath = directory.resolve("aligned-ld.tsv");
         writeMatrix(matrixPath, matrix);
@@ -268,6 +287,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             fine(aligned, false, nx, matrixPath, directory, "exposure", record);
             fine(aligned, true, ny, matrixPath, directory, "outcome", record);
             if (operation.equals("colocalization")) {
+                if (!hasDataRows(directory.resolve("exposure.effects.tsv")))
+                    throw new NoTestableSignalException("Exposure SuSiE converged but produced no credible signal for colocalization");
+                if (!hasDataRows(directory.resolve("outcome.effects.tsv")))
+                    throw new NoTestableSignalException("Outcome SuSiE converged but produced no credible signal for colocalization");
                 // Make the previously implicit coloc defaults explicit in both commands and reporting.
                 List<String> priors = List.of("--trait1-prior", "1e-4", "--trait2-prior", "1e-4", "--minimum-overlap", "0.5");
                 List<String> primary = new ArrayList<>(List.of("--trait1", directory.resolve("exposure.effects.tsv").toString(), "--trait2", directory.resolve("outcome.effects.tsv").toString(),
@@ -304,24 +327,33 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         Files.writeString(input, summary);
         Path output = directory.resolve(name + "-fine-mapping.tsv");
         run("susie", List.of("--summary", input.toString(), "--ld", ld.toString(), "--sample-size", Integer.toString(n),
-            "--z-column", "z", "--effects", Integer.toString(Math.min(10, aligned.size())), "--backend", "cpu",
+            "--z-column", "z", "--effects", Integer.toString(Math.min(10, aligned.size())), "--max-iterations", "2000", "--backend", "cpu",
             "--out", output.toString(), "--effects-output", directory.resolve(name + ".effects.tsv").toString()), directory.resolve(name + "-command.log"));
         if (!Files.readString(Path.of(output + ".log")).contains("converged=true")) throw new IOException("SuSiE did not converge for " + name);
         record.put(name + "_fine_mapping", preview(output));
         var effective = new LinkedHashMap<>(map(record.get("effective_parameters")));
-        effective.put(name + "_fine_mapping", Map.of("sample_size", n, "maximum_effects", Math.min(10, aligned.size()), "backend", "cpu",
+        effective.put(name + "_fine_mapping", Map.of("sample_size", n, "maximum_effects", Math.min(10, aligned.size()), "maximum_iterations", 2000, "backend", "cpu",
             "convergence_required", true, "command_log", name + "-command.log", "effective_backend_log", name + "-fine-mapping.tsv.log"));
         record.put("effective_parameters", effective);
     }
 
+    private static boolean hasDataRows(Path path) throws IOException {
+        try (var reader = Files.newBufferedReader(path)) {
+            if (reader.readLine() == null) throw new IOException("Missing table header: " + path);
+            return reader.readLine() != null;
+        }
+    }
+
     private static Path[] automaticLd(Context context, Map<String, Object> ld,
-            Map<String, Variant> x, Map<String, Variant> y, Path directory) throws IOException {
+            Map<String, Variant> x, Map<String, Variant> y, Path directory,
+            int minimumVariants) throws IOException {
         List<String> requested = x.keySet().stream().filter(y::containsKey).sorted().toList();
         if (requested.isEmpty()) throw new IOException("No overlapping SNPs for LD extraction");
         if (ThousandGenomesGrch38Ld.DATABASE.equals(ld.get("database"))) {
             List<Variant> variants = requested.stream().map(x::get).toList();
             ThousandGenomesGrch38Ld.Result result = ThousandGenomesGrch38Ld.extract(
-                context, required(ld, "population"), variants, directory);
+                context, required(ld, "population"), variants, directory,
+                minimumVariants);
             return new Path[] {result.matrix(), result.alleles()};
         }
         StudyResourceManager.LdReference installed;
@@ -481,7 +513,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         return copy;
     }
 
-    private static Map<String, Variant> variants(Path path, String chromosome, int start, int end, String feature) throws IOException {
+    private static Map<String, Variant> variants(Path path, String chromosome, int start,
+            int end, String feature, Set<String> allowedIds) throws IOException {
         DelimitedData data = DelimitedData.read(path);
         boolean probability = data.header().contains("p_value");
         boolean logarithm = data.header().contains("log10_p");
@@ -496,6 +529,7 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             String id = row[data.column("variant_id")];
             String[] idParts = id.split(":", -1);
             if (idParts.length > 1 && idParts[idParts.length - 1].matches("rs[1-9][0-9]*")) id = idParts[idParts.length - 1];
+            if (allowedIds != null && !allowedIds.contains(id)) continue;
             String ea = row[data.column("effect_allele")].toUpperCase(java.util.Locale.ROOT), oa = row[data.column("other_allele")].toUpperCase(java.util.Locale.ROOT);
             double b = number(row[data.column("beta")]), se = number(row[data.column("se")]);
             double p;
