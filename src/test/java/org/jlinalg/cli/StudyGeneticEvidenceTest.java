@@ -56,6 +56,17 @@ class StudyGeneticEvidenceTest {
         assertTrue(result.details().toString().contains("not positive semidefinite"));
     }
 
+    @Test void genotypeDerivedMrLdCanSkipOnlyTheCubicPsdRecheck() throws Exception {
+        Path matrix = project.resolve("indefinite-ld.tsv");
+        Files.writeString(matrix, "variant_id\trs1\trs2\trs3\nrs1\t1\t.9\t.9\nrs2\t.9\t1\t-.9\nrs3\t.9\t-.9\t1\n");
+        List<StudyGeneticEvidence.Aligned> aligned = List.of(
+            aligned("rs1", 100), aligned("rs2", 200), aligned("rs3", 300));
+        assertDoesNotThrow(() -> StudyGeneticEvidence.matrix(matrix, aligned, false));
+        var failure = assertThrows(java.io.IOException.class,
+            () -> StudyGeneticEvidence.matrix(matrix, aligned, true));
+        assertTrue(failure.getMessage().contains("not positive semidefinite"));
+    }
+
     @Test void palindromeAndWeakInstrumentsAreNotSilentlyUsed() throws Exception {
         Context context = context("mendelian_randomization", Map.of());
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("rs2\t1\t200\tA\tG", "rs2\t1\t200\tA\tT"));
@@ -203,6 +214,12 @@ class StudyGeneticEvidenceTest {
         source.put("trait", role.equals("outcome") ? "BMI" : "splicing"); source.put("tissue", "blood"); source.put("assay", "sQTL");
         source.put("feature_id", "probe1");
         return source;
+    }
+
+    private static StudyGeneticEvidence.Aligned aligned(String id, long position) {
+        var variant = new StudyGeneticEvidence.Variant(id, "1", position,
+            "A", "G", 0.1, 0.01, 1e-12);
+        return new StudyGeneticEvidence.Aligned(variant, variant, 1, 1);
     }
     private Context context(String operation, Map<String, Object> changes) throws Exception {
         String header = "variant_id\tchromosome\tposition\teffect_allele\tother_allele\tbeta\tse\tp_value\n";

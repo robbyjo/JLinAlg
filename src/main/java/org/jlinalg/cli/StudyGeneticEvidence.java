@@ -312,7 +312,19 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             record.put("instrument_lookup_limitation", "Only " + aligned.size() + " of " + x.size()
                 + " exposure candidates had usable aligned outcome and LD evidence; MR used the retained prespecified instruments.");
         }
-        double[][] matrix = matrix(ldPath, aligned);
+        // Automatic MR LD is a correlation matrix computed directly from the
+        // reference genotypes and is used only for pairwise r^2 clumping.  A
+        // cubic Cholesky PSD check adds no information there and can dominate
+        // runtime for large cis-instrument families.  Keep that check for
+        // user-supplied MR matrices and every fine-mapping/colocalization use.
+        boolean verifyPositiveSemidefinite = !mrOnly || !automaticLd;
+        double[][] matrix = matrix(ldPath, aligned, verifyPositiveSemidefinite);
+        record.put("ld_validation", Map.of(
+            "square_symmetric_bounded_unit_diagonal", true,
+            "positive_semidefinite", verifyPositiveSemidefinite
+                ? "verified_by_cholesky"
+                : "guaranteed_by_direct_genotype_correlation; cubic recheck omitted for MR clumping",
+            "usage", mrOnly ? "pairwise_r_squared_clumping" : "fine_mapping"));
         Path matrixPath = directory.resolve("aligned-ld.tsv");
         writeMatrix(matrixPath, matrix);
         StringBuilder audit = new StringBuilder("variant_id\tchromosome\tposition\teffect_allele\tother_allele\tleft_beta\tright_beta\tright_sign\tld_sign\n");
@@ -635,7 +647,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
     }
     private static String complement(String allele) { return switch (allele) { case "A" -> "T"; case "T" -> "A"; case "C" -> "G"; case "G" -> "C"; default -> ""; }; }
     private static boolean palindrome(String a, String b) { return complement(a).equals(b); }
-    private static double[][] matrix(Path path, List<Aligned> aligned) throws IOException {
+    static double[][] matrix(Path path, List<Aligned> aligned,
+            boolean verifyPositiveSemidefinite) throws IOException {
         DelimitedData table = DelimitedData.read(path);
         int n = table.header().size() - 1;
         if (n > 5000 || table.rows().size() != n) throw new IOException("LD matrix must be square and contain at most 5000 variants");
@@ -652,6 +665,7 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         for (int i = 0; i < result.length; i++) for (int j = 0; j < result.length; j++) {
             if (Math.abs(result[i][j]) > 1 || Math.abs(result[i][j] - result[j][i]) > 1e-10 || (i == j && Math.abs(result[i][i] - 1) > 1e-10)) throw new IOException("LD must be symmetric, bounded and have unit diagonal");
         }
+        if (!verifyPositiveSemidefinite) return result;
         // Reference LD can legitimately be rank deficient (more SNPs than founders).
         // Check positive semidefiniteness without silently replacing or ridging it.
         double[][] l = new double[result.length][result.length];
