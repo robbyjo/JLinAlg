@@ -386,7 +386,43 @@ public final class StudyEvidenceIndex {
         return value;
     }
 
-    private static String html(Map<String, Object> index, List<Object> entries) {
+    /** Display-only projection. Complete evidence and scalar bindings remain unchanged. */
+    public static Object displayPreview(Object value) {
+        return displayPreview(value, new int[] {1000}, 0);
+    }
+
+    private static Object displayPreview(Object value, int[] budget, int depth) {
+        if (--budget[0] < 0 || depth > 10) return "Preview omitted; follow the complete artifact link.";
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            int count = 0;
+            for (var entry : map.entrySet()) {
+                if (count++ >= 40 || budget[0] <= 0) {
+                    result.put("_display_preview", "Additional fields omitted; complete artifact is unchanged.");
+                    break;
+                }
+                result.put(String.valueOf(entry.getKey()), displayPreview(entry.getValue(), budget, depth + 1));
+            }
+            return result;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> result = new ArrayList<>();
+            int count = 0;
+            for (Object child : list) {
+                if (count >= 20 || budget[0] <= 0) break;
+                result.add(displayPreview(child, budget, depth + 1));
+                count++;
+            }
+            if (count < list.size()) result.add("Display preview: " + count + " of " + list.size()
+                + " entries; follow the complete artifact link.");
+            return result;
+        }
+        if (value instanceof String text && text.length() > 2048)
+            return text.substring(0, 2048) + " [display preview truncated]";
+        return value;
+    }
+
+    static String html(Map<String, Object> index, List<Object> entries) {
         StringBuilder rows = new StringBuilder();
         StringBuilder findings = new StringBuilder();
         StringBuilder questions = new StringBuilder();
@@ -396,17 +432,18 @@ public final class StudyEvidenceIndex {
                 .append("</p>");
             for (Object raw : StudyIO.optionalList(StudyIO.map(index.get("scientist_questions"), "questions").get("questions"), "questions")) {
                 Map<String, Object> question = StudyIO.map(raw, "question");
-                questions.append("<section data-entry data-historical=\"false\" data-search=\"").append(escape(String.valueOf(question)))
+                questions.append("<section data-entry data-historical=\"false\" data-search=\"").append(escape(String.valueOf(question.get("question_id"))))
                     .append("\"><h3>").append(escape(String.valueOf(question.get("question_id")))).append(" — ")
                     .append(escape(String.valueOf(question.get("state")))).append("</h3>")
                     .append(link(String.valueOf(question.get("artifact")), "Immutable question record"))
-                    .append(render(question)).append("</section>");
+                    .append(render(displayPreview(question))).append("</section>");
             }
         }
         for (Object value : entries) {
             Map<String, Object> entry = StudyIO.map(value, "index entry");
-            String search = escape(String.join(" ", entry.values().stream()
-                .map(String::valueOf).toList()));
+            // Do not duplicate complete nested audits into an HTML attribute.
+            String search = escape(String.join(" ", List.of("result_id", "operation_type", "hypothesis", "state", "summary")
+                .stream().map(key -> String.valueOf(entry.get(key))).toList()));
             String historical = Boolean.TRUE.equals(entry.get("current")) ? "false" : "true";
             rows.append("<tr data-entry data-historical=\"").append(historical).append("\" data-search=\"").append(search)
                 .append("\"><td>").append(escape(String.valueOf(entry.get("result_id"))))
@@ -423,9 +460,9 @@ public final class StudyEvidenceIndex {
                 .append(escape(String.valueOf(entry.get("summary")))).append("</p>")
                 .append("<p>Result: ").append(escape(String.valueOf(entry.get("result_id")))).append(" · ")
                 .append(link(String.valueOf(entry.get("manifest")), "Audit manifest")).append("</p>");
-            if (entry.containsKey("key_findings")) findings.append(render(entry.get("key_findings")));
+            if (entry.containsKey("key_findings")) findings.append(render(displayPreview(entry.get("key_findings"))));
             if (!Set.of("complete", "not_applicable").contains(entry.get("state")))
-                findings.append("<h3>What is needed next?</h3>").append(render(entry.get("details")));
+                findings.append("<h3>What is needed next?</h3>").append(render(displayPreview(entry.get("details"))));
             findings.append("<details><summary>Full results and SHA-256 hashes</summary><ul>");
             for (Object raw : StudyIO.optionalList(entry.get("artifacts"), "artifacts")) {
                 Map<String, Object> artifact = StudyIO.map(raw, "artifact");
@@ -450,7 +487,8 @@ public final class StudyEvidenceIndex {
             <h1>Project evidence index</h1>
             <p>Each result ID resolves to an operation manifest with input and output hashes.</p>
             <p>Major findings, annotated feature lists, and proposed next steps appear below. Tables are bounded previews;
-            follow artifact links for full results. Annotation gaps, search not run, and unavailable evidence are not negative findings.
+            follow artifact links for full results. Search covers operation identity, state and summary, not complete variant audits.
+            Annotation gaps, search not run, and unavailable evidence are not negative findings.
             The current attempt is shown by default; previous attempts remain auditable.</p>
             <label><input id="history" type="checkbox" style="width:auto"> Show historical attempts</label>
             <label>Search <input id="search" type="search" placeholder="hypothesis, operation, status, result ID"></label>

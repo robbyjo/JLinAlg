@@ -414,7 +414,7 @@ final class StudyManuscriptRevision {
                 .append("<p><a href=\"../metadata/sources/").append(esc(entry.getKey())).append(".yaml\">Verified source manifest</a>; SHA-256 ").append(esc(e.get("manifest_sha256"))).append("</p>");
             Object findings = e.get("key_findings");
             if (findings instanceof List<?> rows && !rows.isEmpty()) h.append(table(new ArrayList<>(rows), new ArrayList<>(map(rows.get(0)).keySet())));
-            else h.append("<details><summary>Native findings and prerequisites</summary>").append(StudyPublication.render(findings)).append("</details>");
+            else h.append("<details><summary>Native findings and prerequisites</summary>").append(StudyPublication.render(StudyEvidenceIndex.displayPreview(findings))).append("</details>");
             h.append("</section>");
         }
         return h.append("<script>document.getElementById('search').addEventListener('input',function(){const q=this.value.toLowerCase();document.querySelectorAll('.evidence').forEach(e=>e.hidden=!e.textContent.toLowerCase().includes(q))});</script>").append(end()).toString();

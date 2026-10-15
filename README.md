@@ -88,6 +88,9 @@ GO/Reactome and GENCODE resource resolution through an embedded HTTPS client, a
 conditional checksum-verified 1000 Genomes LD download, quantitative
 cross-cohort anomaly flags, and an LLM-oriented evidence index with bounded key
 findings. Repeating a command resumes verified work and retries unfinished steps;
+HTML evidence and manuscript supplement previews have explicit nesting, row and
+text budgets; full machine-readable evidence and checksum-linked result files
+remain unchanged. Index search covers operation identity, state and summary.
 `--rerun` starts a fresh immutable attempt. Optional data dictionaries, preapproved
 sensitivity analyses, audited browser handoff (the default assistance transport),
 explicit OpenAI/Gemini or OpenAI-compatible API connections, cited literature review,
