@@ -31,11 +31,15 @@ final class StudyIO {
     private StudyIO() { }
 
     static Yaml reader() {
+        return reader(16_000_000);
+    }
+
+    private static Yaml reader(int codePointLimit) {
         LoaderOptions options = new LoaderOptions();
         options.setAllowDuplicateKeys(false);
         options.setMaxAliasesForCollections(0);
         options.setNestingDepthLimit(80);
-        options.setCodePointLimit(16_000_000);
+        options.setCodePointLimit(codePointLimit);
         return new Yaml(new SafeConstructor(options));
     }
 
@@ -51,11 +55,23 @@ final class StudyIO {
     }
 
     static Map<String, Object> load(Path path) throws IOException {
+        return load(path, 16_000_000);
+    }
+
+    /** Generated, ledger/hash-checked evidence can exceed a study contract's budget.
+     * Retains the same alias, duplicate-key, depth and safe-constructor protections. */
+    static Map<String, Object> loadArtifact(Path path) throws IOException {
+        if (Files.size(path) > 128L * 1024 * 1024)
+            throw new IOException("Generated study artifact exceeds 128 MiB: " + path);
+        return load(path, 128 * 1024 * 1024);
+    }
+
+    private static Map<String, Object> load(Path path, int codePointLimit) throws IOException {
         if (!Files.isRegularFile(path))
             throw new IOException("Study document is absent: " + path);
         Object value;
         try (Reader input = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            value = reader().load(input);
+            value = reader(codePointLimit).load(input);
         } catch (RuntimeException failure) {
             throw new IllegalArgumentException(
                 "Invalid YAML in " + path + ": " + failure.getMessage(), failure);

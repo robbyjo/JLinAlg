@@ -221,7 +221,7 @@ final class StudyPublication {
     private static String label(String value) { return value.replace('_', ' '); }
     private static String esc(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;"); }
     private static Map<String, Object> load(Path path) throws IOException {
-        return StudyYaml.loadMap(path);
+        return StudyYaml.loadArtifact(path);
     }
     static String render(Object value) {
         if (value instanceof Map<?, ?> m) { StringBuilder h = new StringBuilder("<dl>"); m.forEach((k, v) -> h.append("<dt>").append(esc(label(text(k)))).append("</dt><dd>").append(v instanceof Map<?, ?> || v instanceof List<?> ? render(v) : esc(StudyReportNumbers.field(text(k), v))).append("</dd>")); return h.append("</dl>").toString(); }

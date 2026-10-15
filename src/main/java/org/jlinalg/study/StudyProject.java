@@ -223,7 +223,7 @@ public final class StudyProject {
             for (Path manifestPath : paths.filter(path ->
                     path.getFileName().toString().equals("manifest.yaml")
                         && !path.getParent().getFileName().toString().startsWith(".operation-")).toList()) {
-                Map<String, Object> manifest = StudyIO.load(manifestPath);
+                Map<String, Object> manifest = StudyIO.loadArtifact(manifestPath);
                 String manifestKey = manifest.get("run_id") + "/"
                     + manifest.get("operation_id");
                 String manifestHash = manifests.remove(manifestKey);

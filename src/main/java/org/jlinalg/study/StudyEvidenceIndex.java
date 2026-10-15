@@ -47,7 +47,7 @@ public final class StudyEvidenceIndex {
                         .filter(candidate -> candidate.getFileName().toString()
                             .equals("manifest.yaml") && !candidate.getParent().getFileName().toString().startsWith(".operation-"))
                         .sorted(Comparator.naturalOrder()).toList()) {
-                    Map<String, Object> manifest = StudyIO.load(path);
+                    Map<String, Object> manifest = StudyIO.loadArtifact(path);
                     Map<String, Object> entry = new LinkedHashMap<>();
                     String operation = String.valueOf(
                         manifest.getOrDefault("operation_id", "unknown"));
@@ -172,7 +172,7 @@ public final class StudyEvidenceIndex {
         if (operationType.equals("participant_characteristics") || operationType.equals("irqtl_candidate_review")) {
             Path summary = operationDirectory.resolve(operationType.equals("participant_characteristics")
                 ? "participant-characteristics.yaml" : "irqtl-review.yaml");
-            return Files.isRegularFile(summary) ? jsonSafe(StudyIO.load(summary)) : null;
+            return Files.isRegularFile(summary) ? jsonSafe(StudyIO.loadArtifact(summary)) : null;
         }
         if (Set.of("source_discovery", "bioinformatics_investigation", "literature_search").contains(operationType)) {
             // The manifest contains the same evidence document, serialized by
@@ -181,17 +181,17 @@ public final class StudyEvidenceIndex {
             // indexable without rewriting evidence or relaxing contract safety.
             Path manifestPath = operationDirectory.resolve("manifest.yaml");
             if (Files.isRegularFile(manifestPath)) {
-                Map<String, Object> manifest = StudyIO.load(manifestPath);
+                Map<String, Object> manifest = StudyIO.loadArtifact(manifestPath);
                 if (operationType.equals(manifest.get("operation_type"))
                         && manifest.get("details") instanceof Map<?, ?>)
                     return jsonSafe(manifest.get("details"));
             }
             Path summary = operationDirectory.resolve(operationType.replace('_', '-') + ".yaml");
-            return Files.isRegularFile(summary) ? jsonSafe(StudyIO.load(summary)) : null;
+            return Files.isRegularFile(summary) ? jsonSafe(StudyIO.loadArtifact(summary)) : null;
         }
         Path genetic = operationDirectory.resolve("genetic-evidence.yaml");
         if (Set.of("fine_mapping", "colocalization", "mendelian_randomization").contains(operationType) && Files.isRegularFile(genetic))
-            return jsonSafe(StudyIO.load(genetic));
+            return jsonSafe(StudyIO.loadArtifact(genetic));
         if (operationType.equals("validate_harmonize")) {
             Path summary = operationDirectory.resolve("annotation-summary.yaml");
             Map<String, Object> findings = new LinkedHashMap<>();
@@ -204,7 +204,7 @@ public final class StudyEvidenceIndex {
                 }
                 findings.put("primary_results", primary);
             }
-            if (Files.isRegularFile(summary)) findings.put("annotation", jsonSafe(StudyIO.load(summary)));
+            if (Files.isRegularFile(summary)) findings.put("annotation", jsonSafe(StudyIO.loadArtifact(summary)));
             return findings;
         }
         if (operationType.equals("association")) {
@@ -227,7 +227,7 @@ public final class StudyEvidenceIndex {
         if (operationType.equals("diagnostic_review")) {
             Path diagnostics = operationDirectory.resolve("diagnostics.yaml");
             return Files.isRegularFile(diagnostics)
-                ? jsonSafe(StudyIO.load(diagnostics)) : null;
+                ? jsonSafe(StudyIO.loadArtifact(diagnostics)) : null;
         }
         if (operationType.equals("gene_ontology"))
             return topRows(operationDirectory.resolve("gene-ontology.tsv"),
@@ -245,7 +245,7 @@ public final class StudyEvidenceIndex {
                 "candidate-prioritization.tsv"), 20, List.of());
         if (Set.of("advisor_review", "literature_support", "manuscript_draft", "sensitivity_analysis").contains(operationType)) {
             Path decision = operationDirectory.resolve("decision.yaml");
-            return Files.isRegularFile(decision) ? StudyIO.load(decision) : null;
+            return Files.isRegularFile(decision) ? StudyIO.loadArtifact(decision) : null;
         }
         return null;
     }

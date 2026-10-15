@@ -118,7 +118,7 @@ public final class StudyQuestions {
                 Path manifest = project.resolve("runs").resolve(runId).resolve("operations")
                     .resolve(String.valueOf(operation.get("id"))).resolve("manifest.yaml");
                 if (Files.isRegularFile(manifest)) {
-                    Map<String, Object> record = StudyIO.load(manifest);
+                    Map<String, Object> record = StudyIO.loadArtifact(manifest);
                     for (Object value : list(map(record.get("details")).get("needs")))
                         needs.add(StudyNeed.from(map(value)));
                 }
@@ -202,7 +202,7 @@ public final class StudyQuestions {
     private static boolean scopeCompleted(Path project, String runId, Map<String, Object> question) throws IOException {
         for (Object operation : list(map(question.get("scope")).get("operations"))) {
             Path manifest = project.resolve("runs").resolve(runId).resolve("operations").resolve(String.valueOf(operation)).resolve("manifest.yaml");
-            if (!Files.isRegularFile(manifest) || !Set.of("complete", "not_applicable").contains(StudyIO.load(manifest).get("state"))) return false;
+            if (!Files.isRegularFile(manifest) || !Set.of("complete", "not_applicable").contains(StudyIO.loadArtifact(manifest).get("state"))) return false;
         }
         return true;
     }

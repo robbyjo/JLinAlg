@@ -124,7 +124,7 @@ public final class StudyExecutionEngine {
                     + destination);
             if (reusable != null) {
                 copyDirectory(reusable, destination);
-                Map<String, Object> manifest = StudyIO.load(
+                Map<String, Object> manifest = StudyIO.loadArtifact(
                     destination.resolve("manifest.yaml"));
                 manifest.put("run_id", runId);
                 manifest.put("reused_from_cache", true);
@@ -324,7 +324,7 @@ public final class StudyExecutionEngine {
         for (Map.Entry<String, Path> dependency : dependencies.entrySet()) {
             Path manifest = dependency.getValue().resolve("manifest.yaml");
             if (Files.isRegularFile(manifest)) {
-                Map<String, Object> source = StudyIO.load(manifest);
+                Map<String, Object> source = StudyIO.loadArtifact(manifest);
                 // Run IDs, reuse flags and timestamps do not change scientific inputs.
                 Map<String, Object> identity = new LinkedHashMap<>();
                 for (String key : List.of("state", "cache_key", "output_sha256", "details"))
@@ -364,7 +364,7 @@ public final class StudyExecutionEngine {
             throws IOException {
         Path manifestPath = directory.resolve("manifest.yaml");
         if (!Files.isRegularFile(manifestPath)) return false;
-        Map<String, Object> manifest = StudyIO.load(manifestPath);
+        Map<String, Object> manifest = StudyIO.loadArtifact(manifestPath);
         if (!"complete".equals(manifest.get("state"))
                 || !cacheKey.equals(manifest.get("cache_key"))
                 || Boolean.TRUE.equals(StudyIO.optionalMap(manifest.get("details"),
@@ -395,7 +395,7 @@ public final class StudyExecutionEngine {
         payload.put("summary", summary);
         StudyProject.append(project, type,
             new StudyProject.Actor("jlinalg", "study-executor", null), payload);
-        Map<String, Object> details = StudyIO.optionalMap(StudyIO.load(
+        Map<String, Object> details = StudyIO.optionalMap(StudyIO.loadArtifact(
             operationDirectory.resolve("manifest.yaml")).get("details"), "details");
         if (!type.equals("operation_reused") && "human_attested_not_observed".equals(details.get("browser_submission"))) {
             Map<String, Object> interaction = new LinkedHashMap<>(payload);

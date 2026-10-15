@@ -106,7 +106,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("pairs", results);
-        if (!automaticSources.isEmpty()) details.put("automatic_" + automaticSourceKind + "_sources", automaticSources);
+        if (!automaticSources.isEmpty()) details.put("automatic_" + automaticSourceKind + "_sources",
+            automaticSourceSummary(automaticSources, context.outputDirectory().resolve("automatic-" + automaticSourceKind + "-sources.yaml")));
         List<Object> caveats = results.stream().map(StudyPublicEvidence::map)
             .filter(row -> row.containsKey("required_manuscript_caveat"))
             .map(row -> (Object) Map.of("pair_id", row.get("pair_id"), "caveat", row.get("required_manuscript_caveat"))).toList();
@@ -130,6 +131,23 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             context.operation().get("type") + ": " + completed + " completed pairs, " + notEstimable
                 + " completed but not estimable, " + needs.size() + " require input",
             List.of("genetic-evidence.yaml"), details);
+    }
+
+    /** Keep complete variant-lookup audits in their hashed artifact, not repeated
+     * in both the operation manifest and every derived evidence view. */
+    static Map<String, Object> automaticSourceSummary(Map<String, Object> audit, Path file) throws IOException {
+        var summary = new LinkedHashMap<String, Object>(audit);
+        List<Object> features = new ArrayList<>();
+        for (Object raw : list(audit.get("features"))) {
+            var feature = map(raw); var compact = new LinkedHashMap<String, Object>();
+            for (String key : List.of("feature_id", "status", "pair_id", "strong_candidate_instruments", "reason"))
+                if (feature.containsKey(key)) compact.put(key, feature.get(key));
+            features.add(compact);
+        }
+        summary.put("features", features);
+        summary.put("complete_audit", Map.of("path", file.getFileName().toString(), "sha256", FollowupSupport.hash(file),
+            "interpretation", "Full source declarations and per-variant lookup provenance; retained without truncation in the operation artifact inventory"));
+        return summary;
     }
 
     private static void executePair(Context context, Map<String, Object> pair, Path directory, Map<String, Object> record) throws IOException {

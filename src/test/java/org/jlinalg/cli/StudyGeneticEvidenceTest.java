@@ -14,6 +14,21 @@ import org.junit.jupiter.api.io.TempDir;
 class StudyGeneticEvidenceTest {
     @TempDir Path project;
 
+    @Test void automaticSourceSummaryPreservesFullHashedAuditWithoutDuplicatingLookupRows() throws Exception {
+        Path file=project.resolve("automatic-mr-sources.yaml");
+        String original="full per-variant lookup audit\n";
+        Files.writeString(file,original);
+        var feature=Map.<String,Object>of("feature_id","ENST1.1","status","prepared","pair_id","ENST1-1",
+            "strong_candidate_instruments",10000,"outcome",Map.of("variant_lookup",List.of(Map.of("variant_id","rs1"))));
+        var summary=StudyGeneticEvidence.automaticSourceSummary(Map.of("generated_pairs",1,"features",List.of(feature)),file);
+        var compact=(Map<?,?>)((List<?>)summary.get("features")).get(0);
+        assertEquals(10000,compact.get("strong_candidate_instruments"));
+        assertFalse(compact.containsKey("outcome"));
+        assertEquals(1,summary.get("generated_pairs"));
+        assertEquals(FollowupSupport.hash(file),((Map<?,?>)summary.get("complete_audit")).get("sha256"));
+        assertEquals(original,Files.readString(file));
+    }
+
     @Test void runsMrHarmonizationAndSensitivityFromReviewedRegionalSources() throws Exception {
         Context context = context("mendelian_randomization", Map.of());
         var result = new StudyGeneticEvidence().execute(context);

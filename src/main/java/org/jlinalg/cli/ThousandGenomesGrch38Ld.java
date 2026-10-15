@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.jlinalg.cli.StudyGeneticEvidence.Variant;
 import org.jlinalg.study.StudyOperationExecutor.Context;
 
@@ -31,6 +32,10 @@ final class ThousandGenomesGrch38Ld {
     record Result(Path matrix, Path alleles, Map<String, Object> provenance) { }
     private record Dosage(Variant variant, String ref, String alt,
             double[] values, double callRate, double alternateFrequency) { }
+    private record Match(Dosage dosage, Map<String, Object> exclusion) { }
+    @FunctionalInterface interface RecordLines { String next() throws IOException; }
+    @FunctionalInterface interface RecordQuery { RecordLines query(long start, long end) throws IOException; }
+    @FunctionalInterface interface RecordMatch { void accept(int requestedIndex, String[] fields) throws IOException; }
 
     private ThousandGenomesGrch38Ld() { }
 
@@ -85,6 +90,8 @@ final class ThousandGenomesGrch38Ld {
         if (samples.size() < 50) throw new IOException("Fewer than 50 unrelated 1000 Genomes samples for " + population);
         List<Dosage> found = new ArrayList<>();
         List<Object> exclusions = new ArrayList<>();
+        Match[] matches = new Match[requested.size()];
+        int queryCount;
         try (TabixReader reader = new TabixReader(
                 installedData.path().toString(),
                 installedIndex.path().toString())) {
@@ -99,52 +106,18 @@ final class ThousandGenomesGrch38Ld {
             String contig = reader.getChromosomes().contains("chr" + chromosome) ? "chr" + chromosome
                 : reader.getChromosomes().contains(chromosome) ? chromosome : null;
             if (contig == null) throw new IOException("GRCh38 VCF index has no chromosome " + chromosome);
-            for (Variant variant : requested) {
-                String[] selected = null;
-                TabixReader.Iterator query = reader.query(contig + ":" + variant.position() + "-" + variant.position());
-                for (String line; query != null && (line = query.next()) != null;) {
-                        String[] candidate = line.split("\t", -1);
-                        if (candidate.length != header.length || candidate[4].contains(",")) continue;
-                        String ref = candidate[3].toUpperCase(Locale.ROOT), alt = candidate[4].toUpperCase(Locale.ROOT);
-                        if (!ref.matches("[ACGT]") || !alt.matches("[ACGT]")) continue;
-                        boolean id = Arrays.asList(candidate[2].split(";", -1)).contains(variant.id());
-                        boolean alleles = (ref.equals(variant.other()) && alt.equals(variant.effect()))
-                            || (ref.equals(variant.effect()) && alt.equals(variant.other()));
-                        if (!id && !alleles) continue;
-                        if (selected != null) throw new IOException("Multiple GRCh38 LD records match " + variant.id());
-                        selected = candidate;
-                }
-                if (selected == null) {
-                    exclusions.add(Map.of("variant_id", variant.id(), "reason", "absent_from_1000g_30x_grch38"));
-                    continue;
-                }
-                String[] format = selected[8].split(":", -1); int gt = -1;
-                for (int i = 0; i < format.length; i++) if (format[i].equals("GT")) gt = i;
-                if (gt < 0) throw new IOException("GRCh38 VCF record lacks GT for " + variant.id());
-                double[] dosage = new double[samples.size()];
-                int indexInArray = 0, called = 0; double alternateCount = 0;
-                for (String sample : samples) {
-                    String[] values = selected[sampleColumns.get(sample)].split(":", -1);
-                    String genotype = gt < values.length ? values[gt] : ".";
-                    String[] alleles = genotype.split("[|/]", -1);
-                    if (alleles.length != 2 || !alleles[0].matches("[01]") || !alleles[1].matches("[01]"))
-                        dosage[indexInArray++] = Double.NaN;
-                    else { int count = Integer.parseInt(alleles[0]) + Integer.parseInt(alleles[1]);
-                        dosage[indexInArray++] = count; alternateCount += count; called++; }
-                }
-                double callRate = called / (double) samples.size();
-                double frequency = called == 0 ? Double.NaN : alternateCount / (2.0 * called);
-                if (callRate < 0.95) {
-                    exclusions.add(Map.of("variant_id", variant.id(), "reason", "call_rate_below_0.95", "call_rate", callRate));
-                    continue;
-                }
-                if (!Double.isFinite(frequency) || Math.min(frequency, 1 - frequency) < 0.01) {
-                    exclusions.add(Map.of("variant_id", variant.id(), "reason", "minor_allele_frequency_below_0.01", "alternate_frequency", frequency));
-                    continue;
-                }
-                found.add(new Dosage(variant, selected[3].toUpperCase(Locale.ROOT),
-                    selected[4].toUpperCase(Locale.ROOT), dosage, callRate, frequency));
-            }
+            queryCount = collectRecords(requested, header.length, (start, end) -> {
+                TabixReader.Iterator query = reader.query(contig + ":" + start + "-" + end);
+                return query == null ? null : query::next;
+            }, (i, fields) -> matches[i] = decode(requested.get(i), fields, samples, sampleColumns));
+        }
+        // VCF traversal is coordinate-ordered; inference and audit order remain
+        // exactly the requested order, including exclusions and allele orientation.
+        for (int i = 0; i < requested.size(); i++) {
+            Match match = matches[i];
+            if (match == null) exclusions.add(Map.of("variant_id", requested.get(i).id(), "reason", "absent_from_1000g_30x_grch38"));
+            else if (match.dosage() == null) exclusions.add(match.exclusion());
+            else found.add(match.dosage());
         }
         if (found.size() < minimumVariants) throw new IOException("Fewer than " + minimumVariants
             + " requested variant" + (minimumVariants == 1 ? " is" : "s are")
@@ -177,6 +150,8 @@ final class ThousandGenomesGrch38Ld {
         provenance.put("local_tabix_index", installedIndex.path().toString());
         provenance.put("local_tabix_index_sha256", installedIndex.sha256());
         provenance.put("retrieval_policy", "Complete public chromosome VCF and index installed once; LD extraction performed locally");
+        provenance.put("local_query_strategy", "Coordinate-ordered windows merge requested positions separated by at most 16384 bp; unrequested records are ignored");
+        provenance.put("local_query_count", queryCount);
         provenance.put("requested_variants", requested.size()); provenance.put("retained_variants", found.size());
         provenance.put("exclusions", exclusions); provenance.put("call_rate_minimum", 0.95);
         provenance.put("minor_allele_frequency_minimum", 0.01);
@@ -185,6 +160,69 @@ final class ThousandGenomesGrch38Ld {
         provenance.put("matrix_sha256", FollowupSupport.hash(matrix)); provenance.put("alleles_sha256", FollowupSupport.hash(alleles));
         StudyPublicEvidence.write(directory.resolve("ld-reference.yaml"), provenance);
         return new Result(matrix, alleles, provenance);
+    }
+
+    /** Read each nearby BGZF region once, preserving the point-query match rule.
+     * Only dosage arrays are retained, not all 3202-sample VCF strings. */
+    static int collectRecords(List<Variant> requested, int headerLength, RecordQuery query, RecordMatch consumer) throws IOException {
+        var positions = new TreeMap<Long, List<Integer>>();
+        for (int i = 0; i < requested.size(); i++) positions.computeIfAbsent(requested.get(i).position(), p -> new ArrayList<>()).add(i);
+        List<long[]> windows = new ArrayList<>();
+        for (long position : positions.keySet()) {
+            if (windows.isEmpty() || position - windows.get(windows.size() - 1)[1] > 16384)
+                windows.add(new long[]{position, position});
+            else windows.get(windows.size() - 1)[1] = position;
+        }
+        boolean[] seen = new boolean[requested.size()];
+        for (long[] window : windows) {
+            RecordLines rows = query.query(window[0], window[1]);
+            for (String line; rows != null && (line = rows.next()) != null;) {
+                int first = line.indexOf('\t'), second = first < 0 ? -1 : line.indexOf('\t', first + 1);
+                if (second < 0) continue;
+                long position;
+                try { position = Long.parseLong(line.substring(first + 1, second)); }
+                catch (NumberFormatException invalid) { continue; }
+                var indices = positions.get(position);
+                if (indices == null || position < window[0] || position > window[1]) continue;
+                String[] candidate = line.split("\t", -1);
+                if (candidate.length != headerLength || candidate[4].contains(",")) continue;
+                String ref = candidate[3].toUpperCase(Locale.ROOT), alt = candidate[4].toUpperCase(Locale.ROOT);
+                if (!ref.matches("[ACGT]") || !alt.matches("[ACGT]")) continue;
+                for (int i : indices) {
+                    Variant variant = requested.get(i);
+                    boolean id = Arrays.asList(candidate[2].split(";", -1)).contains(variant.id());
+                    boolean alleles = (ref.equals(variant.other()) && alt.equals(variant.effect()))
+                        || (ref.equals(variant.effect()) && alt.equals(variant.other()));
+                    if (!id && !alleles) continue;
+                    if (seen[i]) throw new IOException("Multiple GRCh38 LD records match " + variant.id());
+                    seen[i] = true;
+                    consumer.accept(i, candidate);
+                }
+            }
+        }
+        return windows.size();
+    }
+
+    private static Match decode(Variant variant, String[] selected, Set<String> samples, Map<String, Integer> sampleColumns) throws IOException {
+        String[] format = selected[8].split(":", -1); int gt = -1;
+        for (int i = 0; i < format.length; i++) if (format[i].equals("GT")) gt = i;
+        if (gt < 0) throw new IOException("GRCh38 VCF record lacks GT for " + variant.id());
+        double[] dosage = new double[samples.size()];
+        int indexInArray = 0, called = 0; double alternateCount = 0;
+        for (String sample : samples) {
+            String[] values = selected[sampleColumns.get(sample)].split(":", -1);
+            String genotype = gt < values.length ? values[gt] : ".";
+            String[] alleles = genotype.split("[|/]", -1);
+            if (alleles.length != 2 || !alleles[0].matches("[01]") || !alleles[1].matches("[01]")) dosage[indexInArray++] = Double.NaN;
+            else { int count = Integer.parseInt(alleles[0]) + Integer.parseInt(alleles[1]);
+                dosage[indexInArray++] = count; alternateCount += count; called++; }
+        }
+        double callRate = called / (double) samples.size();
+        double frequency = called == 0 ? Double.NaN : alternateCount / (2.0 * called);
+        if (callRate < 0.95) return new Match(null, Map.of("variant_id", variant.id(), "reason", "call_rate_below_0.95", "call_rate", callRate));
+        if (!Double.isFinite(frequency) || Math.min(frequency, 1 - frequency) < 0.01)
+            return new Match(null, Map.of("variant_id", variant.id(), "reason", "minor_allele_frequency_below_0.01", "alternate_frequency", frequency));
+        return new Match(new Dosage(variant, selected[3].toUpperCase(Locale.ROOT), selected[4].toUpperCase(Locale.ROOT), dosage, callRate, frequency), Map.of());
     }
 
     private static Set<String> samples(String text, String population) throws IOException {

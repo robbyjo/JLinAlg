@@ -27,10 +27,20 @@ final class StudyYaml {
     }
 
     static Map<String, Object> loadMap(Path path) throws IOException {
+        return loadMap(path, CODE_POINT_LIMIT);
+    }
+
+    static Map<String, Object> loadArtifact(Path path) throws IOException {
+        if (Files.size(path) > 128L * 1024 * 1024)
+            throw new IOException("Generated study artifact exceeds 128 MiB: " + path);
+        return loadMap(path, 128 * 1024 * 1024);
+    }
+
+    private static Map<String, Object> loadMap(Path path, int codePointLimit) throws IOException {
         Object value;
         try (Reader input = Files.newBufferedReader(path,
                 StandardCharsets.UTF_8)) {
-            value = load(input);
+            value = reader(codePointLimit).load(input);
         }
         if (!(value instanceof Map<?, ?> raw))
             throw new IOException("Expected YAML mapping: " + path);
@@ -40,11 +50,15 @@ final class StudyYaml {
     }
 
     private static Yaml reader() {
+        return reader(CODE_POINT_LIMIT);
+    }
+
+    private static Yaml reader(int codePointLimit) {
         LoaderOptions options = new LoaderOptions();
         options.setAllowDuplicateKeys(false);
         options.setMaxAliasesForCollections(0);
         options.setNestingDepthLimit(80);
-        options.setCodePointLimit(CODE_POINT_LIMIT);
+        options.setCodePointLimit(codePointLimit);
         return new Yaml(new SafeConstructor(options));
     }
 }

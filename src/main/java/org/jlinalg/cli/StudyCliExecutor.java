@@ -601,11 +601,8 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 primaryReplication = dependency.resolve("replication.tsv");
             if (Files.isRegularFile(dependency.resolve("meta-analysis.tsv"))) {
                 primaryMeta = dependency.resolve("meta-analysis.tsv");
-                try (var reader = Files.newBufferedReader(
-                        dependency.resolve("manifest.yaml"))) {
-                    primaryReady |= "complete".equals(map(StudyYaml.load(reader),
-                        "manifest").get("state"));
-                }
+                primaryReady |= "complete".equals(StudyYaml.loadArtifact(
+                    dependency.resolve("manifest.yaml")).get("state"));
             }
         }
         ReplicationMetrics primaryReplicationMetrics = replicationMetrics(
@@ -1065,7 +1062,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 Path path = directory.resolve(name);
                 if (!Files.isRegularFile(path)) continue;
                 Map<String, Object> summary;
-                try (var reader = Files.newBufferedReader(path)) { summary = StudyPublicEvidence.map(StudyYaml.load(reader)); }
+                summary = StudyYaml.loadArtifact(path);
                 for (Object raw : StudyPublicEvidence.list(summary.getOrDefault("evidence", summary.get("pairs")))) {
                     Map<String, Object> row = StudyPublicEvidence.map(raw);
                     String feature = row.get("feature_id") == null
