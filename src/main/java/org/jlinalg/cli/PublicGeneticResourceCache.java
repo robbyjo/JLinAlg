@@ -2,6 +2,7 @@
 package org.jlinalg.cli;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -9,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -16,11 +19,27 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.jlinalg.study.StudyOperationExecutor.Context;
 
 /** Checksum-verified complete public files shared across study projects. */
 final class PublicGeneticResourceCache {
     private static final long GIB = 1024L * 1024 * 1024;
+    private static final Map<Path, Verified> VERIFIED = new ConcurrentHashMap<>();
+
+    private record FileStamp(long bytes, FileTime modified, FileTime created,
+            Object fileKey) {
+        static FileStamp read(Path path) throws IOException {
+            BasicFileAttributes attributes = Files.readAttributes(path,
+                BasicFileAttributes.class);
+            return new FileStamp(attributes.size(), attributes.lastModifiedTime(),
+                attributes.creationTime(), attributes.fileKey());
+        }
+    }
+
+    private record Verified(FileStamp stamp, String source,
+            ExpectedChecksum expected, Map<String, Object> manifest,
+            Installed installed, FileChannel protection) { }
 
     record ExpectedChecksum(String algorithm, String value) {
         ExpectedChecksum {
@@ -130,7 +149,7 @@ final class PublicGeneticResourceCache {
         }
     }
 
-    private static Installed installed(Path file, Path manifestPath,
+    static Installed installed(Path file, Path manifestPath,
             String source, ExpectedChecksum expected) throws IOException {
         if (!Files.exists(file) && !Files.exists(manifestPath)) return null;
         if (!Files.isRegularFile(file) || !Files.isRegularFile(manifestPath))
@@ -149,14 +168,73 @@ final class PublicGeneticResourceCache {
         if (!(manifest.get("bytes") instanceof Number recorded)
                 || recorded.longValue() != bytes)
             throw new IOException("Public resource size mismatch: " + file);
-        String sha = checksum(file, "SHA-256");
-        if (!sha.equals(manifest.get("sha256")))
-            throw new IOException("Public resource SHA-256 mismatch: " + file);
-        if (expected != null
-                && !checksum(file, expected.algorithm()).equals(expected.value()))
-            throw new IOException("Public resource " + expected.algorithm()
-                + " mismatch: " + file);
-        return new Installed(file, source, bytes, sha, Map.copyOf(manifest));
+        Path identity = file.toRealPath();
+        try {
+            // Only a process-local shortcut: every new JVM starts with full
+            // checksum verification. Keep manifest checks on every lookup and
+            // invalidate if the file is replaced or its metadata changes.
+            return VERIFIED.compute(identity, (key, previous) -> {
+                try {
+                    FileStamp before = FileStamp.read(identity);
+                    if (previous != null && previous.stamp().equals(before)
+                            && (before.fileKey() != null || previous.protection() != null
+                                && previous.protection().isOpen())
+                            && previous.source().equals(source)
+                            && java.util.Objects.equals(previous.expected(), expected)
+                            && previous.manifest().equals(manifest))
+                        return previous;
+                    FileChannel protection = protectIdentity(identity, before);
+                    boolean retained = false;
+                    try {
+                        String sha = checksum(identity, "SHA-256");
+                        if (!sha.equals(manifest.get("sha256")))
+                            throw new IOException("Public resource SHA-256 mismatch: " + file);
+                        if (expected != null && !checksum(identity,
+                                expected.algorithm()).equals(expected.value()))
+                            throw new IOException("Public resource " + expected.algorithm()
+                                + " mismatch: " + file);
+                        FileStamp after = FileStamp.read(identity);
+                        if (!before.equals(after))
+                            throw new IOException("Public resource changed during verification: " + file);
+                        Map<String, Object> immutable = Map.copyOf(manifest);
+                        if (previous != null && previous.protection() != null)
+                            previous.protection().close();
+                        Verified verified = new Verified(after, source, expected, immutable,
+                            new Installed(file, source, bytes, sha, immutable), protection);
+                        retained = true;
+                        return verified;
+                    } finally {
+                        if (!retained && protection != null) protection.close();
+                    }
+                } catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            }).installed();
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+    }
+
+    private static FileChannel protectIdentity(Path file, FileStamp stamp) {
+        if (stamp.fileKey() != null) return null;
+        // Windows does not expose a basic file key and can tunnel timestamps
+        // across replacement. Hold a no-write/no-delete read handle instead.
+        // If the optional provider flags are unavailable, never memoize trust.
+        try {
+            Class<?> options = Class.forName("com.sun.nio.file.ExtendedOpenOption");
+            var noWrite = (java.nio.file.OpenOption) options.getField("NOSHARE_WRITE").get(null);
+            var noDelete = (java.nio.file.OpenOption) options.getField("NOSHARE_DELETE").get(null);
+            return FileChannel.open(file, StandardOpenOption.READ, noWrite, noDelete);
+        } catch (ReflectiveOperationException | UnsupportedOperationException
+                | IOException | LinkageError unavailable) {
+            return null;
+        }
+    }
+
+    static void releaseVerification(Path file) throws IOException {
+        Verified previous = VERIFIED.remove(file.toRealPath());
+        if (previous != null && previous.protection() != null)
+            previous.protection().close();
     }
 
     private static String checksum(Path path, String algorithm)
