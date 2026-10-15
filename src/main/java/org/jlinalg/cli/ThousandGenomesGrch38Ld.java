@@ -276,7 +276,7 @@ final class ThousandGenomesGrch38Ld {
         for (int i = 0; i < n; i++) for (int j = 0; j <= i; j++) {
             double covariance = 0;
             for (int k = 0; k < centered[i].length; k++) covariance += centered[i][k] * centered[j][k];
-            double r = covariance / Math.sqrt(sumSquares[i] * sumSquares[j]);
+            double r = LdCorrelation.bounded(covariance / Math.sqrt(sumSquares[i] * sumSquares[j]));
             if (i == j) r = 1;
             result[i][j] = result[j][i] = r;
         }

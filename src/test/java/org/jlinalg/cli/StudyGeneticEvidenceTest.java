@@ -49,6 +49,27 @@ class StudyGeneticEvidenceTest {
         assertTrue(Files.isRegularFile(context.outputDirectory().resolve("pair/colocalization-prior-sensitivity.tsv")));
     }
 
+    @Test @SuppressWarnings("unchecked")
+    void oneOperationRetainsEligibilityChecksForEveryPair() throws Exception {
+        Context base=context("mendelian_randomization",Map.of());
+        var original=StudyBioinformatics.config(base);
+        var pair=(Map<String,Object>)((List<?>)original.get("genetic_pairs")).get(0);
+        var second=new LinkedHashMap<>(pair);second.put("id","second");
+        var ineligible=new LinkedHashMap<>(pair);ineligible.put("id","ineligible");ineligible.put("feature_id","absent");
+        var bio=new LinkedHashMap<>(original);bio.put("genetic_pairs",List.of(pair,second,ineligible));
+        var h=new LinkedHashMap<>((Map<String,Object>)((List<?>)base.study().get("hypotheses")).get(0));
+        h.put("analysis",Map.of("bioinformatics",bio));
+        var study=new LinkedHashMap<>(base.study());study.put("hypotheses",List.of(h));
+        Context context=new Context(base.project(),base.outputDirectory(),base.operation(),study,base.plan(),base.dependencyDirectories());
+        var result=new StudyGeneticEvidence().execute(context);
+        assertEquals(State.WAITING_FOR_INPUT,result.state());
+        assertTrue(Files.isRegularFile(context.outputDirectory().resolve("pair/mr-ivw-fixed.tsv")));
+        assertTrue(Files.isRegularFile(context.outputDirectory().resolve("second/mr-ivw-fixed.tsv")));
+        assertFalse(Files.exists(context.outputDirectory().resolve("ineligible/mr-ivw-fixed.tsv")));
+        var rows=(List<Map<String,Object>>)(List<?>)result.details().get("pairs");
+        assertEquals(List.of("complete","complete","waiting_for_input"),rows.stream().map(r->r.get("status")).toList());
+    }
+
     @Test void overlapUnapprovedAndWrongFeatureCannotProduceInference() throws Exception {
         for (Map<String, Object> change : List.of(Map.<String, Object>of("sample_overlap", "unknown"),
                 Map.<String, Object>of("approved", false), Map.<String, Object>of("feature_id", "wrong-feature"))) {
@@ -80,6 +101,18 @@ class StudyGeneticEvidenceTest {
         var failure = assertThrows(java.io.IOException.class,
             () -> StudyGeneticEvidence.matrix(matrix, aligned, true));
         assertTrue(failure.getMessage().contains("not positive semidefinite"));
+    }
+
+    @Test void perfectLdRoundoffIsCanonicalizedButRealInvalidLdIsRejected() throws Exception {
+        Path matrix=project.resolve("perfect-ld.tsv");
+        var selected=List.of(aligned("rs1",100),aligned("rs2",200));
+        Files.writeString(matrix,"variant_id\trs1\trs2\nrs1\t1\t1.0000000000000002\nrs2\t1.0000000000000002\t1\n");
+        assertEquals(1,StudyGeneticEvidence.matrix(matrix,selected,false)[0][1]);
+        assertEquals(1,StudyGeneticEvidence.matrix(matrix,selected,true)[0][1]);
+        Files.writeString(matrix,"variant_id\trs1\trs2\nrs1\t1\t-1.0000000000000002\nrs2\t-1.0000000000000002\t1\n");
+        assertEquals(-1,StudyGeneticEvidence.matrix(matrix,selected,false)[0][1]);
+        Files.writeString(matrix,"variant_id\trs1\trs2\nrs1\t1\t1.000001\nrs2\t1.000001\t1\n");
+        assertThrows(java.io.IOException.class,()->StudyGeneticEvidence.matrix(matrix,selected,false));
     }
 
     @Test void streamedLdReordersRowsAndColumnsAndOrientsTheSelectedSubmatrix()

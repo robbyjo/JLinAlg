@@ -47,6 +47,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         List<?> configuredPairs = list(StudyBioinformatics.config(context).get("genetic_pairs"));
         Map<String, Object> automaticSources = Map.of();
         String automaticSourceKind = "";
+        // Dependencies are fixed for one operation. Re-reading every full
+        // association/annotation table for each of 1000 pairs changes no finding.
+        // Keep this index local: never reuse eligibility across operations.
+        Map<String, StudyBioinformatics.Feature> eligibleFindings = null;
         if (configuredPairs.isEmpty() && StudyMrSources.configured(context)) {
             try {
                 StudyMrSources.Prepared prepared = StudyMrSources.prepare(context);
@@ -90,7 +94,15 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             Path directory = context.outputDirectory().resolve(id);
             Files.createDirectories(directory);
             try {
-                executePair(context, pair, directory, record);
+                required(pair, "feature_id");
+                if (eligibleFindings == null) {
+                    int limit = "mendelian_randomization".equals(context.operation().get("type"))
+                        ? StudyBioinformatics.mrFeatureLimit(context) : StudyBioinformatics.featureLimit(context);
+                    var loaded = new LinkedHashMap<String, StudyBioinformatics.Feature>();
+                    for (var finding : StudyBioinformatics.features(context, limit)) loaded.put(finding.id(), finding);
+                    eligibleFindings = Map.copyOf(loaded);
+                }
+                executePair(context, pair, directory, record, eligibleFindings);
                 record.put("status", "complete");
             } catch (NotEstimableException exception) {
                 record.put("status", "not_estimable");
@@ -150,16 +162,14 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         return summary;
     }
 
-    private static void executePair(Context context, Map<String, Object> pair, Path directory, Map<String, Object> record) throws IOException {
+    private static void executePair(Context context, Map<String, Object> pair, Path directory, Map<String, Object> record,
+            Map<String, StudyBioinformatics.Feature> eligibleFindings) throws IOException {
         String feature = required(pair, "feature_id");
         String operation = text(context.operation().get("type"));
         boolean mrOnly = operation.equals("mendelian_randomization");
         boolean partialColocalization = operation.equals("colocalization") && Boolean.TRUE.equals(pair.get("partial_colocalization"));
-        int featureLimit = mrOnly ? StudyBioinformatics.mrFeatureLimit(context)
-            : StudyBioinformatics.featureLimit(context);
-        StudyBioinformatics.Feature finding = StudyBioinformatics.features(context,
-            featureLimit).stream().filter(item -> item.id().equals(feature)).findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Genetic pair must identify an eligible unambiguously annotated finding from this hypothesis"));
+        StudyBioinformatics.Feature finding = eligibleFindings.get(feature);
+        if (finding == null) throw new IllegalArgumentException("Genetic pair must identify an eligible unambiguously annotated finding from this hypothesis");
         required(pair, "rationale");
         if (!Boolean.TRUE.equals(pair.get("approved"))) throw new IllegalArgumentException("Set approved:true only after scientist review of phenotype, molecular feature, tissue, ancestry, source citations and instrument assumptions");
         Map<String, Object> exposure = map(pair.get("exposure")), outcome = map(pair.get("outcome")), ld = map(pair.get("ld"));
@@ -722,7 +732,7 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
                     throw new IOException("LD row and column IDs must match uniquely");
                 Integer i = selectedRows.get(id);
                 if (i != null) for (int j = 0; j < aligned.size(); j++) {
-                    result[i][j] = number(row.get(selectedColumns[j]))
+                    result[i][j] = LdCorrelation.bounded(number(row.get(selectedColumns[j])))
                         * aligned.get(i).ldSign() * aligned.get(j).ldSign();
                 }
             }
