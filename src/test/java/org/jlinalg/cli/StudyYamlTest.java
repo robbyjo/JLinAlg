@@ -31,6 +31,20 @@ class StudyYamlTest {
         assertEquals(payload, StudyPublicEvidence.map(parsed).get("evidence"));
     }
 
+    @Test void sharedReportingReaderAcceptsExpandedDependencyManifests() throws Exception {
+        Path file=directory.resolve("manifest.yaml");
+        Files.writeString(file,("#"+"x".repeat(1000)+"\n").repeat(16_000)
+            +"operation_type: mendelian_randomization\nstate: complete\n");
+        assertThrows(RuntimeException.class,()->StudyYaml.loadMap(file));
+        var method=StudyCliExecutor.class.getDeclaredMethod("loadYaml",Path.class);
+        method.setAccessible(true);
+        var parsed=(java.util.Map<?,?>)method.invoke(null,file);
+        assertEquals("mendelian_randomization",parsed.get("operation_type"));
+        assertEquals("complete",parsed.get("state"));
+        Files.writeString(file,"state: complete\nstate: failed\n");
+        assertThrows(java.lang.reflect.InvocationTargetException.class,()->method.invoke(null,file));
+    }
+
     @Test void stillRejectsDuplicateKeysAndAliases() {
         assertThrows(RuntimeException.class,
             () -> StudyYaml.load("value: 1\nvalue: 2\n"));

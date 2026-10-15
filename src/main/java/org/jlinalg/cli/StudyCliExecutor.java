@@ -1631,7 +1631,10 @@ final class StudyCliExecutor implements StudyOperationExecutor {
     }
 
     private static Map<String, Object> loadYaml(Path path) throws IOException {
-        return StudyYaml.loadMap(path);
+        // These callers read generated dependency manifests and annotation
+        // summaries, not user contracts. Expanded MR manifests can exceed the
+        // ordinary 16-million-code-point contract budget.
+        return StudyYaml.loadArtifact(path);
     }
 
     private Result waiting(Context context, String message) throws IOException {
