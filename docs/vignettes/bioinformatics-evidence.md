@@ -184,7 +184,7 @@ MR requires at least one strong, allele-aligned instrument after public outcome 
 
 MR selects exposure instruments using p ≤ 5e-8 and F ≥ 10 by default, then LD-prunes at r-squared ≤ 0.001. It requires at least two remaining instruments for this automatic IVW branch. Outputs include fixed/random IVW, and, with at least three instruments, Egger, weighted median and leave-one-instrument-out estimates. Weak instruments, pleiotropy, selection bias, tissue specificity and exclusion-restriction assumptions still need scientific appraisal. Numerical success is not proof of a causal drug target.
 
-The current in-memory regional limit is 5,000 variants and the window cannot exceed 10 Mb. Multi-trait, multi-tissue and multiple-region analyses are separate declared pairs with separate provenance. No additional across-pair multiplicity adjustment is silently implied by their individual estimates.
+Fine-mapping, colocalization, and user-supplied LD matrices retain a 5,000-variant regional limit. Automatic MR with genotype-derived LD supports up to 20,000 variants per region; it streams LD rows and resolves column positions once, retaining only the aligned numeric matrix for pairwise clumping. These are memory budgets, not silent instrument truncation: an oversized family requires a different execution strategy rather than dropping eligible instruments. The window cannot exceed 10 Mb. Multi-trait, multi-tissue and multiple-region analyses are separate declared pairs with separate provenance. No additional across-pair multiplicity adjustment is silently implied by their individual estimates.
 
 ## Questions and optional AI
 

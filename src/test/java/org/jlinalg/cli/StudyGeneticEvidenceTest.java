@@ -67,6 +67,55 @@ class StudyGeneticEvidenceTest {
         assertTrue(failure.getMessage().contains("not positive semidefinite"));
     }
 
+    @Test void streamedLdReordersRowsAndColumnsAndOrientsTheSelectedSubmatrix()
+            throws Exception {
+        Path matrix = project.resolve("reordered.csv");
+        Files.writeString(matrix, "variant_id,\"rs2\",rs3,rs1\n"
+            + "rs3,.2,1,.3\nrs1,.1,.3,1\nrs2,1,.2,.1\n");
+        var rs3 = aligned("rs3", 300);
+        var flipped = new StudyGeneticEvidence.Aligned(rs3.exposure(),
+            rs3.outcome(), 1, -1);
+        double[][] actual = StudyGeneticEvidence.matrix(matrix,
+            List.of(flipped, aligned("rs1", 100)), true);
+        assertArrayEquals(new double[] {1, -.3}, actual[0], 1e-15);
+        assertArrayEquals(new double[] {-.3, 1}, actual[1], 1e-15);
+    }
+
+    @Test void streamedLdStillRejectsMalformedOrMismatchedRows() throws Exception {
+        Path matrix = project.resolve("malformed.tsv");
+        for (String rows : List.of("rs1\t1\t0\nrs1\t0\t1\n",
+                "rs1\t1\t0\n", "rs1\t1\t0\nrsX\t0\t1\n",
+                "rs1\t1\nrs2\t0\t1\n")) {
+            Files.writeString(matrix, "variant_id\trs1\trs2\n" + rows);
+            assertThrows(java.io.IOException.class, () -> StudyGeneticEvidence.matrix(
+                matrix, List.of(aligned("rs1", 100)), false));
+        }
+    }
+
+    @Test void denseClumpingLdCanExceedFineMappingBudgetWithoutKeepingStrings()
+            throws Exception {
+        int n = 5001;
+        Path matrix = project.resolve("dense-clumping.tsv");
+        try (var writer = Files.newBufferedWriter(matrix)) {
+            writer.write("variant_id");
+            for (int i = 1; i <= n; i++) writer.write("\trs" + i);
+            writer.newLine();
+            String zeros = "\t0".repeat(n);
+            for (int i = 1; i <= n; i++) {
+                StringBuilder row = new StringBuilder("rs" + i).append(zeros);
+                row.setCharAt(("rs" + i).length() + 2 * i - 1, '1');
+                writer.append(row).append('\n');
+            }
+        }
+        double[][] actual = StudyGeneticEvidence.matrix(matrix,
+            List.of(aligned("rs5001", 5001)), false);
+        assertEquals(1, actual[0][0]);
+        var failure = assertThrows(java.io.IOException.class,
+            () -> StudyGeneticEvidence.matrix(matrix,
+                List.of(aligned("rs5001", 5001)), true));
+        assertTrue(failure.getMessage().contains("at most 5000"));
+    }
+
     @Test void palindromeAndWeakInstrumentsAreNotSilentlyUsed() throws Exception {
         Context context = context("mendelian_randomization", Map.of());
         Files.writeString(project.resolve("exposure.tsv"), Files.readString(project.resolve("exposure.tsv")).replace("rs2\t1\t200\tA\tG", "rs2\t1\t200\tA\tT"));

@@ -230,9 +230,14 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             }
             record.put("outcome_acquisition", acquired.provenance());
         } else yPath = source(context, outcome, directory, "outcome-source.tsv", required(pair, "rationale") + " Phenotype-matched outcome statistics for " + outcomeTrait + ".");
-        Map<String, Variant> x = variants(xPath, chromosome, start, end, feature, null);
+        // Automatic MR uses LD only for pairwise clumping, so dense cis families
+        // need not inherit the smaller fine-mapping matrix budget.
+        int maximumVariants = mrOnly && automaticLd ? 20000 : 5000;
+        Map<String, Variant> x = variants(xPath, chromosome, start, end, feature, null,
+            maximumVariants);
         Set<String> outcomeFilter = mrOnly || partialColocalization ? x.keySet() : null;
-        Map<String, Variant> y = variants(yPath, chromosome, start, end, null, outcomeFilter);
+        Map<String, Variant> y = variants(yPath, chromosome, start, end, null,
+            outcomeFilter, maximumVariants);
         Path ldPath, ldAlleles;
         if (automaticLd) {
             Path[] generated;
@@ -603,7 +608,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
     }
 
     private static Map<String, Variant> variants(Path path, String chromosome, int start,
-            int end, String feature, Set<String> allowedIds) throws IOException {
+            int end, String feature, Set<String> allowedIds, int maximumVariants)
+            throws IOException {
         DelimitedData data = DelimitedData.read(path);
         boolean probability = data.header().contains("p_value");
         boolean logarithm = data.header().contains("log10_p");
@@ -631,7 +637,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             if (id.isBlank() || !ea.matches("[ACGT]") || !oa.matches("[ACGT]") || ea.equals(oa) || se <= 0 || p < 0 || p > 1)
                 throw new IOException("Regional adapter requires unique biallelic SNPs, finite beta, positive SE and p in [0,1]");
             if (result.put(id, new Variant(id, chr, pos, ea, oa, b, se, p)) != null) throw new IOException("Duplicate variant " + id);
-            if (result.size() > 5000) throw new IOException("Region exceeds 5000-variant in-memory LD budget");
+            if (result.size() > maximumVariants) throw new IOException(
+                "Region exceeds " + maximumVariants + "-variant in-memory LD budget");
         }
         if (result.isEmpty()) throw new IOException("Source has no variants in the declared region");
         return result;
@@ -649,18 +656,60 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
     private static boolean palindrome(String a, String b) { return complement(a).equals(b); }
     static double[][] matrix(Path path, List<Aligned> aligned,
             boolean verifyPositiveSemidefinite) throws IOException {
-        DelimitedData table = DelimitedData.read(path);
-        int n = table.header().size() - 1;
-        if (n > 5000 || table.rows().size() != n) throw new IOException("LD matrix must be square and contain at most 5000 variants");
-        Map<String, String[]> rows = new LinkedHashMap<>();
-        for (String[] row : table.rows()) if (rows.put(row[0], row) != null) throw new IOException("Duplicate LD matrix row");
-        Set<String> columns = new LinkedHashSet<>(table.header().subList(1, table.header().size()));
-        if (columns.size() != n || !rows.keySet().equals(columns)) throw new IOException("LD row and column IDs must match uniquely");
         double[][] result = new double[aligned.size()][aligned.size()];
-        for (int i = 0; i < aligned.size(); i++) for (int j = 0; j < aligned.size(); j++) {
-            Aligned a = aligned.get(i), b = aligned.get(j);
-            if (!rows.containsKey(a.exposure().id()) || !columns.contains(b.exposure().id())) throw new IOException("Missing aligned variant in LD matrix");
-            result[i][j] = number(rows.get(a.exposure().id())[table.column(b.exposure().id())]) * a.ldSign() * b.ldSign();
+        char delimiter = path.getFileName().toString().toLowerCase(
+            java.util.Locale.ROOT).endsWith(".csv") ? ',' : '\t';
+        try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            String first = reader.readLine();
+            if (first == null) throw new IOException("LD matrix is empty");
+            List<String> header = DelimitedData.parse(first, delimiter, 1, path);
+            int n = header.size() - 1;
+            int maximumVariants = verifyPositiveSemidefinite ? 5000 : 20000;
+            if (n < 1 || n > maximumVariants) throw new IOException(
+                "LD matrix must be square and contain at most "
+                    + maximumVariants + " variants");
+            Map<String, Integer> columns = new LinkedHashMap<>();
+            Set<String> headerNames = new LinkedHashSet<>();
+            for (int i = 0; i < header.size(); i++) {
+                String name = header.get(i).trim();
+                if (name.isEmpty() || !headerNames.add(name))
+                    throw new IOException("LD column IDs must be unique and nonblank");
+                if (i > 0) columns.put(name, i);
+            }
+            // Resolve positions once. Calling List.indexOf for every matrix cell
+            // makes even the clumping-only reader cubic in the variant count.
+            int[] selectedColumns = new int[aligned.size()];
+            Map<String, Integer> selectedRows = new LinkedHashMap<>();
+            for (int i = 0; i < aligned.size(); i++) {
+                String id = aligned.get(i).exposure().id();
+                Integer column = columns.get(id);
+                if (column == null) throw new IOException("Missing aligned variant in LD matrix");
+                selectedColumns[i] = column;
+                if (selectedRows.put(id, i) != null)
+                    throw new IOException("Duplicate aligned variant in LD matrix");
+            }
+            // Stream strings a row at a time, retaining only the aligned double
+            // matrix rather than a second, much larger full matrix of strings.
+            Set<String> seen = new LinkedHashSet<>();
+            long lineNumber = 1;
+            for (String line; (line = reader.readLine()) != null;) {
+                lineNumber++;
+                if (line.isBlank()) continue;
+                List<String> row = DelimitedData.parse(line, delimiter, lineNumber, path);
+                if (row.size() != header.size()) throw new IOException(
+                    "LD row has an unexpected number of fields at line " + lineNumber);
+                String id = row.get(0);
+                if (!seen.add(id)) throw new IOException("Duplicate LD matrix row");
+                if (!columns.containsKey(id))
+                    throw new IOException("LD row and column IDs must match uniquely");
+                Integer i = selectedRows.get(id);
+                if (i != null) for (int j = 0; j < aligned.size(); j++) {
+                    result[i][j] = number(row.get(selectedColumns[j]))
+                        * aligned.get(i).ldSign() * aligned.get(j).ldSign();
+                }
+            }
+            if (seen.size() != n) throw new IOException(
+                "LD row and column IDs must match uniquely in a square matrix");
         }
         for (int i = 0; i < result.length; i++) for (int j = 0; j < result.length; j++) {
             if (Math.abs(result[i][j]) > 1 || Math.abs(result[i][j] - result[j][i]) > 1e-10 || (i == j && Math.abs(result[i][i] - 1) > 1e-10)) throw new IOException("LD must be symmetric, bounded and have unit diagonal");
