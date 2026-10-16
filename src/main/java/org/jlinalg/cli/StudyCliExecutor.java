@@ -131,6 +131,15 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 outputs.add("standard-results/" + id + ".tsv");
             }
         }
+        StudyEffectQc.Result effectQc = StudyEffectQc.apply(standardized, harmonization, context.outputDirectory());
+        outputs.addAll(effectQc.outputs());
+        // QC precedes the common universe, all multiplicity adjustment and follow-up.
+        validCommon = null;
+        for (Path standard : standardized.values()) {
+            Set<String> retained = new LinkedHashSet<>(estimates(standard).keySet());
+            if (validCommon == null) validCommon = retained;
+            else validCommon.retainAll(retained);
+        }
         if (commonUniverse.equals("intersection")) {
             if (validCommon == null || validCommon.isEmpty())
                 throw new IOException("Strict common feature universe is empty");
@@ -144,8 +153,6 @@ final class StudyCliExecutor implements StudyOperationExecutor {
             StringBuilder summary = new StringBuilder(
                 "dataset_id\tinput_rows\teligible_rows\texcluded_invalid"
                     + "\texcluded_status\tretained_common\n");
-            int retained = commonUniverse.equals("intersection")
-                ? validCommon.size() : -1;
             for (Map.Entry<String, Standardization> entry : summaries.entrySet()) {
                 Standardization value = entry.getValue();
                 summary.append(entry.getKey()).append('\t')
@@ -153,7 +160,7 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                     .append(value.eligibleFeatures().size()).append('\t')
                     .append(value.excludedInvalid()).append('\t')
                     .append(value.excludedStatus()).append('\t')
-                    .append(retained < 0 ? value.eligibleFeatures().size() : retained)
+                    .append(DelimitedData.read(standardized.get(entry.getKey())).rows().size())
                     .append('\n');
             }
             summary.append("# exact_common_features\t")
@@ -174,7 +181,8 @@ final class StudyCliExecutor implements StudyOperationExecutor {
                 .stream().anyMatch(item -> Boolean.TRUE.equals(map(item, "request").get("retryable")));
         }
         return new Result(State.COMPLETE, "Validated and hashed " + selected.size()
-            + " dataset inputs", outputs, Map.of("retryable", retryable));
+            + " dataset inputs", outputs, Map.of("retryable", retryable,
+                "effect_outlier_qc", effectQc.document(), "method_report", effectQc.document()));
     }
 
     private Result association(Context context) throws IOException {
@@ -255,12 +263,17 @@ final class StudyCliExecutor implements StudyOperationExecutor {
             "status", "status"), standard, false);
         List<String> outputs = new ArrayList<>(List.of("association.tsv",
             "standard-results/" + datasetId + ".tsv", "console.txt"));
+        StudyEffectQc.Result effectQc = StudyEffectQc.apply(Map.of(datasetId, standard),
+            optionalMap(analysis.get("harmonization"), "analysis.harmonization"), context.outputDirectory());
+        outputs.addAll(effectQc.outputs());
         outputs.addAll(StudyFeatureAnnotations.write(context, Map.of(datasetId, standard)));
-        var method = StudyMethods.record(model, Map.of("dataset", datasetId, "formula", formula, "model", model,
+        var method = new LinkedHashMap<>(StudyMethods.record(model, Map.of("dataset", datasetId, "formula", formula, "model", model,
             "covariates", covariates, "command_arguments", arguments, "threads", options.getOrDefault("threads", "1")),
             StudyPublicEvidence.list(options.get("references")), options.get("rationale"),
-            model.equals("ols") ? List.of("linear regression") : List.of(model, "regression"));
-        return new Result(State.COMPLETE, "Fitted association model for " + datasetId, outputs, Map.of("method_report", method));
+            model.equals("ols") ? List.of("linear regression") : List.of(model, "regression")));
+        method.put("effect_outlier_qc", effectQc.document());
+        return new Result(State.COMPLETE, "Fitted association model for " + datasetId, outputs,
+            Map.of("method_report", method, "effect_outlier_qc", effectQc.document()));
     }
 
     private Result replication(Context context) throws IOException {

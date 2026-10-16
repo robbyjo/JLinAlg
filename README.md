@@ -127,6 +127,11 @@ contextual search limits. `analysis.bioinformatics.mr.max_features` is an option
 explicit cap, not a default top-N selection; existing explicit caps remain honored.
 Source/assay and instrument prerequisites still apply. This changes future default
 selection only and does not regenerate existing study results.
+Association harmonization and newly fitted results also receive an audited,
+conservative, scale-aware extreme-effect QC screen before comparisons and
+downstream analysis. Configure `analysis.harmonization.effect_outliers`; inspect
+the exclusion log, skipped-screen warnings and unit/model diagnostics before
+interpreting the filtered results. See the [QC policy](docs/vignettes/study-pipeline-tutorial.md#effect-size-quality-control-before-downstream-analysis).
 
 The first [study questions and decisions tranche](docs/vignettes/study-questions-and-decisions.md#implemented-first-tranche)
 adds deterministic prerequisite questions, checked batch answers, answer-linked

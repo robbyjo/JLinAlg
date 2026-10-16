@@ -36,7 +36,9 @@ final class StudyMethods {
             + "State customary values such as FDR < 0.05 without requiring a special justification. Require recorded scientific justifications only for uncommon, study-specific or deviating parameter choices; never invent a rationale. "
             + "Cite both statistical methods and annotation/database versions where relevant. "
             + "Association needs model family/link and formula orientation, biological covariates, technical factors, transformations, "
-            + "sample selection/missingness, pedigree/relatedness adjustment and multiple-testing rule. Meta-analysis needs effect scale, "
+            + "sample selection/missingness, pedigree/relatedness adjustment and multiple-testing rule. Report any executed effect-outlier QC, "
+            + "its effective thresholds, robust-scale fallback or skipped screening, per-cohort exclusions and resulting testing universe; "
+            + "identify post hoc QC changes and require sensitivity review rather than treating excluded large effects as proven artifacts. Meta-analysis needs effect scale, "
             + "weighting, fixed/random-effects estimator, heterogeneity and cohort-overlap handling. Enrichment needs selection threshold, "
             + "tested-gene universe, feature-to-gene mapping, database/release, test and multiplicity adjustment. MR needs molecular exposure/outcome "
             + "and tissue, GWAS/QTL sources, instrument P/F thresholds, LD clumping reference/r2/window, allele harmonization, overlap assumptions, estimator and sensitivity settings. "
@@ -56,6 +58,7 @@ final class StudyMethods {
     }
     static String role(String type) {
         return switch (type) {
+            case "validate_harmonize" -> "association";
             case "gene_ontology", "pathway_enrichment" -> "enrichment_ontology";
             case "network_analysis", "network_followup" -> "network";
             case "leave_one_cohort_out", "fixed_random_comparison" -> "sensitivity_analysis";

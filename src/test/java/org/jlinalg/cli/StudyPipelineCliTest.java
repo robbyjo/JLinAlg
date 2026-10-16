@@ -367,7 +367,10 @@ class StudyPipelineCliTest {
                 inputs: {discovery: [missing]}
                 analysis:
                   goals: [meta_anlysis]
-                  harmonization: {invalid_rows: ignore, common_universe: union}
+                  harmonization:
+                    invalid_rows: ignore
+                    common_universe: union
+                    effect_outliers: {enabled: sometimes, robust_z: 0, min_features: 2.5, max_abs_effect: -1, mystery: true}
                   replication: {adjustment_scope: all, require_same_sign: sometimes}
             analysis_requests:
               - id: request-1
@@ -383,6 +386,8 @@ class StudyPipelineCliTest {
         assertTrue(stdout.contains("unregistered analysis goal"));
         assertTrue(stdout.contains("harmonization.invalid_rows"));
         assertTrue(stdout.contains("harmonization.common_universe"));
+        for (String field : List.of("enabled", "robust_z", "min_features", "max_abs_effect", "mystery"))
+            assertTrue(stdout.contains("effect_outliers." + field));
         assertTrue(stdout.contains("replication.adjustment_scope"));
         assertTrue(stdout.contains("replication.require_same_sign"));
         assertTrue(stdout.contains("unknown hypothesis"));
@@ -647,6 +652,7 @@ class StudyPipelineCliTest {
                   harmonization:
                     invalid_rows: exclude
                     common_universe: intersection
+                    effect_outliers: {enabled: true, robust_z: 100, min_features: 20}
                   replication:
                     adjustment_scope: discovery_subset
                     require_same_sign: false

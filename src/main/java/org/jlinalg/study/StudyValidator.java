@@ -517,7 +517,7 @@ public final class StudyValidator {
             Map<String, Object> harmonization = mapping(
                 analysis.get("harmonization"), path + ".analysis.harmonization",
                 true, issues);
-            unknown(harmonization, Set.of("invalid_rows", "common_universe"),
+            unknown(harmonization, Set.of("invalid_rows", "common_universe", "effect_outliers"),
                 path + ".analysis.harmonization", issues);
             enumValue(harmonization.get("invalid_rows"),
                 path + ".analysis.harmonization.invalid_rows",
@@ -525,6 +525,20 @@ public final class StudyValidator {
             enumValue(harmonization.get("common_universe"),
                 path + ".analysis.harmonization.common_universe",
                 Set.of("none", "intersection"), issues);
+            if (harmonization.containsKey("effect_outliers")) {
+                String qcPath = path + ".analysis.harmonization.effect_outliers";
+                Map<String, Object> qc = mapping(harmonization.get("effect_outliers"), qcPath, true, issues);
+                unknown(qc, Set.of("enabled", "robust_z", "min_features", "max_abs_effect"), qcPath, issues);
+                if (qc.containsKey("enabled") && !(qc.get("enabled") instanceof Boolean))
+                    issues.add(issue(ERROR, qcPath + ".enabled", "must be true or false"));
+                for (String field : List.of("robust_z", "max_abs_effect"))
+                    if (qc.containsKey(field) && (!(qc.get(field) instanceof Number value)
+                            || !Double.isFinite(value.doubleValue()) || !(value.doubleValue() > 0)))
+                        issues.add(issue(ERROR, qcPath + "." + field, "must be a positive finite number"));
+                if (qc.containsKey("min_features") && (!(qc.get("min_features") instanceof Number value)
+                        || !Double.isFinite(value.doubleValue()) || value.doubleValue() != value.intValue() || value.intValue() < 3))
+                    issues.add(issue(ERROR, qcPath + ".min_features", "must be an integer >= 3"));
+            }
         }
         if (analysis.containsKey("replication")) {
             Map<String, Object> replication = mapping(

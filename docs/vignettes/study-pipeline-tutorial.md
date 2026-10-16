@@ -36,6 +36,72 @@ control. MCP, provider-specific OAuth login/refresh, general pipeline local-mode
 adapters and autonomous LLM orchestration remain future work. The `llm` actor
 option alone never enables a call.
 
+## Effect-size quality control before downstream analysis
+
+Numerically finite coefficients can still be extreme: a nearly constant predictor,
+ill-conditioned design, separation, unit mismatch or unstable fit can produce a
+very large coefficient and SE. A large raw coefficient is not itself proof of a
+bad association, and summary statistics cannot establish the cause. Do not hide
+these points by clipping a plot or choose exclusions to improve correlation or
+significance. Inspect predictor variation, units and upstream fit diagnostics.
+
+JLinAlg now applies an auditable, conservative effect-size QC screen to supplied
+association results during harmonization and to newly fitted association results
+before annotation. The defaults are:
+
+~~~yaml
+analysis:
+  harmonization:
+    effect_outliers:
+      enabled: true
+      robust_z: 100
+      min_features: 20
+      # max_abs_effect: 1000  # optional; choose only with known effect units
+~~~
+
+For each dataset separately, using all numerically eligible association rows,
+the center is the median beta and the robust scale is
+`1.482602218505602 * median(abs(beta - median(beta)))`. If this scale is zero
+or nonfinite, use `(Q75 - Q25) / 1.348979500392164` with linearly interpolated
+quantiles. Exclude estimates with `abs(beta - center) / scale > robust_z`.
+This is a configurable QC heuristic, **not** a calibrated hypothesis test or a
+universal biological plausibility cutoff. The conservative default of 100 is
+intended to catch gross extremes, not trim an ordinary heavy tail. Uniform
+changes of effect units do not change the relative selection. It uses neither
+P values nor agreement with other cohorts. Relative screening is explicitly
+skipped below `min_features` or without a positive finite robust scale; no
+epsilon denominator is invented. An optional `abs(beta) > max_abs_effect`
+rule still applies to these families. Set `enabled: false` for an explicitly
+unfiltered sensitivity run.
+
+The operation writes `effect-outlier-summary.tsv`,
+`effect-outlier-exclusions.tsv` (dataset, feature, beta, SE, P, robust score and
+reason) and `effect-outlier-qc.yaml` (effective settings, counts, fallbacks,
+skips and caveats), all included in its output manifest and Methods inventory.
+The source files are untouched. Excluded estimates are removed from the generated
+standardized tables, so comparisons/correlations, discovery/replication, FDR,
+meta-analysis, sensitivity analyses, enrichment, MR and colocalization selection
+consume the same QC-eligible results. With `common_universe: intersection`,
+the intersection is computed **after** QC: a feature excluded in one supplied
+cohort is absent from every supplied cohort's downstream table. Otherwise only
+the flagged dataset estimate is removed; valid estimates in other datasets
+remain eligible under the usual minimum-cohort rules. The testing family is
+the retained eligible family, not the old unfiltered set. If separate matrix
+association operations generate new tables, QC is per operation/dataset;
+harmonization does not retroactively impose a shared intersection on those
+later outputs.
+
+Because selection uses estimated effects, it is not an independent-filtering
+procedure that guarantees unchanged FDR calibration merely by avoiding P values.
+Prespecify the policy where possible and retain an unfiltered sensitivity analysis.
+
+Record a post hoc QC change as an amendment, review exclusion counts and
+unit/model diagnostics, and compare a separately approved unfiltered sensitivity
+run before changing scientific conclusions. This software update does not
+invalidate caches, overwrite sealed results, redraw historical figures, or repair
+an already completed manuscript: a new approved analysis is necessary. Never
+claim old results used this screen based on the current software defaults.
+
 ## Probe annotation and genomic locations
 
 The source build assesses annotation during result harmonization (or after an

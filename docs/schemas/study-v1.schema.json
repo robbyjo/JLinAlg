@@ -295,7 +295,18 @@
       "additionalProperties": false,
       "properties": {
         "invalid_rows": {"enum": ["error", "exclude"], "default": "error"},
-        "common_universe": {"enum": ["none", "intersection"], "default": "none"}
+        "common_universe": {"enum": ["none", "intersection"], "default": "none"},
+        "effect_outliers": {"$ref": "#/$defs/effectOutliers"}
+      }
+    },
+    "effectOutliers": {
+      "type": "object", "additionalProperties": false,
+      "description": "Audited per-dataset association-estimate QC before comparisons, FDR and downstream analyses. Conservative scale-aware heuristic, not proof of invalidity. Raw inputs are preserved; common_universe=intersection propagates exclusions across cohorts. Historical results require a new approved run.",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "robust_z": {"type": "number", "exclusiveMinimum": 0, "default": 100, "description": "Exclude when abs(beta-median(beta))/robust_scale is strictly above this threshold. Scale uses normal-consistent MAD with IQR fallback; zero-scale families are not screened relatively."},
+        "min_features": {"type": "integer", "minimum": 3, "maximum": 2147483647, "default": 20},
+        "max_abs_effect": {"type": "number", "exclusiveMinimum": 0, "description": "Optional unit-specific absolute coefficient bound. Applies even below min_features; no universal absolute bound is inferred."}
       }
     },
     "replicationPolicy": {
