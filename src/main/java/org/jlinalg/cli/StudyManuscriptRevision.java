@@ -36,7 +36,7 @@ final class StudyManuscriptRevision {
         if (out.startsWith(root)) throw new IOException("Revision bundle must be outside the frozen source project");
         String requestHash = FollowupSupport.hash(request);
         Map<String, Object> edit = load(request);
-        keys(edit, Set.of("schema_version", "id", "title", "rationale", "previous_revision", "sections", "remove_sections", "comments", "abbreviations", "participant_project", "discussion_selection_note", "paragraph_order", "citation_policy", "reference_bundles"), "revision");
+        keys(edit, Set.of("schema_version", "id", "title", "rationale", "previous_revision", "sections", "remove_sections", "comments", "abbreviations", "participant_project", "discussion_selection_note", "paragraph_order", "citation_policy", "reference_bundles", "editorial_payload"), "revision");
         if (!Integer.valueOf(1).equals(edit.get("schema_version"))) throw new IOException("Revision schema_version must be 1");
         identifier(required(edit, "id")); required(edit, "title"); required(edit, "rationale");
         String start = Instant.now().toString();
@@ -183,7 +183,15 @@ final class StudyManuscriptRevision {
             if ("addressed".equals(c.get("status"))) required(c, "response");
         }
         // All semantic validation precedes publication. The unique output is never overwritten.
-        String editorialPayload = StudyAssistance.json(StudyEditorialReview.payload(merged, evidence, methodsInventory, catalog));
+        Map<String, Object> payloadPolicy = map(merged.get("editorial_payload"));
+        if (merged.containsKey("editorial_payload") && !(merged.get("editorial_payload") instanceof Map<?, ?>))
+            throw new IOException("editorial_payload must be a mapping");
+        keys(payloadPolicy, Set.of("mode", "rationale"), "editorial_payload");
+        String payloadMode = payloadPolicy.containsKey("mode") ? required(payloadPolicy, "mode") : "generate";
+        if (!Set.of("generate", "omit").contains(payloadMode)) throw new IOException("editorial_payload mode must be generate or omit");
+        if (payloadMode.equals("omit")) required(payloadPolicy, "rationale");
+        String editorialPayload = payloadMode.equals("omit") ? null
+            : StudyAssistance.json(StudyEditorialReview.payload(merged, evidence, methodsInventory, catalog));
         Files.createDirectories(out.getParent()); Files.createDirectory(out);
         for (String directory : List.of("artifacts", "scripts", "metadata", "logs", "previews")) Files.createDirectory(out.resolve(directory));
         Files.copy(request, out.resolve("metadata/revision-request.yaml"));
@@ -235,7 +243,9 @@ final class StudyManuscriptRevision {
         }
         writeYaml(out.resolve("artifacts/evidence.yaml"), evidence);
         writeYaml(out.resolve("artifacts/publication-claims.yaml"), Map.of("claims", claims, "limitations", LIMIT));
-        write(out.resolve("artifacts/editorial-payload.json"), editorialPayload);
+        if (editorialPayload != null) write(out.resolve("artifacts/editorial-payload.json"), editorialPayload);
+        else writeYaml(out.resolve("artifacts/editorial-payload-status.yaml"), Map.of("state", "omitted_by_explicit_request",
+            "rationale", payloadPolicy.get("rationale"), "limitation", "Local manuscript and complete evidence are retained. No editorial disclosure payload exists; external editorial review is unavailable for this revision. The default payload size and exact-hash approval rules are unchanged."));
         writeYaml(out.resolve("artifacts/citation-review.yaml"), citationReview);
         writeYaml(out.resolve("artifacts/methods-inventory.yaml"), methodsInventory);
         writeYaml(out.resolve("artifacts/study-context-review.yaml"), StudyContextReview.inventory(study, null));

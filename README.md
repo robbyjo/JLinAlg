@@ -91,6 +91,10 @@ findings. Repeating a command resumes verified work and retries unfinished steps
 HTML evidence and manuscript supplement previews have explicit nesting, row and
 text budgets; full machine-readable evidence and checksum-linked result files
 remain unchanged. Index search covers operation identity, state and summary.
+An offline manuscript revision can explicitly declare `editorial_payload: {mode:
+omit, rationale: ...}` to retain a full local paper without generating an external
+editorial handoff. Omission is audited and prevents editorial submission; the
+default 120,000-character payload limit and exact-hash approval remain unchanged.
 `--rerun` starts a fresh immutable attempt. Optional data dictionaries, preapproved
 sensitivity analyses, audited browser handoff (the default assistance transport),
 explicit OpenAI/Gemini or OpenAI-compatible API connections, cited literature review,

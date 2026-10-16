@@ -17,6 +17,30 @@ import org.junit.jupiter.api.io.TempDir;
 class StudyManuscriptRevisionTest {
     @TempDir Path directory;
 
+    @Test void explicitLocalOnlyRevisionRetainsFullTextWithoutWeakeningEditorialLimits() throws Exception {
+        Path p=project(), r=request(); String ledger=FollowupSupport.hash(p.resolve("ledger/events.jsonl"));
+        String longText="Complete local manuscript context ".repeat(4500);
+        Files.writeString(r,Files.readString(r).replace("<script>alert('not executable')</script> Editorial context.",longText));
+        var oversized=assertThrows(java.io.IOException.class,()->StudyManuscriptRevision.create(p,r,directory.resolve("too-large"),StudyProject.Actor.human("test")));
+        assertTrue(oversized.getMessage().contains("120000"));assertFalse(Files.exists(directory.resolve("too-large")));
+        Files.writeString(r,Files.readString(r)+"\neditorial_payload: {mode: omit, rationale: Keep the complete manuscript local without an external editorial handoff.}\n");
+        Path out=directory.resolve("local-only");StudyManuscriptRevision.create(p,r,out,StudyProject.Actor.human("test"));
+        StudyManuscriptRevision.verifyBundle(out);
+        assertTrue(Files.readString(out.resolve("artifacts/manuscript.html")).contains(longText));
+        assertTrue(Files.readString(out.resolve("artifacts/editorial-payload-status.yaml")).contains("omitted_by_explicit_request"));
+        assertFalse(Files.exists(out.resolve("artifacts/editorial-payload.json")));
+        var missing=assertThrows(java.io.IOException.class,()->StudyEditorialReview.request(out,directory.resolve("not-sent"),"unused",Map.of(),StudyProject.Actor.human("test"),false,
+            new StudyAssistance((uri,provider,key,body,timeout)->{fail("No omitted payload may be transmitted");return null;},ignored->{fail("No credential access");return null;})));
+        assertTrue(missing.getMessage().contains("no editorial disclosure payload"));assertFalse(Files.exists(directory.resolve("not-sent")));
+        assertEquals(ledger,FollowupSupport.hash(p.resolve("ledger/events.jsonl")));
+    }
+
+    @Test void editorialPayloadOptOutRequiresAnExplicitReason() throws Exception {
+        Path p=project(),r=request();Files.writeString(r,Files.readString(r)+"\neditorial_payload: {mode: omit}\n");
+        assertThrows(java.io.IOException.class,()->StudyManuscriptRevision.create(p,r,directory.resolve("missing-reason"),StudyProject.Actor.human("test")));
+        assertFalse(Files.exists(directory.resolve("missing-reason")));
+    }
+
     @Test void importedReferencesAreHashPinnedOfflineAndStrictCitationsPersistInPayloadAndPaper() throws Exception {
         Path p = project(), refs = directory.resolve("refs.yaml");
         Files.writeString(refs, "schema_version: 1\nreferences:\n  - {id: 'pmid:123', rationale: 'Cohort design reference.'}\n");

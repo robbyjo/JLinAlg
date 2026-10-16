@@ -139,6 +139,7 @@ final class StudyEditorialReview {
         if (Files.exists(out) || out.startsWith(root)) throw new IOException("Choose a new editorial-review bundle outside the frozen revision");
         StudyManuscriptRevision.verifyBundle(root);
         Path payloadFile = root.resolve("artifacts/editorial-payload.json");
+        if (!Files.isRegularFile(payloadFile)) throw new IOException("Revision has no editorial disclosure payload; an explicitly omitted payload cannot be sent for editorial review");
         String payloadHash = FollowupSupport.hash(payloadFile);
         if (!payloadHash.equals(map(load(root.resolve("metadata/manifest.yaml")).get("files_sha256")).get("artifacts/editorial-payload.json"))) throw new IOException("Editorial payload is not part of the frozen revision inventory");
         if (!payloadHash.equals(approvedHash)) throw new IOException("Approved editorial payload SHA-256 does not match. Review the exact payload; no request was sent");
