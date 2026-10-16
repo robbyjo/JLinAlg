@@ -40,6 +40,23 @@ class StudyGeneticEvidenceTest {
         assertTrue(Files.readString(context.outputDirectory().resolve("pair/exposure-source.tsv.source.yaml")).contains("sha256"));
     }
 
+    @Test void reviewedMrPairBeyondContextualTopTenStillRunsWithoutAnExplicitCap() throws Exception {
+        Context context=context("mendelian_randomization",Map.of());
+        Path upstream=context.dependencyDirectories().get("harmonize");
+        StringBuilder primary=new StringBuilder("feature_id\tp_value\n");
+        for(int i=0;i<15;i++)primary.append("other-").append(i).append("\t1e-9\n");
+        primary.append("probe1\t1e-8\n");
+        Files.writeString(upstream.resolve("standard-results/d1.tsv"),primary);
+        String annotation=Files.readString(upstream.resolve("feature-annotation.tsv"));
+        for(int i=0;i<15;i++)annotation+="other-"+i+"\tTEST\tENSG1\t1\t100\t300\tGRCh38\tlocated\n";
+        Files.writeString(upstream.resolve("feature-annotation.tsv"),annotation);
+        assertFalse(StudyBioinformatics.features(context).stream().anyMatch(f->f.id().equals("probe1")));
+        var result=new StudyGeneticEvidence().execute(context);
+        assertEquals(State.COMPLETE,result.state(),result.details().toString());
+        assertTrue(Files.isRegularFile(context.outputDirectory().resolve("pair/mr-ivw-fixed.tsv")));
+        assertEquals("all_significant_features",((Map<?,?>)result.details().get("feature_selection")).get("scope"));
+    }
+
     @Test void runsFineMappingAndColocalizationWithPriorSensitivity() throws Exception {
         Context context = context("colocalization", Map.of());
         var result = new StudyGeneticEvidence().execute(context);

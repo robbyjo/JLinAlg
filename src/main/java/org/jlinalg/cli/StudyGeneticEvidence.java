@@ -96,10 +96,10 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
             try {
                 required(pair, "feature_id");
                 if (eligibleFindings == null) {
-                    int limit = "mendelian_randomization".equals(context.operation().get("type"))
-                        ? StudyBioinformatics.mrFeatureLimit(context) : StudyBioinformatics.featureLimit(context);
+                    var findings = "mendelian_randomization".equals(context.operation().get("type"))
+                        ? StudyBioinformatics.mrFeatures(context) : StudyBioinformatics.features(context);
                     var loaded = new LinkedHashMap<String, StudyBioinformatics.Feature>();
-                    for (var finding : StudyBioinformatics.features(context, limit)) loaded.put(finding.id(), finding);
+                    for (var finding : findings) loaded.put(finding.id(), finding);
                     eligibleFindings = Map.copyOf(loaded);
                 }
                 executePair(context, pair, directory, record, eligibleFindings);
@@ -118,6 +118,8 @@ final class StudyGeneticEvidence implements StudyOperationExecutor {
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("pairs", results);
+        if ("mendelian_randomization".equals(context.operation().get("type")))
+            details.put("feature_selection", StudyBioinformatics.mrFeatureSelection(context));
         if (!automaticSources.isEmpty()) details.put("automatic_" + automaticSourceKind + "_sources",
             automaticSourceSummary(automaticSources, context.outputDirectory().resolve("automatic-" + automaticSourceKind + "-sources.yaml")));
         List<Object> caveats = results.stream().map(StudyPublicEvidence::map)

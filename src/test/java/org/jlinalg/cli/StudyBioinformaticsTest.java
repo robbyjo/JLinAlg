@@ -285,6 +285,107 @@ class StudyBioinformaticsTest {
         assertEquals(1000, StudyBioinformatics.geneticFeatureLimit(context));
     }
 
+    @Test void mrDefaultIncludesAllSignificantTranscriptsProteinsAndProbesBeyondOldLimits() throws Exception {
+        Context context = context("mendelian_randomization", Map.of("hypotheses", List.of(Map.of("id", "h1", "analysis",
+            Map.of("bioinformatics", Map.of("max_features", 1))))));
+        significantFeatures(context, 10005);
+        var findings = StudyBioinformatics.mrFeatures(context);
+        assertEquals(10005, findings.size());
+        assertEquals(1, StudyBioinformatics.features(context).size());
+        assertEquals(Integer.MAX_VALUE, StudyBioinformatics.mrFeatureLimit(context));
+        assertTrue(findings.stream().allMatch(feature -> feature.fdr() < .05));
+        for (String kind : List.of("transcript", "protein", "probe"))
+            assertTrue(findings.stream().anyMatch(feature -> feature.id().startsWith(kind)));
+        assertEquals(findings.stream().map(StudyBioinformatics.Feature::id).sorted().toList(), findings.stream().map(StudyBioinformatics.Feature::id).toList());
+        assertEquals("all_significant_features", StudyBioinformatics.mrFeatureSelection(context).get("scope"));
+        assertEquals("unlimited", StudyBioinformatics.mrFeatureSelection(context).get("max_features"));
+    }
+
+    @Test void mrExplicitCapStillAppliesAfterFullFamilySelection() throws Exception {
+        Context context = context("mendelian_randomization", Map.of("hypotheses", List.of(Map.of("id", "h1", "analysis",
+            Map.of("bioinformatics", Map.of("max_features", 1, "mr", Map.of("max_features", 3)))))));
+        significantFeatures(context, 30);
+        assertEquals(3, StudyBioinformatics.mrFeatures(context).size());
+        assertEquals(1, StudyBioinformatics.features(context).size());
+        assertEquals(3, StudyBioinformatics.geneticFeatures(context).size());
+        assertEquals("significant_features_with_explicit_cap", StudyBioinformatics.mrFeatureSelection(context).get("scope"));
+        Path primary = context.dependencyDirectories().get("harmonize").resolve("standard-results/d1.tsv");
+        Files.writeString(primary, "feature_id\tp_value\ntranscript-00000\t0.04\n" +
+            java.util.stream.IntStream.range(0,99).mapToObj(i -> "background-"+i+"\t0.5\n").collect(java.util.stream.Collectors.joining()));
+        assertTrue(StudyBioinformatics.mrFeatures(context).isEmpty(), "BH must not be recomputed within the capped or annotated subset");
+    }
+
+    @Test void mrUsesStrictConfiguredFdrThresholdAndFullTestedFamily() throws Exception {
+        Context context = context("mendelian_randomization", Map.of());
+        Path primary = context.dependencyDirectories().get("harmonize").resolve("standard-results/d1.tsv");
+        Files.writeString(primary, "feature_id\tp_value\nbest\t0.05\n");
+        assertTrue(StudyBioinformatics.mrFeatures(context).isEmpty());
+        assertEquals(1, StudyBioinformatics.features(context).size(), "Contextual boundary behavior remains unchanged");
+        Files.writeString(primary, "feature_id\tp_value\nbest\t0.049\n");
+        assertEquals(1, StudyBioinformatics.mrFeatures(context).size());
+        Context custom = context("mendelian_randomization", Map.of("hypotheses", List.of(Map.of("id", "h1", "analysis", Map.of("bioinformatics", Map.of("fdr", .1))))));
+        Path customPrimary = custom.dependencyDirectories().get("harmonize").resolve("standard-results/d1.tsv");
+        Files.writeString(customPrimary, Files.readString(customPrimary).replace("1e-9", "0.0008"));
+        assertEquals(.08, StudyBioinformatics.mrFeatures(custom).get(0).fdr(), 1e-12);
+        assertEquals(.1, StudyBioinformatics.mrFeatureSelection(custom).get("fdr_threshold"));
+    }
+
+    @Test void mrPrefersFullPooledMetaFamilyOverPrimaryOrIndividualCohortRows() throws Exception {
+        Context base = context("mendelian_randomization", Map.of());
+        Path meta = Files.createTempDirectory(project, "meta-");
+        Files.writeString(meta.resolve("manifest.yaml"), "operation_type: meta_analysis\nstate: complete\n");
+        String background = java.util.stream.IntStream.range(0,99).mapToObj(i -> "background-"+i+"\tpooled\tok\t0.5\n").collect(java.util.stream.Collectors.joining());
+        Files.writeString(meta.resolve("meta-analysis.tsv"), "feature_id\tterm\tstatus\tp_value\nbest\tpooled\tok\t0.0004\nbest\tcohort\tok\t0.9\n"+background);
+        var dependencies = new LinkedHashMap<>(base.dependencyDirectories()); dependencies.put("meta", meta);
+        Context context = new Context(base.project(),base.outputDirectory(),base.operation(),base.study(),base.plan(),dependencies);
+        assertEquals(.04, StudyBioinformatics.mrFeatures(context).get(0).fdr(), 1e-12);
+        Files.writeString(meta.resolve("meta-analysis.tsv"), Files.readString(meta.resolve("meta-analysis.tsv")).replace("0.0004", "0.0008"));
+        assertTrue(StudyBioinformatics.mrFeatures(context).isEmpty());
+    }
+
+    @Test void qtlReviewExpandsForDeclaredOrPlannedMrButNotColocalizationAlone() throws Exception {
+        Context base = context("irqtl_candidate_review", Map.of()); significantFeatures(base,30);
+        assertEquals(10, StudyBioinformatics.geneticFeatures(base).size());
+        for (String goal : List.of("mendelian_randomization", "colocalization")) {
+            Context planned = new Context(base.project(),base.outputDirectory(),base.operation(),base.study(),
+                Map.of("operations",List.of(Map.of("hypothesis","h1","type",goal))),base.dependencyDirectories());
+            assertEquals(goal.equals("mendelian_randomization") ? 30 : 10,StudyBioinformatics.geneticFeatures(planned).size());
+        }
+        Map<String,Object> study = new LinkedHashMap<>(base.study());
+        study.put("hypotheses",List.of(Map.of("id","h1","analysis",Map.of("goals",List.of("mendelian_randomization")))));
+        Context declared = new Context(base.project(),base.outputDirectory(),base.operation(),study,base.plan(),base.dependencyDirectories());
+        assertEquals(30,StudyBioinformatics.geneticFeatures(declared).size());
+    }
+
+    @Test void localQtlCandidateReviewIncludesSignificantTranscriptsBeyondContextualCap() throws Exception {
+        Context base=context("irqtl_candidate_review",Map.of("hypotheses",List.of(Map.of("id","h1","analysis",Map.of("goals",List.of("mendelian_randomization"))))));
+        significantFeatures(base,30);
+        Path source=project.resolve("local-cis.csv");
+        Files.writeString(source,"SNP,SNP_Chr,SNP_Pos,EAF,N,Tx,Is_Cis,RSq,Fx,T,log10P\nchr1:123:G:A:rs1,1,123,0.2,1000,transcript-00027,1,.02,.1,20,-10\n");
+        Map<String,Object> study=new LinkedHashMap<>(base.study());
+        study.put("datasets",List.of(Map.of("id","d1","type","transcriptomics","files",Map.of("irqtl",source.toString()),
+            "columns",Map.of("irqtl",Map.of("genome_build","GRCh38","effect_allele","ALT","complete_region",false,"export_p_threshold",1e-7,"rationale","Synthetic cis-only review")))));
+        Context context=new Context(base.project(),base.outputDirectory(),base.operation(),study,base.plan(),base.dependencyDirectories());
+        var result=new StudyIrQtlReview().execute(context);
+        assertEquals(State.COMPLETE,result.state());
+        assertEquals(30,((List<?>)result.details().get("selected_features")).size());
+        assertTrue(Files.readString(context.outputDirectory().resolve("irqtl-1-candidates.tsv")).contains("transcript-00027"));
+        assertEquals("all_significant_features",((Map<?,?>)result.details().get("mr_feature_selection")).get("scope"));
+    }
+
+    private void significantFeatures(Context context, int count) throws Exception {
+        var primary = new StringBuilder("feature_id\tp_value\n");
+        var annotation = new StringBuilder("feature_id\tgene_symbol\tgene_id\tchromosome\tstart\tend\tgenome_build\tmapping_status\n");
+        for (int i=0;i<count;i++) {
+            String id=List.of("transcript","protein","probe").get(i%3)+String.format(java.util.Locale.ROOT,"-%05d",i);
+            primary.append(id).append("\t1e-9\n");
+            annotation.append(id).append("\tTEST\tENSG1\t1\t100\t300\tGRCh38\tlocated\n");
+        }
+        Path directory=context.dependencyDirectories().get("harmonize");
+        Files.writeString(directory.resolve("standard-results/d1.tsv"),primary);
+        Files.writeString(directory.resolve("feature-annotation.tsv"),annotation);
+    }
+
     @Test void sequenceBudgetDoesNotMasqueradeAsMissingAnnotation() throws Exception {
         Context base = context("bioinformatics_investigation", Map.of());
         Path annotation = base.dependencyDirectories().get("harmonize")

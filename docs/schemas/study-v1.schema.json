@@ -259,7 +259,7 @@
         "instrument_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.00000005, "default": 0.00000005},
         "minimum_f": {"type": "number", "minimum": 10, "default": 10},
         "clump_r2": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.01, "default": 0.001},
-        "max_features": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 10, "description": "Number of FDR-significant meta-analysis features to screen for cis-irQTL MR. Every eligible cis instrument for each selected feature is passed to harmonization and LD clumping."}
+        "max_features": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "Optional explicit cap on FDR-significant measured features screened for MR. Omit to investigate all eligible transcripts, proteins or probes with full-family BH FDR strictly below bioinformatics.fdr (default 0.05), independently of contextual max_features. All eligible cis instruments per feature are passed together to harmonization and LD clumping; source/assay compatibility is still required."}
       }
     },
     "geneticPair": {

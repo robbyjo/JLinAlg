@@ -121,6 +121,12 @@ adds audited public-source discovery, reviewed regional fine-mapping/colocalizat
 protein and reference-sequence investigation, non-LLM literature search, per-feature
 candidate evidence, and local evidence archives. A separate offline synthetic example
 exercises the numerical chain; missing scientific inputs remain explicit questions.
+MR defaults to all eligible measured transcripts, proteins or probes passing the
+configured full-family BH threshold (`FDR < 0.05` by default), independently of
+contextual search limits. `analysis.bioinformatics.mr.max_features` is an optional
+explicit cap, not a default top-N selection; existing explicit caps remain honored.
+Source/assay and instrument prerequisites still apply. This changes future default
+selection only and does not regenerate existing study results.
 
 The first [study questions and decisions tranche](docs/vignettes/study-questions-and-decisions.md#implemented-first-tranche)
 adds deterministic prerequisite questions, checked batch answers, answer-linked

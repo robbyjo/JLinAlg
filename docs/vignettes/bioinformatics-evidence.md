@@ -92,8 +92,8 @@ For an FHS irQTL exposure and BMI outcome, declare the concise source policy onc
 analysis:
   goals: [mendelian_randomization]
   bioinformatics:
+    fdr: 0.05
     mr:
-      max_features: 1000
       exposure_dataset: fhs-bmi
       exposure_ancestry: European
       outcome_provider: auto
@@ -103,7 +103,11 @@ analysis:
       ld_population: EUR
 ```
 
-The actual irQTL analysis ancestry is deliberately required; JLinAlg does not infer it from the FHS cohort name. For BMI/EUR, `auto` selects Pan-UK Biobank field 21001; for obesity/EUR it selects ICD-10 E66, including recorded case/control counts. A non-UKB exposure cohort plus the UKB-only outcome establishes the named-cohort basis for `sample_overlap: none`; an exposure that may include UK Biobank is rejected. The policy ranks the complete tested meta-analysis family by p-value, retains only full-family FDR-significant features, and independently screens up to `mr.max_features`. It excludes every row not explicitly marked cis, then passes all genome-wide-significant cis-irQTL candidates for each transcript together to outcome matching and ancestry-matched GRCh38 LD clumping. One retained independent instrument produces a Wald ratio; multiple retained instruments produce the applicable multi-instrument estimators and sensitivity analyses. There is no arbitrary per-transcript instrument cap.
+The actual irQTL analysis ancestry is deliberately required; JLinAlg does not infer it from the FHS cohort name. For BMI/EUR, `auto` selects Pan-UK Biobank field 21001; for obesity/EUR it selects ICD-10 E66, including recorded case/control counts. A non-UKB exposure cohort plus the UKB-only outcome establishes the named-cohort basis for `sample_overlap: none`; an exposure that may include UK Biobank is rejected. MR defaults to investigating **all eligible significant measured features**, not a top-10 or top-1,000 subset. BH adjustment uses the complete valid tested meta-analysis family (pooled rows only), or each full primary table when meta-analysis is unavailable, before annotation/QTL matching. Selection requires FDR strictly below `bioinformatics.fdr`, which defaults to 0.05. The rule is feature-type agnostic for measured transcripts, proteins and probes; it does not remove annotation, molecular-assay, QTL, allele, ancestry or instrument-validity prerequisites. The built-in automatic source adapter remains cis-irQTL-specific; protein/probe exposures require appropriate reviewed custom sources, not substituted irQTLs.
+
+For a deliberately capped exploratory run, explicitly set `mr.max_features: 1000` (accepted range 1–10,000); existing explicit caps are honored, and caps are applied after full-family BH selection in deterministic P-value/feature-ID order. Omit that setting to use all eligible significant features, including families larger than 10,000. The separate `bioinformatics.max_features` limit still bounds contextual literature/protein/sequence and colocalization work and never caps MR. Source audits record the threshold, strict comparison, selection scope and any explicit cap. This default change does not amend existing frozen study contracts or rerun prior results.
+
+The automatic adapter excludes every row not explicitly marked cis, then passes all genome-wide-significant cis-irQTL candidates for each transcript together to outcome matching and ancestry-matched GRCh38 LD clumping. One retained independent instrument produces a Wald ratio; multiple retained instruments produce the applicable multi-instrument estimators and sensitivity analyses. There is no arbitrary per-transcript instrument cap. Missing QTL or outcome coverage remains an audited exclusion or input requirement, not a negative causal finding.
 
 For colocalization, JLinAlg can use GWAS Catalog REST v2 to find studies by public phenotype label and the Catalog's harmonized FTP collection for complete summary-statistic files. The REST API itself exposes metadata and curated lead associations, not arbitrary full-summary-statistic rows. JLinAlg verifies the selected accession's harmonized metadata, GRCh38 build, sorted status and tabix index, installs the complete file and index in the shared cache, verifies the Catalog MD5 when available, and performs regional extraction locally.
 

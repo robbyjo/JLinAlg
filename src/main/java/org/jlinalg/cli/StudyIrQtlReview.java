@@ -25,8 +25,7 @@ import org.jlinalg.study.StudyOperationExecutor;
 final class StudyIrQtlReview implements StudyOperationExecutor {
     @Override public Result execute(Context context) throws IOException {
         Files.createDirectories(context.outputDirectory());
-        List<StudyBioinformatics.Feature> features = StudyBioinformatics.features(context,
-            StudyBioinformatics.geneticFeatureLimit(context));
+        List<StudyBioinformatics.Feature> features = StudyBioinformatics.geneticFeatures(context);
         Set<String> selected = new HashSet<>();
         features.forEach(f -> selected.add(f.id()));
         List<Object> sources = new ArrayList<>();
@@ -45,6 +44,7 @@ final class StudyIrQtlReview implements StudyOperationExecutor {
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("molecular_trait", "isoform ratio quantitative trait locus (irQTL)");
+        if (StudyBioinformatics.mrRequested(context)) details.put("mr_feature_selection", StudyBioinformatics.mrFeatureSelection(context));
         details.put("sources", sources); details.put("selected_features", features.stream().map(StudyBioinformatics.Feature::document).toList());
         details.put("interpretation", "Candidate review only, not a Mendelian randomization (MR) estimate or colocalization result. Exact transcript versions are matched; no gene-expression QTL substitution. Absence from a significant-only export is not evidence of no association.");
         details.put("downstream_requirements", Map.of(

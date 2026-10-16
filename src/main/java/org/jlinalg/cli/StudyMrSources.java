@@ -65,8 +65,7 @@ final class StudyMrSources {
         Files.createDirectories(root);
         try (PanUkbbGwasOutcome.Lookup outcomeLookup =
                 PanUkbbGwasOutcome.lookup(context, outcomeProfile)) {
-          for (StudyBioinformatics.Feature feature : StudyBioinformatics.features(context,
-                  StudyBioinformatics.mrFeatureLimit(context))) {
+          for (StudyBioinformatics.Feature feature : StudyBioinformatics.mrFeatures(context)) {
             if (!"located".equals(feature.status())) {
                 featureAudit.add(Map.of("feature_id", feature.id(), "status", "missing_verified_grch38_location"));
                 continue;
@@ -143,6 +142,7 @@ final class StudyMrSources {
         audit.put("outcome", PanUkbbGwasOutcome.descriptor(outcomeProfile)); audit.put("ld_provider", ldProvider); audit.put("ld_population", population);
         audit.put("sample_overlap", overlap); audit.put("sample_overlap_basis", overlapBasis); audit.put("candidate_file", candidates.toString());
         audit.put("candidate_exclusions", selection.exclusions());
+        audit.put("feature_selection", StudyBioinformatics.mrFeatureSelection(context));
         audit.put("features", featureAudit); audit.put("generated_pairs", pairs.size());
         StudyPublicEvidence.write(context.outputDirectory().resolve("automatic-mr-sources.yaml"), audit);
         return new Prepared(List.copyOf(pairs), audit);

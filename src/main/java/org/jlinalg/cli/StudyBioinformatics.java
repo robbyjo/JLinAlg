@@ -552,11 +552,44 @@ final class StudyBioinformatics implements StudyOperationExecutor {
 
     static int mrFeatureLimit(Context context) {
         Map<String, Object> mr = map(config(context).get("mr"));
-        return integer(mr, "max_features", featureLimit(context), 1, 10000);
+        // No implicit top-N screen, including the separate contextual-search cap.
+        return mr.containsKey("max_features") ? integer(mr, "max_features", 1, 1, 10000)
+            : Integer.MAX_VALUE;
     }
 
     static int geneticFeatureLimit(Context context) {
-        return Math.max(featureLimit(context), mrFeatureLimit(context));
+        return mrRequested(context) ? Math.max(featureLimit(context), mrFeatureLimit(context)) : featureLimit(context);
+    }
+
+    static boolean mrRequested(Context context) {
+        if ("mendelian_randomization".equals(context.operation().get("type"))
+                || config(context).containsKey("mr")
+                || list(map(hypothesis(context).get("analysis")).get("goals")).contains("mendelian_randomization")) return true;
+        return list(context.plan().get("operations")).stream().map(StudyPublicEvidence::map).anyMatch(operation ->
+            "mendelian_randomization".equals(operation.get("type"))
+                && java.util.Objects.equals(context.operation().get("hypothesis"), operation.get("hypothesis")));
+    }
+
+    static Map<String, Object> mrFeatureSelection(Context context) {
+        boolean capped = map(config(context).get("mr")).containsKey("max_features");
+        return Map.of("scope", capped ? "significant_features_with_explicit_cap" : "all_significant_features",
+            "max_features", capped ? (Object) mrFeatureLimit(context) : "unlimited",
+            "fdr_threshold", config(context).getOrDefault("fdr", 0.05), "fdr_comparison", "less_than",
+            "adjustment", "BH across every valid tested feature in the full meta-analysis or primary table before annotation, QTL matching or capping",
+            "ordering", "p_value_then_feature_id", "contextual_feature_limit_applies", false);
+    }
+
+    static List<Feature> mrFeatures(Context context) throws IOException {
+        return features(context, mrFeatureLimit(context), true);
+    }
+
+    /** Review the union needed by MR and the independently bounded contextual work. */
+    static List<Feature> geneticFeatures(Context context) throws IOException {
+        if (!mrRequested(context)) return features(context);
+        Map<String, Feature> union = new LinkedHashMap<>();
+        for (Feature feature : features(context)) union.put(feature.id(), feature);
+        for (Feature feature : mrFeatures(context)) union.put(feature.id(), feature);
+        return union.values().stream().sorted(Comparator.comparingDouble(Feature::p).thenComparing(Feature::id)).toList();
     }
     private static String label(Object value) {
         String result = text(value);
@@ -584,8 +617,11 @@ final class StudyBioinformatics implements StudyOperationExecutor {
     }
 
     static List<Feature> features(Context context, int limit) throws IOException {
-        if (limit < 1 || limit > 10000)
-            throw new IllegalArgumentException("feature limit must be in [1,10000]");
+        return features(context, limit, false);
+    }
+
+    private static List<Feature> features(Context context, int limit, boolean mrSelection) throws IOException {
+        if (limit < 1) throw new IllegalArgumentException("feature limit must be positive");
         Map<String, List<String>> annotations = new LinkedHashMap<>();
         Set<String> ambiguous = new LinkedHashSet<>();
         List<Path> primary = new ArrayList<>();
@@ -621,6 +657,8 @@ final class StudyBioinformatics implements StudyOperationExecutor {
             Map<String, Double> probabilities = new LinkedHashMap<>();
             for (String[] row : table.rows()) {
                 String id = row[table.column("feature_id")];
+                if (mrSelection && meta != null && table.header().contains("term")
+                        && !"pooled".equals(row[table.column("term")])) continue;
                 if (table.header().contains("status") && !Set.of("ok", "single_cohort").contains(row[table.column("status")])) continue;
                 try { double p = Double.parseDouble(row[table.column("p_value")]); if (Double.isFinite(p) && p >= 0 && p <= 1) probabilities.put(id, p); }
                 catch (NumberFormatException ignored) { /* Invalid/not-estimable tests are not findings. */ }
@@ -631,7 +669,7 @@ final class StudyBioinformatics implements StudyOperationExecutor {
                 var entry = ranked.get(i);
                 adjusted = Math.min(adjusted, entry.getValue() * ranked.size() / (i + 1));
                 List<String> a = annotations.get(entry.getKey());
-                if (adjusted > threshold || a == null || ambiguous.contains(entry.getKey()) || !Set.of("located", "missing_location").contains(a.get(6))) continue;
+                if ((mrSelection ? adjusted >= threshold : adjusted > threshold) || a == null || ambiguous.contains(entry.getKey()) || !Set.of("located", "missing_location").contains(a.get(6))) continue;
                 Feature f = new Feature(entry.getKey(), a.get(0), a.get(1), a.get(2), a.get(3), a.get(4), a.get(5), a.get(6), entry.getValue(), adjusted);
                 chosen.merge(f.id(), f, (left, right) -> left.p() <= right.p() ? left : right);
             }
